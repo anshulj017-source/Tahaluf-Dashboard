@@ -1,0 +1,36 @@
+{
+  "name": "nextjs",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@clerk/themes": "^2.0.0",
+    "d3": "^7.8.5",
+    "d3-scale": "^4.0.2",
+    "firebase": "^12.17.1",
+    "firebase-admin": "^12.1.1",
+    "lucide-react": "^0.292.0",
+    "next": "14.2.4",
+    "pptxgenjs": "^4.0.1",
+    "react": "^18",
+    "react-dom": "^18",
+    "react-simple-maps": "^3.0.0",
+    "react-tooltip": "^6.0.8",
+    "recharts": "^3.10.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.4",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}
