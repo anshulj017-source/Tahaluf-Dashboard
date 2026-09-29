@@ -38,8 +38,8 @@ export default function Login() {
 
   if (loading) {
     return (
-      <div className="min-h-screen app-bg flex flex-col items-center justify-center text-[#c88214] font-black text-2xl tracking-widest animate-pulse gap-6">
-        <img src="/tahaluf-logo.png" alt="Loading Logo" className="h-32 object-contain" onError={(e) => e.target.style.display = 'none'} />
+      <div className="min-h-screen app-bg flex flex-col items-center justify-center text-[#cedc28] font-bold text-2xl tracking-widest animate-pulse gap-6">
+        <img src="/tahaluf-logo.svg" alt="Loading Logo" className="h-16 object-contain" onError={(e) => e.target.style.display = 'none'} />
         <span>AUTHENTICATING...</span>
       </div>
     );
@@ -50,16 +50,16 @@ export default function Login() {
       {/* Background Graphic */}
       <div className="pattern-overlay absolute inset-0 z-0 pointer-events-none"></div>
 
-      <div className="card-surface rounded-3xl p-10 max-w-md w-full shadow-2xl border border-[#c88214]/20 relative z-10">
+      <div className="card-surface rounded-3xl p-10 max-w-md w-full shadow-2xl border border-[#cedc28]/20 relative z-10">
         <div className="flex flex-col items-center mb-10">
           <img 
-            src="/tahaluf-logo.png" 
+            src="/tahaluf-logo.svg" 
             alt="Tahaluf Logo" 
-            className="h-32 object-contain mb-6" 
+            className="h-16 object-contain mb-6" 
             onError={(e) => e.target.style.display = 'none'}
           />
-          <h1 className="text-2xl font-black text-white text-center tracking-tight uppercase">Tournament Performance Dashboard</h1>
-          <p className="text-[10px] text-[#c88214] font-black mt-2 uppercase tracking-[0.2em]">Authorized Access Only</p>
+          <h1 className="text-xl font-anton uppercase text-white text-center tracking-tight uppercase">Event Performance Dashboard</h1>
+          <p className="text-[10px] text-[#cedc28] font-bold mt-2 uppercase tracking-[0.2em]">Authorized Access Only</p>
         </div>
         
         {error && (
@@ -73,23 +73,23 @@ export default function Login() {
 
         <form onSubmit={handleLogin} className="flex flex-col gap-6">
           <div>
-            <label className="text-[10px] font-black text-[#6fa89f] uppercase tracking-widest mb-2 block">Email Address</label>
+            <label className="text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest mb-2 block">Email Address</label>
             <input 
               type="email" 
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full surface-inset border border-[#c88214]/30 rounded-xl px-4 py-3 text-sm text-[#eef7f5] focus:outline-none focus:border-[#c88214] transition-all duration-200"
+              className="w-full surface-inset border border-[#cedc28]/30 rounded-xl px-4 py-3 text-sm text-[#eef7f5] focus:outline-none focus:border-[#cedc28] transition-all duration-200"
               placeholder="name@example.com"
               required 
             />
           </div>
           <div>
-            <label className="text-[10px] font-black text-[#6fa89f] uppercase tracking-widest mb-2 block">Password</label>
+            <label className="text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest mb-2 block">Password</label>
             <input 
               type="password" 
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full surface-inset border border-[#c88214]/30 rounded-xl px-4 py-3 text-sm text-[#eef7f5] focus:outline-none focus:border-[#c88214] transition-all duration-200"
+              className="w-full surface-inset border border-[#cedc28]/30 rounded-xl px-4 py-3 text-sm text-[#eef7f5] focus:outline-none focus:border-[#cedc28] transition-all duration-200"
               placeholder="••••••••"
               required 
             />
@@ -97,7 +97,7 @@ export default function Login() {
           <button 
             type="submit" 
             disabled={loading}
-            className="w-full gradient-gold hover:brightness-110 text-[#043e3f] rounded-xl py-3.5 text-xs font-black uppercase tracking-widest transition-all mt-4 disabled:opacity-100"
+            className="w-full bg-[#cedc28] hover:brightness-110 text-[#1a302e] rounded-xl py-3.5 text-xs font-bold uppercase tracking-widest transition-all mt-4 disabled:opacity-100"
           >
             {loading ? 'Authenticating...' : 'Sign In'}
           </button>

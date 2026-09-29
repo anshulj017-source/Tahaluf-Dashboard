@@ -6,7 +6,8 @@ export async function GET(request) {
 
   let url;
   if (type === 'combined') {
-    url = process.env.COMBINED_COUNTRY_CSV_URL;
+    const gid = searchParams.get('gid');
+    url = process.env.COMBINED_COUNTRY_CSV_URL + (gid ? `&gid=${gid}` : '');
   } else if (type === 'adjust') {
     url = process.env.RAW_ADJUST_CSV_URL;
   } else if (type === 'creative') {

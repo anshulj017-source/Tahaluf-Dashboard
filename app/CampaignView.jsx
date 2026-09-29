@@ -1,9 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import InfoTooltip from './components/InfoTooltip';
 import * as d3 from 'd3';
-import { ChevronDown, Calendar, Layers, Activity, Search, Check, Download } from 'lucide-react';
+import { ChevronDown, Calendar, Layers, Activity, Search, Check, Download, Camera } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from 'recharts';
+import html2canvas from 'html2canvas';
 
-const COLORS = ['#74FA93', '#c88214', '#00937b', '#EF4444', '#065c5d', '#10B981', '#eef7f5', '#6fa89f'];
+const COLORS = ['#74FA93', '#cedc28', '#00937b', '#EF4444', '#14a6d9', '#10B981', '#eef7f5', '#14a6d9'];
 
 const MetricMultiSelectDropdown = ({ options, selected, onChange }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -15,20 +17,20 @@ const MetricMultiSelectDropdown = ({ options, selected, onChange }) => {
     <div className="relative min-w-[200px] z-30">
       <div 
         onClick={() => setIsOpen(!isOpen)}
-        className="px-4 py-2 bg-[#011414] border border-[#c88214]/30 rounded-lg text-xs font-bold text-[#eef7f5] cursor-pointer flex justify-between items-center hover:border-[#c88214] transition-colors"
+        className="px-4 py-2 bg-[#0a2442] border border-[#cedc28]/30 rounded-lg text-xs font-bold text-[#eef7f5] cursor-pointer flex justify-between items-center hover:border-[#cedc28] transition-colors"
       >
         <span className="truncate pr-2">{selected.includes('All') ? 'All Metrics' : selected.join(', ')}</span>
         <ChevronDown className={`w-4 h-4 flex-shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </div>
       {isOpen && (
         <div className="absolute top-full right-0 w-[240px] mt-2 z-50">
-          <div className="w-full bg-[#011414] border border-[#c88214]/30 rounded-xl shadow-2xl flex flex-col max-h-64 overflow-hidden">
-            <div className="p-2 border-b border-[#c88214]/10 relative">
-              <Search className="w-4 h-4 text-[#6fa89f] absolute left-4 top-1/2 -translate-y-1/2" />
-              <input type="text" placeholder="Search..." autoFocus value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full bg-[#011414] text-[#eef7f5] text-xs font-bold pl-9 pr-3 py-2 rounded-lg outline-none border border-transparent focus:border-[#c88214]/50" />
+          <div className="w-full bg-[#0a2442] border border-[#cedc28]/30 rounded-xl shadow-2xl flex flex-col max-h-64 overflow-hidden">
+            <div className="p-2 border-b border-[#cedc28]/10 relative">
+              <Search className="w-4 h-4 text-[#14a6d9] absolute left-4 top-1/2 -translate-y-1/2" />
+              <input type="text" placeholder="Search..." autoFocus value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full bg-[#0a2442] text-[#eef7f5] text-xs font-bold pl-9 pr-3 py-2 rounded-lg outline-none border border-transparent focus:border-[#cedc28]/50" />
             </div>
             <div className="overflow-y-auto p-2 flex-1 custom-scrollbar">
-              <div onClick={() => { onChange(['All']); setIsOpen(false); setSearchTerm(''); }} className={`px-3 py-2 rounded-lg text-sm font-bold cursor-pointer flex justify-between ${selected.includes('All') ? 'bg-[#c88214]/20 text-[#c88214]' : 'text-[#eef7f5] hover:bg-[#011414]'}`}>
+              <div onClick={() => { onChange(['All']); setIsOpen(false); setSearchTerm(''); }} className={`px-3 py-2 rounded-lg text-sm font-bold cursor-pointer flex justify-between ${selected.includes('All') ? 'bg-[#cedc28]/20 text-[#cedc28]' : 'text-[#eef7f5] hover:bg-[#0a2442]'}`}>
                 All <Check className={`w-4 h-4 ${selected.includes('All') ? 'opacity-100' : 'opacity-0'}`} />
               </div>
               {filtered.map(opt => {
@@ -42,7 +44,7 @@ const MetricMultiSelectDropdown = ({ options, selected, onChange }) => {
                       if (next.length === 0) next = ['All'];
                     } else { next.push(opt); }
                     onChange(next);
-                  }} className={`px-3 py-2 mt-1 rounded-lg text-sm font-bold cursor-pointer flex justify-between ${isSel ? 'bg-[#c88214]/20 text-[#c88214]' : 'text-[#eef7f5] hover:bg-[#011414]'}`}>
+                  }} className={`px-3 py-2 mt-1 rounded-lg text-sm font-bold cursor-pointer flex justify-between ${isSel ? 'bg-[#cedc28]/20 text-[#cedc28]' : 'text-[#eef7f5] hover:bg-[#0a2442]'}`}>
                     <span className="truncate pr-2">{opt}</span> <Check className={`w-4 h-4 flex-shrink-0 ${isSel ? 'opacity-100' : 'opacity-0'}`} />
                   </div>
                 )
@@ -57,29 +59,62 @@ const MetricMultiSelectDropdown = ({ options, selected, onChange }) => {
 };
 
 export default function CampaignView({ adData, plannedData = [], exRate = 1, exSym = '$', formatShort = (v) => v, userRole, filterMarkets }) {
-  const [selectedCampaign, setSelectedCampaign] = useState('');
   const [selectedPhases, setSelectedPhases] = useState([]);
   const [selectedChannels, setSelectedChannels] = useState({}); // { phaseName: [channelNames] }
   const [viewMode, setViewMode] = useState('overall'); // 'overall' or 'planned'
   const [plannedMetrics, setPlannedMetrics] = useState(['% Delivered']); // changed to array
+  const [overallMetrics, setOverallMetrics] = useState(['All']);
+  const [chartMetric, setChartMetric] = useState('Spend');
 
-  // 1. Process Campaigns
-  const campaigns = useMemo(() => { console.log("CampaignView adData length:", adData.length, "Unique:", Array.from(new Set(adData.map(d => d.campaignName))));
-    return Array.from(new Set(adData.map(d => d.campaignName))).sort();
+  // Process data based on global filters
+  const campaignData = useMemo(() => {
+    return adData.filter(d => d.dateObj);
   }, [adData]);
 
-  // Set default campaign
-  React.useEffect(() => {
-    if (!selectedCampaign && campaigns.length > 0) {
-      setSelectedCampaign(campaigns[0]);
-    }
-  }, [campaigns, selectedCampaign]);
+  const chartPhases = useMemo(() => selectedPhases.length > 0 ? selectedPhases : ['All Phases'], [selectedPhases]);
 
-  // 2. Process data for selected campaign
-  const campaignData = useMemo(() => {
-    if (!selectedCampaign) return [];
-    return adData.filter(d => d.campaignName === selectedCampaign && d.dateObj);
-  }, [adData, selectedCampaign]);
+  const dailyChartData = useMemo(() => {
+    if (campaignData.length === 0) return [];
+    
+    // Group by date and phase
+    const rolled = d3.rollup(campaignData, 
+      v => ({
+        Spend: d3.sum(v, d => d.cost),
+        Impressions: d3.sum(v, d => d.impressions),
+        Clicks: d3.sum(v, d => d.clicks),
+        CPM: d3.sum(v, d => d.impressions) > 0 ? (d3.sum(v, d => d.cost) / d3.sum(v, d => d.impressions)) * 1000 : 0,
+        CPC: d3.sum(v, d => d.clicks) > 0 ? d3.sum(v, d => d.cost) / d3.sum(v, d => d.clicks) : 0,
+        Conversions: d3.sum(v, d => d.purchases)
+      }),
+      d => d3.timeFormat('%Y-%m-%d')(d.dateObj),
+      d => chartPhases.length === 1 && chartPhases[0] === 'All Phases' ? 'All Phases' : (chartPhases.includes(d.phase) ? d.phase : 'Other')
+    );
+    
+    const dates = Array.from(rolled.keys()).sort();
+    return dates.map(date => {
+      const dateMap = rolled.get(date);
+      const row = { date };
+      chartPhases.forEach(p => {
+        if (dateMap && dateMap.has(p)) {
+          const metrics = dateMap.get(p);
+          row[`${p}_Spend`] = metrics.Spend;
+          row[`${p}_Impressions`] = metrics.Impressions;
+          row[`${p}_Clicks`] = metrics.Clicks;
+          row[`${p}_CPM`] = metrics.CPM;
+          row[`${p}_CPC`] = metrics.CPC;
+          row[`${p}_Conversions`] = metrics.Conversions;
+        } else {
+          row[`${p}_Spend`] = 0;
+          row[`${p}_Impressions`] = 0;
+          row[`${p}_Clicks`] = 0;
+          row[`${p}_CPM`] = 0;
+          row[`${p}_CPC`] = 0;
+          row[`${p}_Conversions`] = 0;
+        }
+      });
+      return row;
+    }).sort((a,b) => new Date(a.date) - new Date(b.date));
+  }, [campaignData, chartPhases]);
 
   // 3. Extract Phases and Channels with their min/max dates and bursts
   const { phases, campaignMinDate, campaignMaxDate } = useMemo(() => {
@@ -177,7 +212,6 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
 
   // Calculate table data based on selections
   const tableData = useMemo(() => {
-    if (!selectedCampaign) return [];
     let data = campaignData;
 
     if (selectedPhases.length > 0) {
@@ -196,7 +230,7 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
       const clicks = d3.sum(rows, d => d.clicks);
       const views = d3.sum(rows, d => d.videoViews);
       const spend = d3.sum(rows, d => d.cost);
-      const purchases = d3.sum(rows, d => d.purchases || 0);
+      const conversions = d3.sum(rows, d => d.purchases || 0);
       
       return {
         channel,
@@ -205,7 +239,7 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
         clicks,
         views,
         completions: d3.sum(rows, d => d.videoCompletions || 0),
-        purchases,
+        conversions,
         ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
         cpm: impressions > 0 ? (spend / impressions) * 1000 : 0,
         cpc: clicks > 0 ? spend / clicks : 0,
@@ -213,11 +247,11 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
       };
     });
     return grouped.sort((a,b) => b.spend - a.spend);
-  }, [campaignData, selectedCampaign, selectedPhases, selectedChannels]);
+  }, [campaignData, selectedPhases, selectedChannels]);
 
   // Calculate planned table data based on selections
   const plannedTableData = useMemo(() => {
-    if (!selectedCampaign || !plannedData || plannedData.length === 0) return [];
+    if (!plannedData || plannedData.length === 0) return [];
     
     let pData = plannedData;
     let actualData = campaignData;
@@ -293,31 +327,40 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
     });
     
     return combined.sort((a,b) => b.plannedCost - a.plannedCost);
-  }, [campaignData, plannedData, selectedCampaign, selectedPhases, selectedChannels, filterMarkets]);
+  }, [campaignData, plannedData, selectedPhases, selectedChannels, filterMarkets]);
 
-  // Reset viewMode if selected campaign is not Gulf Cup
-  React.useEffect(() => {
-    if (selectedCampaign !== 'Gulf Cup' && viewMode === 'planned') {
-      setViewMode('overall');
-    }
-  }, [selectedCampaign, viewMode]);
+
 
   const handleExportCSV = () => {
     let csvContent = "data:text/csv;charset=utf-8,";
     
     if (viewMode === 'overall') {
       const headers = ['Channel'];
-      if (userRole !== 'non-finance') headers.push('Spend');
-      headers.push('Impressions', 'Clicks', 'Video Views', 'Completed Views', 'Purchases', 'CTR');
-      if (userRole !== 'non-finance') headers.push('CPM', 'CPC', 'CPV');
+      if (userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('Spend'))) headers.push('Spend');
+      if (overallMetrics.includes('All') || overallMetrics.includes('Impressions')) headers.push('Impressions');
+      if (overallMetrics.includes('All') || overallMetrics.includes('Clicks')) headers.push('Clicks');
+      if (overallMetrics.includes('All') || overallMetrics.includes('Video Views')) headers.push('Video Views');
+      if (overallMetrics.includes('All') || overallMetrics.includes('Completed Views')) headers.push('Completed Views');
+      if (overallMetrics.includes('All') || overallMetrics.includes('Conversions')) headers.push('Conversions');
+      if (overallMetrics.includes('All') || overallMetrics.includes('CTR')) headers.push('CTR');
+      if (userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPM'))) headers.push('CPM');
+      if (userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPC'))) headers.push('CPC');
+      if (userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPV'))) headers.push('CPV');
       
       csvContent += headers.join(",") + "\r\n";
       
       tableData.forEach(row => {
         const rowData = [row.channel];
-        if (userRole !== 'non-finance') rowData.push((row.spend * exRate).toFixed(2));
-        rowData.push(row.impressions, row.clicks, row.views, row.completions, row.purchases, row.ctr.toFixed(2) + '%');
-        if (userRole !== 'non-finance') rowData.push((row.cpm * exRate).toFixed(2), (row.cpc * exRate).toFixed(2), (row.cpv * exRate).toFixed(2));
+        if (userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('Spend'))) rowData.push((row.spend * exRate).toFixed(2));
+        if (overallMetrics.includes('All') || overallMetrics.includes('Impressions')) rowData.push(row.impressions);
+        if (overallMetrics.includes('All') || overallMetrics.includes('Clicks')) rowData.push(row.clicks);
+        if (overallMetrics.includes('All') || overallMetrics.includes('Video Views')) rowData.push(row.views);
+        if (overallMetrics.includes('All') || overallMetrics.includes('Completed Views')) rowData.push(row.completions);
+        if (overallMetrics.includes('All') || overallMetrics.includes('Conversions')) rowData.push(row.conversions);
+        if (overallMetrics.includes('All') || overallMetrics.includes('CTR')) rowData.push(row.ctr.toFixed(2) + '%');
+        if (userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPM'))) rowData.push((row.cpm * exRate).toFixed(2));
+        if (userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPC'))) rowData.push((row.cpc * exRate).toFixed(2));
+        if (userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPV'))) rowData.push((row.cpv * exRate).toFixed(2));
         csvContent += rowData.join(",") + "\r\n";
       });
       
@@ -328,16 +371,23 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
         const tClicks = d3.sum(tableData, d => d.clicks);
         const tViews = d3.sum(tableData, d => d.views);
         const tCompletions = d3.sum(tableData, d => d.completions);
-        const tPurchases = d3.sum(tableData, d => d.purchases);
+        const tConversions = d3.sum(tableData, d => d.conversions);
         const tCtr = tImp > 0 ? (tClicks / tImp) * 100 : 0;
         const tCpm = tImp > 0 ? (tSpend / tImp) * 1000 : 0;
         const tCpc = tClicks > 0 ? tSpend / tClicks : 0;
         const tCpv = tViews > 0 ? tSpend / tViews : 0;
 
         const totalsRow = ['Total'];
-        if (userRole !== 'non-finance') totalsRow.push((tSpend * exRate).toFixed(2));
-        totalsRow.push(tImp, tClicks, tViews, tCompletions, tPurchases, tCtr.toFixed(2) + '%');
-        if (userRole !== 'non-finance') totalsRow.push((tCpm * exRate).toFixed(2), (tCpc * exRate).toFixed(2), (tCpv * exRate).toFixed(2));
+        if (userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('Spend'))) totalsRow.push((tSpend * exRate).toFixed(2));
+        if (overallMetrics.includes('All') || overallMetrics.includes('Impressions')) totalsRow.push(tImp);
+        if (overallMetrics.includes('All') || overallMetrics.includes('Clicks')) totalsRow.push(tClicks);
+        if (overallMetrics.includes('All') || overallMetrics.includes('Video Views')) totalsRow.push(tViews);
+        if (overallMetrics.includes('All') || overallMetrics.includes('Completed Views')) totalsRow.push(tCompletions);
+        if (overallMetrics.includes('All') || overallMetrics.includes('Conversions')) totalsRow.push(tConversions);
+        if (overallMetrics.includes('All') || overallMetrics.includes('CTR')) totalsRow.push(tCtr.toFixed(2) + '%');
+        if (userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPM'))) totalsRow.push((tCpm * exRate).toFixed(2));
+        if (userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPC'))) totalsRow.push((tCpc * exRate).toFixed(2));
+        if (userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPV'))) totalsRow.push((tCpv * exRate).toFixed(2));
         csvContent += totalsRow.join(",") + "\r\n";
       }
 
@@ -381,7 +431,7 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
     const dateStr = d3.timeFormat('%Y-%m-%d')(new Date());
-    link.setAttribute("download", `${selectedCampaign.replace(/\s+/g, '_')}_${viewMode}_Performance_${dateStr}.csv`);
+    link.setAttribute("download", `Event_${viewMode}_Performance_${dateStr}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -390,84 +440,62 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
   return (
     <div className="flex flex-col gap-8 w-full max-w-7xl mx-auto">
       {/* Top Controls */}
-      <div className="card-surface backdrop-blur-2xl p-6 rounded-3xl border border-[#c88214]/20 shadow-xl flex flex-col md:flex-row gap-6 items-start md:items-center justify-between export-slide" data-title="Tournament Top Stats">
-        <div className="flex-1 w-full md:w-auto">
-          <label className="text-[10px] font-black text-[#6fa89f] uppercase tracking-widest mb-2 block flex items-center gap-2">
-            <Layers size={14} /> Selected Tournament
+      {phases.length > 0 && (
+        <div className="card-surface backdrop-blur-2xl p-6 rounded-3xl border border-[#cedc28]/20 shadow-xl flex flex-col gap-4 export-slide" data-title="Event Top Stats">
+          <label className="text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest mb-2 block flex items-center gap-2">
+            <Activity size={14} /> Active Phases ({phases.length})
           </label>
-          <div className="relative">
-            <select 
-              value={selectedCampaign} 
-              onChange={e => {
-                setSelectedCampaign(e.target.value);
-                setSelectedPhases([]);
-                setSelectedChannels({});
-              }}
-              className="w-full md:max-w-xs bg-[#011414] text-[#c88214] text-sm font-bold pl-4 pr-10 py-3 rounded-xl border border-[#c88214]/30 outline-none appearance-none cursor-pointer hover:border-[#c88214] transition-colors"
-            >
-              {campaigns.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-[#c88214] pointer-events-none" size={16} />
+          <div className="flex flex-wrap gap-2">
+            {phases.map((p, i) => {
+              const isActive = selectedPhases.includes(p.name);
+              const color = COLORS[i % COLORS.length];
+              return (
+                <button
+                  key={p.name}
+                  onClick={() => togglePhase(p.name)}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border`}
+                  style={{
+                    backgroundColor: isActive ? `${color}20` : '#0C272D',
+                    borderColor: isActive ? color : 'rgba(116, 250, 147, 0.2)',
+                    color: isActive ? color : '#14a6d9'
+                  }}
+                >
+                  {p.name}
+                </button>
+              );
+            })}
+            {selectedPhases.length > 0 && (
+              <button 
+                onClick={() => { setSelectedPhases([]); setSelectedChannels({}); }}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-red-400 hover:bg-red-400/10 transition-colors ml-auto border border-transparent"
+              >
+                Clear Selection
+              </button>
+            )}
           </div>
         </div>
-
-        {selectedCampaign && phases.length > 0 && (
-          <div className="flex-1 w-full">
-            <label className="text-[10px] font-black text-[#6fa89f] uppercase tracking-widest mb-2 block flex items-center gap-2">
-              <Activity size={14} /> Active Phases ({phases.length})
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {phases.map((p, i) => {
-                const isActive = selectedPhases.includes(p.name);
-                const color = COLORS[i % COLORS.length];
-                return (
-                  <button
-                    key={p.name}
-                    onClick={() => togglePhase(p.name)}
-                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border`}
-                    style={{
-                      backgroundColor: isActive ? `${color}20` : '#0C272D',
-                      borderColor: isActive ? color : 'rgba(116, 250, 147, 0.2)',
-                      color: isActive ? color : '#6fa89f'
-                    }}
-                  >
-                    {p.name}
-                  </button>
-                );
-              })}
-              {selectedPhases.length > 0 && (
-                <button 
-                  onClick={() => { setSelectedPhases([]); setSelectedChannels({}); }}
-                  className="px-4 py-2 rounded-xl text-xs font-bold text-red-400 hover:bg-red-400/10 transition-colors ml-auto border border-transparent"
-                >
-                  Clear Selection
-                </button>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
+      )}
 
       {/* Timeline Gantt Chart */}
-      {selectedCampaign && selectedPhases.length > 0 && timeScale && (
-        <div className="card-surface backdrop-blur-2xl p-8 rounded-3xl border border-[#c88214]/20 shadow-xl overflow-hidden relative export-slide" data-title="Tournament Timeline">
-          <div className="flex justify-between items-center mb-10">
-            <h3 className="text-xl font-black text-[#eef7f5] flex items-center gap-3">
-              <Calendar className="text-[#c88214]" /> Tournament Timeline
-              <InfoTooltip definition="Definition for Tournament Timeline" />
+      {selectedPhases.length > 0 && timeScale && (
+        <div className="card-surface backdrop-blur-2xl p-4 rounded-3xl border border-[#cedc28]/20 shadow-xl overflow-hidden relative export-slide" data-title="Event Timeline">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-xl font-anton uppercase text-[#eef7f5] flex items-center gap-3">
+              <Calendar className="text-[#cedc28]" /> Event Timeline
+              <InfoTooltip definition="Definition for Event Timeline" />
             </h3>
-            <div className="text-xs font-bold text-[#6fa89f] bg-[#011414] px-4 py-2 rounded-lg border border-[#c88214]/10">
+            <div className="text-xs font-bold text-[#14a6d9] bg-[#0a2442] px-3 py-1.5 rounded-lg border border-[#cedc28]/10">
               {d3.timeFormat('%b %d, %Y')(campaignMinDate)} - {d3.timeFormat('%b %d, %Y')(campaignMaxDate)}
             </div>
           </div>
 
-          <div className="relative pt-6 pb-4 overflow-x-auto custom-scrollbar">
+          <div className="relative pt-4 pb-2 overflow-x-auto custom-scrollbar">
             <div className="min-w-[800px] relative">
               {/* X-Axis Ticks */}
               <div className="absolute top-0 left-[200px] right-0 h-full pointer-events-none">
                 {ticks.map((tick, i) => (
-                  <div key={i} className="absolute top-0 bottom-0 border-l border-[#c88214]/10 flex flex-col justify-start" style={{ left: `${tick.percent}%` }}>
-                    <span className="text-[9px] font-black text-[#6fa89f] uppercase tracking-widest -ml-4 -mt-6 card-surface backdrop-blur-2xl px-1">{tick.label}</span>
+                  <div key={i} className="absolute top-0 bottom-0 border-l border-[#cedc28]/10 flex flex-col justify-start" style={{ left: `${tick.percent}%` }}>
+                    <span className="text-[9px] font-bold text-[#14a6d9] uppercase tracking-widest -ml-4 -mt-6 card-surface backdrop-blur-2xl px-1">{tick.label}</span>
                   </div>
                 ))}
               </div>
@@ -486,12 +514,12 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
                       {/* Phase Row */}
                       <div className="flex items-center gap-4">
                         {/* Label */}
-                        <div className="w-[184px] flex-shrink-0 text-right pr-4 border-r border-[#c88214]/20">
+                        <div className="w-[184px] flex-shrink-0 text-right pr-4 border-r border-[#cedc28]/20">
                           <h4 className="text-sm font-bold" style={{ color: pColor }}>{phase.name}</h4>
-                          <p className="text-[10px] text-[#6fa89f]">{d3.timeFormat('%b %d')(phase.minDate)} - {d3.timeFormat('%b %d')(phase.maxDate)}</p>
+                          <p className="text-[10px] text-[#14a6d9]">{d3.timeFormat('%b %d')(phase.minDate)} - {d3.timeFormat('%b %d')(phase.maxDate)}</p>
                         </div>
                         {/* Bar Area */}
-                        <div className="flex-1 relative h-10 bg-[#011414]/50 rounded-lg overflow-hidden group">
+                        <div className="flex-1 relative h-10 bg-[#0a2442]/50 rounded-lg overflow-hidden group">
                           {phase.bursts.map((b, bi) => {
                             const bLeft = timeScale(b.start);
                             const bWidth = timeScale(b.end) - bLeft;
@@ -525,7 +553,7 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
                               style={{
                                 backgroundColor: isChActive ? `${pColor}15` : 'transparent',
                                 borderColor: isChActive ? pColor : 'rgba(255,255,255,0.1)',
-                                color: isChActive ? pColor : '#6fa89f'
+                                color: isChActive ? pColor : '#14a6d9'
                               }}
                             >
                               {ch.name}
@@ -544,7 +572,7 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
                             <div className="w-[184px] flex-shrink-0 text-right pr-4">
                               <span className="text-xs font-medium text-[#eef7f5]">{chName}</span>
                             </div>
-                            <div className="flex-1 relative h-6 bg-[#011414]/30 rounded-md">
+                            <div className="flex-1 relative h-6 bg-[#0a2442]/30 rounded-md">
                               {chData.bursts.map((b, bi) => {
                                 const chLeft = timeScale(b.start);
                                 const chWidth = timeScale(b.end) - chLeft;
@@ -577,91 +605,195 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
       )}
 
       {/* Metrics Table */}
-      {selectedCampaign && (tableData.length > 0 || plannedTableData.length > 0) && (
-        <div className="card-surface backdrop-blur-2xl p-8 rounded-3xl border border-[#c88214]/20 shadow-xl overflow-hidden export-slide" data-title="Planned vs Delivered">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="text-xl font-black text-[#eef7f5] flex items-center gap-3">
-              <Activity className="text-[#c88214]" /> Performance Metrics Breakdown
-              <InfoTooltip definition="Definition for Performance Metrics Breakdown" />
-            </h3>
-            
-            <div className="flex items-center gap-4">
-              <button
-                onClick={handleExportCSV}
-                className="px-3 py-2 flex items-center gap-2 rounded-lg bg-[#011414] border border-[#c88214]/20 text-[#c88214] hover:bg-[#c88214]/10 transition-colors shadow-[0_0_10px_rgba(200,130,20,0.1)] text-xs font-bold"
-                title="Export to CSV (Excel)"
-              >
-                <Download size={14} /> Export Table
-              </button>
-              <div className="flex bg-[#011414] rounded-lg p-1 border border-[#c88214]/20">
-                <button 
-                  onClick={() => setViewMode('overall')} 
-                  className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${viewMode === 'overall' ? 'gradient-gold text-[#043e3f] shadow-[0_0_15px_rgba(200,130,20,0.35)]' : 'text-[#6fa89f] hover:bg-[#c88214]/10 hover:text-[#c88214] border border-[#c88214]/20'}`}
-                >
-                  Overall Data
-                </button>
-                <button 
-                  onClick={() => { if (selectedCampaign === 'Gulf Cup') setViewMode('planned'); }}
-                  disabled={selectedCampaign !== 'Gulf Cup'}
-                  className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${viewMode === 'planned' ? 'gradient-gold text-[#043e3f] shadow-[0_0_15px_rgba(200,130,20,0.35)]' : 'text-[#6fa89f] hover:bg-[#c88214]/10 hover:text-[#c88214] border border-[#c88214]/20'} ${selectedCampaign !== 'Gulf Cup' ? 'opacity-50 cursor-not-allowed bg-black/20' : ''}`}
-                  title={selectedCampaign !== 'Gulf Cup' ? 'Only available for live campaigns (Gulf Cup)' : ''}
-                >
-                  Planned v/s Delivered
-                </button>
+      {(tableData.length > 0 || plannedTableData.length > 0) && (
+        <div className="card-surface backdrop-blur-2xl p-8 rounded-3xl border border-[#cedc28]/20 shadow-xl overflow-hidden export-slide" data-title="Planned vs Delivered">
+          <h3 className="text-2xl font-anton uppercase text-[#eef7f5] flex items-center gap-3 mb-6">
+            <Activity className="text-[#cedc28]" /> Performance Metrics Breakdown
+            <InfoTooltip definition="Definition for Performance Metrics Breakdown" />
+          </h3>
+          
+          {viewMode === 'overall' && dailyChartData.length > 0 && (
+            <div className="mb-8" id="daily-progress-chart">
+              <div className="flex justify-between items-center mb-4">
+                <h4 className="text-sm font-bold text-[#14a6d9] uppercase tracking-widest">Daily Progress</h4>
+                <div className="flex items-center gap-2">
+                  <div className="flex bg-[#0a2442] rounded-lg p-1 border border-[#cedc28]/20">
+                    {['Spend', 'Impressions', 'Clicks', 'CPM', 'CPC', 'Conversions'].filter(m => userRole !== 'non-finance' || (m !== 'Spend' && m !== 'CPM' && m !== 'CPC')).map(m => (
+                      <button
+                        key={m}
+                        onClick={() => setChartMetric(m)}
+                        className={`px-3 py-1 rounded text-[10px] font-bold transition-all ${chartMetric === m ? 'bg-[#cedc28] text-[#1a302e]' : 'text-[#14a6d9] hover:bg-[#cedc28]/10'}`}
+                      >
+                        {m}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    onClick={async () => {
+                      try {
+                        const el = document.getElementById('daily-progress-chart-container');
+                        if (el) {
+                          const svg = el.querySelector('svg');
+                          if (svg) {
+                            const svgData = new XMLSerializer().serializeToString(svg);
+                            const canvas = document.createElement('canvas');
+                            const svgSize = svg.getBoundingClientRect();
+                            canvas.width = svgSize.width * 2;
+                            canvas.height = svgSize.height * 2;
+                            const ctx = canvas.getContext('2d');
+                            
+                            // Fill background
+                            ctx.fillStyle = '#0a2442';
+                            ctx.fillRect(0, 0, canvas.width, canvas.height);
+                            
+                            const img = new Image();
+                            img.onload = () => {
+                              ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                              const link = document.createElement('a');
+                              link.download = `daily-progress-${chartMetric}.png`;
+                              link.href = canvas.toDataURL('image/png');
+                              link.click();
+                            };
+                            img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+                          }
+                        }
+                      } catch (err) {
+                        console.error("Error downloading chart:", err);
+                        alert("Could not download chart. Please try again.");
+                      }
+                    }}
+                    className="p-1.5 rounded-lg bg-[#0a2442] border border-[#cedc28]/20 text-[#cedc28] hover:bg-[#cedc28]/10 transition-colors"
+                    title="Download Chart as Image"
+                  >
+                    <Camera size={14} />
+                  </button>
+                </div>
               </div>
-              {viewMode === 'planned' ? (
-                <MetricMultiSelectDropdown
-                  options={['% Delivered', '% Pacing', 'Cost compare', '% difference of unit cost']}
-                  selected={plannedMetrics}
-                  onChange={setPlannedMetrics}
-                />
-              ) : (
-                <span className="text-xs font-bold text-[#6fa89f] bg-[#011414] px-4 py-2 rounded-lg border border-[#c88214]/10">
-                  Based on Selection
-                </span>
-              )}
+              <div className="h-64 w-full bg-[#0a2442]/30 rounded-xl p-4 border border-[#cedc28]/10" id="daily-progress-chart-container">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={dailyChartData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#cedc28" opacity={0.1} />
+                    <XAxis 
+                      dataKey="date" 
+                      tick={{ fill: '#eef7f5', fontSize: 10 }} 
+                      tickFormatter={(val) => {
+                        const d = new Date(val);
+                        return `${d.getDate()} ${d.toLocaleString('en-US', { month: 'short' })}`;
+                      }}
+                      stroke="#cedc28" 
+                      opacity={0.5} 
+                    />
+                    <YAxis 
+                      tick={{ fill: '#eef7f5', fontSize: 10 }}
+                      tickFormatter={(val) => {
+                        if (val >= 1000000) return (val / 1000000).toFixed(1) + 'M';
+                        if (val >= 1000) return (val / 1000).toFixed(1) + 'k';
+                        return val;
+                      }}
+                      stroke="#cedc28" 
+                      opacity={0.5}
+                    />
+                    <RechartsTooltip 
+                      contentStyle={{ backgroundColor: '#0a2442', borderColor: '#cedc28', borderRadius: '8px', color: '#eef7f5', fontSize: '12px', fontWeight: 'bold' }}
+                      itemStyle={{ color: '#cedc28' }}
+                      formatter={(value, name) => [
+                        name === 'Spend' ? `${exSym}${d3.format(",.2f")(value * exRate)}` : d3.format(",")(value),
+                        name
+                      ]}
+                      labelFormatter={(label) => {
+                        const d = new Date(label);
+                        return `${d.getDate()} ${d.toLocaleString('en-US', { month: 'short' })} ${d.getFullYear()}`;
+                      }}
+                    />
+                    {chartPhases.map((p, idx) => (
+                      <Line 
+                        key={p}
+                        type="monotone" 
+                        dataKey={`${p}_${chartMetric}`} 
+                        name={p}
+                        stroke={COLORS[idx % COLORS.length]} 
+                        strokeWidth={3}
+                        dot={{ fill: '#0a2442', stroke: COLORS[idx % COLORS.length], strokeWidth: 2, r: 4 }}
+                        activeDot={{ r: 6, fill: COLORS[idx % COLORS.length], stroke: '#0a2442' }}
+                      />
+                    ))}
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
             </div>
+          )}
+
+          <div className="flex justify-end items-center mb-6 gap-4">
+            <button
+              onClick={handleExportCSV}
+              className="px-3 py-2 flex items-center gap-2 rounded-lg bg-[#0a2442] border border-[#cedc28]/20 text-[#cedc28] hover:bg-[#cedc28]/10 transition-colors shadow-[0_0_10px_rgba(200,130,20,0.1)] text-xs font-bold"
+              title="Export to CSV (Excel)"
+            >
+              <Download size={14} /> Export Table
+            </button>
+            <div className="flex bg-[#0a2442] rounded-lg p-1 border border-[#cedc28]/20">
+              <button 
+                onClick={() => setViewMode('overall')} 
+                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${viewMode === 'overall' ? 'bg-[#cedc28] text-[#1a302e] shadow-[0_0_15px_rgba(200,130,20,0.35)]' : 'text-[#14a6d9] hover:bg-[#cedc28]/10 hover:text-[#cedc28] border border-[#cedc28]/20'}`}
+              >
+                Overall Data
+              </button>
+              <button 
+                onClick={() => { if (plannedTableData.length > 0) setViewMode('planned'); }}
+                disabled={plannedTableData.length === 0}
+                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${viewMode === 'planned' ? 'bg-[#cedc28] text-[#1a302e] shadow-[0_0_15px_rgba(200,130,20,0.35)]' : 'text-[#14a6d9] hover:bg-[#cedc28]/10 hover:text-[#cedc28] border border-[#cedc28]/20'} ${plannedTableData.length === 0 ? 'opacity-50 cursor-not-allowed bg-black/20' : ''}`}
+                title={plannedTableData.length === 0 ? 'No planned data available for the current selection' : ''}
+              >
+                Planned v/s Delivered
+              </button>
+            </div>
+            {viewMode === 'planned' ? (
+              <MetricMultiSelectDropdown
+                options={['% Delivered', '% Pacing', 'Cost compare', '% difference of unit cost']}
+                selected={plannedMetrics}
+                onChange={setPlannedMetrics}
+              />
+            ) : (
+              <MetricMultiSelectDropdown
+                options={['Spend', 'Impressions', 'Clicks', 'Video Views', 'Completed Views', 'Conversions', 'CTR', 'CPM', 'CPC', 'CPV']}
+                selected={overallMetrics}
+                onChange={setOverallMetrics}
+              />
+            )}
           </div>
+
           <div className="overflow-x-auto custom-scrollbar">
             {viewMode === 'overall' ? (
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-[#c88214]/20">
-                  <th className="py-4 px-4 text-[10px] font-black text-[#6fa89f] uppercase tracking-widest bg-[#011414]/50 rounded-tl-xl">Channel</th>
-                  {userRole !== 'non-finance' && <th className="py-4 px-4 text-[10px] font-black text-[#6fa89f] uppercase tracking-widest bg-[#011414]/50 text-right">Spend</th>}
-                  <th className="py-4 px-4 text-[10px] font-black text-[#6fa89f] uppercase tracking-widest bg-[#011414]/50 text-right">Impressions</th>
-                  <th className="py-4 px-4 text-[10px] font-black text-[#6fa89f] uppercase tracking-widest bg-[#011414]/50 text-right">Clicks</th>
-                  <th className="py-4 px-4 text-[10px] font-black text-[#6fa89f] uppercase tracking-widest bg-[#011414]/50 text-right">Video Views</th>
-                  <th className="py-4 px-4 text-[10px] font-black text-[#6fa89f] uppercase tracking-widest bg-[#011414]/50 text-right">Completed Views</th>
-                  <th className="py-4 px-4 text-[10px] font-black text-[#6fa89f] uppercase tracking-widest bg-[#011414]/50 text-right">Purchases</th>
-                  <th className={`py-4 px-4 text-[10px] font-black text-[#6fa89f] uppercase tracking-widest bg-[#011414]/50 text-right ${userRole === 'non-finance' ? 'rounded-tr-xl' : ''}`}>CTR</th>
-                  {userRole !== 'non-finance' && (
-                    <>
-                      <th className="py-4 px-4 text-[10px] font-black text-[#6fa89f] uppercase tracking-widest bg-[#011414]/50 text-right">CPM</th>
-                      <th className="py-4 px-4 text-[10px] font-black text-[#6fa89f] uppercase tracking-widest bg-[#011414]/50 text-right">CPC</th>
-                      <th className="py-4 px-4 text-[10px] font-black text-[#6fa89f] uppercase tracking-widest bg-[#011414]/50 text-right rounded-tr-xl">CPV</th>
-                    </>
-                  )}
+                <tr className="border-b border-[#cedc28]/20">
+                  <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 rounded-tl-xl">Channel</th>
+                  {userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('Spend')) && <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">Spend</th>}
+                  {(overallMetrics.includes('All') || overallMetrics.includes('Impressions')) && <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">Impressions</th>}
+                  {(overallMetrics.includes('All') || overallMetrics.includes('Clicks')) && <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">Clicks</th>}
+                  {(overallMetrics.includes('All') || overallMetrics.includes('Video Views')) && <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">Video Views</th>}
+                  {(overallMetrics.includes('All') || overallMetrics.includes('Completed Views')) && <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">Completed Views</th>}
+                  {(overallMetrics.includes('All') || overallMetrics.includes('Conversions')) && <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">Conversions</th>}
+                  {(overallMetrics.includes('All') || overallMetrics.includes('CTR')) && <th className={`py-4 px-4 text-[10px] font-black text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right ${userRole === 'non-finance' ? 'rounded-tr-xl' : ''}`}>CTR</th>}
+                  {userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPM')) && <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">CPM</th>}
+                  {userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPC')) && <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">CPC</th>}
+                  {userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPV')) && <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right rounded-tr-xl">CPV</th>}
                 </tr>
               </thead>
               <tbody>
                 {tableData.map((row, i) => (
-                  <tr key={row.channel} className={`border-b border-[#c88214]/10 hover:bg-[#74FA93]/5 transition-colors ${i % 2 === 0 ? 'bg-transparent' : 'bg-[#011414]/20'}`}>
+                  <tr key={row.channel} className={`border-b border-[#cedc28]/10 hover:bg-[#74FA93]/5 transition-colors ${i % 2 === 0 ? 'bg-transparent' : 'bg-[#0a2442]/20'}`}>
                     <td className="py-4 px-4 text-sm font-bold text-[#eef7f5]">{row.channel}</td>
-                    {userRole !== 'non-finance' && <td className="py-4 px-4 text-sm font-medium text-white text-right">{exSym}{d3.format(",.2f")(row.spend * exRate)}</td>}
-                    <td className="py-4 px-4 text-sm font-medium text-[#c88214] text-right">{d3.format(",")(row.impressions)}</td>
-                    <td className="py-4 px-4 text-sm font-medium text-[#6fa89f] text-right">{d3.format(",")(row.clicks)}</td>
-                    <td className="py-4 px-4 text-sm font-medium text-[#c88214] text-right">{formatShort(row.views)}</td>
-                    <td className="py-4 px-4 text-sm font-medium text-white text-right">{formatShort(row.completions)}</td>
-                    <td className="py-4 px-4 text-sm font-medium text-white text-right">{d3.format(",")(row.purchases)}</td>
-                    <td className="py-4 px-4 text-sm font-bold text-white text-right">{row.ctr.toFixed(2)}%</td>
-                    {userRole !== 'non-finance' && (
-                      <>
-                        <td className="py-4 px-4 text-sm font-medium text-white text-right">{exSym}{d3.format(",.2f")(row.cpm * exRate)}</td>
-                        <td className="py-4 px-4 text-sm font-medium text-white text-right">{exSym}{d3.format(",.2f")(row.cpc * exRate)}</td>
-                        <td className="py-4 px-4 text-sm font-medium text-white text-right">{exSym}{d3.format(",.2f")(row.cpv * exRate)}</td>
-                      </>
-                    )}
+                    {userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('Spend')) && <td className="py-4 px-4 text-sm font-medium text-white text-right">{exSym}{d3.format(",.2f")(row.spend * exRate)}</td>}
+                    {(overallMetrics.includes('All') || overallMetrics.includes('Impressions')) && <td className="py-4 px-4 text-sm font-medium text-[#cedc28] text-right">{d3.format(",")(row.impressions)}</td>}
+                    {(overallMetrics.includes('All') || overallMetrics.includes('Clicks')) && <td className="py-4 px-4 text-sm font-medium text-[#14a6d9] text-right">{d3.format(",")(row.clicks)}</td>}
+                    {(overallMetrics.includes('All') || overallMetrics.includes('Video Views')) && <td className="py-4 px-4 text-sm font-medium text-[#cedc28] text-right">{formatShort(row.views)}</td>}
+                    {(overallMetrics.includes('All') || overallMetrics.includes('Completed Views')) && <td className="py-4 px-4 text-sm font-medium text-white text-right">{formatShort(row.completions)}</td>}
+                    {(overallMetrics.includes('All') || overallMetrics.includes('Conversions')) && <td className="py-4 px-4 text-sm font-medium text-white text-right">{d3.format(",")(row.conversions)}</td>}
+                    {(overallMetrics.includes('All') || overallMetrics.includes('CTR')) && <td className="py-4 px-4 text-sm font-bold text-white text-right">{row.ctr.toFixed(2)}%</td>}
+                    {userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPM')) && <td className="py-4 px-4 text-sm font-medium text-white text-right">{exSym}{d3.format(",.2f")(row.cpm * exRate)}</td>}
+                    {userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPC')) && <td className="py-4 px-4 text-sm font-medium text-white text-right">{exSym}{d3.format(",.2f")(row.cpc * exRate)}</td>}
+                    {userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPV')) && <td className="py-4 px-4 text-sm font-medium text-white text-right">{exSym}{d3.format(",.2f")(row.cpv * exRate)}</td>}
                   </tr>
                 ))}
                 {tableData.length > 0 && (() => {
@@ -670,28 +802,24 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
                   const tClicks = d3.sum(tableData, d => d.clicks);
                   const tViews = d3.sum(tableData, d => d.views);
                   const tCompletions = d3.sum(tableData, d => d.completions);
-                  const tPurchases = d3.sum(tableData, d => d.purchases);
+                  const tConversions = d3.sum(tableData, d => d.conversions);
                   const tCtr = tImp > 0 ? (tClicks / tImp) * 100 : 0;
                   const tCpm = tImp > 0 ? (tSpend / tImp) * 1000 : 0;
                   const tCpc = tClicks > 0 ? tSpend / tClicks : 0;
                   const tCpv = tViews > 0 ? tSpend / tViews : 0;
                   return (
-                    <tr className="bg-[#011414]/80 border-t-2 border-[#c88214]/50">
-                      <td className="py-4 px-4 text-sm font-black text-[#c88214]">Total</td>
-                      {userRole !== 'non-finance' && <td className="py-4 px-4 text-sm font-black text-[#c88214] text-right">{exSym}{d3.format(",.2f")(tSpend * exRate)}</td>}
-                      <td className="py-4 px-4 text-sm font-black text-[#c88214] text-right">{d3.format(",")(tImp)}</td>
-                      <td className="py-4 px-4 text-sm font-black text-[#c88214] text-right">{d3.format(",")(tClicks)}</td>
-                      <td className="py-4 px-4 text-sm font-black text-[#c88214] text-right">{formatShort(tViews)}</td>
-                      <td className="py-4 px-4 text-sm font-black text-[#c88214] text-right">{formatShort(tCompletions)}</td>
-                      <td className="py-4 px-4 text-sm font-black text-[#c88214] text-right">{d3.format(",")(tPurchases)}</td>
-                      <td className="py-4 px-4 text-sm font-black text-[#c88214] text-right">{tCtr.toFixed(2)}%</td>
-                      {userRole !== 'non-finance' && (
-                        <>
-                          <td className="py-4 px-4 text-sm font-black text-[#c88214] text-right">{exSym}{d3.format(",.2f")(tCpm * exRate)}</td>
-                          <td className="py-4 px-4 text-sm font-black text-[#c88214] text-right">{exSym}{d3.format(",.2f")(tCpc * exRate)}</td>
-                          <td className="py-4 px-4 text-sm font-black text-[#c88214] text-right">{exSym}{d3.format(",.2f")(tCpv * exRate)}</td>
-                        </>
-                      )}
+                    <tr className="bg-[#0a2442]/80 border-t-2 border-[#cedc28]/50">
+                      <td className="py-4 px-4 text-sm font-bold text-[#cedc28]">Total</td>
+                      {userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('Spend')) && <td className="py-4 px-4 text-sm font-bold text-[#cedc28] text-right">{exSym}{d3.format(",.2f")(tSpend * exRate)}</td>}
+                      {(overallMetrics.includes('All') || overallMetrics.includes('Impressions')) && <td className="py-4 px-4 text-sm font-bold text-[#cedc28] text-right">{d3.format(",")(tImp)}</td>}
+                      {(overallMetrics.includes('All') || overallMetrics.includes('Clicks')) && <td className="py-4 px-4 text-sm font-bold text-[#cedc28] text-right">{d3.format(",")(tClicks)}</td>}
+                      {(overallMetrics.includes('All') || overallMetrics.includes('Video Views')) && <td className="py-4 px-4 text-sm font-bold text-[#cedc28] text-right">{formatShort(tViews)}</td>}
+                      {(overallMetrics.includes('All') || overallMetrics.includes('Completed Views')) && <td className="py-4 px-4 text-sm font-bold text-[#cedc28] text-right">{formatShort(tCompletions)}</td>}
+                      {(overallMetrics.includes('All') || overallMetrics.includes('Conversions')) && <td className="py-4 px-4 text-sm font-bold text-[#cedc28] text-right">{d3.format(",")(tConversions)}</td>}
+                      {(overallMetrics.includes('All') || overallMetrics.includes('CTR')) && <td className="py-4 px-4 text-sm font-bold text-[#cedc28] text-right">{tCtr.toFixed(2)}%</td>}
+                      {userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPM')) && <td className="py-4 px-4 text-sm font-bold text-[#cedc28] text-right">{exSym}{d3.format(",.2f")(tCpm * exRate)}</td>}
+                      {userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPC')) && <td className="py-4 px-4 text-sm font-bold text-[#cedc28] text-right">{exSym}{d3.format(",.2f")(tCpc * exRate)}</td>}
+                      {userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPV')) && <td className="py-4 px-4 text-sm font-bold text-[#cedc28] text-right">{exSym}{d3.format(",.2f")(tCpv * exRate)}</td>}
                     </tr>
                   );
                 })()}
@@ -700,33 +828,33 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
             ) : (
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="border-b border-[#c88214]/20">
-                    <th className="py-4 px-4 text-[10px] font-black text-[#6fa89f] uppercase tracking-widest bg-[#011414]/50 rounded-tl-xl">Channel</th>
-                    <th className="py-4 px-4 text-[10px] font-black text-[#6fa89f] uppercase tracking-widest bg-[#011414]/50">Buying Type</th>
-                    <th className="py-4 px-4 text-[10px] font-black text-[#6fa89f] uppercase tracking-widest bg-[#011414]/50 text-right">Planned Cost</th>
-                    <th className="py-4 px-4 text-[10px] font-black text-[#6fa89f] uppercase tracking-widest bg-[#011414]/50 text-right">Delivered Cost</th>
-                    <th className="py-4 px-4 text-[10px] font-black text-[#6fa89f] uppercase tracking-widest bg-[#011414]/50 text-right">Booked Units</th>
-                    <th className="py-4 px-4 text-[10px] font-black text-[#6fa89f] uppercase tracking-widest bg-[#011414]/50 text-right">Delivered Units</th>
-                    {(plannedMetrics.includes('% Delivered') || plannedMetrics.includes('All')) && <th className="py-4 px-4 text-[10px] font-black text-[#6fa89f] uppercase tracking-widest bg-[#011414]/50 text-right rounded-tr-xl">% Delivered</th>}
-                    {(plannedMetrics.includes('% Pacing') || plannedMetrics.includes('All')) && <th className="py-4 px-4 text-[10px] font-black text-[#6fa89f] uppercase tracking-widest bg-[#011414]/50 text-right rounded-tr-xl">% Pacing</th>}
+                  <tr className="border-b border-[#cedc28]/20">
+                    <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 rounded-tl-xl">Channel</th>
+                    <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50">Buying Type</th>
+                    <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">Planned Cost</th>
+                    <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">Delivered Cost</th>
+                    <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">Booked Units</th>
+                    <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">Delivered Units</th>
+                    {(plannedMetrics.includes('% Delivered') || plannedMetrics.includes('All')) && <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right rounded-tr-xl">% Delivered</th>}
+                    {(plannedMetrics.includes('% Pacing') || plannedMetrics.includes('All')) && <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right rounded-tr-xl">% Pacing</th>}
                     {(plannedMetrics.includes('Cost compare') || plannedMetrics.includes('All')) && (
                       <>
-                        <th className="py-4 px-4 text-[10px] font-black text-[#6fa89f] uppercase tracking-widest bg-[#011414]/50 text-right">Planned Unit Cost</th>
-                        <th className="py-4 px-4 text-[10px] font-black text-[#6fa89f] uppercase tracking-widest bg-[#011414]/50 text-right rounded-tr-xl">Delivered Unit Cost</th>
+                        <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">Planned Unit Cost</th>
+                        <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right rounded-tr-xl">Delivered Unit Cost</th>
                       </>
                     )}
-                    {(plannedMetrics.includes('% difference of unit cost') || plannedMetrics.includes('All')) && <th className="py-4 px-4 text-[10px] font-black text-[#6fa89f] uppercase tracking-widest bg-[#011414]/50 text-right rounded-tr-xl">% Diff Unit Cost</th>}
+                    {(plannedMetrics.includes('% difference of unit cost') || plannedMetrics.includes('All')) && <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right rounded-tr-xl">% Diff Unit Cost</th>}
                   </tr>
                 </thead>
                 <tbody>
                   {plannedTableData.map((row, i) => (
-                    <tr key={`${row.channel}_${row.buyingType}`} className={`border-b border-[#c88214]/10 hover:bg-[#74FA93]/5 transition-colors ${i % 2 === 0 ? 'bg-transparent' : 'bg-[#011414]/20'}`}>
+                    <tr key={`${row.channel}_${row.buyingType}`} className={`border-b border-[#cedc28]/10 hover:bg-[#74FA93]/5 transition-colors ${i % 2 === 0 ? 'bg-transparent' : 'bg-[#0a2442]/20'}`}>
                       <td className="py-4 px-4 text-sm font-bold text-[#eef7f5]">{row.channel}</td>
-                      <td className="py-4 px-4 text-sm font-medium text-[#c88214]">{row.buyingType}</td>
+                      <td className="py-4 px-4 text-sm font-medium text-[#cedc28]">{row.buyingType}</td>
                       <td className="py-4 px-4 text-sm font-medium text-white text-right">{exSym}{d3.format(",.2f")(row.plannedCost * exRate)}</td>
                       <td className="py-4 px-4 text-sm font-medium text-white text-right">{exSym}{d3.format(",.2f")(row.deliveredCost * exRate)}</td>
-                      <td className="py-4 px-4 text-sm font-medium text-[#6fa89f] text-right">{d3.format(",")(row.bookedUnits)}</td>
-                      <td className="py-4 px-4 text-sm font-medium text-[#6fa89f] text-right">{d3.format(",")(row.deliveredUnits)}</td>
+                      <td className="py-4 px-4 text-sm font-medium text-[#14a6d9] text-right">{d3.format(",")(row.bookedUnits)}</td>
+                      <td className="py-4 px-4 text-sm font-medium text-[#14a6d9] text-right">{d3.format(",")(row.deliveredUnits)}</td>
                       {(plannedMetrics.includes('% Delivered') || plannedMetrics.includes('All')) && <td className="py-4 px-4 text-sm font-bold text-white text-right">{row.pctDelivered.toFixed(2)}%</td>}
                       {(plannedMetrics.includes('% Pacing') || plannedMetrics.includes('All')) && <td className="py-4 px-4 text-sm font-bold text-white text-right">{row.pctPacing.toFixed(2)}%</td>}
                       {(plannedMetrics.includes('Cost compare') || plannedMetrics.includes('All')) && (
@@ -751,23 +879,23 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
                     const tPctPacing = tPlannedCost > 0 ? (tDeliveredCost / tPlannedCost) * 100 : 0;
                     
                     return (
-                      <tr className="bg-[#011414]/80 border-t-2 border-[#c88214]/50">
-                        <td className="py-4 px-4 text-sm font-black text-[#c88214]">Total</td>
-                        <td className="py-4 px-4 text-sm font-black text-[#c88214]"></td>
-                        <td className="py-4 px-4 text-sm font-black text-[#c88214] text-right">{exSym}{d3.format(",.2f")(tPlannedCost * exRate)}</td>
-                        <td className="py-4 px-4 text-sm font-black text-[#c88214] text-right">{exSym}{d3.format(",.2f")(tDeliveredCost * exRate)}</td>
-                        <td className="py-4 px-4 text-sm font-black text-[#c88214] text-right">{d3.format(",")(tBookedUnits)}</td>
-                        <td className="py-4 px-4 text-sm font-black text-[#c88214] text-right">{d3.format(",")(tDeliveredUnits)}</td>
-                        {(plannedMetrics.includes('% Delivered') || plannedMetrics.includes('All')) && <td className="py-4 px-4 text-sm font-black text-[#c88214] text-right">{tPctDelivered.toFixed(2)}%</td>}
-                        {(plannedMetrics.includes('% Pacing') || plannedMetrics.includes('All')) && <td className="py-4 px-4 text-sm font-black text-[#c88214] text-right">{tPctPacing.toFixed(2)}%</td>}
+                      <tr className="bg-[#0a2442]/80 border-t-2 border-[#cedc28]/50">
+                        <td className="py-4 px-4 text-sm font-bold text-[#cedc28]">Total</td>
+                        <td className="py-4 px-4 text-sm font-bold text-[#cedc28]"></td>
+                        <td className="py-4 px-4 text-sm font-bold text-[#cedc28] text-right">{exSym}{d3.format(",.2f")(tPlannedCost * exRate)}</td>
+                        <td className="py-4 px-4 text-sm font-bold text-[#cedc28] text-right">{exSym}{d3.format(",.2f")(tDeliveredCost * exRate)}</td>
+                        <td className="py-4 px-4 text-sm font-bold text-[#cedc28] text-right">{d3.format(",")(tBookedUnits)}</td>
+                        <td className="py-4 px-4 text-sm font-bold text-[#cedc28] text-right">{d3.format(",")(tDeliveredUnits)}</td>
+                        {(plannedMetrics.includes('% Delivered') || plannedMetrics.includes('All')) && <td className="py-4 px-4 text-sm font-bold text-[#cedc28] text-right">{tPctDelivered.toFixed(2)}%</td>}
+                        {(plannedMetrics.includes('% Pacing') || plannedMetrics.includes('All')) && <td className="py-4 px-4 text-sm font-bold text-[#cedc28] text-right">{tPctPacing.toFixed(2)}%</td>}
                         {(plannedMetrics.includes('Cost compare') || plannedMetrics.includes('All')) && (
                           <>
-                            <td className="py-4 px-4 text-sm font-black text-[#c88214] text-right">-</td>
-                            <td className="py-4 px-4 text-sm font-black text-[#c88214] text-right">-</td>
+                            <td className="py-4 px-4 text-sm font-bold text-[#cedc28] text-right">-</td>
+                            <td className="py-4 px-4 text-sm font-bold text-[#cedc28] text-right">-</td>
                           </>
                         )}
                         {(plannedMetrics.includes('% difference of unit cost') || plannedMetrics.includes('All')) && (
-                          <td className="py-4 px-4 text-sm font-black text-[#c88214] text-right">-</td>
+                          <td className="py-4 px-4 text-sm font-bold text-[#cedc28] text-right">-</td>
                         )}
                       </tr>
                     );

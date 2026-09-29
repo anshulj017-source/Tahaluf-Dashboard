@@ -1,79 +1,77 @@
 @import "tailwindcss";
 
-@font-face {
-  font-family: 'DIN Next LT Arabic';
-  src: url('/fonts/DINNextLTArabic-Regular-3.ttf') format('truetype');
-  font-weight: normal;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'DIN Next LT Arabic';
-  src: url('/fonts/DINNEXTLTARABIC-LIGHT-2-2.ttf') format('truetype');
-  font-weight: 300;
-  font-style: normal;
-  font-display: swap;
+@theme {
+  --color-tahaluf-green: #1a302e;
+  --color-informa-indigo: #0a2442;
+  --color-palm-glow: #cedc28;
+  --color-riyadh-sky: #14a6d9;
+  --color-grey-light: #e6e6e6;
+  --font-anton: var(--font-anton), sans-serif;
+  --font-sans: var(--font-open-sans), sans-serif;
 }
 
 :root {
-  --font-din: 'DIN Next LT Arabic', sans-serif;
-}
-
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-din);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --background: #1a302e;
+  --foreground: #ffffff;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
 }
 
-/* --- Tahaluf brand: dark gradient theme --- */
+/* --- Tahaluf brand: Corporate Theme --- */
 
 .app-bg {
-  background: radial-gradient(circle at 15% 0%, #1a2a3a 0%, #0d1b2a 50%, #050a11 100%);
+  background: #1a302e; /* Tahaluf Green */
 }
 
 .card-surface {
-  background: linear-gradient(160deg, rgba(26, 42, 58, 0.55), rgba(5, 10, 17, 0.85));
+  background: #0a2442; /* Informa Indigo */
   position: relative;
+  overflow: hidden;
+  border-radius: 1.5rem; /* Rounded frames matching guidelines */
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .card-surface-gold {
-  background: linear-gradient(160deg, rgba(206, 220, 51, 0.2), rgba(5, 10, 17, 0.85));
+  background: #0a2442; 
   position: relative;
+  overflow: hidden;
+  border-radius: 1.5rem;
+  border: 1px solid rgba(206, 220, 40, 0.2); /* Palm Glow border */
 }
 
 .pattern-overlay {
-  background-image: none; /* Removed AFC specific pattern */
-  opacity: 0.1;
+  background-image: none;
 }
 
 .surface-inset {
-  background: linear-gradient(180deg, rgba(13, 27, 42, 0.7), rgba(5, 10, 17, 0.9));
+  background: #1a302e; /* Tahaluf Green */
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.gradient-gold {
-  background: linear-gradient(135deg, #dce953, #cedc33); /* Tahaluf lime green */
+.gradient-palm {
+  background: linear-gradient(135deg, #cedc28, #b8c424); 
 }
 
-.gradient-teal {
-  background: linear-gradient(135deg, #1f364d, #142433); /* Tahaluf secondary navy */
+.gradient-sky {
+  background: linear-gradient(135deg, #14a6d9, #118eb9); 
+}
+
+/* Custom Scrollbar for sleek look */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.02);
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(206, 220, 40, 0.2); /* Palm Glow */
+  border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(206, 220, 40, 0.4);
 }

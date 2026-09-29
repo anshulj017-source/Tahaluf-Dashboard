@@ -4,7 +4,7 @@ import * as d3 from 'd3';
 import { 
   TrendingUp, Globe, Layers, Activity, DollarSign, MousePointer2, 
   Eye, Zap, LayoutDashboard, ChevronDown, Search, Check, ShoppingCart,
-  TableProperties, MonitorPlay, BarChart3, Smartphone, List, Download, RefreshCw, Users, Calendar, LayoutTemplate, PieChart, Grid, Map
+  TableProperties, MonitorPlay, BarChart3, Smartphone, List, Download, RefreshCw, Users, Calendar, LayoutTemplate, PieChart, Grid, Map, LogOut
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, AreaChart, Area } from 'recharts';
 import { ComposableMap, Geographies, Geography, ZoomableGroup } from 'react-simple-maps';
@@ -84,12 +84,12 @@ const normalizeMarket = (marketName) => {
 
 // --- COMPONENTS ---
 const MetricCard = ({ label, value, color, icon: Icon, definition }) => (
-  <div className="card-surface backdrop-blur-2xl p-6 rounded-2xl border border-[#c88214]/20 shadow-lg relative overflow-hidden group hover:-translate-y-1 transition-transform">
-    <div className="absolute top-0 right-0 w-24 h-24 bg-[#c88214]/10 rounded-full blur-2xl -mr-8 -mt-8 group-hover:bg-[#c88214]/20 transition-colors duration-500"></div>
+  <div className="card-surface backdrop-blur-2xl p-6 rounded-2xl border border-[#cedc28]/20 shadow-lg relative overflow-hidden group hover:-translate-y-1 transition-transform">
+    <div className="absolute top-0 right-0 w-24 h-24 bg-[#cedc28]/10 rounded-full blur-2xl -mr-8 -mt-8 group-hover:bg-[#cedc28]/20 transition-colors duration-500"></div>
     <div className="flex justify-between items-start relative z-10">
       <div>
         <div className="flex items-center gap-2 mb-2">
-          <p className="text-[10px] font-black text-[#6fa89f] uppercase tracking-widest">{label}</p>
+          <p className="text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest">{label}</p>
           <InfoTooltip definition={definition} />
         </div>
         <h3 className={`text-2xl font-black ${color} truncate`} title={value}>{value}</h3>
@@ -97,6 +97,63 @@ const MetricCard = ({ label, value, color, icon: Icon, definition }) => (
     </div>
   </div>
 );
+
+const DateRangeFilter = ({ label, dateRange, onChange }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const wrapperRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const formatDisplay = () => {
+    if (!dateRange.start && !dateRange.end) return 'All Dates';
+    const s = dateRange.start ? new Date(dateRange.start).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }) : '...';
+    const e = dateRange.end ? new Date(dateRange.end).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }) : '...';
+    return `${s} - ${e}`;
+  };
+
+  return (
+    <div ref={wrapperRef} className="relative w-[180px] z-30">
+      <span className="text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest mb-1.5 block">{label}</span>
+      <div 
+        onClick={() => setIsOpen(!isOpen)}
+        className="px-2.5 py-1.5 surface-inset border border-[#cedc28]/30 rounded-lg text-xs font-bold text-[#eef7f5] cursor-pointer flex justify-between items-center hover:border-[#cedc28] transition-colors"
+      >
+        <span className="truncate pr-2">{formatDisplay()}</span>
+        <Calendar className={`w-4 h-4 flex-shrink-0 text-[#cedc28]`} />
+      </div>
+      {isOpen && (
+        <div className="absolute top-full left-0 w-[240px] h-0 z-50">
+          <div className="w-full mt-2 card-surface backdrop-blur-3xl bg-[#0a2442]/95 border border-[#cedc28]/30 rounded-xl shadow-2xl flex flex-col overflow-hidden p-4 gap-4">
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest block">Start Date</span>
+              <input type="date" value={dateRange.start} onClick={e => e.target.showPicker && e.target.showPicker()} onChange={e => onChange({ ...dateRange, start: e.target.value })} className="w-full cursor-pointer px-3 py-2 bg-black/30 border border-[#cedc28]/30 rounded-lg text-xs font-bold text-[#eef7f5] outline-none focus:border-[#cedc28] transition-colors [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-100" />
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest block">End Date</span>
+              <input type="date" value={dateRange.end} onClick={e => e.target.showPicker && e.target.showPicker()} onChange={e => onChange({ ...dateRange, end: e.target.value })} className="w-full cursor-pointer px-3 py-2 bg-black/30 border border-[#cedc28]/30 rounded-lg text-xs font-bold text-[#eef7f5] outline-none focus:border-[#cedc28] transition-colors [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-100" />
+            </div>
+            {(dateRange.start || dateRange.end) && (
+              <button 
+                onClick={() => onChange({ start: '', end: '' })}
+                className="w-full px-3 py-2 bg-red-500/10 text-red-400 border border-red-500/30 rounded-lg text-xs font-bold hover:bg-red-500/20 transition-colors mt-2"
+              >
+                Clear Dates
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const MultiSelect = ({ label, options, selected, onChange }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -117,23 +174,23 @@ const MultiSelect = ({ label, options, selected, onChange }) => {
 
   return (
     <div ref={wrapperRef} className="relative w-[160px] z-30">
-      <span className="text-[10px] font-black text-[#6fa89f] uppercase tracking-widest mb-1.5 block">{label}</span>
+      <span className="text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest mb-1.5 block">{label}</span>
       <div 
         onClick={() => setIsOpen(!isOpen)}
-        className="px-2.5 py-1.5 surface-inset border border-[#c88214]/30 rounded-lg text-xs font-bold text-[#eef7f5] cursor-pointer flex justify-between items-center hover:border-[#c88214] transition-colors"
+        className="px-2.5 py-1.5 surface-inset border border-[#cedc28]/30 rounded-lg text-xs font-bold text-[#eef7f5] cursor-pointer flex justify-between items-center hover:border-[#cedc28] transition-colors"
       >
         <span className="truncate pr-2">{selected.includes('All') ? 'All Selected' : selected.join(', ')}</span>
         <ChevronDown className={`w-4 h-4 flex-shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </div>
       {isOpen && (
         <div className="absolute top-full left-0 w-full h-0 z-50">
-          <div className="w-full mt-2 card-surface backdrop-blur-3xl bg-[#011414]/90 border border-[#c88214]/30 rounded-xl shadow-2xl flex flex-col max-h-64 overflow-hidden">
-            <div className="p-2 border-b border-[#c88214]/10 relative">
-              <Search className="w-4 h-4 text-[#6fa89f] absolute left-4 top-1/2 -translate-y-1/2" />
-              <input type="text" placeholder="Search..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full bg-black/30 text-[#eef7f5] text-xs font-bold pl-9 pr-3 py-2 rounded-lg outline-none border border-transparent focus:border-[#c88214]/50" />
+          <div className="w-full mt-2 card-surface backdrop-blur-3xl bg-[#0a2442]/90 border border-[#cedc28]/30 rounded-xl shadow-2xl flex flex-col max-h-64 overflow-hidden">
+            <div className="p-2 border-b border-[#cedc28]/10 relative">
+              <Search className="w-4 h-4 text-[#14a6d9] absolute left-4 top-1/2 -translate-y-1/2" />
+              <input type="text" placeholder="Search..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full bg-black/30 text-[#eef7f5] text-xs font-bold pl-9 pr-3 py-2 rounded-lg outline-none border border-transparent focus:border-[#cedc28]/50" />
             </div>
             <div className="overflow-y-auto p-2 flex-1 custom-scrollbar">
-              <div onClick={() => { onChange(['All']); setIsOpen(false); setSearchTerm(''); }} className={`px-3 py-2 rounded-lg text-sm font-bold cursor-pointer flex justify-between ${selected.includes('All') ? 'bg-[#c88214]/20 text-[#c88214]' : 'text-[#eef7f5] hover:bg-[#011414]'}`}>
+              <div onClick={() => { onChange(['All']); setIsOpen(false); setSearchTerm(''); }} className={`px-3 py-2 rounded-lg text-sm font-bold cursor-pointer flex justify-between ${selected.includes('All') ? 'bg-[#cedc28]/20 text-[#cedc28]' : 'text-[#eef7f5] hover:bg-[#0a2442]'}`}>
                 All <Check className={`w-4 h-4 ${selected.includes('All') ? 'opacity-100' : 'opacity-0'}`} />
               </div>
               {filtered.map(opt => {
@@ -147,7 +204,7 @@ const MultiSelect = ({ label, options, selected, onChange }) => {
                       if (next.length === 0) next = ['All'];
                     } else { next.push(opt); }
                     onChange(next);
-                  }} className={`px-3 py-2 mt-1 rounded-lg text-sm font-bold cursor-pointer flex justify-between ${isSel ? 'bg-[#c88214]/20 text-[#c88214]' : 'text-[#eef7f5] hover:bg-[#011414]'}`}>
+                  }} className={`px-3 py-2 mt-1 rounded-lg text-sm font-bold cursor-pointer flex justify-between ${isSel ? 'bg-[#cedc28]/20 text-[#cedc28]' : 'text-[#eef7f5] hover:bg-[#0a2442]'}`}>
                     <span className="truncate pr-2">{opt}</span> <Check className={`w-4 h-4 flex-shrink-0 ${isSel ? 'opacity-100' : 'opacity-0'}`} />
                   </div>
                 )
@@ -161,18 +218,18 @@ const MultiSelect = ({ label, options, selected, onChange }) => {
 };
 
 const DataTable = ({ data, columns, totals }) => (
-  <div className="overflow-x-auto card-surface rounded-2xl border border-[#c88214]/20 z-10 relative">
+  <div className="overflow-x-auto card-surface rounded-2xl border border-[#cedc28]/20 z-10 relative">
     <table className="w-full text-left border-collapse">
       <thead>
-        <tr className="bg-black/25 border-b border-[#c88214]/20">
+        <tr className="bg-black/25 border-b border-[#cedc28]/20">
           {columns.map((col, i) => (
-            <th key={i} className="px-6 py-4 text-[10px] font-black text-[#6fa89f] uppercase tracking-widest whitespace-nowrap">{col.label}</th>
+            <th key={i} className="px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest whitespace-nowrap">{col.label}</th>
           ))}
         </tr>
       </thead>
       <tbody>
         {data.map((row, i) => (
-          <tr key={i} className="border-b border-[#c88214]/10 hover:bg-[#c88214]/5 transition-colors">
+          <tr key={i} className="border-b border-[#cedc28]/10 hover:bg-[#cedc28]/5 transition-colors">
             {columns.map((col, j) => (
               <td key={j} className="px-6 py-4 text-sm font-medium text-[#eef7f5] whitespace-nowrap">
                 {col.format ? col.format(row[col.key], row) : row[col.key]}
@@ -181,9 +238,9 @@ const DataTable = ({ data, columns, totals }) => (
           </tr>
         ))}
         {totals && data.length > 0 && (
-          <tr className="bg-black/40 border-t-2 border-[#c88214]/50">
+          <tr className="bg-black/40 border-t-2 border-[#cedc28]/50">
             {columns.map((col, j) => (
-              <td key={j} className="px-6 py-4 text-sm font-black text-[#c88214] whitespace-nowrap">
+              <td key={j} className="px-6 py-4 text-sm font-bold text-[#cedc28] whitespace-nowrap">
                 {totals[col.key] !== undefined 
                   ? (col.format ? col.format(totals[col.key], totals) : totals[col.key])
                   : ''}
@@ -191,7 +248,7 @@ const DataTable = ({ data, columns, totals }) => (
             ))}
           </tr>
         )}
-        {data.length === 0 && <tr><td colSpan={columns.length} className="px-6 py-8 text-center text-[#6fa89f] text-sm">No data available</td></tr>}
+        {data.length === 0 && <tr><td colSpan={columns.length} className="px-6 py-8 text-center text-[#14a6d9] text-sm">No data available</td></tr>}
       </tbody>
     </table>
   </div>
@@ -218,9 +275,13 @@ export default function App() {
   const [filterMarkets, setFilterMarkets] = useState(['All']);
   const [filterPaidOrganic, setFilterPaidOrganic] = useState(['All']);
   const [filterGa4Properties, setFilterGa4Properties] = useState(['All']);
+  const [filterPortfolio, setFilterPortfolio] = useState('All');
+  const [filterEvents, setFilterEvents] = useState(['All']);
+  const [filterEventTypes, setFilterEventTypes] = useState(['All']);
+  const [filterWeeks, setFilterWeeks] = useState(['All']);
   
   // State: Currency
-  const [currency, setCurrency] = useState('SAR'); // 'USD' or 'SAR'
+  const [currency, setCurrency] = useState('USD'); // 'USD' or 'SAR'
   const exRate = currency === 'SAR' ? 3.75 : 1;
   const exSym = currency === 'SAR' ? 'SAR ' : '$';
   
@@ -233,8 +294,6 @@ export default function App() {
   useEffect(() => {
     if (userRole === 'non-finance' && ['CPM', 'CPC'].includes(perfMetric)) {
       setPerfMetric('CTR');
-    } else if (userRole !== 'non-finance' && ['CTR', 'Clicks'].includes(perfMetric)) {
-      setPerfMetric('CPM');
     }
   }, [userRole, perfMetric]);
 
@@ -270,33 +329,52 @@ export default function App() {
     router.push('/login');
   };
 
+  const parseRow = (row) => {
+    const rawCost = parseMetric(row['Cost'] || row['Spend'] || 0);
+    const eventNameDB = (row['Event Name DB'] || '').trim();
+    const eventTypeDB = (row['Event Type DB'] || '').trim();
+    // Derive portfolio: GSTS and SAIF belong to P1
+    let portfolio = 'Other';
+    if (eventNameDB.toUpperCase().includes('GSTS') || eventNameDB.toUpperCase().includes('SAIF')) {
+      portfolio = 'P1';
+    }
+    return {
+      date: row['Date'],
+      dateObj: row['Date'] ? new Date(row['Date']) : null,
+      campaignName: row['Campaign name'] || row['Campaign DB'] || 'Unknown',
+      phase: row['Funnel Stage DB'] || row['Activity'] || row['Campaign Type'] || 'Unknown',
+      buyingType: 'Unknown',
+      country: normalizeMarket(row['Market'] || row['Targeting country location'] || 'Unknown'),
+      language: 'Unknown',
+      channel: row['Channel'] || 'Unknown',
+      adName: row['Ad name'] || 'Unknown',
+      cost: rawCost,
+      impressions: parseMetric(row['Impressions']),
+      clicks: parseMetric(row['Clicks']),
+      videoViews: parseMetric(row['Video views'] || 0),
+      videoViews6s: 0,
+      videoViews15s: 0,
+      videoCompletions: 0,
+      purchases: parseMetric(row['Conversions'] || 0),
+      isAuxiliaryData: false,
+      eventNameDB: eventNameDB || 'Unknown',
+      eventTypeDB: eventTypeDB || 'Unknown',
+      weekDB: (row['Week DB'] || '').trim() || 'Unknown',
+      portfolio: portfolio
+    };
+  };
+
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    d3.csv(BASE_URL).then(raw => {
-      const combinedAds = raw.map(row => {
-        const rawCost = parseMetric(row['Cost'] || row['Spend'] || 0);
-        return {
-          date: row['Date'],
-          dateObj: row['Date'] ? new Date(row['Date']) : null,
-          campaignName: row['Campaign name'] || row['Campaign DB'] || 'Unknown',
-          phase: row['Activity'] || row['Campaign Type'] || 'Unknown',
-          buyingType: 'Unknown',
-          country: normalizeMarket(row['Market'] || row['Targeting country location'] || 'Unknown'),
-          language: 'Unknown',
-          channel: row['Channel'] || 'Unknown',
-          adName: row['Ad name'] || 'Unknown',
-          cost: rawCost,
-          impressions: parseMetric(row['Impressions']),
-          clicks: parseMetric(row['Clicks']),
-          videoViews: parseMetric(row['Video views'] || 0),
-          videoViews6s: 0,
-          videoViews15s: 0,
-          videoCompletions: 0,
-          purchases: parseMetric(row['Conversions'] || 0),
-          isAuxiliaryData: false
-        };
-      });
+    // Fetch from both GSTS (default gid) and SAIF (gid=1196409184) sheets
+    Promise.all([
+      d3.csv(BASE_URL),
+      d3.csv(BASE_URL + '&gid=1196409184')
+    ]).then(([gstsRaw, saifRaw]) => {
+      const gstsAds = gstsRaw.map(parseRow);
+      const saifAds = saifRaw.map(parseRow);
+      const combinedAds = [...gstsAds, ...saifAds];
 
       setAdData(combinedAds);
       setGaData([]);
@@ -325,6 +403,10 @@ export default function App() {
     setFilterMarkets(['All']);
     setFilterPaidOrganic(['All']);
     setFilterGa4Properties(['All']);
+    setFilterPortfolio('All');
+    setFilterEvents(['All']);
+    setFilterEventTypes(['All']);
+    setFilterWeeks(['All']);
     setDateRange({ start: '', end: '' });
   };
 
@@ -335,17 +417,32 @@ export default function App() {
   }, [adData, gaData]);
   const uniquePaidOrganic = useMemo(() => Array.from(new Set(gaData.map(d => d.paidOrganic))).sort(), [gaData]);
   const uniqueGa4Properties = useMemo(() => Array.from(new Set(gaData.map(d => d.ga4Property))).filter(Boolean).sort(), [gaData]);
+  const uniqueEvents = useMemo(() => Array.from(new Set(adData.map(d => d.eventNameDB))).filter(e => e && e !== 'Unknown').sort(), [adData]);
+  const uniqueEventTypes = useMemo(() => Array.from(new Set(adData.map(d => d.eventTypeDB))).filter(e => e && e !== 'Unknown').sort(), [adData]);
+  const uniqueWeeks = useMemo(() => {
+    const weeks = Array.from(new Set(adData.map(d => d.weekDB))).filter(w => w && w !== 'Unknown');
+    // Sort weeks numerically: e.g. "W39 '26" -> 39
+    return weeks.sort((a, b) => {
+      const numA = parseInt(a.replace(/\D/g, ''));
+      const numB = parseInt(b.replace(/\D/g, ''));
+      return numA - numB;
+    });
+  }, [adData]);
 
   // Apply filters to Ad Data
   const filteredAdData = useMemo(() => {
     return adData.filter(d => {
       if (!filterCampaigns.includes('All') && !filterCampaigns.includes(d.campaignName)) return false;
       if (!filterMarkets.includes('All') && !filterMarkets.includes(d.country)) return false;
+      if (filterPortfolio !== 'All' && d.portfolio !== filterPortfolio) return false;
+      if (!filterEvents.includes('All') && !filterEvents.includes(d.eventNameDB)) return false;
+      if (!filterEventTypes.includes('All') && !filterEventTypes.includes(d.eventTypeDB)) return false;
+      if (!filterWeeks.includes('All') && !filterWeeks.includes(d.weekDB)) return false;
       if (dateRange.start && d.dateObj && d.dateObj < new Date(dateRange.start)) return false;
       if (dateRange.end && d.dateObj && d.dateObj > new Date(dateRange.end)) return false;
       return true;
     });
-  }, [adData, filterCampaigns, filterMarkets, dateRange]);
+  }, [adData, filterCampaigns, filterMarkets, filterPortfolio, filterEvents, filterEventTypes, filterWeeks, dateRange]);
 
   const coreAdData = useMemo(() => filteredAdData.filter(d => !d.isAuxiliaryData), [filteredAdData]);
 
@@ -355,7 +452,7 @@ export default function App() {
       let matchesCampaign = true;
       if (!filterCampaigns.includes('All')) {
         matchesCampaign = filterCampaigns.includes(d.campaignName);
-        // Special rule for Gulf Cup: Include all traffic for Gulfcup GA property if Gulf Cup tournament is selected
+        // Special rule for Gulf Cup: Include all traffic for Gulfcup GA property if Gulf Cup event is selected
         if (filterCampaigns.includes('Gulf Cup') && d.ga4Property === 'Gulfcup - Khaleeji27') {
           matchesCampaign = true;
         }
@@ -422,6 +519,33 @@ export default function App() {
         clicks: d3.sum(vals, d => d.clicks)
       };
     }).sort((a,b) => a.sortDate - b.sortDate);
+  }, [filteredAdData, exRate]);
+
+  // Daily spend chart data (for summary tab)
+  const dailySpendData = useMemo(() => {
+    const validData = filteredAdData.filter(d => d.dateObj && !isNaN(d.dateObj));
+    const formatKey = d3.timeFormat("%Y-%m-%d");
+    const formatDisplay = d3.timeFormat("%b %d");
+    const grouped = d3.groups(validData, d => formatKey(d.dateObj));
+    return grouped.map(([key, vals]) => ({
+      key,
+      day: formatDisplay(vals[0].dateObj),
+      sortDate: vals[0].dateObj,
+      spend: d3.sum(vals, d => d.cost) * exRate,
+      impressions: d3.sum(vals, d => d.impressions),
+      clicks: d3.sum(vals, d => d.clicks),
+    })).sort((a, b) => a.sortDate - b.sortDate);
+  }, [filteredAdData, exRate]);
+
+  // Channel spend breakdown (for summary tab)
+  const channelSpendData = useMemo(() => {
+    const grouped = d3.groups(filteredAdData, d => d.channel);
+    return grouped.map(([channel, vals]) => ({
+      channel,
+      spend: d3.sum(vals, d => d.cost) * exRate,
+      impressions: d3.sum(vals, d => d.impressions),
+      clicks: d3.sum(vals, d => d.clicks),
+    })).filter(d => d.spend > 0).sort((a, b) => b.spend - a.spend);
   }, [filteredAdData, exRate]);
 
   const topCountriesGa = useMemo(() => {
@@ -494,11 +618,11 @@ export default function App() {
 
   const NAV_ITEMS = [
     { id: 'summary', label: 'Summary View', icon: Grid },
-    { id: 'campaign', label: 'Tournament View', icon: Activity },
+    { id: 'campaign', label: 'Event View', icon: Activity },
     { id: 'channel', label: 'Channel View', icon: MonitorPlay },
     { id: 'market', label: 'Market View', icon: Map },
     { id: 'detailed', label: 'Detailed Split', icon: PieChart },
-    { id: 'webtraffic', label: 'Web Traffic', icon: Users },
+    /* { id: 'webtraffic', label: 'Web Traffic', icon: Users }, */
     { id: 'creative', label: 'Creative View', icon: LayoutTemplate },
   ];
 
@@ -506,18 +630,18 @@ export default function App() {
 
   if (isAuthLoading || loading) {
     return (
-      <div className="min-h-screen app-bg flex flex-col items-center justify-center text-[#c88214] gap-6 relative overflow-hidden">
+      <div className="min-h-screen app-bg flex flex-col items-center justify-center text-[#cedc28] gap-6 relative overflow-hidden">
         <div className="relative flex flex-col items-center justify-center animate-pulse">
-          <img src="/tahaluf-logo.png" alt="Loading Logo" className="h-24 md:h-32 object-contain" onError={(e) => e.target.style.display = 'none'} />
+          <img src="/tahaluf-logo.svg" alt="Loading Logo" className="h-12 md:h-16 object-contain" onError={(e) => e.target.style.display = 'none'} />
         </div>
         <div className="flex flex-col items-center gap-2 z-10">
-          <span className="text-sm md:text-base font-bold text-[#c88214] tracking-[0.2em]">
+          <span className="text-sm md:text-base font-bold text-[#cedc28] tracking-[0.2em]">
             {isAuthLoading ? "AUTHENTICATING" : "LOADING DATA"}
           </span>
           <div className="flex gap-1.5 mt-1">
-            <div className="w-1.5 h-1.5 rounded-full bg-[#c88214] animate-bounce" style={{ animationDelay: '0s' }}></div>
-            <div className="w-1.5 h-1.5 rounded-full bg-[#c88214] animate-bounce" style={{ animationDelay: '0.15s' }}></div>
-            <div className="w-1.5 h-1.5 rounded-full bg-[#c88214] animate-bounce" style={{ animationDelay: '0.3s' }}></div>
+            <div className="w-1.5 h-1.5 rounded-full bg-[#cedc28] animate-bounce" style={{ animationDelay: '0s' }}></div>
+            <div className="w-1.5 h-1.5 rounded-full bg-[#cedc28] animate-bounce" style={{ animationDelay: '0.15s' }}></div>
+            <div className="w-1.5 h-1.5 rounded-full bg-[#cedc28] animate-bounce" style={{ animationDelay: '0.3s' }}></div>
           </div>
         </div>
       </div>
@@ -555,7 +679,7 @@ export default function App() {
             title: "MASTER_SLIDE",
             background: { color: "0C272D" },
             objects: [
-              { image: { x: 8.8, y: 0.2, w: 0.65, h: 0.75, path: window.location.origin + "/tahaluf-logo.png", sizing: { type: "contain" } } }
+              { image: { x: 8.8, y: 0.2, w: 0.65, h: 0.75, path: window.location.origin + "/tahaluf-logo.svg", sizing: { type: "contain" } } }
             ]
           });
 
@@ -600,9 +724,9 @@ export default function App() {
           slide.addText("Dashboard Snapshot Report", { x: 0.5, y: 2, w: "90%", h: 1, fontSize: 36, bold: true, color: "FFFFFF", align: 'center' });
           
           let durationStr = (dateRange && dateRange.start && dateRange.end) ? `${dateRange.start} to ${dateRange.end}` : 'All Time';
-          let tourneyStr = (filterCampaigns && filterCampaigns.length > 0 && !filterCampaigns.includes('All')) ? filterCampaigns.join(', ') : 'All Tournaments';
+          let tourneyStr = (filterCampaigns && filterCampaigns.length > 0 && !filterCampaigns.includes('All')) ? filterCampaigns.join(', ') : 'All Events';
           
-          let filterText = `Duration: ${durationStr}\nTournament: ${tourneyStr}`;
+          let filterText = `Duration: ${durationStr}\nEvent: ${tourneyStr}`;
           slide.addText(filterText, { x: 0.5, y: 3.5, w: "90%", h: 2, fontSize: 14, color: "CBBB9D", align: 'center', valign: 'top' });
 
           const slides = document.querySelectorAll('.export-slide');
@@ -623,161 +747,142 @@ export default function App() {
 
   const renderContent = () => {
     if (activeTab === 'summary') {
+      // Computed metrics for summary
+      const totalCTR = agg.impressions > 0 ? ((agg.clicks / agg.impressions) * 100) : 0;
+      const totalCPM = agg.impressions > 0 ? ((agg.cost * exRate) / agg.impressions * 1000) : 0;
+      const totalCPC = agg.clicks > 0 ? ((agg.cost * exRate) / agg.clicks) : 0;
+
+      // AI Insights generation from data
+      const topChannel = channelSpendData.length > 0 ? channelSpendData[0] : null;
+      const lowestCPMChannel = channelPerformance.length > 0 ? [...channelPerformance].sort((a, b) => a.cpm - b.cpm).find(d => d.cpm > 0) : null;
+      const highestCTRChannel = channelPerformance.length > 0 ? [...channelPerformance].sort((a, b) => b.ctr - a.ctr)[0] : null;
+      const totalConversions = agg.purchases;
+      const avgDailySpend = dailySpendData.length > 0 ? d3.mean(dailySpendData, d => d.spend) : 0;
+      const peakSpendDay = dailySpendData.length > 0 ? dailySpendData.reduce((max, d) => d.spend > max.spend ? d : max, dailySpendData[0]) : null;
+
       return (
         <div className="space-y-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 export-slide" data-title="Summary Metrics">
+          {/* 1. Top Metric Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 export-slide" data-title="Summary Metrics">
             {userRole !== 'non-finance' && (
-              <MetricCard definition="The total amount of money spent on advertising campaigns across all channels." label="Total Spend" value={`${exSym}${formatShort(agg.cost * exRate)}`} color="text-white" icon={DollarSign} />
+              <MetricCard definition="The total amount of money spent on advertising campaigns across all channels." label="Total Spends" value={`${exSym}${formatShort(agg.cost * exRate)}`} color="text-white" icon={DollarSign} />
             )}
-            <MetricCard definition="The total number of times your ads were displayed on screen to users." label="Impressions" value={formatShort(agg.impressions)} color="text-[#c88214]" icon={Eye} />
-            <MetricCard definition="The number of times users clicked on your ads." label="Clicks" value={formatShort(agg.clicks)} color="text-[#6fa89f]" icon={MousePointer2} />
-            <MetricCard definition="The total number of times your video ads were watched." label="Video Views" value={formatShort(agg.views)} color="text-[#00937b]" icon={MonitorPlay} />
-            <MetricCard definition="The total number of times your video ads were watched to completion (100%)." label="Video Completions (100%)" value={formatShort(agg.completions)} color="text-white" icon={Check} />
-            <MetricCard definition="The total number of sessions on the website originating from the ad campaigns." label="Total Web Sessions" value={formatShort(agg.sessions)} color="text-[#c88214]" icon={Globe} />
-            <MetricCard definition="The total number of purchases reported by GA4." label="GA4 Purchases" value={formatShort(agg.gaPurchases)} color="text-[#00937b]" icon={ShoppingCart} />
-            <MetricCard definition="The total quantity of tickets sold reported by GA4." label="GA4 Tickets Sales" value={formatShort(agg.gaTickets)} color="text-[#6fa89f]" icon={ShoppingCart} />
+            <MetricCard definition="The total number of times your ads were displayed on screen to users." label="Impressions" value={formatShort(agg.impressions)} color="text-[#cedc28]" icon={Eye} />
+            <MetricCard definition="The number of times users clicked on your ads." label="Clicks" value={formatShort(agg.clicks)} color="text-[#14a6d9]" icon={MousePointer2} />
+            <MetricCard definition="Click-Through Rate: the percentage of impressions that resulted in a click." label="CTR" value={`${totalCTR.toFixed(2)}%`} color="text-[#00937b]" icon={TrendingUp} />
+            {userRole !== 'non-finance' && (
+              <>
+                <MetricCard definition="Cost Per Mille: the average cost per 1,000 impressions." label="CPM" value={`${exSym}${totalCPM.toFixed(2)}`} color="text-[#cedc28]" icon={BarChart3} />
+                <MetricCard definition="Cost Per Click: the average cost for each ad click." label="CPC" value={`${exSym}${totalCPC.toFixed(2)}`} color="text-[#14a6d9]" icon={MousePointer2} />
+              </>
+            )}
+            <MetricCard definition="Total number of conversions (purchases, sign-ups, etc.) tracked from the campaigns." label="Total Conversions" value={formatShort(totalConversions)} color="text-white" icon={ShoppingCart} />
           </div>
           
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-             {/* Chart 1: Monthly Spend vs Impressions */}
-             <div className="card-surface backdrop-blur-2xl p-6 rounded-3xl border border-[#c88214]/20 shadow-xl h-[400px] export-slide" data-title="Monthly Trend">
-                <h3 className="text-[#eef7f5] font-black mb-4 flex items-center gap-2">
-                  {userRole === 'non-finance' ? 'Monthly Clicks vs Impressions' : 'Monthly Spend vs Impressions'} 
-                  <InfoTooltip definition={userRole === 'non-finance' ? "A trend analysis comparing clicks against impressions generated over time." : "A trend analysis comparing the total advertising spend against the number of impressions generated over time."} />
-                </h3>
-                <ResponsiveContainer width="100%" height="90%">
-                  <AreaChart data={monthlyChartData}>
-                    <defs>
-                      <linearGradient id="colorCost" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#00937b" stopOpacity={0.8}/>
-                        <stop offset="95%" stopColor="#00937b" stopOpacity={0}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" />
-                    <XAxis dataKey="month" stroke="#6fa89f" fontSize={10} />
-                    <YAxis yAxisId="left" stroke="#00937b" fontSize={10} tickFormatter={(t) => userRole === 'non-finance' ? d3.format(",")(t) : `${exSym}${d3.format(",.2f")(t)}`} />
-                    <YAxis yAxisId="right" orientation="right" stroke="#6fa89f" fontSize={10} tickFormatter={(t) => d3.format(",")(t)} />
-                    <Tooltip 
-                      contentStyle={{ backgroundColor: '#043e3f', borderColor: '#c8821420', color: '#fff' }} 
-                      formatter={(value, name) => [name === 'Spend' ? `${exSym}${d3.format(",.2f")(value)}` : (name === 'CTR' ? `${d3.format(".2f")(value)}%` : d3.format(",")(value)), name]}
-                    />
-                    <Legend />
-                    {userRole === 'non-finance' ? (
-                      <Area yAxisId="left" type="monotone" dataKey="clicks" name="Clicks" stroke="#00937b" fillOpacity={1} fill="url(#colorCost)" />
-                    ) : (
-                      <Area yAxisId="left" type="monotone" dataKey="cost" name="Spend" stroke="#00937b" fillOpacity={1} fill="url(#colorCost)" />
-                    )}
-                    <Line yAxisId="right" type="monotone" dataKey="impressions" name="Impressions" stroke="#6fa89f" strokeWidth={3} dot={false} />
-                  </AreaChart>
-                </ResponsiveContainer>
-             </div>
-             
-             {/* Chart 2: Performance by Channel */}
-             <div className="card-surface backdrop-blur-2xl p-6 rounded-3xl border border-[#c88214]/20 shadow-xl h-[400px] flex flex-col export-slide" data-title="Channel Performance">
-                <div className="flex justify-between items-start mb-4">
-                  <h3 className="text-[#eef7f5] font-black flex items-center gap-2">{perfMetric} by Channel <InfoTooltip definition="A breakdown of key performance indicators (like CPM, CPC, CTR) segmented by the advertising channel." /></h3>
-                  <div className="flex gap-2">
-                    <div className="flex bg-[#011414] p-1 rounded-lg border border-[#c88214]/20">
-                      {userRole !== 'non-finance' ? (
-                        <>
-                          <button onClick={() => setPerfMetric('CPM')} className={`px-2 py-1 text-[10px] font-bold rounded transition-colors ${perfMetric === 'CPM' ? 'gradient-gold text-[#043e3f]' : 'text-slate-400 hover:text-white'}`}>CPM</button>
-                          <button onClick={() => setPerfMetric('CPC')} className={`px-2 py-1 text-[10px] font-bold rounded transition-colors ${perfMetric === 'CPC' ? 'gradient-gold text-[#043e3f]' : 'text-slate-400 hover:text-white'}`}>CPC</button>
-                        </>
-                      ) : (
-                        <>
-                          <button onClick={() => setPerfMetric('CTR')} className={`px-2 py-1 text-[10px] font-bold rounded transition-colors ${perfMetric === 'CTR' ? 'gradient-gold text-[#043e3f]' : 'text-slate-400 hover:text-white'}`}>CTR</button>
-                          <button onClick={() => setPerfMetric('Clicks')} className={`px-2 py-1 text-[10px] font-bold rounded transition-colors ${perfMetric === 'Clicks' ? 'gradient-gold text-[#043e3f]' : 'text-slate-400 hover:text-white'}`}>Clicks</button>
-                        </>
-                      )}
-                    </div>
-                    <div className="flex bg-[#011414] p-1 rounded-lg border border-[#c88214]/20">
-                      <button onClick={() => setPerfSort('Top 5')} className={`px-2 py-1 text-[10px] font-bold rounded transition-colors ${perfSort === 'Top 5' ? 'gradient-teal text-white' : 'text-slate-400 hover:text-white'}`}>Top 5</button>
-                      <button onClick={() => setPerfSort('Bottom 5')} className={`px-2 py-1 text-[10px] font-bold rounded transition-colors ${perfSort === 'Bottom 5' ? 'gradient-teal text-white' : 'text-slate-400 hover:text-white'}`}>Bottom 5</button>
-                    </div>
-                  </div>
-                </div>
-                <ResponsiveContainer width="100%" height="90%">
-                  <BarChart data={channelPerformance} margin={{ left: 20 }}>
-                    <defs>
-                      <linearGradient id="tealBarGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#00937b" />
-                        <stop offset="100%" stopColor="#007542" />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
-                    <XAxis dataKey="channel" stroke="#6fa89f" fontSize={10} />
-                    <YAxis stroke="#6fa89f" fontSize={10} tickFormatter={(t) => ['CPM', 'CPC'].includes(perfMetric) ? `${exSym}${d3.format(",.2f")(t)}` : perfMetric === 'CTR' ? `${t.toFixed(2)}%` : d3.format(",")(t)} />
-                    <Tooltip
-                      contentStyle={{ backgroundColor: '#043e3f', borderColor: '#c8821420', color: '#fff' }}
-                      cursor={{fill: '#ffffff10'}}
-                      formatter={(value) => [userRole === 'non-finance' ? (perfMetric === 'CTR' ? `${d3.format(".2f")(value)}%` : d3.format(",")(value)) : `${exSym}${d3.format(",.2f")(value)}`, perfMetric]}
-                    />
-                    <Bar dataKey={perfMetric.toLowerCase()} name={perfMetric} fill="url(#tealBarGradient)" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-             </div>
-          </div>
-
-          {/* Chart 3: Top Countries Web Traffic (Full Width) */}
-          <div className="card-surface backdrop-blur-2xl p-6 rounded-3xl border border-[#c88214]/20 shadow-xl h-[400px] mb-8 flex flex-col export-slide" data-title="Web Traffic by Country">
-            <div className="flex justify-between items-start mb-4">
-              <h3 className="text-[#eef7f5] font-black flex items-center gap-2">Top Countries by Web Traffic <InfoTooltip definition="A geographical representation showing which countries generate the highest volume of web traffic." /></h3>
-              <div className="flex bg-[#011414] p-1 rounded-lg border border-[#c88214]/20">
-                <button onClick={() => setGaMetric('Sessions')} className={`px-2 py-1 text-[10px] font-bold rounded transition-colors ${gaMetric === 'Sessions' ? 'gradient-gold text-[#043e3f]' : 'text-slate-400 hover:text-white'}`}>Sessions</button>
-                <button onClick={() => setGaMetric('Users')} className={`px-2 py-1 text-[10px] font-bold rounded transition-colors ${gaMetric === 'Users' ? 'gradient-gold text-[#043e3f]' : 'text-slate-400 hover:text-white'}`}>Users</button>
-                <button onClick={() => setGaMetric('Engaged Sessions')} className={`px-2 py-1 text-[10px] font-bold rounded transition-colors ${gaMetric === 'Engaged Sessions' ? 'gradient-gold text-[#043e3f]' : 'text-slate-400 hover:text-white'}`}>Engaged</button>
-              </div>
-            </div>
-            <ResponsiveContainer width="100%" height="90%">
-              <BarChart data={topCountriesGa} layout="vertical" margin={{ left: 20 }}>
+          {/* 2. Daily Spends Trend (Full Width) */}
+          <div className="card-surface backdrop-blur-2xl p-6 rounded-3xl border border-[#cedc28]/20 shadow-xl h-[350px] export-slide" data-title="Daily Spend Trend">
+            <h3 className="text-[#eef7f5] font-bold mb-4 flex items-center gap-2">
+              Daily Spends Trend
+              <InfoTooltip definition="A daily trend of advertising spend across all channels and campaigns." />
+            </h3>
+            <ResponsiveContainer width="100%" height="85%">
+              <AreaChart data={dailySpendData}>
                 <defs>
-                  <linearGradient id="goldBarGradientH" x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="0%" stopColor="#d99a2e" />
-                    <stop offset="100%" stopColor="#c88214" />
+                  <linearGradient id="colorDailySpend" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#cedc28" stopOpacity={0.4}/>
+                    <stop offset="95%" stopColor="#cedc28" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" horizontal={false} />
-                <XAxis type="number" stroke="#6fa89f" fontSize={10} tickFormatter={(t) => d3.format(",")(t)} />
-                <YAxis dataKey="country" type="category" stroke="#6fa89f" fontSize={10} width={80} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: '#043e3f', borderColor: '#c8821420', color: '#fff' }}
-                  cursor={{fill: '#ffffff10'}}
-                  formatter={(value) => [d3.format(",")(value), gaMetric]}
-                />
-                <Bar dataKey={gaMetric === 'Users' ? 'users' : gaMetric === 'Engaged Sessions' ? 'engagedSessions' : 'sessions'} name={gaMetric} fill="url(#goldBarGradientH)" radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Daily GA4 Sales Trend */}
-          <div className="card-surface backdrop-blur-2xl p-6 rounded-3xl border border-[#c88214]/20 shadow-xl h-[400px] mb-8 export-slide" data-title="Daily GA4 Sales Trend">
-            <h3 className="text-[#eef7f5] font-black mb-4 flex items-center gap-2">
-              Daily GA4 Sales Trend
-              <InfoTooltip definition="Daily trend of Purchases and Ticket Sales reported by GA4." />
-            </h3>
-            <ResponsiveContainer width="100%" height="90%">
-              <LineChart data={dailyGaChartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" />
-                <XAxis dataKey="day" stroke="#6fa89f" fontSize={10} />
-                <YAxis yAxisId="left" stroke="#00937b" fontSize={10} tickFormatter={(t) => d3.format(",")(t)} />
-                <YAxis yAxisId="right" orientation="right" stroke="#c88214" fontSize={10} tickFormatter={(t) => d3.format(",")(t)} />
+                <XAxis dataKey="day" stroke="#14a6d9" fontSize={9} angle={-45} textAnchor="end" height={50} interval={Math.max(0, Math.floor(dailySpendData.length / 15))} />
+                <YAxis stroke="#cedc28" fontSize={10} tickFormatter={(t) => `${exSym}${d3.format(",.0f")(t)}`} />
                 <Tooltip 
-                  contentStyle={{ backgroundColor: '#043e3f', borderColor: '#c8821420', color: '#fff' }} 
+                  contentStyle={{ backgroundColor: '#0a2442', borderColor: '#cedc2830', color: '#fff', borderRadius: '12px' }} 
+                  formatter={(value) => [`${exSym}${d3.format(",.2f")(value)}`, 'Spend']}
                 />
-                <Legend />
-                <Line yAxisId="left" type="monotone" dataKey="purchases" name="Purchases" stroke="#00937b" strokeWidth={3} dot={false} />
-                <Line yAxisId="right" type="monotone" dataKey="tickets" name="Ticket Sales" stroke="#c88214" strokeWidth={3} dot={false} />
-              </LineChart>
+                <Area type="monotone" dataKey="spend" name="Spend" stroke="#cedc28" strokeWidth={2} fillOpacity={1} fill="url(#colorDailySpend)" />
+              </AreaChart>
             </ResponsiveContainer>
           </div>
 
-          <div className="card-surface-gold p-8 rounded-3xl border border-[#c88214]/30 shadow-2xl relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-8 opacity-10"><Zap className="w-32 h-32 text-[#c88214]" /></div>
-            <h3 className="text-xl font-black text-white mb-4 flex items-center gap-3"><Zap className="text-[#c88214] w-6 h-6"/> AI Performance Insights <InfoTooltip definition="Automated observations and key takeaways generated by analyzing the current data set." /></h3>
-            <div className="text-[#eef7f5] leading-relaxed max-w-4xl space-y-2 relative z-10 font-medium">
-              <p>• The top performing channel generated <strong>{formatShort(agg.views)}</strong> total video views.</p>
-              <p>• We saw a total of <strong>{formatShort(agg.sessions)}</strong> web sessions based on GA4 data across the selected period.</p>
-              {userRole !== 'non-finance' && <p>• The overall cost per view stands at <strong>{agg.views > 0 ? `${exSym}${((agg.cost * exRate) / agg.views).toFixed(4)}` : `${exSym}0`}</strong>, indicating highly efficient media delivery.</p>}
+          {/* 3. Two side-by-side charts */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Chart A: Performance by Channel */}
+            <div className="card-surface backdrop-blur-2xl p-6 rounded-3xl border border-[#cedc28]/20 shadow-xl h-[350px] flex flex-col export-slide" data-title="Channel Performance">
+              <div className="flex justify-between items-start mb-4">
+                <h3 className="text-[#eef7f5] font-bold flex items-center gap-2">
+                  Metrics By Channel
+                  <InfoTooltip definition="Performance metrics broken down by each advertising channel." />
+                </h3>
+                <div className="flex gap-2">
+                  <div className="flex bg-[#0a2442] p-1 rounded-lg border border-[#cedc28]/20">
+                    <button onClick={() => setPerfMetric('CPM')} className={`px-2 py-1 text-[10px] font-bold rounded transition-colors ${perfMetric === 'CPM' ? 'bg-[#cedc28] text-[#1a302e]' : 'text-slate-400 hover:text-white'}`}>CPM</button>
+                    <button onClick={() => setPerfMetric('CPC')} className={`px-2 py-1 text-[10px] font-bold rounded transition-colors ${perfMetric === 'CPC' ? 'bg-[#cedc28] text-[#1a302e]' : 'text-slate-400 hover:text-white'}`}>CPC</button>
+                    <button onClick={() => setPerfMetric('CTR')} className={`px-2 py-1 text-[10px] font-bold rounded transition-colors ${perfMetric === 'CTR' ? 'bg-[#cedc28] text-[#1a302e]' : 'text-slate-400 hover:text-white'}`}>CTR</button>
+                  </div>
+                </div>
+              </div>
+              <ResponsiveContainer width="100%" height="85%">
+                <BarChart data={channelPerformance} margin={{ left: 10 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
+                  <XAxis dataKey="channel" stroke="#14a6d9" fontSize={10} />
+                  <YAxis stroke="#14a6d9" fontSize={10} tickFormatter={(t) => ['CPM', 'CPC'].includes(perfMetric) ? `${exSym}${d3.format(",.1f")(t)}` : `${t.toFixed(2)}%`} />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#0a2442', borderColor: '#cedc2830', color: '#fff', borderRadius: '12px' }}
+                    cursor={{fill: '#ffffff08'}}
+                    formatter={(value) => [['CPM', 'CPC'].includes(perfMetric) ? `${exSym}${d3.format(",.2f")(value)}` : `${d3.format(".2f")(value)}%`, perfMetric]}
+                  />
+                  <Bar dataKey={perfMetric.toLowerCase()} name={perfMetric} fill={perfMetric === 'CPC' ? '#14a6d9' : '#cedc28'} radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Chart B: Spends by Channel */}
+            <div className="card-surface backdrop-blur-2xl p-6 rounded-3xl border border-[#cedc28]/20 shadow-xl h-[350px] flex flex-col export-slide" data-title="Spends by Channel">
+              <h3 className="text-[#eef7f5] font-bold mb-4 flex items-center gap-2">
+                Spends by Channel
+                <InfoTooltip definition="Total advertising spend distributed across each channel." />
+              </h3>
+              <ResponsiveContainer width="100%" height="85%">
+                <BarChart data={channelSpendData} margin={{ left: 10 }}>
+                  <defs>
+                    <linearGradient id="spendBarGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#00937b" />
+                      <stop offset="100%" stopColor="#006050" />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
+                  <XAxis dataKey="channel" stroke="#14a6d9" fontSize={10} />
+                  <YAxis stroke="#14a6d9" fontSize={10} tickFormatter={(t) => `${exSym}${d3.format(",.0f")(t)}`} />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#0a2442', borderColor: '#cedc2830', color: '#fff', borderRadius: '12px' }}
+                    cursor={{fill: '#ffffff08'}}
+                    formatter={(value) => [`${exSym}${d3.format(",.2f")(value)}`, 'Spend']}
+                  />
+                  <Bar dataKey="spend" name="Spend" fill="url(#spendBarGrad)" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* 4. AI Insights */}
+          <div className="card-surface-gold p-8 rounded-3xl border border-[#cedc28]/30 shadow-2xl relative overflow-hidden export-slide" data-title="AI Insights">
+            <div className="absolute top-0 right-0 p-8 opacity-10"><Zap className="w-32 h-32 text-[#cedc28]" /></div>
+            <h3 className="text-xl font-bold text-white mb-5 flex items-center gap-3"><Zap className="text-[#cedc28] w-5 h-5"/> AI Performance Insights <InfoTooltip definition="Automated observations and key takeaways generated by analyzing the current data set." /></h3>
+            <div className="text-[#eef7f5] leading-relaxed max-w-5xl space-y-3 relative z-10 text-sm">
+              {topChannel && (
+                <p>• <strong>{topChannel.channel}</strong> is the highest-spending channel at <strong>{exSym}{d3.format(",.0f")(topChannel.spend)}</strong>, accounting for <strong>{((topChannel.spend / (agg.cost * exRate)) * 100).toFixed(1)}%</strong> of total budget.</p>
+              )}
+              {lowestCPMChannel && (
+                <p>• <strong>{lowestCPMChannel.channel}</strong> delivers the most cost-efficient impressions with a CPM of <strong>{exSym}{d3.format(",.2f")(lowestCPMChannel.cpm)}</strong> — making it the best value channel for reach.</p>
+              )}
+              {highestCTRChannel && (
+                <p>• <strong>{highestCTRChannel.channel}</strong> leads in engagement with the highest CTR of <strong>{d3.format(".2f")(highestCTRChannel.ctr)}%</strong>, indicating strong creative resonance with the audience.</p>
+              )}
+              {peakSpendDay && (
+                <p>• Peak daily spend of <strong>{exSym}{d3.format(",.0f")(peakSpendDay.spend)}</strong> occurred on <strong>{peakSpendDay.day}</strong>. Average daily spend sits at <strong>{exSym}{d3.format(",.0f")(avgDailySpend)}</strong> across {dailySpendData.length} active days.</p>
+              )}
+              <p>• Across all channels, campaigns have generated <strong>{formatShort(agg.impressions)}</strong> impressions, <strong>{formatShort(agg.clicks)}</strong> clicks, and <strong>{formatShort(totalConversions)}</strong> conversions with an overall CTR of <strong>{totalCTR.toFixed(2)}%</strong> and CPC of <strong>{exSym}{totalCPC.toFixed(2)}</strong>.</p>
             </div>
           </div>
         </div>
@@ -817,6 +922,8 @@ export default function App() {
     }
 
     if (activeTab === 'webtraffic') {
+      return null; // Archived Web Traffic
+
       const totalGaSessions = d3.sum(filteredGaData, d => d.sessions);
       const totalGaUsers = d3.sum(filteredGaData, d => d.users);
       const totalGaEngaged = d3.sum(filteredGaData, d => d.engagedSessions);
@@ -862,11 +969,11 @@ export default function App() {
 
       return (
         <div className="space-y-8">
-          <div className="flex justify-between items-center card-surface backdrop-blur-2xl p-6 rounded-3xl border border-[#c88214]/20 shadow-xl mb-4 flex-wrap gap-4 relative z-20">
+          <div className="flex justify-between items-center card-surface backdrop-blur-2xl p-6 rounded-3xl border border-[#cedc28]/20 shadow-xl mb-4 flex-wrap gap-4 relative z-20">
             <div className="flex items-center gap-6">
-              <h2 className="text-2xl font-black text-white flex items-center gap-3"><MonitorPlay className="text-[#c88214]" /> Web Traffic (GA4)</h2>
+              <h2 className="text-3xl font-anton uppercase text-white flex items-center gap-3"><MonitorPlay className="text-[#cedc28]" /> Web Traffic (GA4)</h2>
               <div className="flex items-end">
-                <MultiSelect label="GA4 Property" options={uniqueGa4Properties} selected={filterGa4Properties} onChange={setFilterGa4Properties} />
+                {/* <MultiSelect label="GA4 Property" options={uniqueGa4Properties} selected={filterGa4Properties} onChange={setFilterGa4Properties} /> */}
               </div>
             </div>
             <div className="flex gap-4 items-end">
@@ -876,27 +983,27 @@ export default function App() {
 
           <div className="grid grid-cols-2 md:grid-cols-5 lg:grid-cols-5 gap-4">
             <MetricCard definition="A session is a group of user interactions with your website that take place within a given time frame." label="Sessions" value={formatShort(totalGaSessions)} icon={Eye} color="text-white" />
-            <MetricCard definition="The number of sessions that lasted longer than 10 seconds, had a conversion event, or had 2 or more screen or page views." label="Engaged Sessions" value={formatShort(totalGaEngaged)} icon={Activity} color="text-[#6fa89f]" />
+            <MetricCard definition="The number of sessions that lasted longer than 10 seconds, had a conversion event, or had 2 or more screen or page views." label="Engaged Sessions" value={formatShort(totalGaEngaged)} icon={Activity} color="text-[#14a6d9]" />
             <MetricCard definition="The number of users who interacted with your site or launched your app for the first time." label="New Users" value={formatShort(totalGaNewUsers)} icon={TrendingUp} color="text-white" />
-            <MetricCard definition="The total number of unique users who logged an event." label="Total Users" value={formatShort(totalGaUsers)} icon={MousePointer2} color="text-[#c88214]" />
+            <MetricCard definition="The total number of unique users who logged an event." label="Total Users" value={formatShort(totalGaUsers)} icon={MousePointer2} color="text-[#cedc28]" />
             
-            <MetricCard definition="The total number of times items were viewed." label="Item Views" value={formatShort(totalItemViews)} icon={Eye} color="text-[#6fa89f]" />
+            <MetricCard definition="The total number of times items were viewed." label="Item Views" value={formatShort(totalItemViews)} icon={Eye} color="text-[#14a6d9]" />
             <MetricCard definition="The total number of times items were added to the cart." label="Add to Carts" value={formatShort(totalAddToCart)} icon={Activity} color="text-white" />
-            <MetricCard definition="The total number of times users initiated a checkout." label="Checkouts" value={formatShort(totalCheckouts)} icon={MousePointer2} color="text-[#c88214]" />
-            <MetricCard definition="The total number of completed purchases." label="Purchases" value={formatShort(totalPurchases)} icon={TrendingUp} color="text-[#6fa89f]" />
+            <MetricCard definition="The total number of times users initiated a checkout." label="Checkouts" value={formatShort(totalCheckouts)} icon={MousePointer2} color="text-[#cedc28]" />
+            <MetricCard definition="The total number of completed purchases." label="Purchases" value={formatShort(totalPurchases)} icon={TrendingUp} color="text-[#14a6d9]" />
             <MetricCard definition="The average duration (in seconds) of user sessions." label="Avg Session (s)" value={d3.format(",.1f")(avgDuration)} icon={List} color="text-white" />
-            <MetricCard definition="The total quantity of tickets sold reported by GA4." label="GA4 Tickets Sales" value={formatShort(totalGaTickets)} icon={ShoppingCart} color="text-[#c88214]" />
+            {/* <MetricCard definition="The total quantity of tickets sold reported by GA4." label="GA4 Tickets Sales" value={formatShort(totalGaTickets)} icon={ShoppingCart} color="text-[#cedc28]" /> */}
           </div>
 
-          <div className="card-surface backdrop-blur-2xl p-6 rounded-3xl border border-[#c88214]/20 shadow-xl relative">
+          <div className="card-surface backdrop-blur-2xl p-6 rounded-3xl border border-[#cedc28]/20 shadow-xl relative">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="text-[#eef7f5] font-black flex items-center gap-2">Global Web Traffic <InfoTooltip definition="An overview of web traffic performance metrics distributed across a global map." /></h3>
+              <h3 className="text-[#eef7f5] font-bold flex items-center gap-2">Global Web Traffic <InfoTooltip definition="An overview of web traffic performance metrics distributed across a global map." /></h3>
               <div className="flex gap-2">
                 {['Sessions', 'Engaged Sessions', 'Total Users'].map(m => (
                   <button
                     key={m}
                     onClick={() => setMapMetric(m)}
-                    className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${mapMetric === m ? 'gradient-gold text-[#043e3f]' : 'bg-[#011414] text-[#c88214] border border-[#c88214]/30 hover:bg-[#c88214]/20'}`}
+                    className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${mapMetric === m ? 'bg-[#cedc28] text-[#1a302e]' : 'bg-[#0a2442] text-[#cedc28] border border-[#cedc28]/30 hover:bg-[#cedc28]/20'}`}
                   >
                     {m}
                   </button>
@@ -904,9 +1011,9 @@ export default function App() {
               </div>
             </div>
             
-            <div className="w-full h-[500px] bg-[#011414]/50 rounded-2xl overflow-hidden border border-[#c88214]/10 relative">
-              <div className="absolute bottom-6 left-6 bg-[#011414]/80 backdrop-blur-md border border-[#c88214]/20 p-4 rounded-xl flex flex-col gap-2 z-10 w-40 shadow-2xl">
-                <span className="text-[10px] font-black text-[#6fa89f] uppercase tracking-widest mb-1">{mapMetric}</span>
+            <div className="w-full h-[500px] bg-[#0a2442]/50 rounded-2xl overflow-hidden border border-[#cedc28]/10 relative">
+              <div className="absolute bottom-6 left-6 bg-[#0a2442]/80 backdrop-blur-md border border-[#cedc28]/20 p-4 rounded-xl flex flex-col gap-2 z-10 w-40 shadow-2xl">
+                <span className="text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest mb-1">{mapMetric}</span>
                 {[
                   { label: '> 100k', color: '#064e3b' },
                   { label: '50k - 100k', color: '#065f46' },
@@ -938,7 +1045,7 @@ export default function App() {
                             key={geo.rsmKey}
                             geography={geo}
                             fill={fill}
-                            stroke="#043e3f"
+                            stroke="#1a302e"
                             strokeWidth={0.5}
                             style={{
                               default: { outline: 'none' },
@@ -954,36 +1061,37 @@ export default function App() {
                   </Geographies>
                 </ZoomableGroup>
               </ComposableMap>
-              <ReactTooltip id="map-tooltip" style={{ backgroundColor: '#043e3f', color: '#c88214', fontWeight: 'bold' }} />
+              <ReactTooltip id="map-tooltip" style={{ backgroundColor: '#1a302e', color: '#cedc28', fontWeight: 'bold' }} />
             </div>
           </div>
           
-          {/* Daily GA4 Sales Trend */}
-          <div className="card-surface backdrop-blur-2xl p-6 rounded-3xl border border-[#c88214]/20 shadow-xl h-[400px] mb-8 export-slide" data-title="Daily GA4 Sales Trend">
-            <h3 className="text-[#eef7f5] font-black mb-4 flex items-center gap-2">
+          {/* Daily GA4 Sales Trend
+          {/* <div className="card-surface backdrop-blur-2xl p-6 rounded-3xl border border-[#cedc28]/20 shadow-xl h-[400px] mb-8 export-slide" data-title="Daily GA4 Sales Trend">
+            <h3 className="text-[#eef7f5] font-bold mb-4 flex items-center gap-2">
               Daily GA4 Sales Trend
               <InfoTooltip definition="Daily trend of Purchases and Ticket Sales reported by GA4." />
             </h3>
             <ResponsiveContainer width="100%" height="90%">
               <LineChart data={dailyGaChartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" />
-                <XAxis dataKey="day" stroke="#6fa89f" fontSize={10} />
+                <XAxis dataKey="day" stroke="#14a6d9" fontSize={10} />
                 <YAxis yAxisId="left" stroke="#00937b" fontSize={10} tickFormatter={(t) => d3.format(",")(t)} />
-                <YAxis yAxisId="right" orientation="right" stroke="#c88214" fontSize={10} tickFormatter={(t) => d3.format(",")(t)} />
+                <YAxis yAxisId="right" orientation="right" stroke="#cedc28" fontSize={10} tickFormatter={(t) => d3.format(",")(t)} />
                 <Tooltip 
-                  contentStyle={{ backgroundColor: '#043e3f', borderColor: '#c8821420', color: '#fff' }} 
+                  contentStyle={{ backgroundColor: '#1a302e', borderColor: '#cedc2820', color: '#fff' }} 
                 />
                 <Legend />
                 <Line yAxisId="left" type="monotone" dataKey="purchases" name="Purchases" stroke="#00937b" strokeWidth={3} dot={false} />
-                <Line yAxisId="right" type="monotone" dataKey="tickets" name="Ticket Sales" stroke="#c88214" strokeWidth={3} dot={false} />
+                <Line yAxisId="right" type="monotone" dataKey="tickets" name="Ticket Sales" stroke="#cedc28" strokeWidth={3} dot={false} />
               </LineChart>
             </ResponsiveContainer>
-          </div>
+          </div> */}
 
           <GaChannelTable rawData={filteredGaData} formatShort={formatShort} />
         </div>
       );
     }
+
     if (activeTab === 'creative') {
       const filteredCreativeData = creativeData.filter(d => {
         if (!filterCampaigns.includes('All') && !filterCampaigns.includes(d.campaignName)) return false;
@@ -1001,74 +1109,53 @@ export default function App() {
   };
 
   return (
-    <div className="h-screen overflow-hidden app-bg font-sans selection:bg-[#c88214]/30 text-white flex flex-col">
+    <div className="h-screen overflow-hidden app-bg font-sans selection:bg-[#cedc28]/30 text-white flex flex-col">
       {/* HEADER */}
-      <header className="sticky top-0 z-50 bg-[#011414]/95 backdrop-blur-xl border-b border-[#c88214]/20 px-8 py-4 flex flex-wrap gap-4 items-center justify-between shadow-2xl relative">
+      <header className="sticky top-0 z-50 bg-[#0a2442]/95 backdrop-blur-xl border-b border-[#cedc28]/20 px-6 py-3 shadow-2xl relative">
         <div className="pattern-overlay absolute inset-0 z-0 pointer-events-none"></div>
         <div className="flex items-center gap-4 relative z-10">
-          <img src="/tahaluf-logo.png" alt="Tahaluf Logo" className="h-24 object-contain" onError={(e) => e.target.style.display = 'none'} />
-          <div>
-            <h1 className="text-xl font-black text-white tracking-tight uppercase">Tahaluf</h1>
-            <p className="text-[10px] font-black text-[#c88214] uppercase tracking-[0.2em]">Performance Dashboard</p>
-            {lastUpdated && (
-              <p className="text-[9px] font-bold text-[#6fa89f] mt-1 uppercase tracking-wider opacity-80">
-                Data up to: {lastUpdated.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
-              </p>
-            )}
-          </div>
-        </div>
-        
-        <div className="flex gap-3 flex-wrap flex-1 justify-end items-end relative z-10">
-          <div className="flex flex-col gap-1">
-             <span className="text-[10px] font-black text-[#6fa89f] uppercase tracking-widest block">Start Date</span>
-             <input type="date" value={dateRange.start} onClick={e => e.target.showPicker && e.target.showPicker()} onChange={e => setDateRange(prev => ({...prev, start: e.target.value}))} className="w-[160px] cursor-pointer px-2.5 py-1.5 surface-inset border border-[#c88214]/30 rounded-lg text-xs font-bold text-[#eef7f5] outline-none focus:border-[#c88214] transition-colors [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-100" />
-          </div>
-          <div className="flex flex-col gap-1">
-             <span className="text-[10px] font-black text-[#6fa89f] uppercase tracking-widest block">End Date</span>
-             <input type="date" value={dateRange.end} onClick={e => e.target.showPicker && e.target.showPicker()} onChange={e => setDateRange(prev => ({...prev, end: e.target.value}))} className="w-[160px] cursor-pointer px-2.5 py-1.5 surface-inset border border-[#c88214]/30 rounded-lg text-xs font-bold text-[#eef7f5] outline-none focus:border-[#c88214] transition-colors [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-100" />
+          {/* LEFT: Logo + Dates + Week */}
+          <div className="flex items-center gap-4 shrink-0">
+            <div className="flex flex-col items-start gap-0.5 mr-2">
+              <img src="/tahaluf-logo.svg" alt="Tahaluf Logo" className="h-8 object-contain" onError={(e) => e.target.style.display = 'none'} />
+              <p className="text-[9px] font-bold text-[#cedc28] uppercase tracking-[0.1em]">Performance Dashboard</p>
+            </div>
+            <div className="h-10 w-px bg-[#cedc28]/20 hidden md:block"></div>
           </div>
 
-          { activeTab !== 'campaign' ? (
-            <MultiSelect label="Tournament" options={uniqueCampaigns} selected={filterCampaigns} onChange={setFilterCampaigns} />
-          ) : (
-            <div className="opacity-30 pointer-events-none" title="Tournament filter is disabled for this view">
-              <MultiSelect label="Tournament" options={uniqueCampaigns} selected={filterCampaigns} onChange={setFilterCampaigns} />
+          {/* RIGHT: Filters + Actions */}
+          <div className="flex gap-3 flex-wrap flex-1 justify-end items-end">
+            <DateRangeFilter label="Date Range" dateRange={dateRange} onChange={setDateRange} />
+            <MultiSelect label="Week" options={uniqueWeeks} selected={filterWeeks} onChange={setFilterWeeks} />
+            
+            {/* Portfolio Filter (single select) */}
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest block">Portfolio</span>
+              <select 
+                value={filterPortfolio} 
+                onChange={e => setFilterPortfolio(e.target.value)}
+                className="w-[120px] cursor-pointer px-2 py-1.5 surface-inset border border-[#cedc28]/30 rounded-lg text-xs font-bold text-[#eef7f5] outline-none focus:border-[#cedc28] transition-colors bg-transparent appearance-none"
+              >
+                <option value="All" className="bg-[#0a2442] text-white">All</option>
+                <option value="P1" className="bg-[#0a2442] text-white">P1</option>
+              </select>
             </div>
-          )}
-          <MultiSelect label="Market" options={uniqueMarkets} selected={filterMarkets} onChange={setFilterMarkets} />
-          
-          <div className="flex items-end gap-3 ml-2">
-             {userRole !== 'non-finance' && (
-               <div className="flex flex-col gap-1">
-                 <span className="text-[10px] font-black text-[#6fa89f] uppercase tracking-widest block">Currency</span>
-                 <div className="flex bg-[#065c5d]/20 backdrop-blur-md p-0.5 rounded-lg border border-[#c88214]/30">
-                   <button onClick={() => setCurrency('USD')} className={`px-2.5 py-1 text-xs font-bold rounded-md transition-colors ${currency === 'USD' ? 'gradient-gold text-[#043e3f]' : 'text-slate-400 hover:text-white'}`}>USD</button>
-                   <button onClick={() => setCurrency('SAR')} className={`px-2.5 py-1 text-xs font-bold rounded-md transition-colors ${currency === 'SAR' ? 'gradient-gold text-[#043e3f]' : 'text-slate-400 hover:text-white'}`}>SAR</button>
-                 </div>
-               </div>
-             )}
-             {(dateRange.start || dateRange.end) && activeTab !== 'summary' && (
-               <button 
-                 onClick={generatePpt}
-                 disabled={isGenerating}
-                 title="Export Dashboard to PPTX"
-                 className="p-1.5 bg-[#74FA93]/10 border border-[#74FA93]/30 text-[#74FA93] rounded-lg hover:bg-[#74FA93]/20 hover:text-white transition-colors flex items-center justify-center disabled:opacity-50"
-               >
-                 {isGenerating ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5"/>}
-               </button>
-             )}
-             <button onClick={resetFilters} className="px-3 py-1.5 bg-[#c88214]/10 border border-[#c88214]/50 text-[#c88214] text-[10px] uppercase font-black rounded-lg hover:bg-[#c88214]/20 hover:text-white transition-colors flex items-center justify-center gap-1"><RefreshCw className="w-3 h-3"/> Reset</button>
-             <button onClick={handleSignOut} className="px-3 py-1.5 bg-red-500/10 border border-red-500/30 text-red-400 text-[10px] uppercase font-black rounded-lg hover:bg-red-500/20 hover:text-red-300 transition-colors flex items-center justify-center gap-1">Sign Out</button>
+
+            <MultiSelect label="Event" options={uniqueEvents} selected={filterEvents} onChange={setFilterEvents} />
+            <MultiSelect label="Event Type" options={uniqueEventTypes} selected={filterEventTypes} onChange={setFilterEventTypes} />
+
+
+            <button onClick={resetFilters} className="px-2 py-1 bg-[#cedc28]/10 border border-[#cedc28]/50 text-[#cedc28] text-[8px] uppercase font-bold rounded-lg hover:bg-[#cedc28]/20 hover:text-white transition-colors flex items-center justify-center gap-1 self-end"><RefreshCw className="w-2.5 h-2.5"/> Reset</button>
           </div>
         </div>
       </header>
 
       <div className="flex flex-1 overflow-hidden">
         {/* SIDEBAR TABS */}
-        <div className="w-64 border-r border-[#c88214]/10 bg-[#011414] flex flex-col gap-2 overflow-y-auto z-20 relative">
+        <div className="w-64 border-r border-[#cedc28]/10 bg-[#0a2442] flex flex-col gap-2 overflow-y-auto z-20 relative">
           <div className="pattern-overlay absolute inset-0 z-0 pointer-events-none" style={{ opacity: 0.20 }}></div>
           <div className="p-6 pb-2 relative z-10">
-            <div className="text-[10px] font-black text-[#6fa89f] uppercase tracking-widest mb-4 px-4">Navigation</div>
+            <div className="text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest mb-4 px-4">Navigation</div>
           {NAV_ITEMS.map(t => {
             const active = activeTab === t.id;
             return (
@@ -1076,7 +1163,7 @@ export default function App() {
                 key={t.id}
                 onClick={() => setActiveTab(t.id)}
                 className={`flex items-center gap-3 w-full px-4 py-3 rounded-xl font-bold transition-all ${
-                  active ? 'gradient-gold text-[#043e3f] shadow-[0_0_15px_rgba(200,130,20,0.35)]' : 'text-[#eef7f5] hover:bg-[#c88214]/10 hover:text-[#c88214]'
+                  active ? 'bg-[#cedc28] text-[#1a302e] shadow-[0_0_15px_rgba(200,130,20,0.35)]' : 'text-[#eef7f5] hover:bg-[#cedc28]/10 hover:text-[#cedc28]'
                 }`}
               >
                 <t.icon className="w-5 h-5" />
@@ -1085,18 +1172,45 @@ export default function App() {
             )
           })}
           </div>
-          <div className="flex-1 min-h-[100px] mt-8"></div>
-          {userRole === 'admin' && (
-            <div className="mt-auto p-6 pt-0 z-30">
+          <div className="flex-1 min-h-[50px] mt-4"></div>
+          
+          <div className="flex flex-col gap-2 px-6 pb-6 mt-auto z-30">
+            {userRole === 'admin' && (
+              <div className="flex justify-start">
+                <button 
+                  onClick={() => setActiveTab('admin')}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    activeTab === 'admin' ? 'bg-[#cedc28] text-[#1a302e] shadow-[0_0_15px_rgba(200,130,20,0.35)]' : 'text-[#eef7f5] hover:bg-[#cedc28]/10 hover:text-[#cedc28]'
+                  }`}
+                >
+                  <Users className="w-3.5 h-3.5" />
+                  Admin
+                </button>
+              </div>
+            )}
+            
+            {userRole !== 'non-finance' && (
+              <div className="flex justify-start px-3">
+                <div className="flex bg-[#0a2442] p-0.5 rounded-lg border border-[#cedc28]/20 w-[100px]">
+                  <button onClick={() => setCurrency('USD')} className={`flex-1 px-2 py-1 text-[10px] font-bold rounded-md transition-colors ${currency === 'USD' ? 'bg-[#cedc28] text-[#1a302e]' : 'text-slate-400 hover:text-white'}`}>USD</button>
+                  <button onClick={() => setCurrency('SAR')} className={`flex-1 px-2 py-1 text-[10px] font-bold rounded-md transition-colors ${currency === 'SAR' ? 'bg-[#cedc28] text-[#1a302e]' : 'text-slate-400 hover:text-white'}`}>SAR</button>
+                </div>
+              </div>
+            )}
+            
+            <div className="flex justify-start mt-1">
               <button 
-                onClick={() => setActiveTab('admin')}
-                className={`flex items-center gap-3 w-full px-4 py-3 rounded-xl font-bold transition-all ${
-                  activeTab === 'admin' ? 'gradient-gold text-[#043e3f] shadow-[0_0_15px_rgba(200,130,20,0.35)]' : 'text-[#eef7f5] hover:bg-[#c88214]/10 hover:text-[#c88214]'
-                }`}
+                onClick={handleSignOut}
+                className="flex items-center gap-2 px-3 py-1.5 text-xs rounded-lg font-bold transition-all text-red-400 hover:bg-red-500/10 hover:text-red-300 hover:shadow-[0_0_15px_rgba(239,68,68,0.2)] border border-transparent hover:border-red-500/20"
               >
-                <Users className="w-5 h-5" />
-                Admin
+                <LogOut className="w-3.5 h-3.5" />
+                Sign Out
               </button>
+            </div>
+          </div>
+          {lastUpdated && (
+            <div className={`px-6 pb-6 text-[9px] font-bold text-[#14a6d9] uppercase tracking-wider opacity-60 text-left ${userRole === 'admin' ? 'mt-0' : 'mt-auto'}`}>
+              Data up to: {lastUpdated.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
             </div>
           )}
         </div>

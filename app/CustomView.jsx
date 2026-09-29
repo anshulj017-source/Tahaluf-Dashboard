@@ -5,7 +5,7 @@ import * as d3 from 'd3';
 import { Filter, Download, Activity, TrendingUp, BarChart3, Target, Calendar, Globe2, AlertCircle, Search, Check, ChevronDown, Zap, TableProperties } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar, Legend, PieChart, Pie, Cell } from 'recharts';
 
-const COLORS = ['#74FA93', '#6fa89f', '#c88214', '#00937b', '#eef7f5', '#c88214', '#007542'];
+const COLORS = ['#74FA93', '#14a6d9', '#cedc28', '#00937b', '#eef7f5', '#cedc28', '#007542'];
 
 // Helper to get ISO Week number
 const getWeekNumber = (d) => {
@@ -16,12 +16,12 @@ const getWeekNumber = (d) => {
     return `Week ${weekNo}`;
 };
 
-const MetricCard = ({ label, value, color = "text-[#c88214]" }) => {
+const MetricCard = ({ label, value, color = "text-[#cedc28]" }) => {
   return (
-    <div className="card-surface backdrop-blur-2xl/80 backdrop-blur-xl p-6 rounded-[1.5rem] border border-[#c88214]/10 shadow-xl transition-all hover:shadow-[0_0_20px_rgba(116,250,147,0.15)] hover:-translate-y-1 relative overflow-hidden group">
-      <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-[#74FA93]/5 to-transparent rounded-full blur-2xl -mr-10 -mt-10 group-hover:bg-[#c88214]/10 transition-colors duration-500"></div>
+    <div className="card-surface backdrop-blur-2xl/80 backdrop-blur-xl p-6 rounded-[1.5rem] border border-[#cedc28]/10 shadow-xl transition-all hover:shadow-[0_0_20px_rgba(116,250,147,0.15)] hover:-translate-y-1 relative overflow-hidden group">
+      <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-[#74FA93]/5 to-transparent rounded-full blur-2xl -mr-10 -mt-10 group-hover:bg-[#cedc28]/10 transition-colors duration-500"></div>
       <p className={`text-[10px] font-black ${color} uppercase tracking-widest mb-2 relative z-10`}>{label}</p>
-      <h3 className="text-2xl font-black text-white truncate relative z-10" title={value}>{value}</h3>
+      <h3 className="text-3xl font-anton uppercase text-white truncate relative z-10" title={value}>{value}</h3>
     </div>
   );
 };
@@ -39,10 +39,10 @@ const MultiSelectDropdown = ({ label, options, selected, onChange, className = "
 
   return (
     <div className={className}>
-      {label && <span className="text-[10px] font-black uppercase text-[#6fa89f] mb-1.5 tracking-widest block">{label}</span>}
+      {label && <span className="text-[10px] font-bold uppercase text-[#14a6d9] mb-1.5 tracking-widest block">{label}</span>}
       <div 
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-4 py-3 card-surface backdrop-blur-2xl border border-[#c88214]/20 rounded-xl text-sm font-black text-[#c88214] shadow-sm cursor-pointer flex justify-between items-center transition-colors hover:border-[#c88214]/50"
+        className="w-full px-4 py-3 card-surface backdrop-blur-2xl border border-[#cedc28]/20 rounded-xl text-sm font-bold text-[#cedc28] shadow-sm cursor-pointer flex justify-between items-center transition-colors hover:border-[#cedc28]/50"
       >
         <span className="truncate pr-4">{selected.length === 0 ? 'All Selected' : (isObject ? `${selected.length} Selected` : selected.join(', '))}</span>
         <ChevronDown className={`w-4 h-4 flex-shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
@@ -51,17 +51,17 @@ const MultiSelectDropdown = ({ label, options, selected, onChange, className = "
         <>
           <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setIsOpen(false); setSearchTerm(''); }} />
           <div className="absolute top-full left-0 w-full h-0 z-50">
-            <div className="w-full mt-2 card-surface backdrop-blur-2xl border border-[#c88214]/20 rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex flex-col max-h-80 overflow-hidden">
-              <div className="p-3 border-b border-[#c88214]/10 bg-[#011414]">
+            <div className="w-full mt-2 card-surface backdrop-blur-2xl border border-[#cedc28]/20 rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex flex-col max-h-80 overflow-hidden">
+              <div className="p-3 border-b border-[#cedc28]/10 bg-[#0a2442]">
                 <div className="relative">
-                  <Search className="w-4 h-4 text-[#6fa89f] absolute left-3 top-1/2 -translate-y-1/2" />
+                  <Search className="w-4 h-4 text-[#14a6d9] absolute left-3 top-1/2 -translate-y-1/2" />
                   <input 
                     type="text" 
                     placeholder="Search..." 
                     autoFocus 
                     value={searchTerm} 
                     onChange={e => setSearchTerm(e.target.value)} 
-                    className="w-full card-surface backdrop-blur-2xl text-white text-xs font-bold pl-9 pr-3 py-2.5 rounded-lg outline-none border border-[#c88214]/20 focus:border-[#c88214] transition-colors" 
+                    className="w-full card-surface backdrop-blur-2xl text-white text-xs font-bold pl-9 pr-3 py-2.5 rounded-lg outline-none border border-[#cedc28]/20 focus:border-[#cedc28] transition-colors" 
                   />
                 </div>
               </div>
@@ -69,7 +69,7 @@ const MultiSelectDropdown = ({ label, options, selected, onChange, className = "
                 {!isObject && (
                 <div 
                   onClick={() => { onChange([]); setIsOpen(false); setSearchTerm(''); }} 
-                  className={`px-3 py-2.5 rounded-lg text-sm font-bold cursor-pointer flex justify-between items-center transition-colors ${selected.length === 0 ? 'bg-[#c88214]/20 text-[#c88214]' : 'text-white hover:bg-[#011414]'}`}
+                  className={`px-3 py-2.5 rounded-lg text-sm font-bold cursor-pointer flex justify-between items-center transition-colors ${selected.length === 0 ? 'bg-[#cedc28]/20 text-[#cedc28]' : 'text-white hover:bg-[#0a2442]'}`}
                 >
                   All <Check className={`w-4 h-4 ${selected.length === 0 ? 'opacity-100' : 'opacity-0'}`} />
                 </div>
@@ -90,7 +90,7 @@ const MultiSelectDropdown = ({ label, options, selected, onChange, className = "
                         }
                         onChange(next);
                       }} 
-                      className={`px-3 py-2.5 mt-1 rounded-lg text-sm font-bold cursor-pointer flex justify-between items-center transition-colors ${isSel ? 'bg-[#c88214]/20 text-[#c88214]' : 'text-white hover:bg-[#011414]'}`}
+                      className={`px-3 py-2.5 mt-1 rounded-lg text-sm font-bold cursor-pointer flex justify-between items-center transition-colors ${isSel ? 'bg-[#cedc28]/20 text-[#cedc28]' : 'text-white hover:bg-[#0a2442]'}`}
                     >
                       <span className="truncate pr-4">{text}</span> 
                       <Check className={`w-4 h-4 flex-shrink-0 ${isSel ? 'opacity-100' : 'opacity-0'}`} />
@@ -98,7 +98,7 @@ const MultiSelectDropdown = ({ label, options, selected, onChange, className = "
                   )
                 })}
                 {filteredOptions.length === 0 && (
-                  <div className="px-3 py-4 text-center text-xs font-bold text-[#6fa89f] uppercase tracking-widest">No results found</div>
+                  <div className="px-3 py-4 text-center text-xs font-bold text-[#14a6d9] uppercase tracking-widest">No results found</div>
                 )}
               </div>
             </div>
@@ -290,13 +290,13 @@ export default function CustomView({ adData = [], exRate = 1, exSym = "$", forma
     <div className="space-y-8 animate-[fadeIn_0.5s_ease-out] mb-24">
       
       {/* HEADER & CONTROLS */}
-      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6 card-surface backdrop-blur-2xl/80 backdrop-blur-xl p-8 rounded-[2rem] border border-[#c88214]/20 shadow-2xl relative z-50">
+      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6 card-surface backdrop-blur-2xl/80 backdrop-blur-xl p-8 rounded-[2rem] border border-[#cedc28]/20 shadow-2xl relative z-50">
         <div className="absolute top-0 left-0 w-32 h-32 bg-[#74FA93]/5 rounded-full blur-3xl -ml-10 -mt-10"></div>
         <div className="relative z-10">
-           <h2 className="text-3xl font-black text-white flex items-center gap-3">
-             <Filter className="text-[#c88214] w-8 h-8" /> Custom Data Hub
+           <h2 className="text-3xl font-bold text-white flex items-center gap-3">
+             <Filter className="text-[#cedc28] w-8 h-8" /> Custom Data Hub
            </h2>
-           <p className="text-[#6fa89f] text-sm mt-2 font-medium tracking-wide">Advanced slicing, goal tracking, and export suite.</p>
+           <p className="text-[#14a6d9] text-sm mt-2 font-medium tracking-wide">Advanced slicing, goal tracking, and export suite.</p>
         </div>
         
         <div className="flex flex-wrap gap-4 items-end w-full xl:w-auto relative z-40">
@@ -311,35 +311,35 @@ export default function CustomView({ adData = [], exRate = 1, exSym = "$", forma
            <div className="export-slide" data-title="Performance & Channel Mix">
              <div className={`grid grid-cols-2 md:grid-cols-${userRole === 'non-finance' ? '3' : '4'} gap-6 mb-8`}>
               {userRole !== 'non-finance' && <MetricCard label="Total Spend" value={`${exSym}${formatShort(actuals.spend)}`} />}
-              <MetricCard label="Impressions" value={formatShort(actuals.impressions)} color="text-[#6fa89f]" />
-              <MetricCard label="Clicks" value={formatShort(actuals.clicks)} color="text-[#c88214]" />
+              <MetricCard label="Impressions" value={formatShort(actuals.impressions)} color="text-[#14a6d9]" />
+              <MetricCard label="Clicks" value={formatShort(actuals.clicks)} color="text-[#cedc28]" />
               <MetricCard label="Video Views" value={formatShort(actuals.views)} color="text-[#007542]" />
            </div>
 
            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
-              <div className="card-surface backdrop-blur-2xl/80 backdrop-blur-xl border border-[#c88214]/10 rounded-[2rem] p-8 xl:col-span-2 shadow-xl">
-                 <h3 className="text-lg font-black text-white mb-8 flex items-center gap-2 uppercase tracking-widest text-sm">
-                   <TrendingUp className="text-[#c88214] w-5 h-5" /> Performance Trend
+              <div className="card-surface backdrop-blur-2xl/80 backdrop-blur-xl border border-[#cedc28]/10 rounded-[2rem] p-8 xl:col-span-2 shadow-xl">
+                 <h3 className="text-lg font-bold text-white mb-8 flex items-center gap-2 uppercase tracking-widest text-sm">
+                   <TrendingUp className="text-[#cedc28] w-5 h-5" /> Performance Trend
                  </h3>
                  <div className="h-72">
                    <ResponsiveContainer width="100%" height="100%">
                      <LineChart data={trendData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                        <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
-                       <XAxis dataKey="date" stroke="#6fa89f" fontSize={12} tickLine={false} axisLine={false} />
+                       <XAxis dataKey="date" stroke="#14a6d9" fontSize={12} tickLine={false} axisLine={false} />
                        {userRole !== 'non-finance' && <YAxis yAxisId="left" stroke="#74FA93" fontSize={12} tickLine={false} axisLine={false} tickFormatter={formatShort} />}
-                       <YAxis yAxisId={userRole === 'non-finance' ? "left" : "right"} orientation={userRole === 'non-finance' ? "left" : "right"} stroke="#c88214" fontSize={12} tickLine={false} axisLine={false} tickFormatter={formatShort} />
+                       <YAxis yAxisId={userRole === 'non-finance' ? "left" : "right"} orientation={userRole === 'non-finance' ? "left" : "right"} stroke="#cedc28" fontSize={12} tickLine={false} axisLine={false} tickFormatter={formatShort} />
                        <RechartsTooltip contentStyle={{ backgroundColor: '#0C272D', borderColor: '#74FA9320', color: '#fff', borderRadius: '16px', boxShadow: '0 10px 30px rgba(0,0,0,0.5)' }} />
                        <Legend wrapperStyle={{ paddingTop: '20px' }} />
                        {userRole !== 'non-finance' && <Line yAxisId="left" type="monotone" dataKey="Spend" stroke="#74FA93" strokeWidth={4} dot={false} activeDot={{r:8, fill: '#74FA93', stroke: '#0C272D', strokeWidth: 2}} />}
-                       <Line yAxisId={userRole === 'non-finance' ? "left" : "right"} type="monotone" dataKey="Impressions" stroke="#c88214" strokeWidth={4} dot={false} activeDot={{r:8, fill: '#c88214', stroke: '#0C272D', strokeWidth: 2}} />
+                       <Line yAxisId={userRole === 'non-finance' ? "left" : "right"} type="monotone" dataKey="Impressions" stroke="#cedc28" strokeWidth={4} dot={false} activeDot={{r:8, fill: '#cedc28', stroke: '#0C272D', strokeWidth: 2}} />
                      </LineChart>
                    </ResponsiveContainer>
                  </div>
               </div>
 
-              <div className="card-surface backdrop-blur-2xl/80 backdrop-blur-xl border border-[#c88214]/10 rounded-[2rem] p-8 shadow-xl">
-                 <h3 className="text-lg font-black text-white mb-8 flex items-center gap-2 uppercase tracking-widest text-sm">
-                   <Activity className="text-[#c88214] w-5 h-5" /> Channel Mix
+              <div className="card-surface backdrop-blur-2xl/80 backdrop-blur-xl border border-[#cedc28]/10 rounded-[2rem] p-8 shadow-xl">
+                 <h3 className="text-lg font-bold text-white mb-8 flex items-center gap-2 uppercase tracking-widest text-sm">
+                   <Activity className="text-[#cedc28] w-5 h-5" /> Channel Mix
                  </h3>
                  <div className="h-72">
                    <ResponsiveContainer width="100%" height="100%">
@@ -364,17 +364,17 @@ export default function CustomView({ adData = [], exRate = 1, exSym = "$", forma
            {/* MARKET CHARTS */}
            {hasMarketFilter && (
              <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8 mt-8 export-slide" data-title="Market Performance & Mix">
-                <div className="card-surface backdrop-blur-2xl/80 backdrop-blur-xl border border-[#c88214]/10 rounded-[2rem] p-8 xl:col-span-2 shadow-xl">
-                   <h3 className="text-lg font-black text-white mb-8 flex items-center gap-2 uppercase tracking-widest text-sm">
-                     <TrendingUp className="text-[#c88214] w-5 h-5" /> Market Performance Trend
+                <div className="card-surface backdrop-blur-2xl/80 backdrop-blur-xl border border-[#cedc28]/10 rounded-[2rem] p-8 xl:col-span-2 shadow-xl">
+                   <h3 className="text-lg font-bold text-white mb-8 flex items-center gap-2 uppercase tracking-widest text-sm">
+                     <TrendingUp className="text-[#cedc28] w-5 h-5" /> Market Performance Trend
                    </h3>
                    <div className="h-72">
                      <ResponsiveContainer width="100%" height="100%">
                        <LineChart data={marketTrendData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                          <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
-                         <XAxis dataKey="date" stroke="#6fa89f" fontSize={12} tickLine={false} axisLine={false} />
+                         <XAxis dataKey="date" stroke="#14a6d9" fontSize={12} tickLine={false} axisLine={false} />
                          {userRole !== 'non-finance' && <YAxis yAxisId="left" stroke="#74FA93" fontSize={12} tickLine={false} axisLine={false} tickFormatter={formatShort} />}
-                         <YAxis yAxisId={userRole === 'non-finance' ? "left" : "right"} orientation={userRole === 'non-finance' ? "left" : "right"} stroke="#c88214" fontSize={12} tickLine={false} axisLine={false} tickFormatter={formatShort} />
+                         <YAxis yAxisId={userRole === 'non-finance' ? "left" : "right"} orientation={userRole === 'non-finance' ? "left" : "right"} stroke="#cedc28" fontSize={12} tickLine={false} axisLine={false} tickFormatter={formatShort} />
                          <RechartsTooltip contentStyle={{ backgroundColor: '#0C272D', borderColor: '#74FA9320', color: '#fff', borderRadius: '16px', boxShadow: '0 10px 30px rgba(0,0,0,0.5)' }} />
                          <Legend wrapperStyle={{ paddingTop: '20px' }} />
                          
@@ -394,9 +394,9 @@ export default function CustomView({ adData = [], exRate = 1, exSym = "$", forma
                    </div>
                 </div>
 
-                <div className="card-surface backdrop-blur-2xl/80 backdrop-blur-xl border border-[#c88214]/10 rounded-[2rem] p-8 shadow-xl">
-                   <h3 className="text-lg font-black text-white mb-8 flex items-center gap-2 uppercase tracking-widest text-sm">
-                     <Activity className="text-[#c88214] w-5 h-5" /> Market Mix
+                <div className="card-surface backdrop-blur-2xl/80 backdrop-blur-xl border border-[#cedc28]/10 rounded-[2rem] p-8 shadow-xl">
+                   <h3 className="text-lg font-bold text-white mb-8 flex items-center gap-2 uppercase tracking-widest text-sm">
+                     <Activity className="text-[#cedc28] w-5 h-5" /> Market Mix
                    </h3>
                    <div className="h-72">
                      <ResponsiveContainer width="100%" height="100%">
@@ -419,10 +419,10 @@ export default function CustomView({ adData = [], exRate = 1, exSym = "$", forma
            )}
 
            {/* Data Table */}
-           <div className="card-surface backdrop-blur-2xl/80 backdrop-blur-xl border border-[#c88214]/10 rounded-[2rem] p-8 shadow-xl overflow-x-auto custom-scrollbar export-slide" data-title="Data Breakdown">
+           <div className="card-surface backdrop-blur-2xl/80 backdrop-blur-xl border border-[#cedc28]/10 rounded-[2rem] p-8 shadow-xl overflow-x-auto custom-scrollbar export-slide" data-title="Data Breakdown">
               <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 gap-4">
-                 <h3 className="text-lg font-black text-white flex items-center gap-2 uppercase tracking-widest text-sm">
-                    <TableProperties className="text-[#c88214] w-5 h-5" /> Data Breakdown
+                 <h3 className="text-lg font-bold text-white flex items-center gap-2 uppercase tracking-widest text-sm">
+                    <TableProperties className="text-[#cedc28] w-5 h-5" /> Data Breakdown
                  </h3>
                  <MultiSelectDropdown 
                    label=""
@@ -434,16 +434,16 @@ export default function CustomView({ adData = [], exRate = 1, exSym = "$", forma
               </div>
               <table className="w-full text-left border-collapse">
                  <thead>
-                    <tr className="border-b border-[#c88214]/20">
-                       <th className="py-4 px-4 text-[#6fa89f] font-bold text-xs uppercase tracking-widest">Week</th>
-                       <th className="py-4 px-4 text-[#6fa89f] font-bold text-xs uppercase tracking-widest">Market</th>
-                       <th className="py-4 px-4 text-[#6fa89f] font-bold text-xs uppercase tracking-widest">Campaign</th>
-                       <th className="py-4 px-4 text-[#6fa89f] font-bold text-xs uppercase tracking-widest">Channel</th>
+                    <tr className="border-b border-[#cedc28]/20">
+                       <th className="py-4 px-4 text-[#14a6d9] font-bold text-xs uppercase tracking-widest">Week</th>
+                       <th className="py-4 px-4 text-[#14a6d9] font-bold text-xs uppercase tracking-widest">Market</th>
+                       <th className="py-4 px-4 text-[#14a6d9] font-bold text-xs uppercase tracking-widest">Campaign</th>
+                       <th className="py-4 px-4 text-[#14a6d9] font-bold text-xs uppercase tracking-widest">Channel</th>
                        {selectedMetrics.map((metricKey) => {
                           const mDef = AVAILABLE_METRICS.find(m => m.key === metricKey);
                           if (!mDef) return null;
                           return (
-                            <th key={metricKey} className="py-4 px-4 text-[#6fa89f] font-bold text-xs uppercase tracking-widest text-right">
+                            <th key={metricKey} className="py-4 px-4 text-[#14a6d9] font-bold text-xs uppercase tracking-widest text-right">
                               {mDef.label}
                             </th>
                           )
@@ -456,7 +456,7 @@ export default function CustomView({ adData = [], exRate = 1, exSym = "$", forma
                           <td className="py-4 px-4 text-white text-sm font-medium">{d.week}</td>
                           <td className="py-4 px-4 text-white text-sm font-bold">{d.market}</td>
                           <td className="py-4 px-4 text-white text-sm font-bold">{d.campaignName}</td>
-                          <td className="py-4 px-4 text-[#c88214] text-sm font-bold">{d.channel}</td>
+                          <td className="py-4 px-4 text-[#cedc28] text-sm font-bold">{d.channel}</td>
                           {selectedMetrics.map((metricKey) => {
                              const mDef = AVAILABLE_METRICS.find(m => m.key === metricKey);
                              if (!mDef) return null;
@@ -471,17 +471,17 @@ export default function CustomView({ adData = [], exRate = 1, exSym = "$", forma
                  </tbody>
               </table>
               {tableDataByWeek.length > 50 && (
-                 <div className="text-center text-[#6fa89f] text-xs font-bold mt-6 uppercase tracking-widest">
+                 <div className="text-center text-[#14a6d9] text-xs font-bold mt-6 uppercase tracking-widest">
                    Showing first 50 rows. Export report for full data.
                  </div>
               )}
            </div>
          </>
       ) : (
-         <div className="card-surface backdrop-blur-2xl/50 p-16 rounded-[2rem] border border-[#c88214]/10 text-center flex flex-col items-center justify-center">
+         <div className="card-surface backdrop-blur-2xl/50 p-16 rounded-[2rem] border border-[#cedc28]/10 text-center flex flex-col items-center justify-center">
             <AlertCircle className="w-16 h-16 text-[#007542] mb-6 opacity-80" />
-            <h3 className="text-2xl font-black text-white">No data matches your filters</h3>
-            <p className="text-[#6fa89f] mt-2 font-medium">Try clearing some selections to see results.</p>
+            <h3 className="text-3xl font-anton uppercase text-white">No data matches your filters</h3>
+            <p className="text-[#14a6d9] mt-2 font-medium">Try clearing some selections to see results.</p>
          </div>
       )}
     </div>

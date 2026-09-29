@@ -6,7 +6,7 @@ import * as d3 from 'd3';
 import { Eye, MousePointer2, Play, Activity, TrendingUp, BarChart3, Target, CheckCircle2 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
 
-const COLORS = ['#74FA93', '#c88214', '#00937b', '#eef7f5', '#007542'];
+const COLORS = ['#74FA93', '#cedc28', '#00937b', '#eef7f5', '#007542'];
 
 export default function ChannelView({ adData, exRate = 1, exSym = '$', formatShort = (v) => v, userRole }) {
   const [selectedChannels, setSelectedChannels] = useState([]);
@@ -123,11 +123,11 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
     }).sort((a, b) => a.sortDate - b.sortDate);
   }, [selectedChannelData, exRate, selectedChannels, trendMetric]);
 
-  // 5. Tournament breakdown (flattened)
+  // 5. Event breakdown (flattened)
   const campaignBreakdown = useMemo(() => {
     if (selectedChannelData.length === 0) return [];
     
-    // Group by Channel -> Tournament
+    // Group by Channel -> Event
     const grouped = d3.groups(selectedChannelData, d => d.channel, d => d.campaignName);
     
     let flattened = [];
@@ -164,7 +164,7 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
     return flattened.sort((a,b) => b.spend - a.spend);
   }, [selectedChannelData]);
 
-  // Tournament chart data (pivot for stacked bars)
+  // Event chart data (pivot for stacked bars)
   const campaignChartData = useMemo(() => {
      if (selectedChannelData.length === 0) return [];
      const grouped = d3.groups(selectedChannelData, d => d.campaignName);
@@ -182,7 +182,7 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
   const TrendTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-[#011414] border border-[#c88214]/30 p-4 rounded-xl shadow-xl">
+        <div className="bg-[#0a2442] border border-[#cedc28]/30 p-4 rounded-xl shadow-xl">
           <p className="text-white font-bold mb-2">{label}</p>
           {payload.map((entry, index) => (
             <p key={index} className="text-sm font-medium" style={{ color: entry.color }}>
@@ -204,40 +204,40 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
       {selectedChannels.length === 0 && (
         <>
           <div className="flex items-center justify-between">
-            <h2 className="text-3xl font-black text-white flex items-center gap-3">
-              <Activity className="text-[#c88214] w-8 h-8" /> Channel Overview
+            <h2 className="text-3xl font-bold text-white flex items-center gap-3">
+              <Activity className="text-[#cedc28] w-8 h-8" /> Channel Overview
             </h2>
           </div>
 
           {topCards && (
             <div className={`grid grid-cols-1 md:grid-cols-2 ${userRole === 'non-finance' ? 'lg:grid-cols-3' : 'lg:grid-cols-4'} gap-4`}>
-              <div className="bg-[#011414] border border-[#c88214]/20 rounded-2xl p-6 relative overflow-hidden group hover:border-[#c88214]/50 transition-colors">
+              <div className="bg-[#0a2442] border border-[#cedc28]/20 rounded-2xl p-6 relative overflow-hidden group hover:border-[#cedc28]/50 transition-colors">
                 <div className="absolute -right-4 -top-4 opacity-5 group-hover:opacity-10 transition-opacity"><Eye className="w-32 h-32 text-white" /></div>
-                <p className="text-[#6fa89f] text-xs font-bold uppercase tracking-widest mb-1 flex items-center gap-2"><Eye className="w-4 h-4 text-[#c88214]"/> Top by Impressions</p>
-                <p className="text-2xl font-black text-white truncate">{topCards.impressions.channel}</p>
-                <p className="text-[#c88214] font-bold text-lg mt-2">{formatShort(topCards.impressions.impressions)} <span className="text-xs text-[#6fa89f] font-medium">Impressions</span></p>
+                <p className="text-[#14a6d9] text-xs font-bold uppercase tracking-widest mb-1 flex items-center gap-2"><Eye className="w-4 h-4 text-[#cedc28]"/> Top by Impressions</p>
+                <p className="text-3xl font-anton uppercase text-white truncate">{topCards.impressions.channel}</p>
+                <p className="text-[#cedc28] font-bold text-lg mt-2">{formatShort(topCards.impressions.impressions)} <span className="text-xs text-[#14a6d9] font-medium">Impressions</span></p>
               </div>
               
-              <div className="bg-[#011414] border border-[#c88214]/20 rounded-2xl p-6 relative overflow-hidden group hover:border-[#c88214]/50 transition-colors">
+              <div className="bg-[#0a2442] border border-[#cedc28]/20 rounded-2xl p-6 relative overflow-hidden group hover:border-[#cedc28]/50 transition-colors">
                 <div className="absolute -right-4 -top-4 opacity-5 group-hover:opacity-10 transition-opacity"><MousePointer2 className="w-32 h-32 text-white" /></div>
-                <p className="text-[#6fa89f] text-xs font-bold uppercase tracking-widest mb-1 flex items-center gap-2"><MousePointer2 className="w-4 h-4 text-[#c88214]"/> Top by Clicks</p>
-                <p className="text-2xl font-black text-white truncate">{topCards.clicks.channel}</p>
-                <p className="text-[#c88214] font-bold text-lg mt-2">{formatShort(topCards.clicks.clicks)} <span className="text-xs text-[#6fa89f] font-medium">Clicks</span></p>
+                <p className="text-[#14a6d9] text-xs font-bold uppercase tracking-widest mb-1 flex items-center gap-2"><MousePointer2 className="w-4 h-4 text-[#cedc28]"/> Top by Clicks</p>
+                <p className="text-3xl font-anton uppercase text-white truncate">{topCards.clicks.channel}</p>
+                <p className="text-[#cedc28] font-bold text-lg mt-2">{formatShort(topCards.clicks.clicks)} <span className="text-xs text-[#14a6d9] font-medium">Clicks</span></p>
               </div>
 
-              <div className="bg-[#011414] border border-[#c88214]/20 rounded-2xl p-6 relative overflow-hidden group hover:border-[#c88214]/50 transition-colors">
+              <div className="bg-[#0a2442] border border-[#cedc28]/20 rounded-2xl p-6 relative overflow-hidden group hover:border-[#cedc28]/50 transition-colors">
                 <div className="absolute -right-4 -top-4 opacity-5 group-hover:opacity-10 transition-opacity"><Play className="w-32 h-32 text-white" /></div>
-                <p className="text-[#6fa89f] text-xs font-bold uppercase tracking-widest mb-1 flex items-center gap-2"><Play className="w-4 h-4 text-[#c88214]"/> Top by Video Views</p>
-                <p className="text-2xl font-black text-white truncate">{topCards.views.channel}</p>
-                <p className="text-[#c88214] font-bold text-lg mt-2">{formatShort(topCards.views.views)} <span className="text-xs text-[#6fa89f] font-medium">Views</span></p>
+                <p className="text-[#14a6d9] text-xs font-bold uppercase tracking-widest mb-1 flex items-center gap-2"><Play className="w-4 h-4 text-[#cedc28]"/> Top by Video Views</p>
+                <p className="text-3xl font-anton uppercase text-white truncate">{topCards.views.channel}</p>
+                <p className="text-[#cedc28] font-bold text-lg mt-2">{formatShort(topCards.views.views)} <span className="text-xs text-[#14a6d9] font-medium">Views</span></p>
               </div>
 
               {userRole !== 'non-finance' && (
-                <div className="bg-gradient-to-br from-[#0C272D] to-[#113A42] border border-[#c88214]/40 rounded-2xl p-6 relative overflow-hidden group hover:border-[#c88214] transition-colors shadow-[0_0_15px_rgba(116,250,147,0.1)]">
-                  <div className="absolute -right-4 -top-4 opacity-5 group-hover:opacity-10 transition-opacity"><Target className="w-32 h-32 text-[#c88214]" /></div>
-                  <p className="text-[#6fa89f] text-xs font-bold uppercase tracking-widest mb-1 flex items-center gap-2"><Target className="w-4 h-4 text-[#c88214]"/> Most Efficient</p>
-                  <p className="text-2xl font-black text-white truncate">{topCards.efficiency.channel}</p>
-                  <p className="text-[#c88214] font-bold text-lg mt-2">{exSym}{d3.format(",.2f")(topCards.efficiency.cpc * exRate)} <span className="text-xs text-[#6fa89f] font-medium">CPC</span></p>
+                <div className="bg-gradient-to-br from-[#0C272D] to-[#113A42] border border-[#cedc28]/40 rounded-2xl p-6 relative overflow-hidden group hover:border-[#cedc28] transition-colors shadow-[0_0_15px_rgba(116,250,147,0.1)]">
+                  <div className="absolute -right-4 -top-4 opacity-5 group-hover:opacity-10 transition-opacity"><Target className="w-32 h-32 text-[#cedc28]" /></div>
+                  <p className="text-[#14a6d9] text-xs font-bold uppercase tracking-widest mb-1 flex items-center gap-2"><Target className="w-4 h-4 text-[#cedc28]"/> Most Efficient</p>
+                  <p className="text-3xl font-anton uppercase text-white truncate">{topCards.efficiency.channel}</p>
+                  <p className="text-[#cedc28] font-bold text-lg mt-2">{exSym}{d3.format(",.2f")(topCards.efficiency.cpc * exRate)} <span className="text-xs text-[#14a6d9] font-medium">CPC</span></p>
                 </div>
               )}
             </div>
@@ -246,16 +246,16 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
       )}
 
       {/* CHANNEL SELECTION GRID */}
-      <div className={`card-surface backdrop-blur-2xl border border-[#c88214]/20 rounded-3xl p-6 md:p-8 transition-all ${selectedChannels.length > 0 ? 'mt-0' : ''} export-slide`} data-title="Channel Top Stats">
+      <div className={`card-surface backdrop-blur-2xl border border-[#cedc28]/20 rounded-3xl p-6 md:p-8 transition-all ${selectedChannels.length > 0 ? 'mt-0' : ''} export-slide`} data-title="Channel Top Stats">
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
           <div>
-            <h3 className="text-xl font-black text-white">Compare Channels</h3>
-            <p className="text-sm text-[#6fa89f]">Select up to 3 channels to compare their performance.</p>
+            <h3 className="text-2xl font-anton uppercase text-white">Compare Channels</h3>
+            <p className="text-sm text-[#14a6d9]">Select up to 3 channels to compare their performance.</p>
           </div>
           {selectedChannels.length > 0 && (
              <button 
                 onClick={() => setSelectedChannels([])}
-                className="text-xs font-bold uppercase tracking-widest text-[#c88214] hover:text-white bg-[#c88214]/10 hover:bg-[#74FA93]/20 px-4 py-2 rounded-full transition-colors"
+                className="text-xs font-bold uppercase tracking-widest text-[#cedc28] hover:text-white bg-[#cedc28]/10 hover:bg-[#74FA93]/20 px-4 py-2 rounded-full transition-colors"
              >
                 Clear Selection
              </button>
@@ -272,18 +272,18 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
                 onClick={() => handleChannelToggle(ch.channel)}
                 disabled={isDisabled}
                 className={`border rounded-xl p-4 text-left transition-all duration-300 relative flex flex-col justify-between min-h-[100px]
-                  ${isSelected ? 'bg-[#74FA93]/20 border-[#c88214] shadow-[0_0_15px_rgba(116,250,147,0.1)]' : 'bg-[#011414] border-[#c88214]/20'}
-                  ${!isSelected && !isDisabled ? 'hover:bg-[#c88214]/10 hover:border-[#c88214]/60' : ''}
+                  ${isSelected ? 'bg-[#74FA93]/20 border-[#cedc28] shadow-[0_0_15px_rgba(116,250,147,0.1)]' : 'bg-[#0a2442] border-[#cedc28]/20'}
+                  ${!isSelected && !isDisabled ? 'hover:bg-[#cedc28]/10 hover:border-[#cedc28]/60' : ''}
                   ${isDisabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}
                 `}
               >
-                {isSelected && <CheckCircle2 className="absolute top-2 right-2 w-4 h-4 text-[#c88214]" />}
+                {isSelected && <CheckCircle2 className="absolute top-2 right-2 w-4 h-4 text-[#cedc28]" />}
                 <div>
-                  <h4 className={`text-base font-bold transition-colors line-clamp-1 ${isSelected ? 'text-[#c88214]' : 'text-white'}`}>{ch.channel}</h4>
+                  <h4 className={`text-base font-bold transition-colors line-clamp-1 ${isSelected ? 'text-[#cedc28]' : 'text-white'}`}>{ch.channel}</h4>
                 </div>
                 <div className="mt-2">
-                  <p className="text-[10px] text-[#6fa89f] uppercase tracking-wider">{userRole === 'non-finance' ? 'Clicks' : 'Spend'}</p>
-                  <p className="text-sm font-black text-white">{userRole === 'non-finance' ? formatShort(ch.clicks) : `${exSym}${formatShort(ch.spend * exRate)}`}</p>
+                  <p className="text-[10px] text-[#14a6d9] uppercase tracking-wider">{userRole === 'non-finance' ? 'Clicks' : 'Spend'}</p>
+                  <p className="text-sm font-bold text-white">{userRole === 'non-finance' ? formatShort(ch.clicks) : `${exSym}${formatShort(ch.spend * exRate)}`}</p>
                 </div>
               </button>
             )
@@ -296,15 +296,15 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
         <div className="space-y-6 animate-[fadeIn_0.4s_ease-out]">
           
           {/* KPI MATRIX */}
-          <div className="card-surface backdrop-blur-2xl border border-[#c88214]/20 rounded-3xl p-6 overflow-hidden export-slide" data-title="Top Performing Campaigns">
-             <h3 className="text-lg font-black text-white mb-6">Channel Performance Matrix</h3>
+          <div className="card-surface backdrop-blur-2xl border border-[#cedc28]/20 rounded-3xl p-6 overflow-hidden export-slide" data-title="Top Performing Campaigns">
+             <h3 className="text-lg font-bold text-white mb-6">Channel Performance Matrix</h3>
              <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse whitespace-nowrap">
                   <thead>
-                    <tr className="border-b-2 border-[#c88214]/30">
-                      <th className="px-4 py-3 text-xs font-black text-[#6fa89f] uppercase tracking-wider">Metric</th>
+                    <tr className="border-b-2 border-[#cedc28]/30">
+                      <th className="px-4 py-3 text-xs font-bold text-[#14a6d9] uppercase tracking-wider">Metric</th>
                       {selectedChannels.map(ch => (
-                         <th key={ch} className="px-4 py-3 text-sm font-black text-[#c88214] uppercase tracking-wider text-right">{ch}</th>
+                         <th key={ch} className="px-4 py-3 text-sm font-bold text-[#cedc28] uppercase tracking-wider text-right">{ch}</th>
                       ))}
                     </tr>
                   </thead>
@@ -313,7 +313,7 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
                        const metricDef = AVAILABLE_METRICS.find(m => m.key === metricKey);
                        if (!metricDef) return null;
                        return (
-                          <tr key={metricKey} className={`border-b border-[#c88214]/10 ${i % 2 === 0 ? 'bg-transparent' : 'bg-[#011414]/30'}`}>
+                          <tr key={metricKey} className={`border-b border-[#cedc28]/10 ${i % 2 === 0 ? 'bg-transparent' : 'bg-[#0a2442]/30'}`}>
                             <td className="px-4 py-4 text-sm font-bold text-white">{metricDef.label}</td>
                             {selectedChannels.map(ch => {
                                const stat = channelStats.find(c => c.channel === ch);
@@ -334,15 +334,15 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
             
             {/* TREND CHART */}
-            <div className="card-surface backdrop-blur-2xl border border-[#c88214]/20 rounded-3xl p-6 export-slide" data-title="Ad Format Performance">
+            <div className="card-surface backdrop-blur-2xl border border-[#cedc28]/20 rounded-3xl p-6 export-slide" data-title="Ad Format Performance">
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-black text-white flex items-center gap-2">
-                  <TrendingUp className="text-[#c88214] w-5 h-5" /> Comparison Trend
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <TrendingUp className="text-[#cedc28] w-5 h-5" /> Comparison Trend
                 </h3>
                 <select 
                   value={trendMetric} 
                   onChange={(e) => setTrendMetric(e.target.value)}
-                  className="bg-[#011414] text-[#c88214] border border-[#c88214]/30 rounded-lg px-3 py-1 text-xs font-bold outline-none"
+                  className="bg-[#0a2442] text-[#cedc28] border border-[#cedc28]/30 rounded-lg px-3 py-1 text-xs font-bold outline-none"
                 >
                   {userRole !== 'non-finance' && <option value="spend">Spend</option>}
                   <option value="impressions">Impressions</option>
@@ -355,8 +355,8 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={trendData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
-                    <XAxis dataKey="month" stroke="#6fa89f" fontSize={12} tickLine={false} axisLine={false} />
-                    <YAxis stroke="#6fa89f" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => formatShort(v)} />
+                    <XAxis dataKey="month" stroke="#14a6d9" fontSize={12} tickLine={false} axisLine={false} />
+                    <YAxis stroke="#14a6d9" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => formatShort(v)} />
                     <RechartsTooltip content={<TrendTooltip />} />
                     <Legend wrapperStyle={{ paddingTop: '20px' }} />
                     {selectedChannels.map((ch, idx) => (
@@ -368,17 +368,17 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
             </div>
 
             {/* TOURNAMENT BREAKDOWN CHART */}
-            <div className="card-surface backdrop-blur-2xl border border-[#c88214]/20 rounded-3xl p-6 export-slide" data-title="Buying Type Performance">
-              <h3 className="text-lg font-black text-white mb-6 flex items-center gap-2">
-                <BarChart3 className="text-[#c88214] w-5 h-5" /> Top Tournaments Across Channels
-                <InfoTooltip definition="Definition for Top Tournaments" />
+            <div className="card-surface backdrop-blur-2xl border border-[#cedc28]/20 rounded-3xl p-6 export-slide" data-title="Buying Type Performance">
+              <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
+                <BarChart3 className="text-[#cedc28] w-5 h-5" /> Top Events Across Channels
+                <InfoTooltip definition="Definition for Top Events" />
               </h3>
               <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={campaignChartData} layout="vertical" margin={{ top: 0, right: 20, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" horizontal={true} vertical={false} />
-                    <XAxis type="number" stroke="#6fa89f" fontSize={10} tickFormatter={(v) => formatShort(v)} />
-                    <YAxis dataKey="campaign" type="category" stroke="#6fa89f" fontSize={10} width={110} tickFormatter={(v) => v.length > 15 ? v.substring(0,15)+'...' : v} />
+                    <XAxis type="number" stroke="#14a6d9" fontSize={10} tickFormatter={(v) => formatShort(v)} />
+                    <YAxis dataKey="campaign" type="category" stroke="#14a6d9" fontSize={10} width={110} tickFormatter={(v) => v.length > 15 ? v.substring(0,15)+'...' : v} />
                     <RechartsTooltip 
                       contentStyle={{ backgroundColor: '#0C272D', borderColor: '#74FA9320', color: '#fff', borderRadius: '12px' }} 
                       cursor={{fill: '#ffffff05'}} 
@@ -395,15 +395,15 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
           </div>
           
           {/* TOURNAMENT DATA TABLE */}
-          <div className="card-surface backdrop-blur-2xl border border-[#c88214]/20 rounded-3xl p-6 overflow-hidden export-slide" data-title="Detailed Channel Metrics">
+          <div className="card-surface backdrop-blur-2xl border border-[#cedc28]/20 rounded-3xl p-6 overflow-hidden export-slide" data-title="Detailed Channel Metrics">
              <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 gap-4">
-               <h3 className="text-lg font-black text-white flex items-center gap-2">Detailed Tournament Metrics <InfoTooltip definition="Definition for Detailed Tournament Metrics" /></h3>
+               <h3 className="text-lg font-bold text-white flex items-center gap-2">Detailed Event Metrics <InfoTooltip definition="Definition for Detailed Event Metrics" /></h3>
                <div className="flex flex-wrap gap-2">
                  {AVAILABLE_METRICS.map(m => (
                    <button 
                      key={m.key}
                      onClick={() => setSelectedMetrics(prev => prev.includes(m.key) ? prev.filter(k => k !== m.key) : [...prev, m.key])}
-                     className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${selectedMetrics.includes(m.key) ? 'bg-[#74FA93] text-[#0C272D]' : 'bg-[#011414] text-[#6fa89f] border border-[#c88214]/30 hover:border-[#c88214] hover:text-white'}`}
+                     className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${selectedMetrics.includes(m.key) ? 'bg-[#74FA93] text-[#0C272D]' : 'bg-[#0a2442] text-[#14a6d9] border border-[#cedc28]/30 hover:border-[#cedc28] hover:text-white'}`}
                    >
                      {m.label}
                    </button>
@@ -414,21 +414,21 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
              <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse whitespace-nowrap">
                   <thead>
-                    <tr className="border-b-2 border-[#c88214]/30">
-                      <th className="px-4 py-3 text-xs font-black text-[#6fa89f] uppercase tracking-wider sticky left-0 bg-[#065c5d] z-10">Tournament</th>
-                      <th className="px-4 py-3 text-xs font-black text-[#6fa89f] uppercase tracking-wider">Channel</th>
+                    <tr className="border-b-2 border-[#cedc28]/30">
+                      <th className="px-4 py-3 text-xs font-bold text-[#14a6d9] uppercase tracking-wider sticky left-0 bg-[#14a6d9] z-10">Event</th>
+                      <th className="px-4 py-3 text-xs font-bold text-[#14a6d9] uppercase tracking-wider">Channel</th>
                       {AVAILABLE_METRICS.filter(m => selectedMetrics.includes(m.key)).map(m => (
-                         <th key={m.key} className="px-4 py-3 text-xs font-black text-[#6fa89f] uppercase tracking-wider text-right">{m.label}</th>
+                         <th key={m.key} className="px-4 py-3 text-xs font-bold text-[#14a6d9] uppercase tracking-wider text-right">{m.label}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {campaignBreakdown.map((row, i) => (
-                      <tr key={`${row.channel}-${row.campaign}`} className={`border-b border-[#c88214]/10 hover:bg-[#74FA93]/5 transition-colors ${i % 2 === 0 ? 'bg-transparent' : 'bg-[#011414]/30'}`}>
-                        <td className={`px-4 py-4 text-sm font-bold text-white sticky left-0 z-10 ${i % 2 === 0 ? 'card-surface backdrop-blur-2xl' : 'bg-[#011414]'}`}>{row.campaign}</td>
-                        <td className="px-4 py-4 text-sm font-bold text-[#6fa89f]">{row.channel}</td>
+                      <tr key={`${row.channel}-${row.campaign}`} className={`border-b border-[#cedc28]/10 hover:bg-[#74FA93]/5 transition-colors ${i % 2 === 0 ? 'bg-transparent' : 'bg-[#0a2442]/30'}`}>
+                        <td className={`px-4 py-4 text-sm font-bold text-white sticky left-0 z-10 ${i % 2 === 0 ? 'card-surface backdrop-blur-2xl' : 'bg-[#0a2442]'}`}>{row.campaign}</td>
+                        <td className="px-4 py-4 text-sm font-bold text-[#14a6d9]">{row.channel}</td>
                         {AVAILABLE_METRICS.filter(m => selectedMetrics.includes(m.key)).map(m => (
-                           <td key={m.key} className="px-4 py-4 text-sm font-medium text-[#c88214] text-right">{m.format(row[m.key])}</td>
+                           <td key={m.key} className="px-4 py-4 text-sm font-medium text-[#cedc28] text-right">{m.format(row[m.key])}</td>
                         ))}
                       </tr>
                     ))}
@@ -459,11 +459,11 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
                       };
 
                       return (
-                         <tr className="bg-[#011414] border-t-2 border-[#c88214]/50">
-                            <td className="px-4 py-4 text-sm font-black text-[#c88214] sticky left-0 bg-[#011414] z-10">Total</td>
-                            <td className="px-4 py-4 text-sm font-black text-[#c88214]"></td>
+                         <tr className="bg-[#0a2442] border-t-2 border-[#cedc28]/50">
+                            <td className="px-4 py-4 text-sm font-bold text-[#cedc28] sticky left-0 bg-[#0a2442] z-10">Total</td>
+                            <td className="px-4 py-4 text-sm font-bold text-[#cedc28]"></td>
                             {AVAILABLE_METRICS.filter(m => selectedMetrics.includes(m.key)).map(m => (
-                               <td key={m.key} className="px-4 py-4 text-sm font-black text-[#c88214] text-right">{m.format(totals[m.key])}</td>
+                               <td key={m.key} className="px-4 py-4 text-sm font-bold text-[#cedc28] text-right">{m.format(totals[m.key])}</td>
                             ))}
                          </tr>
                       )

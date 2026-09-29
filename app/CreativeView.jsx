@@ -12,23 +12,23 @@ const MultiSelectDropdown = ({ label, options, selected, onChange }) => {
 
   return (
     <div className="relative min-w-[120px] z-30">
-      <span className="text-[10px] font-black text-[#6fa89f] uppercase tracking-widest mb-1.5 block">{label}</span>
+      <span className="text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest mb-1.5 block">{label}</span>
       <div 
         onClick={() => setIsOpen(!isOpen)}
-        className="px-2.5 py-1.5 card-surface backdrop-blur-2xl border border-[#c88214]/30 rounded-lg text-xs font-bold text-[#eef7f5] cursor-pointer flex justify-between items-center hover:border-[#c88214] transition-colors"
+        className="px-2.5 py-1.5 card-surface backdrop-blur-2xl border border-[#cedc28]/30 rounded-lg text-xs font-bold text-[#eef7f5] cursor-pointer flex justify-between items-center hover:border-[#cedc28] transition-colors"
       >
         <span className="truncate pr-2">{selected.includes('All') ? 'All Selected' : selected.join(', ')}</span>
         <ChevronDown className={`w-4 h-4 flex-shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </div>
       {isOpen && (
         <div className="absolute top-full left-0 w-full h-0 z-50">
-          <div className="w-full mt-2 card-surface backdrop-blur-2xl border border-[#c88214]/30 rounded-xl shadow-2xl flex flex-col max-h-64 overflow-hidden">
-            <div className="p-2 border-b border-[#c88214]/10 relative">
-              <Search className="w-4 h-4 text-[#6fa89f] absolute left-4 top-1/2 -translate-y-1/2" />
-              <input type="text" placeholder="Search..." autoFocus value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full bg-[#011414] text-[#eef7f5] text-xs font-bold pl-9 pr-3 py-2 rounded-lg outline-none border border-transparent focus:border-[#c88214]/50" />
+          <div className="w-full mt-2 card-surface backdrop-blur-2xl border border-[#cedc28]/30 rounded-xl shadow-2xl flex flex-col max-h-64 overflow-hidden">
+            <div className="p-2 border-b border-[#cedc28]/10 relative">
+              <Search className="w-4 h-4 text-[#14a6d9] absolute left-4 top-1/2 -translate-y-1/2" />
+              <input type="text" placeholder="Search..." autoFocus value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full bg-[#0a2442] text-[#eef7f5] text-xs font-bold pl-9 pr-3 py-2 rounded-lg outline-none border border-transparent focus:border-[#cedc28]/50" />
             </div>
             <div className="overflow-y-auto p-2 flex-1 custom-scrollbar">
-              <div onClick={() => { onChange(['All']); setIsOpen(false); setSearchTerm(''); }} className={`px-3 py-2 rounded-lg text-sm font-bold cursor-pointer flex justify-between ${selected.includes('All') ? 'bg-[#c88214]/20 text-[#c88214]' : 'text-[#eef7f5] hover:bg-[#011414]'}`}>
+              <div onClick={() => { onChange(['All']); setIsOpen(false); setSearchTerm(''); }} className={`px-3 py-2 rounded-lg text-sm font-bold cursor-pointer flex justify-between ${selected.includes('All') ? 'bg-[#cedc28]/20 text-[#cedc28]' : 'text-[#eef7f5] hover:bg-[#0a2442]'}`}>
                 All <Check className={`w-4 h-4 ${selected.includes('All') ? 'opacity-100' : 'opacity-0'}`} />
               </div>
               {filtered.map(opt => {
@@ -42,7 +42,7 @@ const MultiSelectDropdown = ({ label, options, selected, onChange }) => {
                       if (next.length === 0) next = ['All'];
                     } else { next.push(opt); }
                     onChange(next);
-                  }} className={`px-3 py-2 mt-1 rounded-lg text-sm font-bold cursor-pointer flex justify-between ${isSel ? 'bg-[#c88214]/20 text-[#c88214]' : 'text-[#eef7f5] hover:bg-[#011414]'}`}>
+                  }} className={`px-3 py-2 mt-1 rounded-lg text-sm font-bold cursor-pointer flex justify-between ${isSel ? 'bg-[#cedc28]/20 text-[#cedc28]' : 'text-[#eef7f5] hover:bg-[#0a2442]'}`}>
                     <span className="truncate pr-2">{opt}</span> <Check className={`w-4 h-4 flex-shrink-0 ${isSel ? 'opacity-100' : 'opacity-0'}`} />
                   </div>
                 )
@@ -172,13 +172,13 @@ export default function CreativeView({ data, exRate = 1, exSym = '$', formatShor
 
   const renderSortHeader = (label, key) => (
     <th 
-      className="px-6 py-4 text-[10px] font-black text-[#6fa89f] uppercase tracking-widest cursor-pointer hover:text-[#eef7f5] transition-colors"
+      className="px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest cursor-pointer hover:text-[#eef7f5] transition-colors"
       onClick={() => handleSort(key)}
     >
       <div className="flex items-center gap-1">
         {label}
         {sortConfig?.key === key && (
-           <span className="text-[#c88214]">{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>
+           <span className="text-[#cedc28]">{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>
         )}
       </div>
     </th>
@@ -188,19 +188,19 @@ export default function CreativeView({ data, exRate = 1, exSym = '$', formatShor
     <div className="animate-in fade-in duration-500">
       <div className="mb-6 flex justify-between items-end">
         <div>
-          <h2 className="text-3xl font-black text-[#eef7f5] tracking-tight">Creative Performance</h2>
-          <p className="text-[#6fa89f] font-medium italic mt-1">Independent creative asset analysis.</p>
+          <h2 className="text-3xl font-bold text-[#eef7f5] tracking-tight">Creative Performance</h2>
+          <p className="text-[#14a6d9] font-medium italic mt-1">Independent creative asset analysis.</p>
         </div>
       </div>
       
       {/* TOP 10 SUMMARY GRAPHS */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 export-slide" data-title="Creative Overview">
-         <div className="card-surface backdrop-blur-2xl rounded-2xl border border-[#c88214]/20 p-6 shadow-xl flex flex-col">
-            <h3 className="text-sm font-black text-[#eef7f5] uppercase tracking-widest mb-4 flex items-center gap-2"><BarChart3 className="w-4 h-4 text-[#c88214]"/> Top 10 by CTR</h3>
+         <div className="card-surface backdrop-blur-2xl rounded-2xl border border-[#cedc28]/20 p-6 shadow-xl flex flex-col">
+            <h3 className="text-sm font-bold text-[#eef7f5] uppercase tracking-widest mb-4 flex items-center gap-2"><BarChart3 className="w-4 h-4 text-[#cedc28]"/> Top 10 by CTR</h3>
             <div className="flex-1 space-y-3">
                {topCTR.map((c, i) => (
                   <div key={i} className="flex flex-col gap-1">
-                     <div className="flex justify-between text-xs text-[#6fa89f]">
+                     <div className="flex justify-between text-xs text-[#14a6d9]">
                         <span className="truncate w-3/4" title={c.creativeName}>
                           {i+1}.{' '}
                           {c.adImageUrl ? (
@@ -209,24 +209,24 @@ export default function CreativeView({ data, exRate = 1, exSym = '$', formatShor
                             c.creativeName
                           )}
                         </span>
-                        <span className="font-bold text-[#c88214]">{(c.ctr*100).toFixed(2)}%</span>
+                        <span className="font-bold text-[#cedc28]">{(c.ctr*100).toFixed(2)}%</span>
                      </div>
-                     <div className="w-full bg-[#011414] h-1.5 rounded-full overflow-hidden">
-                        <div className="bg-[#c88214] h-full rounded-full" style={{width: `${Math.min(100, (c.ctr / (topCTR[0]?.ctr || 1)) * 100)}%`}}></div>
+                     <div className="w-full bg-[#0a2442] h-1.5 rounded-full overflow-hidden">
+                        <div className="bg-[#cedc28] h-full rounded-full" style={{width: `${Math.min(100, (c.ctr / (topCTR[0]?.ctr || 1)) * 100)}%`}}></div>
                      </div>
                   </div>
                ))}
-               {topCTR.length === 0 && <div className="text-[#6fa89f] text-xs py-4 text-center">No data available</div>}
+               {topCTR.length === 0 && <div className="text-[#14a6d9] text-xs py-4 text-center">No data available</div>}
             </div>
          </div>
          
          {userRole !== 'non-finance' && (
-           <div className="card-surface backdrop-blur-2xl rounded-2xl border border-[#c88214]/20 p-6 shadow-xl flex flex-col">
-              <h3 className="text-sm font-black text-[#eef7f5] uppercase tracking-widest mb-4 flex items-center gap-2"><BarChart3 className="w-4 h-4 text-[#c88214]"/> Top 10 by CPC (Lowest)</h3>
+           <div className="card-surface backdrop-blur-2xl rounded-2xl border border-[#cedc28]/20 p-6 shadow-xl flex flex-col">
+              <h3 className="text-sm font-bold text-[#eef7f5] uppercase tracking-widest mb-4 flex items-center gap-2"><BarChart3 className="w-4 h-4 text-[#cedc28]"/> Top 10 by CPC (Lowest)</h3>
               <div className="flex-1 space-y-3">
                  {topCPC.map((c, i) => (
                     <div key={i} className="flex flex-col gap-1">
-                       <div className="flex justify-between text-xs text-[#6fa89f]">
+                       <div className="flex justify-between text-xs text-[#14a6d9]">
                           <span className="truncate w-3/4" title={c.creativeName}>
                             {i+1}.{' '}
                             {c.adImageUrl ? (
@@ -235,25 +235,25 @@ export default function CreativeView({ data, exRate = 1, exSym = '$', formatShor
                               c.creativeName
                             )}
                           </span>
-                          <span className="font-bold text-[#c88214]">{exSym}{d3.format(",.2f")(c.cpc)}</span>
+                          <span className="font-bold text-[#cedc28]">{exSym}{d3.format(",.2f")(c.cpc)}</span>
                        </div>
-                       <div className="w-full bg-[#011414] h-1.5 rounded-full overflow-hidden">
+                       <div className="w-full bg-[#0a2442] h-1.5 rounded-full overflow-hidden">
                           <div className="bg-[#74FA93] h-full rounded-full" style={{width: `${Math.min(100, (c.cpc / (topCPC[topCPC.length-1]?.cpc || 1)) * 100)}%`}}></div>
                        </div>
                     </div>
                  ))}
-                 {topCPC.length === 0 && <div className="text-[#6fa89f] text-xs py-4 text-center">No data available</div>}
+                 {topCPC.length === 0 && <div className="text-[#14a6d9] text-xs py-4 text-center">No data available</div>}
               </div>
            </div>
          )}
          
          {userRole !== 'non-finance' && (
-           <div className="card-surface backdrop-blur-2xl rounded-2xl border border-[#c88214]/20 p-6 shadow-xl flex flex-col">
-              <h3 className="text-sm font-black text-[#eef7f5] uppercase tracking-widest mb-4 flex items-center gap-2"><BarChart3 className="w-4 h-4 text-rose-400"/> Top 10 by Spend</h3>
+           <div className="card-surface backdrop-blur-2xl rounded-2xl border border-[#cedc28]/20 p-6 shadow-xl flex flex-col">
+              <h3 className="text-sm font-bold text-[#eef7f5] uppercase tracking-widest mb-4 flex items-center gap-2"><BarChart3 className="w-4 h-4 text-rose-400"/> Top 10 by Spend</h3>
               <div className="flex-1 space-y-3">
                  {topCost.map((c, i) => (
                     <div key={i} className="flex flex-col gap-1">
-                       <div className="flex justify-between text-xs text-[#6fa89f]">
+                       <div className="flex justify-between text-xs text-[#14a6d9]">
                           <span className="truncate w-3/4" title={c.creativeName}>
                             {i+1}.{' '}
                             {c.adImageUrl ? (
@@ -264,23 +264,23 @@ export default function CreativeView({ data, exRate = 1, exSym = '$', formatShor
                           </span>
                           <span className="font-bold text-rose-400">{exSym}{formatShort(c.cost)}</span>
                        </div>
-                       <div className="w-full bg-[#011414] h-1.5 rounded-full overflow-hidden">
+                       <div className="w-full bg-[#0a2442] h-1.5 rounded-full overflow-hidden">
                           <div className="bg-rose-500 h-full rounded-full" style={{width: `${Math.min(100, (c.cost / (topCost[0]?.cost || 1)) * 100)}%`}}></div>
                        </div>
                     </div>
                  ))}
-                 {topCost.length === 0 && <div className="text-[#6fa89f] text-xs py-4 text-center">No data available</div>}
+                 {topCost.length === 0 && <div className="text-[#14a6d9] text-xs py-4 text-center">No data available</div>}
               </div>
            </div>
          )}
       </div>
 
-      <div className="card-surface backdrop-blur-2xl p-6 rounded-2xl border border-[#c88214]/20 break-inside-avoid mb-8 shadow-lg export-slide" data-title="AI Creative Insights">
-         <h4 className="text-sm font-black text-[#c88214] uppercase tracking-widest mb-2 flex items-center gap-2"><Zap className="w-4 h-4 text-[#c88214]" /> AI Creative Insights</h4>
+      <div className="card-surface backdrop-blur-2xl p-6 rounded-2xl border border-[#cedc28]/20 break-inside-avoid mb-8 shadow-lg export-slide" data-title="AI Creative Insights">
+         <h4 className="text-sm font-bold text-[#cedc28] uppercase tracking-widest mb-2 flex items-center gap-2"><Zap className="w-4 h-4 text-[#cedc28]" /> AI Creative Insights</h4>
          <p className="text-sm text-[#eef7f5] font-medium">{insightText}</p>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 border-b border-[#c88214]/20 pb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 border-b border-[#cedc28]/20 pb-6">
         <MultiSelectDropdown label="Channel" options={uniqueChannels} selected={filterChannels} onChange={setFilterChannels} />
         <MultiSelectDropdown label="Language" options={uniqueLanguages} selected={filterLanguages} onChange={setFilterLanguages} />
         <MultiSelectDropdown label="Phase" options={uniquePhases} selected={filterPhases} onChange={setFilterPhases} />
@@ -288,28 +288,28 @@ export default function CreativeView({ data, exRate = 1, exSym = '$', formatShor
       </div>
 
       <div className="flex flex-wrap justify-between items-end gap-4 mb-6 mt-4">
-         <h3 className="text-lg font-black text-[#eef7f5] tracking-tight">Creative Library ({creativeTabData.length})</h3>
+         <h3 className="text-lg font-bold text-[#eef7f5] tracking-tight">Creative Library ({creativeTabData.length})</h3>
          <div className="flex gap-4 items-end w-full md:w-auto">
            <div className="w-full md:w-64">
               <MultiSelectDropdown label="Metrics" options={availableMetrics} selected={selectedMetrics} onChange={setSelectedMetrics} />
            </div>
            <div className="relative w-full md:w-64 flex flex-col justify-end">
-              <span className="text-[10px] font-black text-[#6fa89f] uppercase tracking-widest mb-1.5 block">Search</span>
+              <span className="text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest mb-1.5 block">Search</span>
               <div className="relative">
-                <Search className="w-4 h-4 text-[#6fa89f] absolute left-3 top-1/2 -translate-y-1/2" />
-                <input type="text" placeholder="Search creatives..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-[#011414] text-[#eef7f5] text-xs font-bold pl-9 pr-3 py-1.5 card-surface backdrop-blur-2xl border border-[#c88214]/30 rounded-lg outline-none focus:border-[#c88214] transition-colors" />
+                <Search className="w-4 h-4 text-[#14a6d9] absolute left-3 top-1/2 -translate-y-1/2" />
+                <input type="text" placeholder="Search creatives..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-[#0a2442] text-[#eef7f5] text-xs font-bold pl-9 pr-3 py-1.5 card-surface backdrop-blur-2xl border border-[#cedc28]/30 rounded-lg outline-none focus:border-[#cedc28] transition-colors" />
               </div>
            </div>
          </div>
       </div>
 
 
-        <div className="card-surface backdrop-blur-2xl rounded-3xl border border-[#c88214]/20 overflow-x-auto shadow-xl export-slide" data-title="Creative Data Breakdown">
+        <div className="card-surface backdrop-blur-2xl rounded-3xl border border-[#cedc28]/20 overflow-x-auto shadow-xl export-slide" data-title="Creative Data Breakdown">
            <table className="w-full text-left border-collapse">
               <thead>
-                 <tr className="bg-[#011414] border-b border-[#c88214]/20">
+                 <tr className="bg-[#0a2442] border-b border-[#cedc28]/20">
                     
-                    <th className="px-6 py-4 text-[10px] font-black text-[#6fa89f] uppercase tracking-widest">Preview</th>
+                    <th className="px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest">Preview</th>
                     {renderSortHeader('Creative Name', 'creativeName')}
                     {renderSortHeader('Status', 'status')}
                     {selectedMetrics.includes('Spend') && renderSortHeader('Spend', 'cost')}
@@ -324,14 +324,14 @@ export default function CreativeView({ data, exRate = 1, exSym = '$', formatShor
               </thead>
               <tbody>
                  {paginatedData.map((c, i) => (
-                    <tr key={i} className="border-b border-[#c88214]/10 hover:bg-[#74FA93]/5 transition-colors group">
+                    <tr key={i} className="border-b border-[#cedc28]/10 hover:bg-[#74FA93]/5 transition-colors group">
                        
                        <td className="px-6 py-3">
                           <div 
                              onClick={(e) => { 
                                 if(c.adImageUrl || c.videoUrl || c.postUrl) window.open(c.videoUrl || c.postUrl || c.adImageUrl, '_blank');
                              }}
-                             className={`group w-16 h-10 bg-[#011414] rounded-lg overflow-hidden border border-[#c88214]/20 flex items-center justify-center relative ${c.adImageUrl || c.videoUrl || c.postUrl ? 'cursor-pointer' : 'cursor-default'}`}
+                             className={`group w-16 h-10 bg-[#0a2442] rounded-lg overflow-hidden border border-[#cedc28]/20 flex items-center justify-center relative ${c.adImageUrl || c.videoUrl || c.postUrl ? 'cursor-pointer' : 'cursor-default'}`}
                           >
                              {c.videoUrl && (
                                 <video 
@@ -346,7 +346,7 @@ export default function CreativeView({ data, exRate = 1, exSym = '$', formatShor
                              {c.adImageUrl ? (
                                 <img src={c.adImageUrl} className={`w-full h-full object-cover ${c.videoUrl ? 'group-hover:opacity-0 transition-opacity duration-300' : ''}`} onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; }} />
                              ) : (
-                                <Grid className="w-4 h-4 text-[#6fa89f] opacity-30" />
+                                <Grid className="w-4 h-4 text-[#14a6d9] opacity-30" />
                              )}
                           </div>
                        </td>
@@ -354,21 +354,21 @@ export default function CreativeView({ data, exRate = 1, exSym = '$', formatShor
                           {c.creativeName}
                        </td>
                        <td className="px-6 py-4">
-                          <span className={`px-2 py-1 text-[8px] font-black uppercase tracking-widest rounded-md ${c.status === 'Live' ? 'bg-[#74FA93]/20 text-[#c88214]' : 'bg-gray-500/20 text-gray-400'}`}>
+                          <span className={`px-2 py-1 text-[8px] font-black uppercase tracking-widest rounded-md ${c.status === 'Live' ? 'bg-[#74FA93]/20 text-[#cedc28]' : 'bg-gray-500/20 text-gray-400'}`}>
                             {c.status}
                           </span>
                        </td>
                        {selectedMetrics.includes('Spend') && <td className="px-6 py-4 text-sm font-bold text-rose-400 whitespace-nowrap">{exSym}{formatShort(c.cost)}</td>}
                        {selectedMetrics.includes('Impressions') && <td className="px-6 py-4 text-sm font-bold text-[#eef7f5] whitespace-nowrap">{formatShort(c.impressions)}</td>}
                        {selectedMetrics.includes('Clicks') && <td className="px-6 py-4 text-sm font-bold text-[#eef7f5] whitespace-nowrap">{formatShort(c.clicks)}</td>}
-                       {selectedMetrics.includes('CTR') && <td className="px-6 py-4 text-sm font-bold text-[#c88214] whitespace-nowrap">{(c.ctr*100).toFixed(2)}%</td>}
-                       {selectedMetrics.includes('CPC') && <td className="px-6 py-4 text-sm font-bold text-[#c88214] whitespace-nowrap">{exSym}{d3.format(",.2f")(c.cpc)}</td>}
+                       {selectedMetrics.includes('CTR') && <td className="px-6 py-4 text-sm font-bold text-[#cedc28] whitespace-nowrap">{(c.ctr*100).toFixed(2)}%</td>}
+                       {selectedMetrics.includes('CPC') && <td className="px-6 py-4 text-sm font-bold text-[#cedc28] whitespace-nowrap">{exSym}{d3.format(",.2f")(c.cpc)}</td>}
                        {selectedMetrics.includes('Views') && <td className="px-6 py-4 text-sm font-bold text-amber-400 whitespace-nowrap">{formatShort(c.views)}</td>}
                        {selectedMetrics.includes('Purchases') && <td className="px-6 py-4 text-sm font-bold text-[#74FA93] whitespace-nowrap">{formatShort(c.purchases)}</td>}
 
                     </tr>
                  ))}
-                 {paginatedData.length === 0 && <tr><td colSpan={10} className="px-6 py-8 text-center text-[#6fa89f] text-sm font-bold">No creatives match the current filters</td></tr>}
+                 {paginatedData.length === 0 && <tr><td colSpan={10} className="px-6 py-8 text-center text-[#14a6d9] text-sm font-bold">No creatives match the current filters</td></tr>}
               </tbody>
            </table>
         </div>
@@ -378,17 +378,17 @@ export default function CreativeView({ data, exRate = 1, exSym = '$', formatShor
             <button 
                onClick={() => setCreativePage(p => Math.max(1, p-1))} 
                disabled={creativePage === 1}
-               className="px-4 py-2 card-surface backdrop-blur-2xl border border-[#c88214]/30 rounded-xl text-xs font-black text-[#c88214] uppercase tracking-widest hover:bg-[#74FA93]/20 disabled:opacity-50 transition-colors"
+               className="px-4 py-2 card-surface backdrop-blur-2xl border border-[#cedc28]/30 rounded-xl text-xs font-bold text-[#cedc28] uppercase tracking-widest hover:bg-[#74FA93]/20 disabled:opacity-50 transition-colors"
             >
                Prev
             </button>
-            <span className="text-sm font-black text-[#6fa89f]">
+            <span className="text-sm font-bold text-[#14a6d9]">
                Page {creativePage} of {totalPages}
             </span>
             <button 
                onClick={() => setCreativePage(p => Math.min(totalPages, p+1))} 
                disabled={creativePage === totalPages}
-               className="px-4 py-2 card-surface backdrop-blur-2xl border border-[#c88214]/30 rounded-xl text-xs font-black text-[#c88214] uppercase tracking-widest hover:bg-[#74FA93]/20 disabled:opacity-50 transition-colors"
+               className="px-4 py-2 card-surface backdrop-blur-2xl border border-[#cedc28]/30 rounded-xl text-xs font-bold text-[#cedc28] uppercase tracking-widest hover:bg-[#74FA93]/20 disabled:opacity-50 transition-colors"
             >
                Next
             </button>

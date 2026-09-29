@@ -152,21 +152,21 @@ export default function AdminView() {
       <div className="max-w-6xl mx-auto">
         <div className="flex justify-between items-end mb-8">
           <div>
-            <h2 className="text-3xl font-black text-white tracking-widest uppercase mb-1">User Management</h2>
-            <p className="text-[#6fa89f] text-sm font-medium">Control dashboard access and administrator privileges</p>
+            <h2 className="text-3xl font-bold text-white tracking-widest uppercase mb-1">User Management</h2>
+            <p className="text-[#14a6d9] text-sm font-medium">Control dashboard access and administrator privileges</p>
           </div>
           
           <div className="flex gap-3">
             <button 
               onClick={fetchUsers}
-              className="px-4 py-2 bg-[#011414] border border-[#c88214]/30 text-[#c88214] hover:bg-[#c88214]/10 hover:text-white rounded-xl transition-all text-xs font-black uppercase tracking-widest flex items-center gap-2"
+              className="px-4 py-2 bg-[#0a2442] border border-[#cedc28]/30 text-[#cedc28] hover:bg-[#cedc28]/10 hover:text-white rounded-xl transition-all text-xs font-bold uppercase tracking-widest flex items-center gap-2"
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
               Refresh
             </button>
             <button 
               onClick={() => setShowAddForm(!showAddForm)}
-              className="px-4 py-2 bg-[#c88214]/20 border border-[#c88214]/50 text-[#c88214] hover:bg-[#c88214]/40 hover:text-white rounded-xl transition-all text-xs font-black uppercase tracking-widest flex items-center gap-2 shadow-[0_0_15px_rgba(200,130,20,0.15)]"
+              className="px-4 py-2 bg-[#cedc28]/20 border border-[#cedc28]/50 text-[#cedc28] hover:bg-[#cedc28]/40 hover:text-white rounded-xl transition-all text-xs font-bold uppercase tracking-widest flex items-center gap-2 shadow-[0_0_15px_rgba(200,130,20,0.15)]"
             >
               <UserPlus className="w-4 h-4" />
               {showAddForm ? 'Cancel' : 'Add User'}
@@ -182,48 +182,48 @@ export default function AdminView() {
         )}
 
         {addSuccess && (
-          <div className="bg-[#c88214]/10 border border-[#c88214]/30 text-[#c88214] p-4 rounded-2xl text-sm font-medium mb-6 flex items-center gap-3 shadow-lg">
-            <CheckCircle2 className="w-5 h-5 text-[#c88214]" />
+          <div className="bg-[#cedc28]/10 border border-[#cedc28]/30 text-[#cedc28] p-4 rounded-2xl text-sm font-medium mb-6 flex items-center gap-3 shadow-lg">
+            <CheckCircle2 className="w-5 h-5 text-[#cedc28]" />
             User successfully created and granted access.
           </div>
         )}
 
         {showAddForm && (
-          <div className="card-surface backdrop-blur-2xl p-6 rounded-3xl border border-[#c88214]/20 shadow-2xl mb-8 relative overflow-hidden">
+          <div className="card-surface backdrop-blur-2xl p-6 rounded-3xl border border-[#cedc28]/20 shadow-2xl mb-8 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-64 h-64 opacity-5 pointer-events-none" style={{ backgroundImage: "url('/loc-pattern.png')", backgroundSize: 'contain', backgroundRepeat: 'no-repeat', backgroundPosition: 'top right' }}></div>
             
-            <h3 className="text-[#6fa89f] font-black uppercase tracking-widest text-sm mb-4">Create New User</h3>
+            <h3 className="text-[#14a6d9] font-bold uppercase tracking-widest text-sm mb-4">Create New User</h3>
             
             <form onSubmit={handleAddUser} className="relative z-10 flex flex-wrap items-end gap-4">
               <div className="flex-1 min-w-[200px]">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Email Address</label>
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 block">Email Address</label>
                 <input 
                   type="email" 
                   value={newEmail}
                   onChange={(e) => setNewEmail(e.target.value)}
-                  className="w-full bg-[#011414] border border-gray-600/50 rounded-xl px-4 py-2.5 text-sm text-[#eef7f5] focus:outline-none focus:border-[#c88214]/50 transition-all"
+                  className="w-full bg-[#0a2442] border border-gray-600/50 rounded-xl px-4 py-2.5 text-sm text-[#eef7f5] focus:outline-none focus:border-[#cedc28]/50 transition-all"
                   placeholder="name@example.com"
                   required 
                 />
               </div>
               <div className="flex-1 min-w-[200px]">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Temporary Password</label>
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 block">Temporary Password</label>
                 <input 
                   type="password" 
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full bg-[#011414] border border-gray-600/50 rounded-xl px-4 py-2.5 text-sm text-[#eef7f5] focus:outline-none focus:border-[#c88214]/50 transition-all"
+                  className="w-full bg-[#0a2442] border border-gray-600/50 rounded-xl px-4 py-2.5 text-sm text-[#eef7f5] focus:outline-none focus:border-[#cedc28]/50 transition-all"
                   placeholder="Min 6 characters"
                   required 
                   minLength={6}
                 />
               </div>
               <div className="flex-1 min-w-[150px]">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">User Role</label>
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 block">User Role</label>
                 <select 
                   value={newRole}
                   onChange={(e) => setNewRole(e.target.value)}
-                  className="w-full bg-[#011414] border border-gray-600/50 rounded-xl px-4 py-2.5 text-sm text-[#eef7f5] font-bold focus:outline-none focus:border-[#c88214]/50 transition-all cursor-pointer appearance-none"
+                  className="w-full bg-[#0a2442] border border-gray-600/50 rounded-xl px-4 py-2.5 text-sm text-[#eef7f5] font-bold focus:outline-none focus:border-[#cedc28]/50 transition-all cursor-pointer appearance-none"
                 >
                   <option value="admin">Admin</option>
                   <option value="standard">Standard</option>
@@ -234,7 +234,7 @@ export default function AdminView() {
               <button 
                 type="submit" 
                 disabled={addingUser}
-                className="px-6 py-2.5 bg-[#c88214]/20 hover:bg-[#c88214]/40 border border-[#c88214]/50 text-[#c88214] hover:text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all disabled:opacity-50"
+                className="px-6 py-2.5 bg-[#cedc28]/20 hover:bg-[#cedc28]/40 border border-[#cedc28]/50 text-[#cedc28] hover:text-white rounded-xl text-xs font-bold uppercase tracking-widest transition-all disabled:opacity-50"
               >
                 {addingUser ? 'Creating...' : 'Create'}
               </button>
@@ -242,15 +242,15 @@ export default function AdminView() {
           </div>
         )}
 
-        <div className="card-surface border border-[#c88214]/10 rounded-3xl overflow-hidden shadow-2xl relative">
+        <div className="card-surface border border-[#cedc28]/10 rounded-3xl overflow-hidden shadow-2xl relative">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-[#011414]/50 border-b border-[#c88214]/10">
-                  <th className="py-4 px-6 text-[10px] font-black text-[#6fa89f] uppercase tracking-widest">User Details</th>
-                  <th className="py-4 px-6 text-[10px] font-black text-[#6fa89f] uppercase tracking-widest text-center">Role</th>
-                  <th className="py-4 px-6 text-[10px] font-black text-[#6fa89f] uppercase tracking-widest text-center">Last Active</th>
-                  <th className="py-4 px-6 text-[10px] font-black text-[#6fa89f] uppercase tracking-widest text-center">Actions</th>
+                <tr className="bg-[#0a2442]/50 border-b border-[#cedc28]/10">
+                  <th className="py-4 px-6 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest">User Details</th>
+                  <th className="py-4 px-6 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest text-center">Role</th>
+                  <th className="py-4 px-6 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest text-center">Last Active</th>
+                  <th className="py-4 px-6 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest text-center">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
@@ -268,10 +268,10 @@ export default function AdminView() {
                   </tr>
                 ) : (
                   users.map(user => (
-                    <tr key={user.uid} className="hover:bg-[#011414]/30 transition-colors group">
+                    <tr key={user.uid} className="hover:bg-[#0a2442]/30 transition-colors group">
                       <td className="py-4 px-6">
                         <div className="flex items-center gap-3">
-                          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${user.role === 'admin' ? 'bg-[#c88214]/10 text-[#c88214]' : 'bg-gray-800 text-gray-400'}`}>
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${user.role === 'admin' ? 'bg-[#cedc28]/10 text-[#cedc28]' : 'bg-gray-800 text-gray-400'}`}>
                             {user.role === 'admin' ? <Shield className="w-5 h-5" /> : <User className="w-5 h-5" />}
                           </div>
                           <div>
@@ -286,7 +286,7 @@ export default function AdminView() {
                             value={user.role || 'standard'}
                             onChange={(e) => updateUserRole(user.uid, e.target.value)}
                             className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all outline-none cursor-pointer appearance-none text-center ${
-                              user.role === 'admin' ? 'bg-[#c88214]/10 border border-[#c88214]/30 text-[#c88214]' : 
+                              user.role === 'admin' ? 'bg-[#cedc28]/10 border border-[#cedc28]/30 text-[#cedc28]' : 
                               user.role === 'non-finance' ? 'bg-purple-900/20 border border-purple-500/30 text-purple-400' : 
                               'bg-gray-800 border border-gray-600 text-gray-400'
                             }`}
