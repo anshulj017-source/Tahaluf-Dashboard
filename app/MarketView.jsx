@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import InfoTooltip from './components/InfoTooltip';
+
 import * as d3 from 'd3';
 import { Eye, DollarSign, Activity, TrendingUp, BarChart3, Target, CheckCircle2, Globe2, MousePointer2 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
@@ -454,7 +454,7 @@ export default function MarketView({ adData, gaData, exRate = 1, exSym = '$', fo
             <div className="card-surface backdrop-blur-2xl border border-[#cedc28]/20 rounded-3xl p-6 export-slide" data-title="Market Channels">
               <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
                 <BarChart3 className="text-[#cedc28] w-5 h-5" /> Top Events Across Markets
-                <InfoTooltip definition="Definition for Top Events Across Markets" />
+
               </h3>
               <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
@@ -505,7 +505,7 @@ export default function MarketView({ adData, gaData, exRate = 1, exSym = '$', fo
           {/* TOURNAMENT DATA TABLE */}
           <div className="card-surface backdrop-blur-2xl border border-[#cedc28]/20 rounded-3xl p-6 overflow-hidden export-slide" data-title="Detailed Market Metrics">
              <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 gap-4">
-               <h3 className="text-lg font-bold text-white flex items-center gap-2">Detailed Event Metrics <InfoTooltip definition="Definition for Detailed Event Metrics" /></h3>
+               <h3 className="text-lg font-bold text-white flex items-center gap-2">Detailed Event Metrics</h3>
                <div className="flex flex-wrap gap-2">
                  {AVAILABLE_METRICS.map(m => (
                    <button 

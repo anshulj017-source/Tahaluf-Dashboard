@@ -1,12 +1,63 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import InfoTooltip from './components/InfoTooltip';
+
 import * as d3 from 'd3';
-import { Eye, MousePointer2, Play, Activity, TrendingUp, BarChart3, Target, CheckCircle2 } from 'lucide-react';
+import { Eye, MousePointer2, Play, Activity, TrendingUp, BarChart3, Target, CheckCircle2, ChevronDown, Search, Check, Camera, Download } from 'lucide-react';
+import html2canvas from 'html2canvas';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
 
 const COLORS = ['#74FA93', '#cedc28', '#00937b', '#eef7f5', '#007542'];
+
+const MetricMultiSelectDropdown = ({ options, selectedKeys, onChange }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  const filtered = options.filter(o => o.label.toLowerCase().includes(searchTerm.toLowerCase()));
+  const selectedLabels = selectedKeys.map(k => options.find(o => o.key === k)?.label).filter(Boolean);
+
+  return (
+    <div className="relative min-w-[200px] z-30">
+      <div 
+        onClick={() => setIsOpen(!isOpen)}
+        className="px-4 py-2 bg-[#0a2442] border border-[#cedc28]/30 rounded-lg text-xs font-bold text-[#eef7f5] cursor-pointer flex justify-between items-center hover:border-[#cedc28] transition-colors"
+      >
+        <span className="truncate pr-2">{selectedKeys.length === options.length ? 'All Metrics' : (selectedLabels.join(', ') || 'Select metrics')}</span>
+        <ChevronDown className={`w-4 h-4 flex-shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </div>
+      {isOpen && (
+        <div className="absolute top-full right-0 w-[240px] mt-2 z-50">
+          <div className="w-full bg-[#0a2442] border border-[#cedc28]/30 rounded-xl shadow-2xl flex flex-col max-h-64 overflow-hidden">
+            <div className="p-2 border-b border-[#cedc28]/10 relative">
+              <Search className="w-4 h-4 text-[#14a6d9] absolute left-4 top-1/2 -translate-y-1/2" />
+              <input type="text" placeholder="Search..." autoFocus value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full bg-[#0a2442] text-[#eef7f5] text-xs font-bold pl-9 pr-3 py-2 rounded-lg outline-none border border-transparent focus:border-[#cedc28]/50" />
+            </div>
+            <div className="overflow-y-auto p-2 flex-1 custom-scrollbar">
+              <div onClick={() => { onChange(options.map(o => o.key)); setIsOpen(false); setSearchTerm(''); }} className={`px-3 py-2 rounded-lg text-sm font-bold cursor-pointer flex justify-between ${selectedKeys.length === options.length ? 'bg-[#cedc28]/20 text-[#cedc28]' : 'text-[#eef7f5] hover:bg-[#0a2442]'}`}>
+                All <Check className={`w-4 h-4 ${selectedKeys.length === options.length ? 'opacity-100' : 'opacity-0'}`} />
+              </div>
+              {filtered.map(opt => {
+                const isSel = selectedKeys.includes(opt.key);
+                return (
+                  <div key={opt.key} onClick={() => {
+                    let next = [...selectedKeys];
+                    if (isSel) {
+                      next = next.filter(n => n !== opt.key);
+                    } else { next.push(opt.key); }
+                    onChange(next);
+                  }} className={`px-3 py-2 mt-1 rounded-lg text-sm font-bold cursor-pointer flex justify-between ${isSel ? 'bg-[#cedc28]/20 text-[#cedc28]' : 'text-[#eef7f5] hover:bg-[#0a2442]'}`}>
+                    <span className="truncate pr-2">{opt.label}</span> <Check className={`w-4 h-4 flex-shrink-0 ${isSel ? 'opacity-100' : 'opacity-0'}`} />
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+      {isOpen && <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)}></div>}
+    </div>
+  );
+};
 
 export default function ChannelView({ adData, exRate = 1, exSym = '$', formatShort = (v) => v, userRole }) {
   const [selectedChannels, setSelectedChannels] = useState([]);
@@ -22,7 +73,7 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
       { key: 'views6s', label: '6s Views', format: v => d3.format(",")(v) },
       { key: 'views15s', label: '15s Views', format: v => d3.format(",")(v) },
       { key: 'completions', label: 'Completed Views', format: v => d3.format(",")(v) },
-      { key: 'purchases', label: 'Purchases', format: v => d3.format(",")(v) },
+      { key: 'purchases', label: 'Conversions', format: v => d3.format(",")(v) },
       { key: 'cpc', label: 'CPC', format: v => `${exSym}${d3.format(",.2f")(v * exRate)}` },
       { key: 'cpm', label: 'CPM', format: v => `${exSym}${d3.format(",.2f")(v * exRate)}` },
       { key: 'ctr', label: 'CTR', format: v => `${v.toFixed(2)}%` },
@@ -61,7 +112,7 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
         cpc,
         ctr,
         cpv,
-        campaignsCount: new Set(vals.map(d => d.campaignName)).size
+        campaignsCount: new Set(vals.map(d => d.phase)).size
       };
     });
     return grouped.sort((a,b) => b.spend - a.spend);
@@ -73,12 +124,12 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
     
     const byImp = [...channelStats].sort((a, b) => b.impressions - a.impressions)[0];
     const byClicks = [...channelStats].sort((a, b) => b.clicks - a.clicks)[0];
-    const byViews = [...channelStats].sort((a, b) => b.views - a.views)[0];
+    const byConversions = [...channelStats].sort((a, b) => b.purchases - a.purchases)[0];
     
     const validCpc = channelStats.filter(c => c.clicks > 100 && c.cpc !== Infinity);
     const byEfficiency = validCpc.sort((a, b) => a.cpc - b.cpc)[0] || channelStats[0];
 
-    return { impressions: byImp, clicks: byClicks, views: byViews, efficiency: byEfficiency };
+    return { impressions: byImp, clicks: byClicks, conversions: byConversions, efficiency: byEfficiency };
   }, [channelStats]);
 
   // Handle Channel Selection
@@ -92,11 +143,16 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
     }
   };
 
-  // 3. Detailed stats for the SELECTED channels
+  // 3. Detailed stats for the SELECTED channels (or all if none selected)
   const selectedChannelData = useMemo(() => {
-    if (selectedChannels.length === 0) return [];
+    if (selectedChannels.length === 0) return adData;
     return adData.filter(d => selectedChannels.includes(d.channel));
   }, [selectedChannels, adData]);
+
+  const activeChannels = useMemo(() => {
+    if (selectedChannels.length > 0) return selectedChannels;
+    return channelStats.map(c => c.channel);
+  }, [selectedChannels, channelStats]);
 
   // 4. Month-by-month trend for the selected channels
   const trendData = useMemo(() => {
@@ -104,13 +160,13 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
     
     const grouped = d3.groups(selectedChannelData, d => {
       if (!d.dateObj) return 'Unknown';
-      return d3.timeFormat("%b %Y")(d.dateObj);
+      return d3.timeFormat("%b %d, %Y")(d.dateObj);
     });
 
-    return grouped.map(([month, vals]) => {
-      const row = { month, sortDate: vals[0].dateObj || new Date(0) };
-      // Calculate metric for each selected channel
-      selectedChannels.forEach(ch => {
+    return grouped.map(([day, vals]) => {
+      const row = { day, sortDate: vals[0].dateObj || new Date(0) };
+      // Calculate metric for each active channel
+      activeChannels.forEach(ch => {
         const chVals = vals.filter(v => v.channel === ch);
         let val = 0;
         if (trendMetric === 'spend') val = d3.sum(chVals, d => d.cost) * exRate;
@@ -121,14 +177,14 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
       });
       return row;
     }).sort((a, b) => a.sortDate - b.sortDate);
-  }, [selectedChannelData, exRate, selectedChannels, trendMetric]);
+  }, [selectedChannelData, exRate, activeChannels, trendMetric]);
 
   // 5. Event breakdown (flattened)
   const campaignBreakdown = useMemo(() => {
     if (selectedChannelData.length === 0) return [];
     
     // Group by Channel -> Event
-    const grouped = d3.groups(selectedChannelData, d => d.channel, d => d.campaignName);
+    const grouped = d3.groups(selectedChannelData, d => d.channel, d => d.phase);
     
     let flattened = [];
     grouped.forEach(([channel, campaigns]) => {
@@ -167,15 +223,15 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
   // Event chart data (pivot for stacked bars)
   const campaignChartData = useMemo(() => {
      if (selectedChannelData.length === 0) return [];
-     const grouped = d3.groups(selectedChannelData, d => d.campaignName);
+     const grouped = d3.groups(selectedChannelData, d => d.phase);
      return grouped.map(([campaign, vals]) => {
         const row = { campaign, totalSpend: d3.sum(vals, d => d.cost) };
-        selectedChannels.forEach(ch => {
+        activeChannels.forEach(ch => {
            row[ch] = d3.sum(vals.filter(v => v.channel === ch), d => d.cost) * exRate;
         });
         return row;
      }).sort((a,b) => b.totalSpend - a.totalSpend).slice(0, 7);
-  }, [selectedChannelData, selectedChannels, exRate]);
+  }, [selectedChannelData, activeChannels, exRate]);
 
 
   // Custom Tooltip for Trend Chart
@@ -195,22 +251,93 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
     return null;
   };
 
+  const exportChart = async (chartId, filename) => {
+    try {
+      const el = document.getElementById(chartId);
+      if (el) {
+        const canvas = await html2canvas(el, { backgroundColor: '#0a2442', scale: 2 });
+        const link = document.createElement('a');
+        link.download = `${filename}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const exportCSV = (data, filename) => {
+    const encodedUri = encodeURI(data);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `${filename}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleExportPerformanceMatrix = () => {
+     let csv = "Metric," + activeChannels.join(",") + "\r\n";
+     const metricsToExport = userRole === 'non-finance' ? ['impressions', 'clicks', 'ctr', 'views', 'purchases'] : ['spend', 'impressions', 'clicks', 'ctr', 'cpm', 'purchases'];
+     metricsToExport.forEach(mKey => {
+         const def = AVAILABLE_METRICS.find(m => m.key === mKey);
+         if (!def) return;
+         let row = [def.label];
+         activeChannels.forEach(ch => {
+            const stat = channelStats.find(c => c.channel === ch);
+            row.push(stat ? String(def.format(stat[mKey])).replace(/,/g, '') : "0");
+         });
+         csv += row.join(",") + "\r\n";
+     });
+     exportCSV("data:text/csv;charset=utf-8," + csv, "Channel_Performance_Matrix");
+  };
+
+  const handleExportDetailedMetrics = () => {
+     const headers = ["Event Phase", "Channel", ...AVAILABLE_METRICS.filter(m => selectedMetrics.includes(m.key)).map(m => m.label)];
+     let csv = headers.join(",") + "\r\n";
+     campaignBreakdown.forEach(row => {
+        let csvRow = [row.campaign, row.channel];
+        AVAILABLE_METRICS.filter(m => selectedMetrics.includes(m.key)).forEach(m => {
+           csvRow.push(String(m.format(row[m.key])).replace(/,/g, ''));
+        });
+        csv += csvRow.join(",") + "\r\n";
+     });
+     
+     // Add total row
+     const tSpend = d3.sum(campaignBreakdown, d => d.spend);
+     const tImp = d3.sum(campaignBreakdown, d => d.impressions);
+     const tClicks = d3.sum(campaignBreakdown, d => d.clicks);
+     const tViews = d3.sum(campaignBreakdown, d => d.views);
+     const tPurchases = d3.sum(campaignBreakdown, d => Number(d.purchases) || 0);
+     const totals = {
+       spend: tSpend,
+       impressions: tImp,
+       clicks: tClicks,
+       views: tViews,
+       purchases: tPurchases,
+       ctr: tImp > 0 ? (tClicks / tImp) * 100 : 0,
+       cpc: tClicks > 0 ? tSpend / tClicks : 0,
+       cpm: tImp > 0 ? (tSpend / tImp) * 1000 : 0,
+       cpv: tViews > 0 ? tSpend / tViews : 0
+     };
+     let totalRow = ["Total", ""];
+     AVAILABLE_METRICS.filter(m => selectedMetrics.includes(m.key)).forEach(m => {
+        totalRow.push(String(m.format(totals[m.key])).replace(/,/g, ''));
+     });
+     csv += totalRow.join(",") + "\r\n";
+
+     exportCSV("data:text/csv;charset=utf-8," + csv, "Detailed_Event_Phase_Metrics");
+  };
+
+
   if (!channelStats || channelStats.length === 0) return <div className="text-white p-8">No channel data available.</div>;
 
   return (
     <div className="space-y-8 animate-[fadeIn_0.5s_ease-out]">
       
       {/* HEADER & TOP CARDS (Hidden when exploring detailed view) */}
-      {selectedChannels.length === 0 && (
-        <>
-          <div className="flex items-center justify-between">
-            <h2 className="text-3xl font-bold text-white flex items-center gap-3">
-              <Activity className="text-[#cedc28] w-8 h-8" /> Channel Overview
-            </h2>
-          </div>
-
           {topCards && (
-            <div className={`grid grid-cols-1 md:grid-cols-2 ${userRole === 'non-finance' ? 'lg:grid-cols-3' : 'lg:grid-cols-4'} gap-4`}>
+            <div className={`grid grid-cols-1 md:grid-cols-2 ${userRole === 'non-finance' ? 'lg:grid-cols-3' : 'lg:grid-cols-4'} gap-4 mb-8`}>
               <div className="bg-[#0a2442] border border-[#cedc28]/20 rounded-2xl p-6 relative overflow-hidden group hover:border-[#cedc28]/50 transition-colors">
                 <div className="absolute -right-4 -top-4 opacity-5 group-hover:opacity-10 transition-opacity"><Eye className="w-32 h-32 text-white" /></div>
                 <p className="text-[#14a6d9] text-xs font-bold uppercase tracking-widest mb-1 flex items-center gap-2"><Eye className="w-4 h-4 text-[#cedc28]"/> Top by Impressions</p>
@@ -226,10 +353,10 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
               </div>
 
               <div className="bg-[#0a2442] border border-[#cedc28]/20 rounded-2xl p-6 relative overflow-hidden group hover:border-[#cedc28]/50 transition-colors">
-                <div className="absolute -right-4 -top-4 opacity-5 group-hover:opacity-10 transition-opacity"><Play className="w-32 h-32 text-white" /></div>
-                <p className="text-[#14a6d9] text-xs font-bold uppercase tracking-widest mb-1 flex items-center gap-2"><Play className="w-4 h-4 text-[#cedc28]"/> Top by Video Views</p>
-                <p className="text-3xl font-anton uppercase text-white truncate">{topCards.views.channel}</p>
-                <p className="text-[#cedc28] font-bold text-lg mt-2">{formatShort(topCards.views.views)} <span className="text-xs text-[#14a6d9] font-medium">Views</span></p>
+                <div className="absolute -right-4 -top-4 opacity-5 group-hover:opacity-10 transition-opacity"><CheckCircle2 className="w-32 h-32 text-white" /></div>
+                <p className="text-[#14a6d9] text-xs font-bold uppercase tracking-widest mb-1 flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-[#cedc28]"/> Top by Conversions</p>
+                <p className="text-3xl font-anton uppercase text-white truncate">{topCards.conversions.channel}</p>
+                <p className="text-[#cedc28] font-bold text-lg mt-2">{formatShort(topCards.conversions.purchases)} <span className="text-xs text-[#14a6d9] font-medium">Conversions</span></p>
               </div>
 
               {userRole !== 'non-finance' && (
@@ -242,68 +369,61 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
               )}
             </div>
           )}
-        </>
-      )}
 
-      {/* CHANNEL SELECTION GRID */}
-      <div className={`card-surface backdrop-blur-2xl border border-[#cedc28]/20 rounded-3xl p-6 md:p-8 transition-all ${selectedChannels.length > 0 ? 'mt-0' : ''} export-slide`} data-title="Channel Top Stats">
-        <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
-          <div>
-            <h3 className="text-2xl font-anton uppercase text-white">Compare Channels</h3>
-            <p className="text-sm text-[#14a6d9]">Select up to 3 channels to compare their performance.</p>
-          </div>
-          {selectedChannels.length > 0 && (
-             <button 
-                onClick={() => setSelectedChannels([])}
-                className="text-xs font-bold uppercase tracking-widest text-[#cedc28] hover:text-white bg-[#cedc28]/10 hover:bg-[#74FA93]/20 px-4 py-2 rounded-full transition-colors"
-             >
-                Clear Selection
-             </button>
-          )}
-        </div>
-        
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-          {channelStats.map((ch) => {
+      {/* CHANNEL SELECTION BUTTONS */}
+      <div className="card-surface backdrop-blur-2xl p-6 rounded-3xl border border-[#cedc28]/20 shadow-xl flex flex-col gap-4 export-slide" data-title="Channel Selection">
+        <label className="text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest mb-2 block flex items-center gap-2">
+          <Activity size={14} /> Compare Channels (Select up to 3)
+        </label>
+        <div className="flex flex-wrap gap-2">
+          {channelStats.map((ch, i) => {
             const isSelected = selectedChannels.includes(ch.channel);
             const isDisabled = !isSelected && selectedChannels.length >= 3;
+            const color = COLORS[i % COLORS.length];
             return (
-              <button 
+              <button
                 key={ch.channel}
                 onClick={() => handleChannelToggle(ch.channel)}
                 disabled={isDisabled}
-                className={`border rounded-xl p-4 text-left transition-all duration-300 relative flex flex-col justify-between min-h-[100px]
-                  ${isSelected ? 'bg-[#74FA93]/20 border-[#cedc28] shadow-[0_0_15px_rgba(116,250,147,0.1)]' : 'bg-[#0a2442] border-[#cedc28]/20'}
-                  ${!isSelected && !isDisabled ? 'hover:bg-[#cedc28]/10 hover:border-[#cedc28]/60' : ''}
-                  ${isDisabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}
-                `}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border ${isDisabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
+                style={{
+                  backgroundColor: isSelected ? `${color}20` : '#0C272D',
+                  borderColor: isSelected ? color : 'rgba(116, 250, 147, 0.2)',
+                  color: isSelected ? color : '#14a6d9'
+                }}
               >
-                {isSelected && <CheckCircle2 className="absolute top-2 right-2 w-4 h-4 text-[#cedc28]" />}
-                <div>
-                  <h4 className={`text-base font-bold transition-colors line-clamp-1 ${isSelected ? 'text-[#cedc28]' : 'text-white'}`}>{ch.channel}</h4>
-                </div>
-                <div className="mt-2">
-                  <p className="text-[10px] text-[#14a6d9] uppercase tracking-wider">{userRole === 'non-finance' ? 'Clicks' : 'Spend'}</p>
-                  <p className="text-sm font-bold text-white">{userRole === 'non-finance' ? formatShort(ch.clicks) : `${exSym}${formatShort(ch.spend * exRate)}`}</p>
-                </div>
+                {ch.channel}
               </button>
-            )
+            );
           })}
+          {selectedChannels.length > 0 && (
+            <button 
+              onClick={() => setSelectedChannels([])}
+              className="px-4 py-2 rounded-xl text-xs font-bold text-red-400 hover:bg-red-400/10 transition-colors ml-auto border border-transparent"
+            >
+              Clear Selection
+            </button>
+          )}
         </div>
       </div>
 
       {/* DETAILED DRILL-DOWN VIEW */}
-      {selectedChannels.length > 0 && (
-        <div className="space-y-6 animate-[fadeIn_0.4s_ease-out]">
-          
-          {/* KPI MATRIX */}
+      <div className="space-y-6 animate-[fadeIn_0.4s_ease-out]">
+        
+        {/* KPI MATRIX */}
           <div className="card-surface backdrop-blur-2xl border border-[#cedc28]/20 rounded-3xl p-6 overflow-hidden export-slide" data-title="Top Performing Campaigns">
-             <h3 className="text-lg font-bold text-white mb-6">Channel Performance Matrix</h3>
+             <div className="flex justify-between items-center mb-6">
+               <h3 className="text-lg font-bold text-white">Channel Performance Matrix</h3>
+               <button onClick={handleExportPerformanceMatrix} className="p-1.5 rounded-lg bg-[#0a2442] border border-[#cedc28]/20 text-[#cedc28] hover:bg-[#cedc28]/10 transition-colors shadow-[0_0_10px_rgba(200,130,20,0.1)] text-xs font-bold" title="Export CSV">
+                 <Download size={14} />
+               </button>
+             </div>
              <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse whitespace-nowrap">
                   <thead>
                     <tr className="border-b-2 border-[#cedc28]/30">
                       <th className="px-4 py-3 text-xs font-bold text-[#14a6d9] uppercase tracking-wider">Metric</th>
-                      {selectedChannels.map(ch => (
+                      {activeChannels.map(ch => (
                          <th key={ch} className="px-4 py-3 text-sm font-bold text-[#cedc28] uppercase tracking-wider text-right">{ch}</th>
                       ))}
                     </tr>
@@ -315,7 +435,7 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
                        return (
                           <tr key={metricKey} className={`border-b border-[#cedc28]/10 ${i % 2 === 0 ? 'bg-transparent' : 'bg-[#0a2442]/30'}`}>
                             <td className="px-4 py-4 text-sm font-bold text-white">{metricDef.label}</td>
-                            {selectedChannels.map(ch => {
+                            {activeChannels.map(ch => {
                                const stat = channelStats.find(c => c.channel === ch);
                                return (
                                  <td key={ch} className="px-4 py-4 text-sm font-medium text-white text-right">
@@ -334,32 +454,37 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
             
             {/* TREND CHART */}
-            <div className="card-surface backdrop-blur-2xl border border-[#cedc28]/20 rounded-3xl p-6 export-slide" data-title="Ad Format Performance">
+            <div className="card-surface backdrop-blur-2xl border border-[#cedc28]/20 rounded-3xl p-6 export-slide" data-title="Ad Format Performance" id="comparison-trend-chart">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-lg font-bold text-white flex items-center gap-2">
                   <TrendingUp className="text-[#cedc28] w-5 h-5" /> Comparison Trend
                 </h3>
-                <select 
-                  value={trendMetric} 
-                  onChange={(e) => setTrendMetric(e.target.value)}
-                  className="bg-[#0a2442] text-[#cedc28] border border-[#cedc28]/30 rounded-lg px-3 py-1 text-xs font-bold outline-none"
-                >
-                  {userRole !== 'non-finance' && <option value="spend">Spend</option>}
-                  <option value="impressions">Impressions</option>
-                  <option value="clicks">Clicks</option>
-                  <option value="views">Video Views</option>
-                </select>
+                <div className="flex items-center gap-3">
+                  <select 
+                    value={trendMetric} 
+                    onChange={(e) => setTrendMetric(e.target.value)}
+                    className="bg-[#0a2442] text-[#cedc28] border border-[#cedc28]/30 rounded-lg px-3 py-1 text-xs font-bold outline-none"
+                  >
+                    {userRole !== 'non-finance' && <option value="spend">Spend</option>}
+                    <option value="impressions">Impressions</option>
+                    <option value="clicks">Clicks</option>
+                    <option value="views">Video Views</option>
+                  </select>
+                  <button onClick={() => exportChart('comparison-trend-chart', 'comparison_trend')} className="p-1.5 rounded-lg bg-[#0a2442] border border-[#cedc28]/20 text-[#cedc28] hover:bg-[#cedc28]/10 transition-colors shadow-[0_0_10px_rgba(200,130,20,0.1)] text-xs font-bold" title="Export Image" data-html2canvas-ignore="true">
+                    <Camera size={14} />
+                  </button>
+                </div>
               </div>
               
-              <div className="h-80">
+              <div className="h-80 mb-6">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={trendData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
-                    <XAxis dataKey="month" stroke="#14a6d9" fontSize={12} tickLine={false} axisLine={false} />
+                    <XAxis dataKey="day" stroke="#14a6d9" fontSize={9} angle={-45} textAnchor="end" height={50} tickLine={false} axisLine={false} interval={Math.max(0, Math.floor(trendData.length / 15))} />
                     <YAxis stroke="#14a6d9" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => formatShort(v)} />
                     <RechartsTooltip content={<TrendTooltip />} />
                     <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                    {selectedChannels.map((ch, idx) => (
+                    {activeChannels.map((ch, idx) => (
                       <Line key={ch} type="monotone" dataKey={ch} name={ch} stroke={COLORS[idx % COLORS.length]} strokeWidth={3} dot={{r:4, fill: '#0C272D', strokeWidth: 2}} activeDot={{r:6}} />
                     ))}
                   </LineChart>
@@ -368,12 +493,16 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
             </div>
 
             {/* TOURNAMENT BREAKDOWN CHART */}
-            <div className="card-surface backdrop-blur-2xl border border-[#cedc28]/20 rounded-3xl p-6 export-slide" data-title="Buying Type Performance">
-              <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
-                <BarChart3 className="text-[#cedc28] w-5 h-5" /> Top Events Across Channels
-                <InfoTooltip definition="Definition for Top Events" />
-              </h3>
-              <div className="h-80">
+            <div className="card-surface backdrop-blur-2xl border border-[#cedc28]/20 rounded-3xl p-6 export-slide" data-title="Buying Type Performance" id="phases-across-channels-chart">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <BarChart3 className="text-[#cedc28] w-5 h-5" /> Phases Across Channels
+                </h3>
+                <button onClick={() => exportChart('phases-across-channels-chart', 'phases_across_channels')} className="p-1.5 rounded-lg bg-[#0a2442] border border-[#cedc28]/20 text-[#cedc28] hover:bg-[#cedc28]/10 transition-colors shadow-[0_0_10px_rgba(200,130,20,0.1)] text-xs font-bold" title="Export Image" data-html2canvas-ignore="true">
+                  <Camera size={14} />
+                </button>
+              </div>
+              <div className="h-80 mb-6">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={campaignChartData} layout="vertical" margin={{ top: 0, right: 20, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" horizontal={true} vertical={false} />
@@ -385,7 +514,7 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
                       formatter={(value, name) => [`${exSym}${d3.format(",.0f")(value)}`, name]}
                     />
                     <Legend wrapperStyle={{ paddingTop: '10px', fontSize: '12px' }} />
-                    {selectedChannels.map((ch, idx) => (
+                    {activeChannels.map((ch, idx) => (
                        <Bar key={ch} dataKey={ch} name={ch} fill={COLORS[idx % COLORS.length]} stackId="a" radius={[0, 4, 4, 0]} />
                     ))}
                   </BarChart>
@@ -397,25 +526,24 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
           {/* TOURNAMENT DATA TABLE */}
           <div className="card-surface backdrop-blur-2xl border border-[#cedc28]/20 rounded-3xl p-6 overflow-hidden export-slide" data-title="Detailed Channel Metrics">
              <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 gap-4">
-               <h3 className="text-lg font-bold text-white flex items-center gap-2">Detailed Event Metrics <InfoTooltip definition="Definition for Detailed Event Metrics" /></h3>
-               <div className="flex flex-wrap gap-2">
-                 {AVAILABLE_METRICS.map(m => (
-                   <button 
-                     key={m.key}
-                     onClick={() => setSelectedMetrics(prev => prev.includes(m.key) ? prev.filter(k => k !== m.key) : [...prev, m.key])}
-                     className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${selectedMetrics.includes(m.key) ? 'bg-[#74FA93] text-[#0C272D]' : 'bg-[#0a2442] text-[#14a6d9] border border-[#cedc28]/30 hover:border-[#cedc28] hover:text-white'}`}
-                   >
-                     {m.label}
-                   </button>
-                 ))}
+               <div className="flex items-center gap-4">
+                 <h3 className="text-lg font-bold text-white flex items-center gap-2">Detailed Event Phase Metrics</h3>
+                 <button onClick={handleExportDetailedMetrics} className="p-1.5 rounded-lg bg-[#0a2442] border border-[#cedc28]/20 text-[#cedc28] hover:bg-[#cedc28]/10 transition-colors shadow-[0_0_10px_rgba(200,130,20,0.1)] text-xs font-bold" title="Export CSV">
+                   <Download size={14} />
+                 </button>
                </div>
+               <MetricMultiSelectDropdown 
+                 options={AVAILABLE_METRICS}
+                 selectedKeys={selectedMetrics}
+                 onChange={setSelectedMetrics}
+               />
              </div>
              
              <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse whitespace-nowrap">
                   <thead>
                     <tr className="border-b-2 border-[#cedc28]/30">
-                      <th className="px-4 py-3 text-xs font-bold text-[#14a6d9] uppercase tracking-wider sticky left-0 bg-[#14a6d9] z-10">Event</th>
+                      <th className="px-4 py-3 text-xs font-bold text-[#14a6d9] uppercase tracking-wider sticky left-0 bg-[#0a2442] z-10">Event Phase</th>
                       <th className="px-4 py-3 text-xs font-bold text-[#14a6d9] uppercase tracking-wider">Channel</th>
                       {AVAILABLE_METRICS.filter(m => selectedMetrics.includes(m.key)).map(m => (
                          <th key={m.key} className="px-4 py-3 text-xs font-bold text-[#14a6d9] uppercase tracking-wider text-right">{m.label}</th>
@@ -473,7 +601,6 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
              </div>
           </div>
         </div>
-      )}
-    </div>
+      </div>
   );
 }

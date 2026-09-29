@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import InfoTooltip from './components/InfoTooltip';
+
 import * as d3 from 'd3';
 import { ChevronDown, Calendar, Layers, Activity, Search, Check, Download, Camera } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from 'recharts';
@@ -482,7 +482,7 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-xl font-anton uppercase text-[#eef7f5] flex items-center gap-3">
               <Calendar className="text-[#cedc28]" /> Event Timeline
-              <InfoTooltip definition="Definition for Event Timeline" />
+
             </h3>
             <div className="text-xs font-bold text-[#14a6d9] bg-[#0a2442] px-3 py-1.5 rounded-lg border border-[#cedc28]/10">
               {d3.timeFormat('%b %d, %Y')(campaignMinDate)} - {d3.timeFormat('%b %d, %Y')(campaignMaxDate)}
@@ -609,7 +609,7 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
         <div className="card-surface backdrop-blur-2xl p-8 rounded-3xl border border-[#cedc28]/20 shadow-xl overflow-hidden export-slide" data-title="Planned vs Delivered">
           <h3 className="text-2xl font-anton uppercase text-[#eef7f5] flex items-center gap-3 mb-6">
             <Activity className="text-[#cedc28]" /> Performance Metrics Breakdown
-            <InfoTooltip definition="Definition for Performance Metrics Breakdown" />
+
           </h3>
           
           {viewMode === 'overall' && dailyChartData.length > 0 && (
