@@ -39,7 +39,7 @@ export default function Login() {
   if (loading) {
     return (
       <div className="min-h-screen app-bg flex flex-col items-center justify-center text-[#c88214] font-black text-2xl tracking-widest animate-pulse gap-6">
-        <img src="/loc-logo/Saudi 2027-07.png" alt="Loading Logo" className="h-32 object-contain" onError={(e) => e.target.style.display = 'none'} />
+        <img src="/tahaluf-logo.png" alt="Loading Logo" className="h-32 object-contain" onError={(e) => e.target.style.display = 'none'} />
         <span>AUTHENTICATING...</span>
       </div>
     );
@@ -53,8 +53,8 @@ export default function Login() {
       <div className="card-surface rounded-3xl p-10 max-w-md w-full shadow-2xl border border-[#c88214]/20 relative z-10">
         <div className="flex flex-col items-center mb-10">
           <img 
-            src="/loc-logo/Saudi 2027-07.png" 
-            alt="AFC Logo" 
+            src="/tahaluf-logo.png" 
+            alt="Tahaluf Logo" 
             className="h-32 object-contain mb-6" 
             onError={(e) => e.target.style.display = 'none'}
           />

@@ -1,8 +1,8 @@
 import './globals.css'
 
 export const metadata = {
-  title: 'Asia Cup 2027 Dashboard',
-  description: 'Asia Cup LOC Overview',
+  title: 'Tahaluf Dashboard',
+  description: 'Tahaluf Event Operations Overview',
 }
 
 export default function RootLayout({

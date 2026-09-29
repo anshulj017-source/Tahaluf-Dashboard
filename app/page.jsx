@@ -26,7 +26,7 @@ import CreativeView from './CreativeView';
 
 const GEO_URL = "https://unpkg.com/world-atlas@2.0.2/countries-110m.json";
 
-const BASE_URL = "/api/sheets?type=afc";
+const BASE_URL = "/api/sheets?type=combined";
 const CHANNELS = [
   { name: 'TikTok', gid: '0', viewsCol: 9, compCol: 11 }, // J=9, L=11
   { name: 'Snapchat', gid: '1220368554', viewsCol: 8, compCol: 10, purchCol: 11 }, // I=8, L=11
@@ -273,310 +273,52 @@ export default function App() {
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    const fetchPromises = CHANNELS.map(ch => 
-      d3.csv(`${BASE_URL}&gid=${ch.gid}`).then(raw => {
-        return raw.map(row => {
-          const vals = Object.values(row);
-          // Find 'DB' prefixed columns dynamically if they exist, otherwise fallback
-          const rawCampDB = row['Campaign DB'] || row['Campaign name'] || row['Campaign Name'] || 'Unknown';
-          const campDB = rawCampDB.replace(/\r/g, '').trim();
-          const phaseDB = row['Phase DB'] || row['Phase'] || 'Unknown';
-          const countryDB = normalizeMarket(row['Country DB'] || row['Country'] || 'Unknown');
-          const langDB = row['Language DB'] || row['Language'] || 'Unknown';
-          
-          let finalChannel = ch.name;
-          if (ch.name === 'DV360') finalChannel = 'Programmatic';
-          if (ch.name === 'Google') finalChannel = 'Google Search';
-
-          if (ch.subCol !== undefined && vals[ch.subCol] && vals[ch.subCol].trim() !== '') {
-            const rawSub = vals[ch.subCol].trim();
-            const lowerSub = rawSub.toLowerCase();
-            if (lowerSub === 'youtube') {
-              finalChannel = 'YouTube';
-            }
-          }
-          if (finalChannel.toLowerCase() === 'meta') finalChannel = 'META';
-
-          const bKey = Object.keys(row).find(k => k && k.trim() === 'Buying Type DB');
-          let finalBuyingType = bKey && row[bKey] && row[bKey].trim() !== ''
-            ? row[bKey].trim()
-            : 'Unknown';
-          
-          let rawCost = parseMetric(row['Cost (USD)'] || row['Cost'] || row['Total cost'] || row['Total media cost'] || row['Spend']);
-          if (ch.name === 'X') {
-            rawCost = rawCost / 3.75;
-          }
-
-          return {
-            date: row['Date'],
-            dateObj: row['Date'] ? new Date(row['Date']) : null,
-            campaignName: campDB,
-            phase: phaseDB,
-            buyingType: finalBuyingType,
-            country: countryDB,
-            language: langDB,
-            channel: finalChannel,
-            adName: (ch.name === 'Snapchat' || ch.name === 'X' || ch.name === 'DV360') ? vals[4] : (ch.name === 'Amazon' ? vals[5] : (ch.name === 'Google' ? vals[2] : (row['Ad name'] || row['Ad Name'] || 'Unknown'))),
-            cost: rawCost,
-            impressions: parseMetric(row['Impressions']),
-            clicks: parseMetric(row['Clicks'] || row['Swipes'] || row['Link clicks'] || row['Click-throughs']),
-            videoViews: parseMetric(vals[ch.viewsCol]), // based on user mapping
-            videoViews6s: parseMetric(row['6-second video views'] || row['Three-second video views'] || 0),
-            videoViews15s: parseMetric(row['15-second video views (focused view)'] || row['ThruPlay actions'] || 0),
-            videoCompletions: parseMetric(vals[ch.compCol]), // approx 100% views mapped column
-            purchases: ch.purchCol !== undefined ? parseMetric(vals[ch.purchCol]) : 0
-          };
-        });
-      })
-    );
-
-    const googlePurchasesPromise = d3.csv(`${BASE_URL}&gid=${GOOGLE_PURCHASES_GID}`).then(raw => {
-      return raw
-        .filter(row => row['Conversion category'] === 'Purchase/Sale')
-        .map(row => {
-          let cName = row['Campaign DB'] || row['Campaign name'] || 'Unknown';
-          const cNameUpper = cName.toUpperCase();
-          if (cNameUpper.includes('AC27')) cName = 'AC27';
-          else if (cNameUpper.includes('ACLE')) cName = 'ACLE';
-          else if (cNameUpper.includes('FAN ID')) cName = 'Fan ID';
-          else if (cNameUpper.includes('GULF CUP')) cName = 'Gulf Cup';
-          else if (cNameUpper.includes('UNDER 17') || cNameUpper.includes('U17')) cName = 'Under 17';
-
-          return {
-            date: row['Date'],
-            dateObj: row['Date'] ? new Date(row['Date']) : null,
-            campaignName: cName,
-            isAuxiliaryData: true,
-            phase: row['Phase DB'] || row['Phase'] || 'Unknown',
-            buyingType: row['Buying Type DB'] || 'Unknown',
-            country: normalizeMarket(row['Country DB'] || row['Country'] || 'Unknown'),
-            language: row['Language DB'] || row['Language'] || 'Unknown',
-            channel: 'Google Search',
-            adName: row['Ad group name'] || 'Unknown',
-            cost: 0,
-            impressions: 0,
-            clicks: 0,
-            videoViews: 0,
-            videoViews6s: 0,
-            videoViews15s: 0,
-            videoCompletions: 0,
-            purchases: parseMetric(row['Conversions'])
-          };
-      });
-    });
-
-    const tiktokPurchasesPromise = d3.csv(`${BASE_URL}&gid=1963494707`).then(raw => {
-      return raw.map(row => {
-        const vals = Object.values(row);
-        let cName = row['Campaign DB'] || row['Campaign name'] || 'Unknown';
-        const phaseDB = row['Phase DB'] || row['Phase'] || 'Unknown';
-        const countryDB = row['Country DB'] || row['Country'] || 'Unknown';
-        const langDB = row['Language DB'] || row['Language'] || 'Unknown';
-
-        const dateVal = row['By Day'] || row['Date'];
+    d3.csv(BASE_URL).then(raw => {
+      const combinedAds = raw.map(row => {
+        const rawCost = parseMetric(row['Cost'] || row['Spend'] || 0);
         return {
-          date: dateVal,
-          dateObj: dateVal ? new Date(dateVal) : null,
-          campaignName: cName,
-          isAuxiliaryData: true,
-          phase: phaseDB,
-          buyingType: row['Buying Type DB'] || row['Buying Type'] || 'Unknown',
-          country: normalizeMarket(countryDB),
-          language: langDB,
-          channel: 'TikTok',
-          adName: row['Ad name'] || row['Ad Name'] || 'Unknown',
-          cost: 0,
-          impressions: 0,
-          clicks: 0,
-          videoViews: 0,
+          date: row['Date'],
+          dateObj: row['Date'] ? new Date(row['Date']) : null,
+          campaignName: row['Campaign name'] || row['Campaign DB'] || 'Unknown',
+          phase: row['Activity'] || row['Campaign Type'] || 'Unknown',
+          buyingType: 'Unknown',
+          country: normalizeMarket(row['Market'] || row['Targeting country location'] || 'Unknown'),
+          language: 'Unknown',
+          channel: row['Channel'] || 'Unknown',
+          adName: row['Ad name'] || 'Unknown',
+          cost: rawCost,
+          impressions: parseMetric(row['Impressions']),
+          clicks: parseMetric(row['Clicks']),
+          videoViews: parseMetric(row['Video views'] || 0),
           videoViews6s: 0,
           videoViews15s: 0,
           videoCompletions: 0,
-          purchases: parseMetric(vals[5]) // Column F is index 5
+          purchases: parseMetric(row['Conversions'] || 0),
+          isAuxiliaryData: false
         };
       });
-    });
 
-    Promise.all([
-      Promise.all(fetchPromises),
-      d3.csv(`${BASE_URL}&gid=${GA4_GID}`),
-      d3.csv(`${BASE_URL}&gid=${META_CREATIVE_GID}`),
-      googlePurchasesPromise,
-      tiktokPurchasesPromise
-    ]).then(([channelResults, ga4Raw, metaCreativeRaw, googlePurchases, tiktokPurchases]) => {
-      let combinedAds = [];
-      channelResults.forEach(res => combinedAds = combinedAds.concat(res));
-      combinedAds = combinedAds.concat(googlePurchases);
-      combinedAds = combinedAds.concat(tiktokPurchases);
+      setAdData(combinedAds);
+      setGaData([]);
+      setCreativeData([]);
+      setPlannedData([]);
       
-      const gaResults = ga4Raw.map(row => {
-        const rawPaid = row['Paid/Organic'] || 'Unknown';
-        let paidOrganic = 'Unknown';
-        if (rawPaid.toLowerCase() === 'paid') paidOrganic = 'Paid';
-        else if (rawPaid.toLowerCase() === 'organic') paidOrganic = 'Organic';
-        else paidOrganic = rawPaid;
-
-          const campKey = Object.keys(row).find(k => k && k.trim() === 'Campaign DB');
-          const rawCamp = campKey ? row[campKey] : 'Unknown';
-          const campaignName = (rawCamp || 'Unknown').replace(/\r/g, '').trim();
-          
-          return {
-            date: row['Date'],
-            dateObj: row['Date'] ? new Date(row['Date']) : null,
-            sourceMedium: row['Session source / medium'],
-            country: normalizeMarket(row['Country']),
-            sessions: parseMetric(row['Sessions']),
-            users: parseMetric(row['Total users']),
-            engagedSessions: parseMetric(row['Engaged sessions']),
-            newUsers: parseMetric(row['New users']),
-            avgSessionDuration: parseMetric(row['Average session length (sec)']),
-            itemViews: parseMetric(row['Item views']),
-            addToCarts: parseMetric(row['Add-to-carts']),
-            checkouts: parseMetric(row['Checkouts']),
-            purchases: parseMetric(row['Purchases']),
-            gaTickets: parseMetric(row['Item purchase quantity']),
-            campaignName,
-            paidOrganic,
-            ga4Property: row['GA4 property'] || 'Unknown'
-          };
-      });
-
-      const creativeResults = metaCreativeRaw.map(row => {
-          let cName = row['Campaign name'] || row['Campaign DB'] || 'Unknown';
-          const cNameUpper = cName.toUpperCase();
-          if (cNameUpper.includes('AC27')) cName = 'AC27';
-          else if (cNameUpper.includes('ACLE')) cName = 'ACLE';
-          else if (cNameUpper.includes('FAN ID')) cName = 'Fan ID';
-          else if (cNameUpper.includes('GULF CUP')) cName = 'Gulf Cup';
-          else if (cNameUpper.includes('UNDER 17') || cNameUpper.includes('U17')) cName = 'Under 17';
-          
-          return {
-            date: row['Date'] ? new Date(row['Date']) : null,
-            campaignName: cName,
-            phase: row['Phase DB'] || row['Phase'] || 'Unknown',
-            adName: row['Ad name'] || 'Unknown',
-            creativeName: row['Creative Name'] || row['Ad name'] || 'Unknown',
-            adImageUrl: row['Ad creative image URL'] || '',
-            impressions: parseMetric(row['Impressions']),
-            clicks: parseMetric(row['Link clicks']),
-            views: parseMetric(row['Three-second video views']),
-            thruPlays: parseMetric(row['ThruPlay actions']),
-            cost: parseMetric(row['Cost (USD)']),
-            purchases: parseMetric(row['Purchases']),
-            market: row['Country DB'] || 'Unknown',
-            language: row['Language DB'] || 'Unknown',
-            status: row['Status'] || row['Ad Delivery'] || row['Operation Status'] || 'Unknown',
-            channel: 'META'
-          };
-      });
-
-      // Fetch Planned Data
-      const fetchPlanned = d3.csv("/api/sheets?type=planned").then(raw => {
-        return raw.map(row => ({
-          phase: row['Phase'] || 'Unknown',
-          channel: row['Channel'] || 'Unknown',
-          buyingType: row['Buying Type'] || 'Unknown',
-          bookedUnits: parseMetric(row['Booked Units'] || '0'),
-          plannedCost: parseFloat((row['Planned Budget'] || '0').replace(/[^0-9.-]+/g,"")),
-          targetMarket: normalizeMarket(row['Target Market'] || 'Unknown')
-        }));
-      });
-
-      // Fetch TikTok Creatives
-      const fetchTikTok = fetch('/api/tiktok/creatives?advertiser_id=7598486787190997008')
-        .then(res => res.json())
-        .then(json => {
-          if (!json.success || !json.data) return [];
-          return json.data.map(item => {
-            let cName = item.campaignName || item.adName || 'Unknown'; 
-            // Try to extract standard campaign names from TikTok naming conventions
-            const cNameUpper = cName.toUpperCase();
-            if (cNameUpper.includes('AC27')) cName = 'AC27';
-            else if (cNameUpper.includes('ACLE')) cName = 'ACLE';
-            else if (cNameUpper.includes('FAN ID')) cName = 'Fan ID';
-            else if (cNameUpper.includes('GULF CUP')) cName = 'Gulf Cup';
-            else if (cNameUpper.includes('UNDER 17') || cNameUpper.includes('U17')) cName = 'Under 17';
-            else cName = 'Unknown';
-            
-            return {
-              date: item.dimensions?.stat_time_day ? new Date(item.dimensions.stat_time_day) : null,
-              campaignName: cName,
-              adName: item.adName || 'Unknown',
-              creativeName: item.adName || 'Unknown',
-              adImageUrl: item.thumbnailUrl || '',
-              videoUrl: item.videoUrl || '',
-              postUrl: item.postUrl || '',
-              impressions: parseMetric(item.metrics?.impressions),
-              clicks: parseMetric(item.metrics?.clicks),
-              views: parseMetric(item.metrics?.video_play_actions), // Using video_play_actions if available, fallback mapped later if needed
-              thruPlays: 0,
-              cost: parseFloat(item.metrics?.spend) || 0,
-              market: 'Unknown',
-              language: 'Unknown',
-              status: item.status || 'Unknown',
-              channel: 'TikTok'
-            };
-          });
-        })
-        .catch(err => {
-          console.error("Error fetching TikTok creatives:", err);
-          return [];
-        });
-
-      Promise.all([fetchPlanned, fetchTikTok]).then(([plannedResults, tiktokResults]) => {
-        // Merge TikTok purchases
-        tiktokResults.forEach(tr => {
-          const matchingPurchases = tiktokPurchases.filter(tp => tp.adName === tr.adName);
-          tr.purchases = d3.sum(matchingPurchases, tp => tp.purchases);
-          tr.phase = matchingPurchases.length > 0 ? matchingPurchases[0].phase : 'Unknown';
-        });
-
-        // Extract other channels from combinedAds
-        const otherChannelsData = combinedAds
-          .filter(ad => ad.channel && ad.channel.toUpperCase() !== 'META' && ad.channel.toUpperCase() !== 'TIKTOK' && !ad.isAuxiliaryData)
-          .map(ad => ({
-            date: ad.dateObj,
-            campaignName: ad.campaignName,
-            phase: ad.phase || 'Unknown',
-            adName: ad.adName,
-            creativeName: ad.adName,
-            adImageUrl: '',
-            videoUrl: '',
-            postUrl: '',
-            impressions: ad.impressions || 0,
-            clicks: ad.clicks || 0,
-            views: ad.videoViews || 0,
-            thruPlays: 0,
-            cost: ad.cost || 0,
-            purchases: ad.purchases || 0,
-            market: ad.country || 'Unknown',
-            language: ad.language || 'Unknown',
-            status: 'Unknown',
-            channel: ad.channel
-          }));
-
-        setAdData(combinedAds);
-        setGaData(gaResults);
-        setCreativeData([...creativeResults, ...tiktokResults, ...otherChannelsData]);
-        setPlannedData(plannedResults);
-        
-        const allDates = [...combinedAds, ...gaResults]
-          .map(d => d.dateObj || d.date)
-          .filter(d => d instanceof Date && !isNaN(d));
-        if (allDates.length > 0) {
-          const maxDate = new Date(Math.max(...allDates));
-          setLastUpdated(maxDate);
-        } else {
-          setLastUpdated(new Date());
-        }
-        
-        setLoading(false);
-      });
+      const allDates = combinedAds
+        .map(d => d.dateObj)
+        .filter(d => d instanceof Date && !isNaN(d));
+      if (allDates.length > 0) {
+        setLastUpdated(new Date(Math.max(...allDates)));
+      } else {
+        setLastUpdated(new Date());
+      }
+      setLoading(false);
     }).catch(err => {
       console.error(err);
       setLoading(false);
     });
   }, [isAuthenticated]);
+
+  
 
   const resetFilters = () => {
     setFilterCampaigns(['All']);
@@ -766,7 +508,7 @@ export default function App() {
     return (
       <div className="min-h-screen app-bg flex flex-col items-center justify-center text-[#c88214] gap-6 relative overflow-hidden">
         <div className="relative flex flex-col items-center justify-center animate-pulse">
-          <img src="/loc-logo/Saudi 2027-07.png" alt="Loading Logo" className="h-24 md:h-32 object-contain" onError={(e) => e.target.style.display = 'none'} />
+          <img src="/tahaluf-logo.png" alt="Loading Logo" className="h-24 md:h-32 object-contain" onError={(e) => e.target.style.display = 'none'} />
         </div>
         <div className="flex flex-col items-center gap-2 z-10">
           <span className="text-sm md:text-base font-bold text-[#c88214] tracking-[0.2em]">
@@ -813,7 +555,7 @@ export default function App() {
             title: "MASTER_SLIDE",
             background: { color: "0C272D" },
             objects: [
-              { image: { x: 8.8, y: 0.2, w: 0.65, h: 0.75, path: window.location.origin + "/loc-logo/Saudi 2027-10.png", sizing: { type: "contain" } } }
+              { image: { x: 8.8, y: 0.2, w: 0.65, h: 0.75, path: window.location.origin + "/tahaluf-logo.png", sizing: { type: "contain" } } }
             ]
           });
 
@@ -871,7 +613,7 @@ export default function App() {
 
           if (mainScroll) mainScroll.scrollTo({ top: 0, behavior: 'smooth' });
 
-          await pres.writeFile({ fileName: `AFC_Dashboard_Snapshot_${new Date().getTime()}.pptx` });
+          await pres.writeFile({ fileName: `Tahaluf_Dashboard_Snapshot_${new Date().getTime()}.pptx` });
       } catch (err) {
           console.error("PPTX Error", err);
           alert("Error generating PPTX: " + (err.message || err.toString()));
@@ -1264,10 +1006,10 @@ export default function App() {
       <header className="sticky top-0 z-50 bg-[#011414]/95 backdrop-blur-xl border-b border-[#c88214]/20 px-8 py-4 flex flex-wrap gap-4 items-center justify-between shadow-2xl relative">
         <div className="pattern-overlay absolute inset-0 z-0 pointer-events-none"></div>
         <div className="flex items-center gap-4 relative z-10">
-          <img src="/loc-logo/Saudi 2027-07.png" alt="AFC Logo" className="h-24 object-contain" onError={(e) => e.target.style.display = 'none'} />
+          <img src="/tahaluf-logo.png" alt="Tahaluf Logo" className="h-24 object-contain" onError={(e) => e.target.style.display = 'none'} />
           <div>
-            <h1 className="text-xl font-black text-white tracking-tight uppercase">Local Organising Committee</h1>
-            <p className="text-[10px] font-black text-[#c88214] uppercase tracking-[0.2em]">Tournament Performance Dashboard</p>
+            <h1 className="text-xl font-black text-white tracking-tight uppercase">Tahaluf</h1>
+            <p className="text-[10px] font-black text-[#c88214] uppercase tracking-[0.2em]">Performance Dashboard</p>
             {lastUpdated && (
               <p className="text-[9px] font-bold text-[#6fa89f] mt-1 uppercase tracking-wider opacity-80">
                 Data up to: {lastUpdated.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}

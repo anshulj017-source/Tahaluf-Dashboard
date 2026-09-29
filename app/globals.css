@@ -45,37 +45,35 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-/* --- LOC Asia Cup 2027 brand: dark gradient theme --- */
+/* --- Tahaluf brand: dark gradient theme --- */
 
 .app-bg {
-  background: radial-gradient(circle at 15% 0%, #062f2e 0%, #01100f 50%, #000705 100%);
+  background: radial-gradient(circle at 15% 0%, #1a2a3a 0%, #0d1b2a 50%, #050a11 100%);
 }
 
 .card-surface {
-  background: linear-gradient(160deg, rgba(0, 60, 50, 0.55), rgba(0, 8, 7, 0.85));
+  background: linear-gradient(160deg, rgba(26, 42, 58, 0.55), rgba(5, 10, 17, 0.85));
   position: relative;
 }
 
 .card-surface-gold {
-  background: linear-gradient(160deg, rgba(90, 55, 8, 0.5), rgba(0, 8, 7, 0.85));
+  background: linear-gradient(160deg, rgba(206, 220, 51, 0.2), rgba(5, 10, 17, 0.85));
   position: relative;
 }
 
 .pattern-overlay {
-  background-image: url('/loc-pattern-11-cropped.png');
-  background-size: 600px auto;
-  background-repeat: repeat;
-  opacity: 0.35;
+  background-image: none; /* Removed AFC specific pattern */
+  opacity: 0.1;
 }
 
 .surface-inset {
-  background: linear-gradient(180deg, rgba(3, 35, 35, 0.7), rgba(0, 5, 5, 0.9));
+  background: linear-gradient(180deg, rgba(13, 27, 42, 0.7), rgba(5, 10, 17, 0.9));
 }
 
 .gradient-gold {
-  background: linear-gradient(135deg, #d99a2e, #c88214);
+  background: linear-gradient(135deg, #dce953, #cedc33); /* Tahaluf lime green */
 }
 
 .gradient-teal {
-  background: linear-gradient(135deg, #00937b, #007542);
+  background: linear-gradient(135deg, #1f364d, #142433); /* Tahaluf secondary navy */
 }
