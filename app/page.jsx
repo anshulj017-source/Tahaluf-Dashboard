@@ -333,11 +333,23 @@ export default function App() {
     const rawCost = parseMetric(row['Cost'] || row['Spend'] || 0);
     const eventNameDB = (row['Event Name DB'] || '').trim();
     const eventTypeDB = (row['Event Type DB'] || '').trim();
+    const channel = row['Channel'] || 'Unknown';
     // Derive portfolio: GSTS and SAIF belong to P1
     let portfolio = 'Other';
     if (eventNameDB.toUpperCase().includes('GSTS') || eventNameDB.toUpperCase().includes('SAIF')) {
       portfolio = 'P1';
     }
+
+    const isGoogle = channel.toLowerCase().includes('google');
+    const isMetaOrLinkedin = channel.toLowerCase().includes('meta') || channel.toLowerCase().includes('linkedin') || channel.toLowerCase().includes('fb') || channel.toLowerCase().includes('ig') || channel.toLowerCase().includes('facebook') || channel.toLowerCase().includes('instagram');
+    
+    const rowVals = Object.values(row);
+    const creativeName = isGoogle 
+        ? (rowVals[11] || row['Ad set name'] || 'Unknown') 
+        : (rowVals[12] || row['Ad name'] || 'Unknown');
+        
+    const previewLink = isMetaOrLinkedin ? (rowVals[14] || '') : '';
+
     return {
       date: row['Date'],
       dateObj: row['Date'] ? new Date(row['Date']) : null,
@@ -346,8 +358,11 @@ export default function App() {
       buyingType: 'Unknown',
       country: normalizeMarket(row['Market'] || row['Targeting country location'] || 'Unknown'),
       language: 'Unknown',
-      channel: row['Channel'] || 'Unknown',
-      adName: row['Ad name'] || 'Unknown',
+      channel: channel,
+      adName: creativeName,
+      creativeName: creativeName,
+      adImageUrl: previewLink,
+      postUrl: previewLink,
       cost: rawCost,
       impressions: parseMetric(row['Impressions']),
       clicks: parseMetric(row['Clicks']),
@@ -378,7 +393,7 @@ export default function App() {
 
       setAdData(combinedAds);
       setGaData([]);
-      setCreativeData([]);
+      setCreativeData(combinedAds);
       setPlannedData([]);
       
       const allDates = combinedAds
