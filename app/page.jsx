@@ -382,14 +382,16 @@ export default function App() {
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    // Fetch from both GSTS (default gid) and SAIF (gid=1196409184) sheets
+    // Fetch from GSTS (default gid), SAIF (gid=1196409184), and KoG 2026 (gid=1486784585) sheets
     Promise.all([
       d3.csv(BASE_URL),
-      d3.csv(BASE_URL + '&gid=1196409184')
-    ]).then(([gstsRaw, saifRaw]) => {
+      d3.csv(BASE_URL + '&gid=1196409184'),
+      d3.csv(BASE_URL + '&gid=1486784585')
+    ]).then(([gstsRaw, saifRaw, kogRaw]) => {
       const gstsAds = gstsRaw.map(parseRow);
       const saifAds = saifRaw.map(parseRow);
-      const combinedAds = [...gstsAds, ...saifAds];
+      const kogAds = kogRaw.map(parseRow);
+      const combinedAds = [...gstsAds, ...saifAds, ...kogAds];
 
       setAdData(combinedAds);
       setGaData([]);

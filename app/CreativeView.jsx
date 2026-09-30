@@ -67,7 +67,7 @@ export default function CreativeView({ data, exRate = 1, exSym = '$', formatShor
   const [filterChannels, setFilterChannels] = useState(['All']);
   const [filterStatuses, setFilterStatuses] = useState(['All']);
   const [filterPhases, setFilterPhases] = useState(['All']);
-  const availableMetrics = userRole === 'non-finance' ? ['Impressions', 'Clicks', 'CTR', 'Views', 'Purchases'] : ['Spend', 'Impressions', 'Clicks', 'CTR', 'CPC', 'Views', 'Purchases'];
+  const availableMetrics = userRole === 'non-finance' ? ['Impressions', 'Clicks', 'CTR', 'Views', 'Conversions', 'CR'] : ['Spend', 'Impressions', 'Clicks', 'CTR', 'CPC', 'Views', 'Conversions', 'CPA', 'CR'];
   const [selectedMetrics, setSelectedMetrics] = useState(availableMetrics);
 
   const [sortConfig, setSortConfig] = useState({ key: 'cost', direction: 'desc' });
@@ -115,6 +115,8 @@ export default function CreativeView({ data, exRate = 1, exSym = '$', formatShor
       const ctr = imp > 0 ? clk / imp : 0;
       const cpc = clk > 0 ? cst / clk : 0;
       const cpv = views > 0 ? cst / views : 0;
+      const cpa = purch > 0 ? cst / purch : 0;
+      const cr = clk > 0 ? purch / clk : 0;
       const isLive = rows.some(r => r.dateObj && r.dateObj >= twoDaysAgo && r.cost > 0);
       const status = isLive ? 'Live' : 'Paused';
       
@@ -137,6 +139,8 @@ export default function CreativeView({ data, exRate = 1, exSym = '$', formatShor
         ctr,
         cpc,
         cpv,
+        cpa,
+        cr,
       };
     }).filter(c => filterStatuses.includes('All') || filterStatuses.includes(c.status))
     .sort((a,b) => {
@@ -342,7 +346,9 @@ export default function CreativeView({ data, exRate = 1, exSym = '$', formatShor
                     {selectedMetrics.includes('CTR') && renderSortHeader('CTR', 'ctr')}
                     {selectedMetrics.includes('CPC') && renderSortHeader('CPC', 'cpc')}
                     {selectedMetrics.includes('Views') && renderSortHeader('Views', 'views')}
-                    {selectedMetrics.includes('Purchases') && renderSortHeader('Purchases', 'purchases')}
+                    {selectedMetrics.includes('Conversions') && renderSortHeader('Conversions', 'purchases')}
+                    {selectedMetrics.includes('CPA') && renderSortHeader('CPA', 'cpa')}
+                    {selectedMetrics.includes('CR') && renderSortHeader('CR', 'cr')}
 
                  </tr>
               </thead>
@@ -388,7 +394,9 @@ export default function CreativeView({ data, exRate = 1, exSym = '$', formatShor
                        {selectedMetrics.includes('CTR') && <td className="px-6 py-4 text-sm font-bold text-[#cedc28] whitespace-nowrap">{(c.ctr*100).toFixed(2)}%</td>}
                        {selectedMetrics.includes('CPC') && <td className="px-6 py-4 text-sm font-bold text-[#cedc28] whitespace-nowrap">{exSym}{d3.format(",.2f")(c.cpc)}</td>}
                        {selectedMetrics.includes('Views') && <td className="px-6 py-4 text-sm font-bold text-amber-400 whitespace-nowrap">{formatShort(c.views)}</td>}
-                       {selectedMetrics.includes('Purchases') && <td className="px-6 py-4 text-sm font-bold text-[#74FA93] whitespace-nowrap">{formatShort(c.purchases)}</td>}
+                       {selectedMetrics.includes('Conversions') && <td className="px-6 py-4 text-sm font-bold text-[#74FA93] whitespace-nowrap">{formatShort(c.purchases)}</td>}
+                       {selectedMetrics.includes('CPA') && <td className="px-6 py-4 text-sm font-medium text-[#eef7f5] whitespace-nowrap">{exSym}{d3.format(",.2f")(c.cpa * exRate)}</td>}
+                       {selectedMetrics.includes('CR') && <td className="px-6 py-4 text-sm font-medium text-[#eef7f5] whitespace-nowrap">{(c.cr * 100).toFixed(2)}%</td>}
 
                     </tr>
                  ))}

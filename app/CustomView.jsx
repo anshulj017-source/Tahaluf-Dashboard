@@ -166,6 +166,8 @@ export default function CustomView({ adData = [], exRate = 1, exSym = "$", forma
       { key: 'impressions', label: 'Impressions', format: v => d3.format(",")((v||0)) },
       { key: 'clicks', label: 'Clicks', format: v => d3.format(",")((v||0)) },
       { key: 'purchases', label: 'Conversions', format: v => d3.format(",")((v||0)) },
+      { key: 'cpa', label: 'CPA', format: v => `${exSym}${d3.format(",.2f")((v||0) * exRate)}` },
+      { key: 'cr', label: 'CR', format: v => `${(v||0).toFixed(2)}%` },
       { key: 'videoViews', label: 'Video Views', format: v => formatShort(v||0) },
       { key: 'videoViews6s', label: '6s Views', format: v => formatShort(v||0) },
       { key: 'videoViews15s', label: '15s Views', format: v => formatShort(v||0) },
@@ -177,7 +179,7 @@ export default function CustomView({ adData = [], exRate = 1, exSym = "$", forma
       { key: 'cpcv', label: 'CPCV', format: v => `${exSym}${d3.format(",.4f")((v||0) * exRate)}` }
     ];
     if (userRole === 'non-finance') {
-      return base.filter(m => !['cost', 'cpc', 'cpm', 'cpv', 'cpcv'].includes(m.key));
+      return base.filter(m => !['cost', 'cpc', 'cpm', 'cpv', 'cpcv', 'cpa'].includes(m.key));
     }
     return base;
   }, [exRate, exSym, userRole]);
@@ -191,7 +193,7 @@ export default function CustomView({ adData = [], exRate = 1, exSym = "$", forma
     { key: 'phase', label: 'Event Phase' }
   ];
   
-  const PIE_DIMENSIONS = DIMENSIONS.filter(d => d.key !== 'date' && d.key !== 'week');
+  const PIE_DIMENSIONS = DIMENSIONS.filter(d => d.key !== 'date' && d.key !== 'week' && d.key !== 'campaignName');
 
   // Custom Chart State
   const [chartDimX, setChartDimX] = useState('date');
@@ -220,19 +222,23 @@ export default function CustomView({ adData = [], exRate = 1, exSym = "$", forma
           
           let m1Val = d3.sum(vals, d => d[chartMetric1] || 0);
           if (chartMetric1 === 'cost') m1Val *= exRate;
-          if (['ctr', 'cpc', 'cpm', 'cpv', 'cpcv'].includes(chartMetric1)) {
+          if (['ctr', 'cpc', 'cpm', 'cpv', 'cpcv', 'cpa', 'cr'].includes(chartMetric1)) {
              // For rates, this simple sum doesn't work perfectly, but for demonstration:
              if (chartMetric1 === 'ctr') m1Val = d3.sum(vals, d => d.impressions) > 0 ? (d3.sum(vals, d => d.clicks) / d3.sum(vals, d => d.impressions)) * 100 : 0;
              if (chartMetric1 === 'cpc') m1Val = d3.sum(vals, d => d.clicks) > 0 ? (d3.sum(vals, d => d.cost) * exRate) / d3.sum(vals, d => d.clicks) : 0;
              if (chartMetric1 === 'cpm') m1Val = d3.sum(vals, d => d.impressions) > 0 ? ((d3.sum(vals, d => d.cost) * exRate) / d3.sum(vals, d => d.impressions)) * 1000 : 0;
+             if (chartMetric1 === 'cpa') m1Val = d3.sum(vals, d => d.purchases) > 0 ? (d3.sum(vals, d => d.cost) * exRate) / d3.sum(vals, d => d.purchases) : 0;
+             if (chartMetric1 === 'cr') m1Val = d3.sum(vals, d => d.clicks) > 0 ? (d3.sum(vals, d => d.purchases) / d3.sum(vals, d => d.clicks)) * 100 : 0;
           }
 
           let m2Val = d3.sum(vals, d => d[chartMetric2] || 0);
           if (chartMetric2 === 'cost') m2Val *= exRate;
-          if (['ctr', 'cpc', 'cpm', 'cpv', 'cpcv'].includes(chartMetric2)) {
+          if (['ctr', 'cpc', 'cpm', 'cpv', 'cpcv', 'cpa', 'cr'].includes(chartMetric2)) {
              if (chartMetric2 === 'ctr') m2Val = d3.sum(vals, d => d.impressions) > 0 ? (d3.sum(vals, d => d.clicks) / d3.sum(vals, d => d.impressions)) * 100 : 0;
              if (chartMetric2 === 'cpc') m2Val = d3.sum(vals, d => d.clicks) > 0 ? (d3.sum(vals, d => d.cost) * exRate) / d3.sum(vals, d => d.clicks) : 0;
              if (chartMetric2 === 'cpm') m2Val = d3.sum(vals, d => d.impressions) > 0 ? ((d3.sum(vals, d => d.cost) * exRate) / d3.sum(vals, d => d.impressions)) * 1000 : 0;
+             if (chartMetric2 === 'cpa') m2Val = d3.sum(vals, d => d.purchases) > 0 ? (d3.sum(vals, d => d.cost) * exRate) / d3.sum(vals, d => d.purchases) : 0;
+             if (chartMetric2 === 'cr') m2Val = d3.sum(vals, d => d.clicks) > 0 ? (d3.sum(vals, d => d.purchases) / d3.sum(vals, d => d.clicks)) * 100 : 0;
           }
 
           return {
@@ -314,7 +320,9 @@ export default function CustomView({ adData = [], exRate = 1, exSym = "$", forma
                      cpm: impressions > 0 ? (cost / impressions) * 1000 : 0,
                      cpc: clicks > 0 ? cost / clicks : 0,
                      cpv: videoViews > 0 ? cost / videoViews : 0,
-                     cpcv: videoCompletions > 0 ? cost / videoCompletions : 0
+                     cpcv: videoCompletions > 0 ? cost / videoCompletions : 0,
+                     cpa: purchases > 0 ? cost / purchases : 0,
+                     cr: clicks > 0 ? (purchases / clicks) * 100 : 0
                  });
              } else if (item.hasOwnProperty('cost')) { // single row case
                 const impressions = item.impressions;
@@ -326,6 +334,8 @@ export default function CustomView({ adData = [], exRate = 1, exSym = "$", forma
                      ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
                      cpm: impressions > 0 ? (cost / impressions) * 1000 : 0,
                      cpc: clicks > 0 ? cost / clicks : 0,
+                     cpa: (item.purchases > 0 && cost) ? cost / item.purchases : 0,
+                     cr: clicks > 0 ? ((item.purchases || 0) / clicks) * 100 : 0,
                  });
              }
          });
@@ -461,10 +471,10 @@ export default function CustomView({ adData = [], exRate = 1, exSym = "$", forma
                      </div>
                  </div>
                  <div className="flex flex-col lg:flex-row items-center gap-8 w-full mt-auto relative z-10">
-                   <div className="h-80 w-full lg:w-1/2">
+                   <div className="h-[400px] w-full lg:w-1/2 flex items-center justify-center">
                      <ResponsiveContainer width="100%" height="100%">
                        <PieChart>
-                         <Pie data={dynamicPieData} innerRadius={80} outerRadius={120} paddingAngle={5} dataKey="value" stroke="none">
+                         <Pie data={dynamicPieData} innerRadius="55%" outerRadius="75%" paddingAngle={5} dataKey="value" stroke="none">
                            {dynamicPieData.map((entry, index) => (
                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                            ))}
@@ -478,7 +488,7 @@ export default function CustomView({ adData = [], exRate = 1, exSym = "$", forma
                                return [`${mDef ? mDef.format(val) : val} (${percent}%)`, name];
                             }}
                          />
-                         <Legend layout="vertical" verticalAlign="middle" align="right" wrapperStyle={{ fontSize: '14px', fontWeight: '500' }} />
+                         <Legend layout="horizontal" verticalAlign="bottom" align="center" wrapperStyle={{ fontSize: '12px', fontWeight: '500', paddingTop: '10px' }} />
                        </PieChart>
                      </ResponsiveContainer>
                    </div>

@@ -83,7 +83,7 @@ const getFlagEmoji = (countryName) => {
 
 export default function MarketView({ adData, gaData, exRate = 1, exSym = '$', formatShort = (v) => v, userRole }) {
   const [selectedMarkets, setSelectedMarkets] = useState([]);
-  const [selectedMetrics, setSelectedMetrics] = useState(userRole === 'non-finance' ? ['impressions', 'clicks', 'ctr', 'purchases'] : ['spend', 'impressions', 'clicks', 'ctr', 'cpm', 'purchases']);
+  const [selectedMetrics, setSelectedMetrics] = useState(userRole === 'non-finance' ? ['impressions', 'clicks', 'ctr', 'purchases', 'cr'] : ['spend', 'impressions', 'clicks', 'ctr', 'cpm', 'purchases', 'cpa', 'cr']);
   const [channelMetric, setChannelMetric] = useState(userRole === 'non-finance' ? 'impressions' : 'spend'); // For chart 2
   const [trendMetric, setTrendMetric] = useState(userRole === 'non-finance' ? 'impressions' : 'spend'); // For chart 1
 
@@ -135,6 +135,8 @@ export default function MarketView({ adData, gaData, exRate = 1, exSym = '$', fo
       { key: 'impressions', label: 'Impressions', format: v => d3.format(",")(v) },
       { key: 'clicks', label: 'Clicks', format: v => d3.format(",")(v) },
       { key: 'purchases', label: 'Conversions', format: v => d3.format(",")(v) },
+      { key: 'cpa', label: 'CPA', format: v => `${exSym}${d3.format(",.2f")(v * exRate)}` },
+      { key: 'cr', label: 'CR', format: v => `${v.toFixed(2)}%` },
       { key: 'views', label: 'Video Views', format: v => d3.format(",")(v) },
       { key: 'views6s', label: '6s Views', format: v => d3.format(",")(v) },
       { key: 'views15s', label: '15s Views', format: v => d3.format(",")(v) },
@@ -147,7 +149,7 @@ export default function MarketView({ adData, gaData, exRate = 1, exSym = '$', fo
       { key: 'cpcv', label: 'CPCV', format: v => `${exSym}${d3.format(",.4f")(v * exRate)}` }
     ];
     if (userRole === 'non-finance') {
-      return base.filter(m => !['spend', 'cpc', 'cpm', 'cpv', 'cpcv'].includes(m.key));
+      return base.filter(m => !['spend', 'cpc', 'cpm', 'cpv', 'cpcv', 'cpa'].includes(m.key));
     }
     return base;
   }, [exRate, exSym, userRole]);
@@ -171,6 +173,8 @@ export default function MarketView({ adData, gaData, exRate = 1, exSym = '$', fo
       const cpc = clicks > 0 ? (spend / clicks) : Infinity;
       const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;
       const cpv = views > 0 ? (spend / views) : Infinity;
+      const cpa = purchases > 0 ? (spend / purchases) : 0;
+      const cr = clicks > 0 ? (purchases / clicks) * 100 : 0;
 
       return {
         country,
@@ -184,6 +188,8 @@ export default function MarketView({ adData, gaData, exRate = 1, exSym = '$', fo
         cpc,
         ctr,
         cpv,
+        cpa,
+        cr,
         campaignsCount: new Set(vals.map(d => d.campaignName)).size
       };
     });
@@ -304,7 +310,9 @@ export default function MarketView({ adData, gaData, exRate = 1, exSym = '$', fo
           cpc: clicks > 0 ? spend / clicks : 0,
           cpm: impressions > 0 ? (spend / impressions) * 1000 : 0,
           cpv: views > 0 ? spend / views : 0,
-          cpcv: completions > 0 ? spend / completions : 0
+          cpcv: completions > 0 ? spend / completions : 0,
+          cpa: purchases > 0 ? spend / purchases : 0,
+          cr: clicks > 0 ? (purchases / clicks) * 100 : 0
         });
       });
     });
@@ -655,7 +663,9 @@ export default function MarketView({ adData, gaData, exRate = 1, exSym = '$', fo
                         cpc: tClicks > 0 ? tSpend / tClicks : 0,
                         cpm: tImp > 0 ? (tSpend / tImp) * 1000 : 0,
                         cpv: tViews > 0 ? tSpend / tViews : 0,
-                        cpcv: tCompletions > 0 ? tSpend / tCompletions : 0
+                        cpcv: tCompletions > 0 ? tSpend / tCompletions : 0,
+                        cpa: tPurchases > 0 ? tSpend / tPurchases : 0,
+                        cr: tClicks > 0 ? (tPurchases / tClicks) * 100 : 0
                       };
 
                       return (

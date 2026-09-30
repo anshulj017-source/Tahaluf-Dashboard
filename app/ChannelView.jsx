@@ -61,7 +61,7 @@ const MetricMultiSelectDropdown = ({ options, selectedKeys, onChange }) => {
 
 export default function ChannelView({ adData, exRate = 1, exSym = '$', formatShort = (v) => v, userRole }) {
   const [selectedChannels, setSelectedChannels] = useState([]);
-  const [selectedMetrics, setSelectedMetrics] = useState(userRole === 'non-finance' ? ['impressions', 'clicks', 'ctr', 'views'] : ['spend', 'impressions', 'clicks', 'ctr', 'cpm']);
+  const [selectedMetrics, setSelectedMetrics] = useState(userRole === 'non-finance' ? ['impressions', 'clicks', 'ctr', 'views', 'purchases', 'cr'] : ['spend', 'impressions', 'clicks', 'ctr', 'cpm', 'purchases', 'cpa', 'cr']);
   const [trendMetric, setTrendMetric] = useState(userRole === 'non-finance' ? 'impressions' : 'spend'); // spend, impressions, clicks, views
 
   const AVAILABLE_METRICS = useMemo(() => {
@@ -74,6 +74,8 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
       { key: 'views15s', label: '15s Views', format: v => d3.format(",")(v) },
       { key: 'completions', label: 'Completed Views', format: v => d3.format(",")(v) },
       { key: 'purchases', label: 'Conversions', format: v => d3.format(",")(v) },
+      { key: 'cpa', label: 'CPA', format: v => `${exSym}${d3.format(",.2f")(v * exRate)}` },
+      { key: 'cr', label: 'CR', format: v => `${v.toFixed(2)}%` },
       { key: 'cpc', label: 'CPC', format: v => `${exSym}${d3.format(",.2f")(v * exRate)}` },
       { key: 'cpm', label: 'CPM', format: v => `${exSym}${d3.format(",.2f")(v * exRate)}` },
       { key: 'ctr', label: 'CTR', format: v => `${v.toFixed(2)}%` },
@@ -81,7 +83,7 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
       { key: 'cpcv', label: 'CPCV', format: v => `${exSym}${d3.format(",.4f")(v * exRate)}` }
     ];
     if (userRole === 'non-finance') {
-      return base.filter(m => !['spend', 'cpc', 'cpm', 'cpv', 'cpcv'].includes(m.key));
+      return base.filter(m => !['spend', 'cpc', 'cpm', 'cpv', 'cpcv', 'cpa'].includes(m.key));
     }
     return base;
   }, [exRate, exSym, userRole]);
@@ -100,6 +102,8 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
       const cpc = clicks > 0 ? (spend / clicks) : Infinity;
       const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;
       const cpv = views > 0 ? (spend / views) : Infinity;
+      const cpa = purchases > 0 ? (spend / purchases) : 0;
+      const cr = clicks > 0 ? (purchases / clicks) * 100 : 0;
 
       return {
         channel,
@@ -112,6 +116,8 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
         cpc,
         ctr,
         cpv,
+        cpa,
+        cr,
         campaignsCount: new Set(vals.map(d => d.phase)).size
       };
     });
@@ -213,7 +219,9 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
           cpc: clicks > 0 ? spend / clicks : 0,
           cpm: impressions > 0 ? (spend / impressions) * 1000 : 0,
           cpv: views > 0 ? spend / views : 0,
-          cpcv: completions > 0 ? spend / completions : 0
+          cpcv: completions > 0 ? spend / completions : 0,
+          cpa: purchases > 0 ? spend / purchases : 0,
+          cr: clicks > 0 ? (purchases / clicks) * 100 : 0
         });
       });
     });
@@ -592,7 +600,9 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
                         cpc: tClicks > 0 ? tSpend / tClicks : 0,
                         cpm: tImp > 0 ? (tSpend / tImp) * 1000 : 0,
                         cpv: tViews > 0 ? tSpend / tViews : 0,
-                        cpcv: tCompletions > 0 ? tSpend / tCompletions : 0
+                        cpcv: tCompletions > 0 ? tSpend / tCompletions : 0,
+                        cpa: tPurchases > 0 ? tSpend / tPurchases : 0,
+                        cr: tClicks > 0 ? (tPurchases / tClicks) * 100 : 0
                       };
 
                       return (

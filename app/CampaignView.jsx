@@ -243,7 +243,9 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
         ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
         cpm: impressions > 0 ? (spend / impressions) * 1000 : 0,
         cpc: clicks > 0 ? spend / clicks : 0,
-        cpv: views > 0 ? spend / views : 0
+        cpv: views > 0 ? spend / views : 0,
+        cpa: conversions > 0 ? spend / conversions : 0,
+        cr: clicks > 0 ? (conversions / clicks) * 100 : 0
       };
     });
     return grouped.sort((a,b) => b.spend - a.spend);
@@ -342,6 +344,8 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
       if (overallMetrics.includes('All') || overallMetrics.includes('Video Views')) headers.push('Video Views');
       if (overallMetrics.includes('All') || overallMetrics.includes('Completed Views')) headers.push('Completed Views');
       if (overallMetrics.includes('All') || overallMetrics.includes('Conversions')) headers.push('Conversions');
+      if (userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPA'))) headers.push('CPA');
+      if (overallMetrics.includes('All') || overallMetrics.includes('CR')) headers.push('CR');
       if (overallMetrics.includes('All') || overallMetrics.includes('CTR')) headers.push('CTR');
       if (userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPM'))) headers.push('CPM');
       if (userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPC'))) headers.push('CPC');
@@ -357,6 +361,8 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
         if (overallMetrics.includes('All') || overallMetrics.includes('Video Views')) rowData.push(row.views);
         if (overallMetrics.includes('All') || overallMetrics.includes('Completed Views')) rowData.push(row.completions);
         if (overallMetrics.includes('All') || overallMetrics.includes('Conversions')) rowData.push(row.conversions);
+        if (userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPA'))) rowData.push((row.cpa * exRate).toFixed(2));
+        if (overallMetrics.includes('All') || overallMetrics.includes('CR')) rowData.push(row.cr.toFixed(2) + '%');
         if (overallMetrics.includes('All') || overallMetrics.includes('CTR')) rowData.push(row.ctr.toFixed(2) + '%');
         if (userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPM'))) rowData.push((row.cpm * exRate).toFixed(2));
         if (userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPC'))) rowData.push((row.cpc * exRate).toFixed(2));
@@ -376,6 +382,8 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
         const tCpm = tImp > 0 ? (tSpend / tImp) * 1000 : 0;
         const tCpc = tClicks > 0 ? tSpend / tClicks : 0;
         const tCpv = tViews > 0 ? tSpend / tViews : 0;
+        const tCpa = tConversions > 0 ? tSpend / tConversions : 0;
+        const tCr = tClicks > 0 ? (tConversions / tClicks) * 100 : 0;
 
         const totalsRow = ['Total'];
         if (userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('Spend'))) totalsRow.push((tSpend * exRate).toFixed(2));
@@ -384,6 +392,8 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
         if (overallMetrics.includes('All') || overallMetrics.includes('Video Views')) totalsRow.push(tViews);
         if (overallMetrics.includes('All') || overallMetrics.includes('Completed Views')) totalsRow.push(tCompletions);
         if (overallMetrics.includes('All') || overallMetrics.includes('Conversions')) totalsRow.push(tConversions);
+        if (userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPA'))) totalsRow.push((tCpa * exRate).toFixed(2));
+        if (overallMetrics.includes('All') || overallMetrics.includes('CR')) totalsRow.push(tCr.toFixed(2) + '%');
         if (overallMetrics.includes('All') || overallMetrics.includes('CTR')) totalsRow.push(tCtr.toFixed(2) + '%');
         if (userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPM'))) totalsRow.push((tCpm * exRate).toFixed(2));
         if (userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPC'))) totalsRow.push((tCpc * exRate).toFixed(2));
@@ -755,7 +765,7 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
               />
             ) : (
               <MetricMultiSelectDropdown
-                options={['Spend', 'Impressions', 'Clicks', 'Video Views', 'Completed Views', 'Conversions', 'CTR', 'CPM', 'CPC', 'CPV']}
+                options={['Spend', 'Impressions', 'Clicks', 'Video Views', 'Completed Views', 'Conversions', 'CPA', 'CR', 'CTR', 'CPM', 'CPC', 'CPV']}
                 selected={overallMetrics}
                 onChange={setOverallMetrics}
               />
@@ -774,6 +784,8 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
                   {(overallMetrics.includes('All') || overallMetrics.includes('Video Views')) && <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">Video Views</th>}
                   {(overallMetrics.includes('All') || overallMetrics.includes('Completed Views')) && <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">Completed Views</th>}
                   {(overallMetrics.includes('All') || overallMetrics.includes('Conversions')) && <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">Conversions</th>}
+                  {userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPA')) && <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">CPA</th>}
+                  {(overallMetrics.includes('All') || overallMetrics.includes('CR')) && <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">CR</th>}
                   {(overallMetrics.includes('All') || overallMetrics.includes('CTR')) && <th className={`py-4 px-4 text-[10px] font-black text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right ${userRole === 'non-finance' ? 'rounded-tr-xl' : ''}`}>CTR</th>}
                   {userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPM')) && <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">CPM</th>}
                   {userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPC')) && <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">CPC</th>}
@@ -790,6 +802,8 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
                     {(overallMetrics.includes('All') || overallMetrics.includes('Video Views')) && <td className="py-4 px-4 text-sm font-medium text-[#cedc28] text-right">{formatShort(row.views)}</td>}
                     {(overallMetrics.includes('All') || overallMetrics.includes('Completed Views')) && <td className="py-4 px-4 text-sm font-medium text-white text-right">{formatShort(row.completions)}</td>}
                     {(overallMetrics.includes('All') || overallMetrics.includes('Conversions')) && <td className="py-4 px-4 text-sm font-medium text-white text-right">{d3.format(",")(row.conversions)}</td>}
+                    {userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPA')) && <td className="py-4 px-4 text-sm font-medium text-white text-right">{exSym}{d3.format(",.2f")(row.cpa * exRate)}</td>}
+                    {(overallMetrics.includes('All') || overallMetrics.includes('CR')) && <td className="py-4 px-4 text-sm font-medium text-white text-right">{row.cr.toFixed(2)}%</td>}
                     {(overallMetrics.includes('All') || overallMetrics.includes('CTR')) && <td className="py-4 px-4 text-sm font-bold text-white text-right">{row.ctr.toFixed(2)}%</td>}
                     {userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPM')) && <td className="py-4 px-4 text-sm font-medium text-white text-right">{exSym}{d3.format(",.2f")(row.cpm * exRate)}</td>}
                     {userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPC')) && <td className="py-4 px-4 text-sm font-medium text-white text-right">{exSym}{d3.format(",.2f")(row.cpc * exRate)}</td>}
@@ -807,6 +821,8 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
                   const tCpm = tImp > 0 ? (tSpend / tImp) * 1000 : 0;
                   const tCpc = tClicks > 0 ? tSpend / tClicks : 0;
                   const tCpv = tViews > 0 ? tSpend / tViews : 0;
+                  const tCpa = tConversions > 0 ? tSpend / tConversions : 0;
+                  const tCr = tClicks > 0 ? (tConversions / tClicks) * 100 : 0;
                   return (
                     <tr className="bg-[#0a2442]/80 border-t-2 border-[#cedc28]/50">
                       <td className="py-4 px-4 text-sm font-bold text-[#cedc28]">Total</td>
@@ -816,6 +832,8 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
                       {(overallMetrics.includes('All') || overallMetrics.includes('Video Views')) && <td className="py-4 px-4 text-sm font-bold text-[#cedc28] text-right">{formatShort(tViews)}</td>}
                       {(overallMetrics.includes('All') || overallMetrics.includes('Completed Views')) && <td className="py-4 px-4 text-sm font-bold text-[#cedc28] text-right">{formatShort(tCompletions)}</td>}
                       {(overallMetrics.includes('All') || overallMetrics.includes('Conversions')) && <td className="py-4 px-4 text-sm font-bold text-[#cedc28] text-right">{d3.format(",")(tConversions)}</td>}
+                      {userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPA')) && <td className="py-4 px-4 text-sm font-bold text-[#cedc28] text-right">{exSym}{d3.format(",.2f")(tCpa * exRate)}</td>}
+                      {(overallMetrics.includes('All') || overallMetrics.includes('CR')) && <td className="py-4 px-4 text-sm font-bold text-[#cedc28] text-right">{tCr.toFixed(2)}%</td>}
                       {(overallMetrics.includes('All') || overallMetrics.includes('CTR')) && <td className="py-4 px-4 text-sm font-bold text-[#cedc28] text-right">{tCtr.toFixed(2)}%</td>}
                       {userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPM')) && <td className="py-4 px-4 text-sm font-bold text-[#cedc28] text-right">{exSym}{d3.format(",.2f")(tCpm * exRate)}</td>}
                       {userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPC')) && <td className="py-4 px-4 text-sm font-bold text-[#cedc28] text-right">{exSym}{d3.format(",.2f")(tCpc * exRate)}</td>}
