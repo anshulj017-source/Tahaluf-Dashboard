@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 
 import * as d3 from 'd3';
-import { Eye, MousePointer2, Play, Activity, TrendingUp, BarChart3, Target, CheckCircle2, ChevronDown, Search, Check, Camera, Download } from 'lucide-react';
+import { Eye, MousePointer2, Play, Activity, TrendingUp, BarChart3, Target, CheckCircle2, ChevronDown, Search, Check, Camera, Download, Zap } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
 
@@ -332,6 +332,29 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
 
   if (!channelStats || channelStats.length === 0) return <div className="text-white p-8">No channel data available.</div>;
 
+  // AI Insights data
+  const aiInsights = useMemo(() => {
+    if (activeChannels.length === 0 || channelStats.length === 0) return null;
+    const selectedData = channelStats.filter(c => activeChannels.includes(c.channel));
+    if (selectedData.length === 0) return null;
+    
+    const totalSpend = d3.sum(selectedData, d => d.spend) * exRate;
+    const totalImpressions = d3.sum(selectedData, d => d.impressions);
+    const totalClicks = d3.sum(selectedData, d => d.clicks);
+    const totalPurchases = d3.sum(selectedData, d => Number(d.purchases) || 0);
+    const totalCTR = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0;
+    const totalCPC = totalClicks > 0 ? totalSpend / totalClicks : 0;
+    
+    const topBySpend = [...selectedData].sort((a,b) => b.spend - a.spend)[0];
+    const topByImp = [...selectedData].sort((a,b) => b.impressions - a.impressions)[0];
+    const topByConv = [...selectedData].sort((a,b) => Number(b.purchases || 0) - Number(a.purchases || 0))[0];
+    
+    const lowestCPM = [...selectedData].filter(d => d.cpm > 0 && d.cpm !== Infinity).sort((a,b) => a.cpm - b.cpm)[0];
+    const highestCTR = [...selectedData].sort((a,b) => b.ctr - a.ctr)[0];
+
+    return { totalSpend, totalImpressions, totalClicks, totalPurchases, totalCTR, totalCPC, topBySpend, topByImp, topByConv, lowestCPM, highestCTR };
+  }, [activeChannels, channelStats, exRate]);
+
   return (
     <div className="space-y-8 animate-[fadeIn_0.5s_ease-out]">
       
@@ -410,118 +433,104 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
       {/* DETAILED DRILL-DOWN VIEW */}
       <div className="space-y-6 animate-[fadeIn_0.4s_ease-out]">
         
-        {/* KPI MATRIX */}
-          <div className="card-surface backdrop-blur-2xl border border-[#cedc28]/20 rounded-3xl p-6 overflow-hidden export-slide" data-title="Top Performing Campaigns">
-             <div className="flex justify-between items-center mb-6">
-               <h3 className="text-lg font-bold text-white">Channel Performance Matrix</h3>
-               <button onClick={handleExportPerformanceMatrix} className="p-1.5 rounded-lg bg-[#0a2442] border border-[#cedc28]/20 text-[#cedc28] hover:bg-[#cedc28]/10 transition-colors shadow-[0_0_10px_rgba(200,130,20,0.1)] text-xs font-bold" title="Export CSV">
-                 <Download size={14} />
-               </button>
-             </div>
-             <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse whitespace-nowrap">
-                  <thead>
-                    <tr className="border-b-2 border-[#cedc28]/30">
-                      <th className="px-4 py-3 text-xs font-bold text-[#14a6d9] uppercase tracking-wider">Metric</th>
-                      {activeChannels.map(ch => (
-                         <th key={ch} className="px-4 py-3 text-sm font-bold text-[#cedc28] uppercase tracking-wider text-right">{ch}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(userRole === 'non-finance' ? ['impressions', 'clicks', 'ctr', 'views', 'purchases'] : ['spend', 'impressions', 'clicks', 'ctr', 'cpm', 'purchases']).map((metricKey, i) => {
-                       const metricDef = AVAILABLE_METRICS.find(m => m.key === metricKey);
-                       if (!metricDef) return null;
-                       return (
-                          <tr key={metricKey} className={`border-b border-[#cedc28]/10 ${i % 2 === 0 ? 'bg-transparent' : 'bg-[#0a2442]/30'}`}>
-                            <td className="px-4 py-4 text-sm font-bold text-white">{metricDef.label}</td>
-                            {activeChannels.map(ch => {
-                               const stat = channelStats.find(c => c.channel === ch);
-                               return (
-                                 <td key={ch} className="px-4 py-4 text-sm font-medium text-white text-right">
-                                    {stat ? metricDef.format(stat[metricKey]) : '-'}
-                                 </td>
-                               );
-                            })}
-                          </tr>
-                       )
-                    })}
-                  </tbody>
-                </table>
-             </div>
-          </div>
-
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            
-            {/* TREND CHART */}
-            <div className="card-surface backdrop-blur-2xl border border-[#cedc28]/20 rounded-3xl p-6 export-slide" data-title="Ad Format Performance" id="comparison-trend-chart">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                  <TrendingUp className="text-[#cedc28] w-5 h-5" /> Comparison Trend
-                </h3>
-                <div className="flex items-center gap-3">
-                  <select 
-                    value={trendMetric} 
-                    onChange={(e) => setTrendMetric(e.target.value)}
-                    className="bg-[#0a2442] text-[#cedc28] border border-[#cedc28]/30 rounded-lg px-3 py-1 text-xs font-bold outline-none"
-                  >
-                    {userRole !== 'non-finance' && <option value="spend">Spend</option>}
-                    <option value="impressions">Impressions</option>
-                    <option value="clicks">Clicks</option>
-                    <option value="views">Video Views</option>
-                  </select>
-                  <button onClick={() => exportChart('comparison-trend-chart', 'comparison_trend')} className="p-1.5 rounded-lg bg-[#0a2442] border border-[#cedc28]/20 text-[#cedc28] hover:bg-[#cedc28]/10 transition-colors shadow-[0_0_10px_rgba(200,130,20,0.1)] text-xs font-bold" title="Export Image" data-html2canvas-ignore="true">
-                    <Camera size={14} />
-                  </button>
-                </div>
-              </div>
-              
-              <div className="h-80 mb-6">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={trendData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
-                    <XAxis dataKey="day" stroke="#14a6d9" fontSize={9} angle={-45} textAnchor="end" height={50} tickLine={false} axisLine={false} interval={Math.max(0, Math.floor(trendData.length / 15))} />
-                    <YAxis stroke="#14a6d9" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => formatShort(v)} />
-                    <RechartsTooltip content={<TrendTooltip />} />
-                    <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                    {activeChannels.map((ch, idx) => (
-                      <Line key={ch} type="monotone" dataKey={ch} name={ch} stroke={COLORS[idx % COLORS.length]} strokeWidth={3} dot={{r:4, fill: '#0C272D', strokeWidth: 2}} activeDot={{r:6}} />
-                    ))}
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            {/* TOURNAMENT BREAKDOWN CHART */}
-            <div className="card-surface backdrop-blur-2xl border border-[#cedc28]/20 rounded-3xl p-6 export-slide" data-title="Buying Type Performance" id="phases-across-channels-chart">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                  <BarChart3 className="text-[#cedc28] w-5 h-5" /> Phases Across Channels
-                </h3>
-                <button onClick={() => exportChart('phases-across-channels-chart', 'phases_across_channels')} className="p-1.5 rounded-lg bg-[#0a2442] border border-[#cedc28]/20 text-[#cedc28] hover:bg-[#cedc28]/10 transition-colors shadow-[0_0_10px_rgba(200,130,20,0.1)] text-xs font-bold" title="Export Image" data-html2canvas-ignore="true">
-                  <Camera size={14} />
-                </button>
-              </div>
-              <div className="h-80 mb-6">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={campaignChartData} layout="vertical" margin={{ top: 0, right: 20, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" horizontal={true} vertical={false} />
-                    <XAxis type="number" stroke="#14a6d9" fontSize={10} tickFormatter={(v) => formatShort(v)} />
-                    <YAxis dataKey="campaign" type="category" stroke="#14a6d9" fontSize={10} width={110} tickFormatter={(v) => v.length > 15 ? v.substring(0,15)+'...' : v} />
-                    <RechartsTooltip 
-                      contentStyle={{ backgroundColor: '#0C272D', borderColor: '#74FA9320', color: '#fff', borderRadius: '12px' }} 
-                      cursor={{fill: '#ffffff05'}} 
-                      formatter={(value, name) => [`${exSym}${d3.format(",.0f")(value)}`, name]}
-                    />
-                    <Legend wrapperStyle={{ paddingTop: '10px', fontSize: '12px' }} />
-                    {activeChannels.map((ch, idx) => (
-                       <Bar key={ch} dataKey={ch} name={ch} fill={COLORS[idx % COLORS.length]} stackId="a" radius={[0, 4, 4, 0]} />
-                    ))}
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+        {/* DAILY TREND CHART (Replaces KPI Matrix) */}
+        <div className="card-surface backdrop-blur-2xl border border-[#cedc28]/20 rounded-3xl p-6 export-slide" data-title="Daily Comparison Trend" id="comparison-trend-chart">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+              <TrendingUp className="text-[#cedc28] w-5 h-5" /> Daily Comparison Trend
+            </h3>
+            <div className="flex items-center gap-3">
+              <select 
+                value={trendMetric} 
+                onChange={(e) => setTrendMetric(e.target.value)}
+                className="bg-[#0a2442] text-[#cedc28] border border-[#cedc28]/30 rounded-lg px-3 py-1 text-xs font-bold outline-none"
+              >
+                {userRole !== 'non-finance' && <option value="spend">Spend</option>}
+                <option value="impressions">Impressions</option>
+                <option value="clicks">Clicks</option>
+                <option value="views">Video Views</option>
+              </select>
+              <button onClick={() => exportChart('comparison-trend-chart', 'comparison_trend')} className="p-1.5 rounded-lg bg-[#0a2442] border border-[#cedc28]/20 text-[#cedc28] hover:bg-[#cedc28]/10 transition-colors shadow-[0_0_10px_rgba(200,130,20,0.1)] text-xs font-bold" title="Export Image" data-html2canvas-ignore="true">
+                <Camera size={14} />
+              </button>
             </div>
           </div>
+          
+          <div className="h-80 mb-6">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={trendData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
+                <XAxis dataKey="day" stroke="#14a6d9" fontSize={9} angle={-45} textAnchor="end" height={50} tickLine={false} axisLine={false} interval={Math.max(0, Math.floor(trendData.length / 15))} />
+                <YAxis stroke="#14a6d9" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => formatShort(v)} />
+                <RechartsTooltip content={<TrendTooltip />} />
+                <Legend wrapperStyle={{ paddingTop: '20px' }} />
+                {activeChannels.map((ch, idx) => (
+                  <Line key={ch} type="monotone" dataKey={ch} name={ch} stroke={COLORS[idx % COLORS.length]} strokeWidth={3} dot={{r:4, fill: '#0C272D', strokeWidth: 2}} activeDot={{r:6}} />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          {/* TOURNAMENT BREAKDOWN CHART (Left) */}
+          <div className="card-surface backdrop-blur-2xl border border-[#cedc28]/20 rounded-3xl p-6 export-slide" data-title="Phases Across Channels" id="phases-across-channels-chart">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <BarChart3 className="text-[#cedc28] w-5 h-5" /> Phases Across Channels
+              </h3>
+              <button onClick={() => exportChart('phases-across-channels-chart', 'phases_across_channels')} className="p-1.5 rounded-lg bg-[#0a2442] border border-[#cedc28]/20 text-[#cedc28] hover:bg-[#cedc28]/10 transition-colors shadow-[0_0_10px_rgba(200,130,20,0.1)] text-xs font-bold" title="Export Image" data-html2canvas-ignore="true">
+                <Camera size={14} />
+              </button>
+            </div>
+            <div className="h-80 mb-6">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={campaignChartData} layout="vertical" margin={{ top: 0, right: 20, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" horizontal={true} vertical={false} />
+                  <XAxis type="number" stroke="#14a6d9" fontSize={10} tickFormatter={(v) => formatShort(v)} />
+                  <YAxis dataKey="campaign" type="category" stroke="#14a6d9" fontSize={10} width={110} tickFormatter={(v) => v.length > 15 ? v.substring(0,15)+'...' : v} />
+                  <RechartsTooltip 
+                    contentStyle={{ backgroundColor: '#0C272D', borderColor: '#74FA9320', color: '#fff', borderRadius: '12px' }} 
+                    cursor={{fill: '#ffffff05'}} 
+                    formatter={(value, name) => [`${exSym}${d3.format(",.0f")(value)}`, name]}
+                  />
+                  <Legend wrapperStyle={{ paddingTop: '10px', fontSize: '12px' }} />
+                  {activeChannels.map((ch, idx) => (
+                     <Bar key={ch} dataKey={ch} name={ch} fill={COLORS[idx % COLORS.length]} stackId="a" radius={[0, 4, 4, 0]} />
+                  ))}
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* AI INSIGHTS (Right) */}
+          <div className="card-surface-gold p-8 rounded-3xl border border-[#cedc28]/30 shadow-2xl relative overflow-hidden export-slide" data-title="AI Insights">
+            <div className="absolute top-0 right-0 p-8 opacity-10"><Zap className="w-32 h-32 text-[#cedc28]" /></div>
+            <h3 className="text-xl font-bold text-white mb-5 flex items-center gap-3"><Zap className="text-[#cedc28] w-5 h-5"/> AI Performance Insights </h3>
+            <div className="text-[#eef7f5] leading-relaxed max-w-5xl space-y-3 relative z-10 text-sm">
+              {aiInsights && (
+                <>
+                  <p>• In the selected channels, campaigns have generated <strong>{formatShort(aiInsights.totalImpressions)}</strong> impressions, <strong>{formatShort(aiInsights.totalClicks)}</strong> clicks, and <strong>{formatShort(aiInsights.totalPurchases)}</strong> conversions overall.</p>
+                  {userRole !== 'non-finance' && (
+                    <p>• Total spend across these channels is <strong>{exSym}{d3.format(",.0f")(aiInsights.totalSpend)}</strong> with an average CPC of <strong>{exSym}{aiInsights.totalCPC.toFixed(2)}</strong>.</p>
+                  )}
+                  {aiInsights.topBySpend && userRole !== 'non-finance' && (
+                    <p>• <strong>{aiInsights.topBySpend.channel}</strong> is driving the highest spend at <strong>{exSym}{d3.format(",.0f")(aiInsights.topBySpend.spend * exRate)}</strong>.</p>
+                  )}
+                  {aiInsights.topByConv && aiInsights.topByConv.purchases > 0 && (
+                    <p>• <strong>{aiInsights.topByConv.channel}</strong> leads in conversions with <strong>{formatShort(aiInsights.topByConv.purchases)}</strong> completed purchases.</p>
+                  )}
+                  {aiInsights.lowestCPM && (
+                    <p>• <strong>{aiInsights.lowestCPM.channel}</strong> is the most cost-efficient channel with a CPM of <strong>{exSym}{d3.format(",.2f")(aiInsights.lowestCPM.cpm * exRate)}</strong>.</p>
+                  )}
+                  {aiInsights.highestCTR && (
+                    <p>• <strong>{aiInsights.highestCTR.channel}</strong> sees the highest engagement with a CTR of <strong>{aiInsights.highestCTR.ctr.toFixed(2)}%</strong>.</p>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
           
           {/* TOURNAMENT DATA TABLE */}
           <div className="card-surface backdrop-blur-2xl border border-[#cedc28]/20 rounded-3xl p-6 overflow-hidden export-slide" data-title="Detailed Channel Metrics">
@@ -552,8 +561,8 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
                   </thead>
                   <tbody>
                     {campaignBreakdown.map((row, i) => (
-                      <tr key={`${row.channel}-${row.campaign}`} className={`border-b border-[#cedc28]/10 hover:bg-[#74FA93]/5 transition-colors ${i % 2 === 0 ? 'bg-transparent' : 'bg-[#0a2442]/30'}`}>
-                        <td className={`px-4 py-4 text-sm font-bold text-white sticky left-0 z-10 ${i % 2 === 0 ? 'card-surface backdrop-blur-2xl' : 'bg-[#0a2442]'}`}>{row.campaign}</td>
+                      <tr key={`${row.channel}-${row.campaign}`} className={`border-b border-[#cedc28]/10 hover:bg-[#74FA93]/5 transition-colors bg-transparent`}>
+                        <td className="px-4 py-4 text-sm font-bold text-white sticky left-0 z-10 bg-[#0a2442]">{row.campaign}</td>
                         <td className="px-4 py-4 text-sm font-bold text-[#14a6d9]">{row.channel}</td>
                         {AVAILABLE_METRICS.filter(m => selectedMetrics.includes(m.key)).map(m => (
                            <td key={m.key} className="px-4 py-4 text-sm font-medium text-[#cedc28] text-right">{m.format(row[m.key])}</td>

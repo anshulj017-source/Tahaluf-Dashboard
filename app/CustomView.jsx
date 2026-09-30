@@ -2,8 +2,9 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import * as d3 from 'd3';
-import { Filter, Download, Activity, TrendingUp, BarChart3, Target, Calendar, Globe2, AlertCircle, Search, Check, ChevronDown, Zap, TableProperties } from 'lucide-react';
+import { Filter, Download, Activity, TrendingUp, BarChart3, Target, Calendar, Globe2, AlertCircle, Search, Check, ChevronDown, Zap, TableProperties, Camera } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar, Legend, PieChart, Pie, Cell } from 'recharts';
+import html2canvas from 'html2canvas';
 
 const COLORS = ['#74FA93', '#14a6d9', '#cedc28', '#00937b', '#eef7f5', '#cedc28', '#007542'];
 
@@ -16,17 +17,7 @@ const getWeekNumber = (d) => {
     return `Week ${weekNo}`;
 };
 
-const MetricCard = ({ label, value, color = "text-[#cedc28]" }) => {
-  return (
-    <div className="card-surface backdrop-blur-2xl/80 backdrop-blur-xl p-6 rounded-[1.5rem] border border-[#cedc28]/10 shadow-xl transition-all hover:shadow-[0_0_20px_rgba(116,250,147,0.15)] hover:-translate-y-1 relative overflow-hidden group">
-      <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-[#74FA93]/5 to-transparent rounded-full blur-2xl -mr-10 -mt-10 group-hover:bg-[#cedc28]/10 transition-colors duration-500"></div>
-      <p className={`text-[10px] font-black ${color} uppercase tracking-widest mb-2 relative z-10`}>{label}</p>
-      <h3 className="text-3xl font-anton uppercase text-white truncate relative z-10" title={value}>{value}</h3>
-    </div>
-  );
-};
-
-const MultiSelectDropdown = ({ label, options, selected, onChange, className = "flex-1 relative min-w-[180px]" }) => {
+const MultiSelectDropdown = ({ label, options, selected, onChange, className = "flex-1 relative min-w-[180px]", singleSelect = false }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -44,14 +35,14 @@ const MultiSelectDropdown = ({ label, options, selected, onChange, className = "
         onClick={() => setIsOpen(!isOpen)}
         className="w-full px-4 py-3 card-surface backdrop-blur-2xl border border-[#cedc28]/20 rounded-xl text-sm font-bold text-[#cedc28] shadow-sm cursor-pointer flex justify-between items-center transition-colors hover:border-[#cedc28]/50"
       >
-        <span className="truncate pr-4">{selected.length === 0 ? 'All Selected' : (isObject ? `${selected.length} Selected` : selected.join(', '))}</span>
+        <span className="truncate pr-4">{selected.length === 0 && !singleSelect ? 'All Selected' : (isObject ? (singleSelect ? options.find(o => o.key === selected)?.label || 'Select...' : `${selected.length} Selected`) : (singleSelect ? selected || 'Select...' : selected.join(', ')))}</span>
         <ChevronDown className={`w-4 h-4 flex-shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </div>
       {isOpen && (
         <>
           <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setIsOpen(false); setSearchTerm(''); }} />
-          <div className="absolute top-full left-0 w-full h-0 z-50">
-            <div className="w-full mt-2 card-surface backdrop-blur-2xl border border-[#cedc28]/20 rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex flex-col max-h-80 overflow-hidden">
+          <div className="absolute top-full left-0 w-full z-[100] mt-2">
+            <div className="w-full card-surface backdrop-blur-2xl border border-[#cedc28]/20 rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex flex-col max-h-80 overflow-hidden">
               <div className="p-3 border-b border-[#cedc28]/10 bg-[#0a2442]">
                 <div className="relative">
                   <Search className="w-4 h-4 text-[#14a6d9] absolute left-3 top-1/2 -translate-y-1/2" />
@@ -66,7 +57,7 @@ const MultiSelectDropdown = ({ label, options, selected, onChange, className = "
                 </div>
               </div>
               <div className="overflow-y-auto p-2 flex-1 custom-scrollbar">
-                {!isObject && (
+                {!isObject && !singleSelect && (
                 <div 
                   onClick={() => { onChange([]); setIsOpen(false); setSearchTerm(''); }} 
                   className={`px-3 py-2.5 rounded-lg text-sm font-bold cursor-pointer flex justify-between items-center transition-colors ${selected.length === 0 ? 'bg-[#cedc28]/20 text-[#cedc28]' : 'text-white hover:bg-[#0a2442]'}`}
@@ -77,18 +68,24 @@ const MultiSelectDropdown = ({ label, options, selected, onChange, className = "
                 {filteredOptions.map(opt => {
                   const key = isObject ? opt.key : opt;
                   const text = isObject ? opt.label : opt;
-                  const isSel = selected.includes(key);
+                  const isSel = singleSelect ? selected === key : selected.includes(key);
                   return (
                     <div 
                       key={key} 
                       onClick={() => {
-                        let next = [...selected];
-                        if (isSel) {
-                          next = next.filter(n => n !== key);
-                        } else { 
-                          next.push(key); 
+                        if (singleSelect) {
+                          onChange(key);
+                          setIsOpen(false);
+                          setSearchTerm('');
+                        } else {
+                          let next = [...selected];
+                          if (isSel) {
+                            next = next.filter(n => n !== key);
+                          } else { 
+                            next.push(key); 
+                          }
+                          onChange(next);
                         }
-                        onChange(next);
                       }} 
                       className={`px-3 py-2.5 mt-1 rounded-lg text-sm font-bold cursor-pointer flex justify-between items-center transition-colors ${isSel ? 'bg-[#cedc28]/20 text-[#cedc28]' : 'text-white hover:bg-[#0a2442]'}`}
                     >
@@ -112,97 +109,63 @@ const MultiSelectDropdown = ({ label, options, selected, onChange, className = "
 
 export default function CustomView({ adData = [], exRate = 1, exSym = "$", formatShort = (v)=>v, filterCampaigns = [], filterMarkets = [], dateRange = {start:'', end:''}, userRole = 'admin' }) {
   
-  const hasMarketFilter = filterMarkets && filterMarkets.length > 0 && !filterMarkets.includes('All');
+  const exportChart = async (chartId, filename) => {
+    try {
+      const el = document.getElementById(chartId);
+      if (el) {
+        const originalBg = el.style.backgroundColor;
+        el.style.backgroundColor = '#0a2442'; // Force background for capture
+        const canvas = await html2canvas(el, { backgroundColor: '#0a2442', scale: 2, useCORS: true, allowTaint: true, logging: false });
+        el.style.backgroundColor = originalBg;
+        
+        const link = document.createElement('a');
+        link.download = `${filename}.png`;
+        link.href = canvas.toDataURL('image/png');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        alert('Chart element not found.');
+      }
+    } catch (err) {
+      console.error('Error exporting chart:', err);
+      alert('Error exporting chart. Please try again.');
+    }
+  };
 
-  
   // Data enrichment (Add Week)
   const enrichedData = useMemo(() => {
      if(!adData) return [];
      return adData.map(d => ({
         ...d,
-        week: d.dateObj ? getWeekNumber(d.dateObj) : 'Unknown'
+        week: d.dateObj ? getWeekNumber(d.dateObj) : 'Unknown',
+        market: d.country || 'Unknown'
      })).filter(d => d.week !== 'Unknown');
   }, [adData]);
 
   // Filters State
   const [fChannels, setFChannels] = useState([]);
-  const [fWeeks, setFWeeks] = useState([]);
+  const [fMarkets, setFMarkets] = useState([]);
 
   // Extract distinct filter options
   const optChannels = useMemo(() => Array.from(new Set(enrichedData.map(d => d.channel).filter(Boolean))).sort(), [enrichedData]);
-  const optWeeks = useMemo(() => {
-     const wks = Array.from(new Set(enrichedData.map(d => d.week).filter(Boolean)));
-     return wks.sort((a,b) => parseInt(a.replace('Week ','')) - parseInt(b.replace('Week ','')));
-  }, [enrichedData]);
+  const optMarkets = useMemo(() => Array.from(new Set(enrichedData.map(d => d.market).filter(Boolean))).sort(), [enrichedData]);
 
   // Apply filters
   const filteredData = useMemo(() => {
     return enrichedData.filter(d => {
        const mChan = fChannels.length === 0 || fChannels.includes(d.channel);
-       const mWeek = fWeeks.length === 0 || fWeeks.includes(d.week);
-       return mChan && mWeek;
+       const mMarket = fMarkets.length === 0 || fMarkets.includes(d.market);
+       return mChan && mMarket;
     });
-  }, [enrichedData, fChannels, fWeeks]);
-
-  // Actual Metrics for Filtered Data
-  const actuals = useMemo(() => {
-      return {
-          spend: d3.sum(filteredData, d => d.cost) * exRate,
-          impressions: d3.sum(filteredData, d => d.impressions),
-          clicks: d3.sum(filteredData, d => d.clicks),
-          views: d3.sum(filteredData, d => d.videoViews)
-      }
-  }, [filteredData, exRate]);
-
-
-  // Trend Data for Line Chart
-  const trendData = useMemo(() => {
-      const grouped = d3.groups(filteredData, d => d.dateObj ? d3.timeFormat("%b %d")(d.dateObj) : 'Unknown');
-      return grouped.map(([date, vals]) => ({
-          date,
-          sortDate: vals[0].dateObj,
-          Spend: d3.sum(vals, d => d.cost) * exRate,
-          Impressions: d3.sum(vals, d => d.impressions),
-          Clicks: d3.sum(vals, d => d.clicks)
-      })).filter(d => d.date !== 'Unknown').sort((a,b) => a.sortDate - b.sortDate);
-  }, [filteredData, exRate]);
-
-  // Channel Mix Data for Pie Chart
-  const channelMix = useMemo(() => {
-      return d3.groups(filteredData, d => d.channel).map(([channel, vals]) => ({
-          name: channel || 'Unknown',
-          value: d3.sum(vals, d => d.cost) * exRate
-      })).sort((a,b) => b.value - a.value);
-  }, [filteredData, exRate]);
-
-
-  const marketTrendData = useMemo(() => {
-      if (!hasMarketFilter) return [];
-      const grouped = d3.groups(filteredData, d => d.dateObj ? d3.timeFormat("%b %d")(d.dateObj) : 'Unknown');
-      return grouped.map(([date, vals]) => {
-         const obj = { date, sortDate: vals[0].dateObj };
-         const byMarket = d3.groups(vals, d => d.country);
-         byMarket.forEach(([mkt, mktVals]) => {
-             obj[`${mkt} Spend`] = d3.sum(mktVals, d => d.cost) * exRate;
-             obj[`${mkt} Impressions`] = d3.sum(mktVals, d => d.impressions);
-         });
-         return obj;
-      }).filter(d => d.date !== 'Unknown').sort((a,b) => a.sortDate - b.sortDate);
-  }, [filteredData, exRate, hasMarketFilter]);
-
-  const marketMixData = useMemo(() => {
-      if (!hasMarketFilter) return [];
-      return d3.groups(filteredData, d => d.country).map(([market, vals]) => ({
-          name: market || 'Unknown',
-          value: d3.sum(vals, d => d.cost) * exRate
-      })).sort((a,b) => b.value - a.value);
-  }, [filteredData, exRate, hasMarketFilter]);
+  }, [enrichedData, fChannels, fMarkets]);
 
   const AVAILABLE_METRICS = useMemo(() => {
     const base = [
       { key: 'cost', label: 'Spend', format: v => `${exSym}${d3.format(",.2f")((v||0) * exRate)}` },
       { key: 'impressions', label: 'Impressions', format: v => d3.format(",")((v||0)) },
       { key: 'clicks', label: 'Clicks', format: v => d3.format(",")((v||0)) },
+      { key: 'purchases', label: 'Conversions', format: v => d3.format(",")((v||0)) },
       { key: 'videoViews', label: 'Video Views', format: v => formatShort(v||0) },
       { key: 'videoViews6s', label: '6s Views', format: v => formatShort(v||0) },
       { key: 'videoViews15s', label: '15s Views', format: v => formatShort(v||0) },
@@ -218,79 +181,218 @@ export default function CustomView({ adData = [], exRate = 1, exSym = "$", forma
     }
     return base;
   }, [exRate, exSym, userRole]);
+  
+  const DIMENSIONS = [
+    { key: 'date', label: 'Daily Date' },
+    { key: 'week', label: 'Week' },
+    { key: 'market', label: 'Market' },
+    { key: 'campaignName', label: 'Campaign' },
+    { key: 'channel', label: 'Channel' },
+    { key: 'phase', label: 'Event Phase' }
+  ];
+  
+  const PIE_DIMENSIONS = DIMENSIONS.filter(d => d.key !== 'date' && d.key !== 'week');
 
+  // Custom Chart State
+  const [chartDimX, setChartDimX] = useState('date');
+  const [chartMetric1, setChartMetric1] = useState(userRole === 'non-finance' ? 'impressions' : 'cost');
+  const [chartMetric2, setChartMetric2] = useState('clicks');
+  
+  const [pieDim, setPieDim] = useState('channel');
+  const [pieMetric, setPieMetric] = useState(userRole === 'non-finance' ? 'impressions' : 'cost');
+  
+  const [tableDims, setTableDims] = useState(['week', 'market', 'campaignName', 'channel']);
   const [selectedMetrics, setSelectedMetrics] = useState(
-    userRole === 'non-finance' ? ['impressions', 'clicks', 'ctr', 'videoViews'] : ['cost', 'impressions', 'clicks']
+    userRole === 'non-finance' ? ['impressions', 'clicks', 'purchases'] : ['cost', 'impressions', 'clicks', 'purchases']
   );
 
-  // Table Aggregation by Week
-  const tableDataByWeek = useMemo(() => {
-      const hasCampFilter = filterCampaigns.length > 0 && !filterCampaigns.includes('All');
-      const hasChanFilter = fChannels.length > 0;
-      
-      const mappedData = filteredData.map(d => ({
-          week: d.week,
-          market: hasMarketFilter ? (d.country || 'Unknown') : 'All Markets',
-          campaignName: hasCampFilter ? d.campaignName : 'All Campaigns',
-          channel: hasChanFilter ? d.channel : 'All Channels',
-          cost: d.cost || 0,
-          impressions: d.impressions || 0,
-          clicks: d.clicks || 0,
-          videoViews: d.videoViews || 0,
-          videoViews6s: d.videoViews6s || 0,
-          videoViews15s: d.videoViews15s || 0,
-          videoCompletions: d.videoCompletions || 0
-      }));
+  // Dynamic Line Chart Data
+  const dynamicChartData = useMemo(() => {
+      let grouped;
+      if (chartDimX === 'date') {
+          grouped = d3.groups(filteredData, d => d.dateObj ? d3.timeFormat("%b %d")(d.dateObj) : 'Unknown');
+      } else {
+          grouped = d3.groups(filteredData, d => d[chartDimX] || 'Unknown');
+      }
+      return grouped.map(([dim, vals]) => {
+          const m1Def = AVAILABLE_METRICS.find(m => m.key === chartMetric1);
+          const m2Def = AVAILABLE_METRICS.find(m => m.key === chartMetric2);
+          
+          let m1Val = d3.sum(vals, d => d[chartMetric1] || 0);
+          if (chartMetric1 === 'cost') m1Val *= exRate;
+          if (['ctr', 'cpc', 'cpm', 'cpv', 'cpcv'].includes(chartMetric1)) {
+             // For rates, this simple sum doesn't work perfectly, but for demonstration:
+             if (chartMetric1 === 'ctr') m1Val = d3.sum(vals, d => d.impressions) > 0 ? (d3.sum(vals, d => d.clicks) / d3.sum(vals, d => d.impressions)) * 100 : 0;
+             if (chartMetric1 === 'cpc') m1Val = d3.sum(vals, d => d.clicks) > 0 ? (d3.sum(vals, d => d.cost) * exRate) / d3.sum(vals, d => d.clicks) : 0;
+             if (chartMetric1 === 'cpm') m1Val = d3.sum(vals, d => d.impressions) > 0 ? ((d3.sum(vals, d => d.cost) * exRate) / d3.sum(vals, d => d.impressions)) * 1000 : 0;
+          }
 
-      const groups = d3.groups(mappedData, d => d.week, d => d.market, d => d.campaignName, d => d.channel);
-      const rows = [];
-      groups.forEach(([week, markets]) => {
-        markets.forEach(([market, camps]) => {
-          camps.forEach(([camp, chans]) => {
-              chans.forEach(([chan, items]) => {
-                  const impressions = d3.sum(items, i => i.impressions);
-                  const clicks = d3.sum(items, i => i.clicks);
-                  const cost = d3.sum(items, i => i.cost);
-                  const videoViews = d3.sum(items, i => i.videoViews);
-                  const videoCompletions = d3.sum(items, i => i.videoCompletions);
-                  rows.push({
-                      week,
-                      market,
-                      campaignName: camp,
-                      channel: chan,
-                      cost,
-                      impressions,
-                      clicks,
-                      videoViews,
-                      videoViews6s: d3.sum(items, i => i.videoViews6s),
-                      videoViews15s: d3.sum(items, i => i.videoViews15s),
-                      videoCompletions,
-                      ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
-                      cpm: impressions > 0 ? (cost / impressions) * 1000 : 0,
-                      cpc: clicks > 0 ? cost / clicks : 0,
-                      cpv: videoViews > 0 ? cost / videoViews : 0,
-                      cpcv: videoCompletions > 0 ? cost / videoCompletions : 0
-                  });
-              });
+          let m2Val = d3.sum(vals, d => d[chartMetric2] || 0);
+          if (chartMetric2 === 'cost') m2Val *= exRate;
+          if (['ctr', 'cpc', 'cpm', 'cpv', 'cpcv'].includes(chartMetric2)) {
+             if (chartMetric2 === 'ctr') m2Val = d3.sum(vals, d => d.impressions) > 0 ? (d3.sum(vals, d => d.clicks) / d3.sum(vals, d => d.impressions)) * 100 : 0;
+             if (chartMetric2 === 'cpc') m2Val = d3.sum(vals, d => d.clicks) > 0 ? (d3.sum(vals, d => d.cost) * exRate) / d3.sum(vals, d => d.clicks) : 0;
+             if (chartMetric2 === 'cpm') m2Val = d3.sum(vals, d => d.impressions) > 0 ? ((d3.sum(vals, d => d.cost) * exRate) / d3.sum(vals, d => d.impressions)) * 1000 : 0;
+          }
+
+          return {
+              dim,
+              sortDate: chartDimX === 'date' ? (vals[0].dateObj || 0) : 0,
+              [m1Def?.label || 'M1']: m1Val,
+              [m2Def?.label || 'M2']: m2Val,
+          };
+      }).filter(d => d.dim !== 'Unknown').sort((a,b) => {
+         if (chartDimX === 'date') return a.sortDate - b.sortDate;
+         const m1Label = AVAILABLE_METRICS.find(m => m.key === chartMetric1)?.label || 'M1';
+         return b[m1Label] - a[m1Label];
+      });
+  }, [filteredData, chartDimX, chartMetric1, chartMetric2, exRate, AVAILABLE_METRICS]);
+
+  // Dynamic Pie Chart Data
+  const dynamicPieData = useMemo(() => {
+      const grouped = d3.groups(filteredData, d => d[pieDim] || 'Unknown');
+      return grouped.map(([dim, vals]) => {
+          let val = d3.sum(vals, d => d[pieMetric] || 0);
+          if (pieMetric === 'cost') val *= exRate;
+          return {
+              name: dim,
+              value: val
+          };
+      }).filter(d => d.name !== 'Unknown').sort((a,b) => b.value - a.value);
+  }, [filteredData, pieDim, pieMetric, exRate]);
+
+
+  // Dynamic Table Aggregation
+  const dynamicTableData = useMemo(() => {
+      const mappedData = filteredData.map(d => {
+          const row = {
+             cost: d.cost || 0,
+             impressions: d.impressions || 0,
+             clicks: d.clicks || 0,
+             purchases: d.purchases || 0,
+             videoViews: d.videoViews || 0,
+             videoViews6s: d.videoViews6s || 0,
+             videoViews15s: d.videoViews15s || 0,
+             videoCompletions: d.videoCompletions || 0
+          };
+          tableDims.forEach(dim => {
+             row[dim] = d[dim] || 'Unknown';
           });
-        });
+          return row;
       });
-      // Sort week numerically, then campaign
+
+      // Group dynamically
+      const groupFuncs = tableDims.map(dim => (d => d[dim]));
+      let grouped = d3.groups(mappedData, ...groupFuncs);
+      
+      const flattenGroups = (groupsArr, currentDims) => {
+         let rows = [];
+         groupsArr.forEach(item => {
+             if (Array.isArray(item) && item.length === 2 && Array.isArray(item[1]) && !item[1][0]?.hasOwnProperty('cost')) {
+                 const newDims = { ...currentDims, [tableDims[Object.keys(currentDims).length]]: item[0] };
+                 rows = rows.concat(flattenGroups(item[1], newDims));
+             } else if (Array.isArray(item) && item.length === 2) {
+                 const newDims = { ...currentDims, [tableDims[Object.keys(currentDims).length]]: item[0] };
+                 const items = item[1];
+                 const impressions = d3.sum(items, i => i.impressions);
+                 const clicks = d3.sum(items, i => i.clicks);
+                 const purchases = d3.sum(items, i => i.purchases);
+                 const cost = d3.sum(items, i => i.cost);
+                 const videoViews = d3.sum(items, i => i.videoViews);
+                 const videoCompletions = d3.sum(items, i => i.videoCompletions);
+                 rows.push({
+                     ...newDims,
+                     cost,
+                     impressions,
+                     clicks,
+                     purchases,
+                     videoViews,
+                     videoViews6s: d3.sum(items, i => i.videoViews6s),
+                     videoViews15s: d3.sum(items, i => i.videoViews15s),
+                     videoCompletions,
+                     ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
+                     cpm: impressions > 0 ? (cost / impressions) * 1000 : 0,
+                     cpc: clicks > 0 ? cost / clicks : 0,
+                     cpv: videoViews > 0 ? cost / videoViews : 0,
+                     cpcv: videoCompletions > 0 ? cost / videoCompletions : 0
+                 });
+             } else if (item.hasOwnProperty('cost')) { // single row case
+                const impressions = item.impressions;
+                 const clicks = item.clicks;
+                 const cost = item.cost;
+                 rows.push({
+                     ...currentDims,
+                     ...item,
+                     ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
+                     cpm: impressions > 0 ? (cost / impressions) * 1000 : 0,
+                     cpc: clicks > 0 ? cost / clicks : 0,
+                 });
+             }
+         });
+         return rows;
+      };
+
+      let rows = flattenGroups(grouped, {});
+      
+      // Sort rows
       return rows.sort((a,b) => {
-         const wa = parseInt(a.week.replace('Week ','')) || 0;
-         const wb = parseInt(b.week.replace('Week ','')) || 0;
-         if (wa !== wb) return wa - wb;
-         return a.campaignName.localeCompare(b.campaignName);
+         return (b.impressions || 0) - (a.impressions || 0);
       });
-  }, [filteredData, filterCampaigns, fChannels, hasMarketFilter]);
+  }, [filteredData, tableDims]);
 
+  const exportCSV = () => {
+     if (dynamicTableData.length === 0) return;
+     const headers = [...tableDims.map(d => DIMENSIONS.find(x => x.key === d)?.label || d), ...selectedMetrics.map(m => AVAILABLE_METRICS.find(x => x.key === m)?.label || m)];
+     let csv = headers.join(",") + "\r\n";
+     dynamicTableData.forEach(row => {
+        let csvRow = [];
+        tableDims.forEach(d => csvRow.push(`"${row[d]}"`));
+        selectedMetrics.forEach(m => {
+           const val = row[m];
+           const mDef = AVAILABLE_METRICS.find(x => x.key === m);
+           csvRow.push(mDef ? `"${String(mDef.format(val)).replace(/,/g, '')}"` : `"${val}"`);
+        });
+        csv += csvRow.join(",") + "\r\n";
+     });
+     const encodedUri = encodeURI("data:text/csv;charset=utf-8," + csv);
+     const link = document.createElement("a");
+     link.setAttribute("href", encodedUri);
+     link.setAttribute("download", "Detailed_Custom_Data.csv");
+     document.body.appendChild(link);
+     link.click();
+     document.body.removeChild(link);
+  };
 
+  const chartInsights = useMemo(() => {
+     if (!dynamicChartData.length) return "No data available for the selected parameters.";
+     const m1Def = AVAILABLE_METRICS.find(m => m.key === chartMetric1);
+     const m2Def = AVAILABLE_METRICS.find(m => m.key === chartMetric2);
+     const m1Label = m1Def?.label || 'Metric 1';
+     const m2Label = m2Def?.label || 'Metric 2';
+     
+     const topM1 = [...dynamicChartData].sort((a,b) => b[m1Label] - a[m1Label])[0];
+     const topM2 = [...dynamicChartData].sort((a,b) => b[m2Label] - a[m2Label])[0];
+     
+     return `Peak ${m1Label} occurs at ${topM1.dim} with ${m1Def.format(topM1[m1Label])}. Meanwhile, the highest ${m2Label} was recorded at ${topM2.dim} reaching ${m2Def.format(topM2[m2Label])}. Focus your budget and optimizations toward ${topM1.dim} to maximize performance returns.`;
+  }, [dynamicChartData, chartMetric1, chartMetric2, AVAILABLE_METRICS]);
+
+  const pieInsights = useMemo(() => {
+     if (!dynamicPieData.length) return "No data available for the selected parameters.";
+     const total = d3.sum(dynamicPieData, d => d.value);
+     const top = dynamicPieData[0];
+     const mDef = AVAILABLE_METRICS.find(m => m.key === pieMetric);
+     const percentage = total > 0 ? ((top.value / total) * 100).toFixed(1) : 0;
+     const metricLabel = mDef?.label || 'Metric';
+     const dimLabel = PIE_DIMENSIONS.find(d => d.key === pieDim)?.label || pieDim;
+     
+     return `The top ${dimLabel} is ${top.name}, generating ${percentage}% of total ${metricLabel} (${mDef?.format(top.value) || top.value}).`;
+  }, [dynamicPieData, pieMetric, pieDim, AVAILABLE_METRICS, PIE_DIMENSIONS]);
 
   return (
     <div className="space-y-8 animate-[fadeIn_0.5s_ease-out] mb-24">
       
       {/* HEADER & CONTROLS */}
-      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6 card-surface backdrop-blur-2xl/80 backdrop-blur-xl p-8 rounded-[2rem] border border-[#cedc28]/20 shadow-2xl relative z-50">
+      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6 card-surface !overflow-visible backdrop-blur-2xl/80 backdrop-blur-xl p-8 rounded-[2rem] border border-[#cedc28]/20 shadow-2xl relative z-[60]">
         <div className="absolute top-0 left-0 w-32 h-32 bg-[#74FA93]/5 rounded-full blur-3xl -ml-10 -mt-10"></div>
         <div className="relative z-10">
            <h2 className="text-3xl font-bold text-white flex items-center gap-3">
@@ -299,8 +401,8 @@ export default function CustomView({ adData = [], exRate = 1, exSym = "$", forma
            <p className="text-[#14a6d9] text-sm mt-2 font-medium tracking-wide">Advanced slicing, goal tracking, and export suite.</p>
         </div>
         
-        <div className="flex flex-wrap gap-4 items-end w-full xl:w-auto relative z-40">
-           <MultiSelectDropdown label="Week" options={optWeeks} selected={fWeeks} onChange={setFWeeks} />
+        <div className="flex flex-wrap gap-4 items-center w-full xl:w-auto relative z-50">
+           <MultiSelectDropdown label="Market" options={optMarkets} selected={fMarkets} onChange={setFMarkets} />
            <MultiSelectDropdown label="Channel" options={optChannels} selected={fChannels} onChange={setFChannels} />
         </div>
       </div>
@@ -308,173 +410,171 @@ export default function CustomView({ adData = [], exRate = 1, exSym = "$", forma
       {/* DYNAMIC CHARTS */}
       {filteredData.length > 0 ? (
          <>
-           <div className="export-slide" data-title="Performance & Channel Mix">
-             <div className={`grid grid-cols-2 md:grid-cols-${userRole === 'non-finance' ? '3' : '4'} gap-6 mb-8`}>
-              {userRole !== 'non-finance' && <MetricCard label="Total Spend" value={`${exSym}${formatShort(actuals.spend)}`} />}
-              <MetricCard label="Impressions" value={formatShort(actuals.impressions)} color="text-[#14a6d9]" />
-              <MetricCard label="Clicks" value={formatShort(actuals.clicks)} color="text-[#cedc28]" />
-              <MetricCard label="Video Views" value={formatShort(actuals.views)} color="text-[#007542]" />
-           </div>
-
-           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
-              <div className="card-surface backdrop-blur-2xl/80 backdrop-blur-xl border border-[#cedc28]/10 rounded-[2rem] p-8 xl:col-span-2 shadow-xl">
-                 <h3 className="text-lg font-bold text-white mb-8 flex items-center gap-2 uppercase tracking-widest text-sm">
-                   <TrendingUp className="text-[#cedc28] w-5 h-5" /> Performance Trend
-                 </h3>
-                 <div className="h-72">
+           <div className="flex flex-col gap-8 export-slide" data-title="Performance & Channel Mix">
+              <div id="dynamic-comparison-chart" className="card-surface !overflow-visible border border-[rgba(206,220,40,0.1)] rounded-[2rem] p-8 shadow-xl flex flex-col w-full relative z-[50]">
+                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 relative z-30">
+                     <h3 className="text-lg font-bold text-white flex items-center gap-2 uppercase tracking-widest text-sm whitespace-nowrap">
+                       <TrendingUp className="text-[#cedc28] w-5 h-5" /> Dynamic Comparison
+                       <button data-html2canvas-ignore="true" type="button" onClick={() => exportChart('dynamic-comparison-chart', 'Dynamic_Comparison')} className="ml-2 p-1.5 hover:bg-[rgba(206,220,40,0.1)] rounded-lg transition-colors text-[#14a6d9] relative z-50 cursor-pointer" title="Download Chart">
+                         <Camera className="w-4 h-4" />
+                       </button>
+                     </h3>
+                     <div data-html2canvas-ignore="true" className="flex flex-wrap items-center gap-3 w-full md:w-auto relative z-[50]">
+                        <MultiSelectDropdown label="X-Axis" options={DIMENSIONS} selected={chartDimX} onChange={setChartDimX} singleSelect className="relative min-w-[150px]" />
+                        <MultiSelectDropdown label="Primary Metric" options={AVAILABLE_METRICS} selected={chartMetric1} onChange={setChartMetric1} singleSelect className="relative min-w-[180px]" />
+                        <MultiSelectDropdown label="Secondary Metric" options={AVAILABLE_METRICS} selected={chartMetric2} onChange={setChartMetric2} singleSelect className="relative min-w-[180px]" />
+                     </div>
+                 </div>
+                 
+                 <div className="h-96 w-full mb-6 relative z-10">
                    <ResponsiveContainer width="100%" height="100%">
-                     <LineChart data={trendData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                     <LineChart data={dynamicChartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                        <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
-                       <XAxis dataKey="date" stroke="#14a6d9" fontSize={12} tickLine={false} axisLine={false} />
-                       {userRole !== 'non-finance' && <YAxis yAxisId="left" stroke="#74FA93" fontSize={12} tickLine={false} axisLine={false} tickFormatter={formatShort} />}
-                       <YAxis yAxisId={userRole === 'non-finance' ? "left" : "right"} orientation={userRole === 'non-finance' ? "left" : "right"} stroke="#cedc28" fontSize={12} tickLine={false} axisLine={false} tickFormatter={formatShort} />
+                       <XAxis dataKey="dim" stroke="#14a6d9" fontSize={12} tickLine={false} axisLine={false} />
+                       <YAxis yAxisId="left" stroke="#74FA93" fontSize={12} tickLine={false} axisLine={false} tickFormatter={formatShort} />
+                       <YAxis yAxisId="right" orientation="right" stroke="#cedc28" fontSize={12} tickLine={false} axisLine={false} tickFormatter={formatShort} />
                        <RechartsTooltip contentStyle={{ backgroundColor: '#0C272D', borderColor: '#74FA9320', color: '#fff', borderRadius: '16px', boxShadow: '0 10px 30px rgba(0,0,0,0.5)' }} />
                        <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                       {userRole !== 'non-finance' && <Line yAxisId="left" type="monotone" dataKey="Spend" stroke="#74FA93" strokeWidth={4} dot={false} activeDot={{r:8, fill: '#74FA93', stroke: '#0C272D', strokeWidth: 2}} />}
-                       <Line yAxisId={userRole === 'non-finance' ? "left" : "right"} type="monotone" dataKey="Impressions" stroke="#cedc28" strokeWidth={4} dot={false} activeDot={{r:8, fill: '#cedc28', stroke: '#0C272D', strokeWidth: 2}} />
+                       <Line yAxisId="left" type="monotone" name={AVAILABLE_METRICS.find(m => m.key === chartMetric1)?.label} dataKey={AVAILABLE_METRICS.find(m => m.key === chartMetric1)?.label || 'M1'} stroke="#74FA93" strokeWidth={4} dot={false} activeDot={{r:8, fill: '#74FA93', stroke: '#0C272D', strokeWidth: 2}} />
+                       <Line yAxisId="right" type="monotone" name={AVAILABLE_METRICS.find(m => m.key === chartMetric2)?.label} dataKey={AVAILABLE_METRICS.find(m => m.key === chartMetric2)?.label || 'M2'} stroke="#cedc28" strokeWidth={4} dot={false} activeDot={{r:8, fill: '#cedc28', stroke: '#0C272D', strokeWidth: 2}} />
                      </LineChart>
                    </ResponsiveContainer>
                  </div>
-              </div>
-
-              <div className="card-surface backdrop-blur-2xl/80 backdrop-blur-xl border border-[#cedc28]/10 rounded-[2rem] p-8 shadow-xl">
-                 <h3 className="text-lg font-bold text-white mb-8 flex items-center gap-2 uppercase tracking-widest text-sm">
-                   <Activity className="text-[#cedc28] w-5 h-5" /> Channel Mix
-                 </h3>
-                 <div className="h-72">
-                   <ResponsiveContainer width="100%" height="100%">
-                     <PieChart>
-                       <Pie data={channelMix} innerRadius={60} outerRadius={85} paddingAngle={5} dataKey="value" stroke="none">
-                         {channelMix.map((entry, index) => (
-                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                         ))}
-                       </Pie>
-                       <RechartsTooltip 
-                          contentStyle={{ backgroundColor: '#0C272D', borderColor: '#74FA9320', color: '#fff', borderRadius: '16px', fontSize: '12px' }}
-                          formatter={(val) => `${exSym}${d3.format(",.2f")(val)}`}
-                       />
-                       <Legend wrapperStyle={{ paddingTop: '20px', fontSize: '12px' }} />
-                     </PieChart>
-                   </ResponsiveContainer>
+                 
+                 <div className="bg-[rgba(10,36,66,0.5)] border border-[rgba(20,166,217,0.2)] rounded-xl p-5 flex gap-3 items-start mt-auto relative z-10">
+                    <Zap className="text-[#cedc28] w-6 h-6 flex-shrink-0 mt-0.5" />
+                    <p className="text-base text-[#eef7f5] leading-relaxed font-medium">{chartInsights}</p>
                  </div>
               </div>
-           </div>
-           </div>
 
-           {/* MARKET CHARTS */}
-           {hasMarketFilter && (
-             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8 mt-8 export-slide" data-title="Market Performance & Mix">
-                <div className="card-surface backdrop-blur-2xl/80 backdrop-blur-xl border border-[#cedc28]/10 rounded-[2rem] p-8 xl:col-span-2 shadow-xl">
-                   <h3 className="text-lg font-bold text-white mb-8 flex items-center gap-2 uppercase tracking-widest text-sm">
-                     <TrendingUp className="text-[#cedc28] w-5 h-5" /> Market Performance Trend
-                   </h3>
-                   <div className="h-72">
-                     <ResponsiveContainer width="100%" height="100%">
-                       <LineChart data={marketTrendData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                         <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
-                         <XAxis dataKey="date" stroke="#14a6d9" fontSize={12} tickLine={false} axisLine={false} />
-                         {userRole !== 'non-finance' && <YAxis yAxisId="left" stroke="#74FA93" fontSize={12} tickLine={false} axisLine={false} tickFormatter={formatShort} />}
-                         <YAxis yAxisId={userRole === 'non-finance' ? "left" : "right"} orientation={userRole === 'non-finance' ? "left" : "right"} stroke="#cedc28" fontSize={12} tickLine={false} axisLine={false} tickFormatter={formatShort} />
-                         <RechartsTooltip contentStyle={{ backgroundColor: '#0C272D', borderColor: '#74FA9320', color: '#fff', borderRadius: '16px', boxShadow: '0 10px 30px rgba(0,0,0,0.5)' }} />
-                         <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                         
-                         {filterMarkets.map((mkt, idx) => {
-                             if (mkt === 'All') return null;
-                             const color1 = COLORS[idx % COLORS.length];
-                             const color2 = COLORS[(idx + 2) % COLORS.length];
-                             return (
-                               <React.Fragment key={mkt}>
-                                 {userRole !== 'non-finance' && <Line yAxisId="left" type="monotone" name={`${mkt} Spend`} dataKey={`${mkt} Spend`} stroke={color1} strokeWidth={3} dot={false} />}
-                                 <Line yAxisId={userRole === 'non-finance' ? "left" : "right"} type="monotone" name={`${mkt} Impressions`} dataKey={`${mkt} Impressions`} stroke={color2} strokeWidth={3} strokeDasharray="5 5" dot={false} />
-                               </React.Fragment>
-                             );
-                         })}
-                       </LineChart>
-                     </ResponsiveContainer>
-                   </div>
-                </div>
-
-                <div className="card-surface backdrop-blur-2xl/80 backdrop-blur-xl border border-[#cedc28]/10 rounded-[2rem] p-8 shadow-xl">
-                   <h3 className="text-lg font-bold text-white mb-8 flex items-center gap-2 uppercase tracking-widest text-sm">
-                     <Activity className="text-[#cedc28] w-5 h-5" /> Market Mix
-                   </h3>
-                   <div className="h-72">
+              <div id="dynamic-split-chart" className="card-surface !overflow-visible border border-[rgba(206,220,40,0.1)] rounded-[2rem] p-8 shadow-xl flex flex-col w-full relative z-[40]">
+                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 relative z-30">
+                     <h3 className="text-lg font-bold text-white flex items-center gap-2 uppercase tracking-widest text-sm">
+                       <Activity className="text-[#cedc28] w-5 h-5" /> Dynamic Split
+                       <button data-html2canvas-ignore="true" type="button" onClick={() => exportChart('dynamic-split-chart', 'Dynamic_Split')} className="ml-2 p-1.5 hover:bg-[rgba(206,220,40,0.1)] rounded-lg transition-colors text-[#14a6d9] relative z-50 cursor-pointer" title="Download Chart">
+                         <Camera className="w-4 h-4" />
+                       </button>
+                     </h3>
+                     <div data-html2canvas-ignore="true" className="flex flex-wrap items-center gap-3 w-full md:w-auto relative z-[50]">
+                        <MultiSelectDropdown label="Split By" options={PIE_DIMENSIONS} selected={pieDim} onChange={setPieDim} singleSelect className="relative min-w-[150px]" />
+                        <MultiSelectDropdown label="Metric" options={AVAILABLE_METRICS} selected={pieMetric} onChange={setPieMetric} singleSelect className="relative min-w-[180px]" />
+                     </div>
+                 </div>
+                 <div className="flex flex-col lg:flex-row items-center gap-8 w-full mt-auto relative z-10">
+                   <div className="h-80 w-full lg:w-1/2">
                      <ResponsiveContainer width="100%" height="100%">
                        <PieChart>
-                         <Pie data={marketMixData} innerRadius={60} outerRadius={85} paddingAngle={5} dataKey="value" stroke="none">
-                           {marketMixData.map((entry, index) => (
+                         <Pie data={dynamicPieData} innerRadius={80} outerRadius={120} paddingAngle={5} dataKey="value" stroke="none">
+                           {dynamicPieData.map((entry, index) => (
                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                            ))}
                          </Pie>
                          <RechartsTooltip 
-                            contentStyle={{ backgroundColor: '#0C272D', borderColor: '#74FA9320', color: '#fff', borderRadius: '16px', fontSize: '12px' }}
-                            formatter={(val) => `${exSym}${d3.format(",.2f")(val)}`}
+                            contentStyle={{ backgroundColor: '#0C272D', borderColor: '#74FA9320', color: '#fff', borderRadius: '16px', fontSize: '14px', fontWeight: 'bold' }}
+                            formatter={(val, name, props) => {
+                               const total = d3.sum(dynamicPieData, d => d.value);
+                               const percent = total > 0 ? ((val / total) * 100).toFixed(1) : 0;
+                               const mDef = AVAILABLE_METRICS.find(m => m.key === pieMetric);
+                               return [`${mDef ? mDef.format(val) : val} (${percent}%)`, name];
+                            }}
                          />
-                         <Legend wrapperStyle={{ paddingTop: '20px', fontSize: '12px' }} />
+                         <Legend layout="vertical" verticalAlign="middle" align="right" wrapperStyle={{ fontSize: '14px', fontWeight: '500' }} />
                        </PieChart>
                      </ResponsiveContainer>
                    </div>
-                </div>
-             </div>
-           )}
+                   <div className="w-full lg:w-1/2">
+                     <div className="bg-[rgba(10,36,66,0.5)] border border-[rgba(206,220,40,0.2)] rounded-xl p-6 flex gap-4 items-start shadow-[0_10px_30px_rgba(206,220,40,0.05)]">
+                        <div className="bg-[rgba(206,220,40,0.1)] p-3 rounded-full flex-shrink-0">
+                           <Zap className="text-[#cedc28] w-6 h-6" />
+                        </div>
+                        <div className="flex flex-col">
+                           <h4 className="text-sm text-[#cedc28] font-bold uppercase tracking-widest mb-2">Split Insight</h4>
+                           <p className="text-base text-[#eef7f5] leading-relaxed font-medium">{pieInsights}</p>
+                        </div>
+                     </div>
+                   </div>
+                 </div>
+              </div>
+           </div>
 
            {/* Data Table */}
-           <div className="card-surface backdrop-blur-2xl/80 backdrop-blur-xl border border-[#cedc28]/10 rounded-[2rem] p-8 shadow-xl overflow-x-auto custom-scrollbar export-slide" data-title="Data Breakdown">
-              <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 gap-4">
+           <div className="card-surface !overflow-visible backdrop-blur-2xl/80 backdrop-blur-xl border border-[#cedc28]/10 rounded-[2rem] p-8 shadow-xl overflow-visible export-slide relative z-[30]" data-title="Data Breakdown">
+              <div className="flex flex-col xl:flex-row justify-between xl:items-center mb-8 gap-6 relative z-30">
                  <h3 className="text-lg font-bold text-white flex items-center gap-2 uppercase tracking-widest text-sm">
                     <TableProperties className="text-[#cedc28] w-5 h-5" /> Data Breakdown
                  </h3>
-                 <MultiSelectDropdown 
-                   label=""
-                   options={AVAILABLE_METRICS} 
-                   selected={selectedMetrics} 
-                   onChange={setSelectedMetrics} 
-                   className="relative min-w-[220px]"
-                 />
-              </div>
-              <table className="w-full text-left border-collapse">
-                 <thead>
-                    <tr className="border-b border-[#cedc28]/20">
-                       <th className="py-4 px-4 text-[#14a6d9] font-bold text-xs uppercase tracking-widest">Week</th>
-                       <th className="py-4 px-4 text-[#14a6d9] font-bold text-xs uppercase tracking-widest">Market</th>
-                       <th className="py-4 px-4 text-[#14a6d9] font-bold text-xs uppercase tracking-widest">Campaign</th>
-                       <th className="py-4 px-4 text-[#14a6d9] font-bold text-xs uppercase tracking-widest">Channel</th>
-                       {selectedMetrics.map((metricKey) => {
-                          const mDef = AVAILABLE_METRICS.find(m => m.key === metricKey);
-                          if (!mDef) return null;
-                          return (
-                            <th key={metricKey} className="py-4 px-4 text-[#14a6d9] font-bold text-xs uppercase tracking-widest text-right">
-                              {mDef.label}
-                            </th>
-                          )
-                       })}
-                    </tr>
-                 </thead>
-                 <tbody>
-                    {tableDataByWeek.slice(0, 50).map((d, i) => (
-                       <tr key={i} className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                          <td className="py-4 px-4 text-white text-sm font-medium">{d.week}</td>
-                          <td className="py-4 px-4 text-white text-sm font-bold">{d.market}</td>
-                          <td className="py-4 px-4 text-white text-sm font-bold">{d.campaignName}</td>
-                          <td className="py-4 px-4 text-[#cedc28] text-sm font-bold">{d.channel}</td>
-                          {selectedMetrics.map((metricKey) => {
-                             const mDef = AVAILABLE_METRICS.find(m => m.key === metricKey);
-                             if (!mDef) return null;
-                             return (
-                               <td key={metricKey} className="py-4 px-4 text-white text-sm font-bold text-right">
-                                 {mDef.format(d[metricKey])}
-                               </td>
-                             )
-                          })}
-                       </tr>
-                    ))}
-                 </tbody>
-              </table>
-              {tableDataByWeek.length > 50 && (
-                 <div className="text-center text-[#14a6d9] text-xs font-bold mt-6 uppercase tracking-widest">
-                   Showing first 50 rows. Export report for full data.
+                 <div className="flex flex-wrap items-center gap-3 relative z-30">
+                   <MultiSelectDropdown 
+                     label="Dimensions"
+                     options={DIMENSIONS} 
+                     selected={tableDims} 
+                     onChange={setTableDims} 
+                     className="relative min-w-[200px]"
+                   />
+                   <MultiSelectDropdown 
+                     label="Metrics"
+                     options={AVAILABLE_METRICS} 
+                     selected={selectedMetrics} 
+                     onChange={setSelectedMetrics} 
+                     className="relative min-w-[200px]"
+                   />
+                   <button onClick={exportCSV} className="h-[44px] px-6 bg-[#0a2442] border border-[#cedc28]/30 rounded-xl text-[#cedc28] font-bold text-sm hover:bg-[#cedc28]/10 transition-colors shadow-[0_0_15px_rgba(200,130,20,0.1)] flex items-center gap-2 mt-5">
+                     <Download className="w-4 h-4" /> Export CSV
+                   </button>
                  </div>
-              )}
+              </div>
+              <div className="overflow-x-auto custom-scrollbar relative z-10 pb-4">
+                  <table className="w-full text-left border-collapse min-w-[800px]">
+                     <thead>
+                        <tr className="border-b border-[#cedc28]/20">
+                           {tableDims.map((dim) => (
+                             <th key={dim} className="py-4 px-4 text-[#14a6d9] font-bold text-xs uppercase tracking-widest whitespace-nowrap">
+                               {DIMENSIONS.find(d => d.key === dim)?.label || dim}
+                             </th>
+                           ))}
+                           {selectedMetrics.map((metricKey) => {
+                              const mDef = AVAILABLE_METRICS.find(m => m.key === metricKey);
+                              if (!mDef) return null;
+                              return (
+                                <th key={metricKey} className="py-4 px-4 text-[#14a6d9] font-bold text-xs uppercase tracking-widest text-right whitespace-nowrap">
+                                  {mDef.label}
+                                </th>
+                              )
+                           })}
+                        </tr>
+                     </thead>
+                     <tbody>
+                        {dynamicTableData.slice(0, 100).map((d, i) => (
+                           <tr key={i} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                              {tableDims.map((dim, idx) => (
+                                 <td key={dim} className={`py-4 px-4 text-sm whitespace-nowrap ${idx === 0 ? 'text-[#cedc28] font-bold' : 'text-white font-medium'}`}>
+                                    {d[dim]}
+                                 </td>
+                              ))}
+                              {selectedMetrics.map((metricKey) => {
+                                 const mDef = AVAILABLE_METRICS.find(m => m.key === metricKey);
+                                 if (!mDef) return null;
+                                 return (
+                                   <td key={metricKey} className="py-4 px-4 text-white text-sm font-bold text-right whitespace-nowrap">
+                                     {mDef.format(d[metricKey])}
+                                   </td>
+                                 )
+                              })}
+                           </tr>
+                        ))}
+                     </tbody>
+                  </table>
+                  {dynamicTableData.length > 100 && (
+                     <div className="text-center text-[#14a6d9] text-xs font-bold mt-6 uppercase tracking-widest">
+                       Showing first 100 rows. Export report for full data.
+                     </div>
+                  )}
+                  {dynamicTableData.length === 0 && (
+                     <div className="text-center text-[#14a6d9] text-xs font-bold mt-6 uppercase tracking-widest">
+                       No data to display. Please select at least one dimension.
+                     </div>
+                  )}
+              </div>
            </div>
          </>
       ) : (

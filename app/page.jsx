@@ -621,7 +621,7 @@ export default function App() {
     { id: 'campaign', label: 'Event View', icon: Activity },
     { id: 'channel', label: 'Channel View', icon: MonitorPlay },
     { id: 'market', label: 'Market View', icon: Map },
-    { id: 'detailed', label: 'Detailed Split', icon: PieChart },
+    { id: 'detailed', label: 'Detailed View', icon: PieChart },
     /* { id: 'webtraffic', label: 'Web Traffic', icon: Users }, */
     { id: 'creative', label: 'Creative View', icon: LayoutTemplate },
   ];
