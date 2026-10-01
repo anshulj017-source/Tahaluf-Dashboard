@@ -15,6 +15,16 @@ export default function AdminView() {
   const [addingUser, setAddingUser] = useState(false);
   const [addSuccess, setAddSuccess] = useState(false);
 
+  const [sortConfig, setSortConfig] = useState({ key: 'lastactive', direction: 'desc' });
+
+  const handleSort = (key) => {
+    let direction = 'desc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'desc') {
+      direction = 'asc';
+    }
+    setSortConfig({ key, direction });
+  };
+
   const fetchUsers = async () => {
     setLoading(true);
     setError(null);
@@ -247,10 +257,10 @@ export default function AdminView() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-[#0a2442]/50 border-b border-[#cedc28]/10">
-                  <th className="py-4 px-6 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest">User Details</th>
-                  <th className="py-4 px-6 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest text-center">Role</th>
-                  <th className="py-4 px-6 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest text-center">Last Active</th>
-                  <th className="py-4 px-6 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest text-center">Actions</th>
+                  <th onClick={() => handleSort('userdetails')} className="cursor-pointer py-4 px-6 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest">User Details {sortConfig?.key === 'userdetails' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>
+                  <th onClick={() => handleSort('role')} className="cursor-pointer py-4 px-6 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest text-center">Role {sortConfig?.key === 'role' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>
+                  <th onClick={() => handleSort('lastactive')} className="cursor-pointer py-4 px-6 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest text-center">Last Active {sortConfig?.key === 'lastactive' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>
+                  <th onClick={() => handleSort('actions')} className="cursor-pointer py-4 px-6 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest text-center">Actions {sortConfig?.key === 'actions' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
@@ -267,7 +277,21 @@ export default function AdminView() {
                     </td>
                   </tr>
                 ) : (
-                  users.map(user => (
+                  [...users].sort((a, b) => {
+                    if (!sortConfig) return 0;
+                    let valA = a.email;
+                    let valB = b.email;
+                    if (sortConfig.key === 'role') {
+                      valA = a.role || 'standard';
+                      valB = b.role || 'standard';
+                    } else if (sortConfig.key === 'lastactive') {
+                      valA = a.lastSignInTime ? new Date(a.lastSignInTime).getTime() : 0;
+                      valB = b.lastSignInTime ? new Date(b.lastSignInTime).getTime() : 0;
+                    }
+                    if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+                    if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+                    return 0;
+                  }).map(user => (
                     <tr key={user.uid} className="hover:bg-[#0a2442]/30 transition-colors group">
                       <td className="py-4 px-6">
                         <div className="flex items-center gap-3">

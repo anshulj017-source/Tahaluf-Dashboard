@@ -66,6 +66,34 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
   const [overallMetrics, setOverallMetrics] = useState(['All']);
   const [chartMetric, setChartMetric] = useState('Spend');
 
+  const [sortConfig, setSortConfig] = useState({ key: 'spend', direction: 'desc' });
+  const [plannedSortConfig, setPlannedSortConfig] = useState({ key: 'plannedCost', direction: 'desc' });
+  const [comparisonSortConfig, setComparisonSortConfig] = useState({ key: 'spend', direction: 'desc' });
+
+  const handleSort = (key) => {
+    let direction = 'desc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'desc') {
+      direction = 'asc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const handlePlannedSort = (key) => {
+    let direction = 'desc';
+    if (plannedSortConfig && plannedSortConfig.key === key && plannedSortConfig.direction === 'desc') {
+      direction = 'asc';
+    }
+    setPlannedSortConfig({ key, direction });
+  };
+
+  const handleComparisonSort = (key) => {
+    let direction = 'desc';
+    if (comparisonSortConfig && comparisonSortConfig.key === key && comparisonSortConfig.direction === 'desc') {
+      direction = 'asc';
+    }
+    setComparisonSortConfig({ key, direction });
+  };
+
   // Process data based on global filters
   const campaignData = useMemo(() => {
     return adData.filter(d => d.dateObj);
@@ -262,8 +290,15 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
         cpa: conv > 0 ? spend / conv : 0,
         cr: clk > 0 ? (conv / clk) * 100 : 0
       };
+    }).sort((a,b) => {
+      if (!comparisonSortConfig) return 0;
+      let valA = a[comparisonSortConfig.key];
+      let valB = b[comparisonSortConfig.key];
+      if (valA < valB) return comparisonSortConfig.direction === 'asc' ? -1 : 1;
+      if (valA > valB) return comparisonSortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
     });
-  }, [campaignData, uniqueEvents]);
+  }, [campaignData, uniqueEvents, comparisonSortConfig]);
 
   // Create time scale for percentage calculations
   const timeScale = useMemo(() => {
@@ -343,9 +378,15 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
         cpa: conversions > 0 ? spend / conversions : 0,
         cr: clicks > 0 ? (conversions / clicks) * 100 : 0
       };
+    }).sort((a,b) => {
+      if (!sortConfig) return 0;
+      let valA = a[sortConfig.key];
+      let valB = b[sortConfig.key];
+      if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
     });
-    return grouped.sort((a,b) => b.spend - a.spend);
-  }, [campaignData, selectedPhases, selectedChannels]);
+  }, [campaignData, selectedPhases, selectedChannels, sortConfig]);
 
   // Calculate planned table data based on selections
   const plannedTableData = useMemo(() => {
@@ -428,10 +469,15 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
         deliveredUnitCost,
         pctDiffUnitCost
       };
+    }).sort((a,b) => {
+      if (!plannedSortConfig) return 0;
+      let valA = a[plannedSortConfig.key];
+      let valB = b[plannedSortConfig.key];
+      if (valA < valB) return plannedSortConfig.direction === 'asc' ? -1 : 1;
+      if (valA > valB) return plannedSortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
     });
-    
-    return combined.sort((a,b) => b.plannedCost - a.plannedCost);
-  }, [campaignData, plannedData, selectedPhases, selectedChannels, filterMarkets]);
+  }, [campaignData, plannedData, selectedPhases, selectedChannels, filterMarkets, plannedSortConfig]);
 
 
 
@@ -718,17 +764,17 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
             <table className="w-full text-left border-collapse whitespace-nowrap">
               <thead>
                 <tr className="bg-[#0a2442]/80 border-b border-[#cedc28]/20">
-                  <th className="px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest">Event</th>
-                  <th className="px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest">Launch Date</th>
-                  {userRole !== 'non-finance' && <th className="px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest text-right">Spend</th>}
-                  <th className="px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest text-right">Impressions</th>
-                  <th className="px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest text-right">Clicks</th>
-                  <th className="px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest text-right">CTR</th>
-                  {userRole !== 'non-finance' && <th className="px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest text-right">CPC</th>}
-                  {userRole !== 'non-finance' && <th className="px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest text-right">CPM</th>}
-                  <th className="px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest text-right">Conversions</th>
-                  <th className="px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest text-right">CR</th>
-                  {userRole !== 'non-finance' && <th className="px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest text-right">CPA</th>}
+                  <th onClick={() => handleComparisonSort('event')} className="cursor-pointer px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest">Event {comparisonSortConfig?.key === 'event' ? (comparisonSortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>
+                  <th onClick={() => handleComparisonSort('dateObj')} className="cursor-pointer px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest">Launch Date {comparisonSortConfig?.key === 'dateObj' ? (comparisonSortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>
+                  {userRole !== 'non-finance' && <th onClick={() => handleComparisonSort('spend')} className="cursor-pointer px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest text-right">Spend {comparisonSortConfig?.key === 'spend' ? (comparisonSortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>}
+                  <th onClick={() => handleComparisonSort('impressions')} className="cursor-pointer px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest text-right">Impressions {comparisonSortConfig?.key === 'impressions' ? (comparisonSortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>
+                  <th onClick={() => handleComparisonSort('clicks')} className="cursor-pointer px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest text-right">Clicks {comparisonSortConfig?.key === 'clicks' ? (comparisonSortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>
+                  <th onClick={() => handleComparisonSort('ctr')} className="cursor-pointer px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest text-right">CTR {comparisonSortConfig?.key === 'ctr' ? (comparisonSortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>
+                  {userRole !== 'non-finance' && <th onClick={() => handleComparisonSort('cpc')} className="cursor-pointer px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest text-right">CPC {comparisonSortConfig?.key === 'cpc' ? (comparisonSortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>}
+                  {userRole !== 'non-finance' && <th onClick={() => handleComparisonSort('cpm')} className="cursor-pointer px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest text-right">CPM {comparisonSortConfig?.key === 'cpm' ? (comparisonSortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>}
+                  <th onClick={() => handleComparisonSort('conversions')} className="cursor-pointer px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest text-right">Conversions {comparisonSortConfig?.key === 'conversions' ? (comparisonSortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>
+                  <th onClick={() => handleComparisonSort('cr')} className="cursor-pointer px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest text-right">CR {comparisonSortConfig?.key === 'cr' ? (comparisonSortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>
+                  {userRole !== 'non-finance' && <th onClick={() => handleComparisonSort('cpa')} className="cursor-pointer px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest text-right">CPA {comparisonSortConfig?.key === 'cpa' ? (comparisonSortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>}
                 </tr>
               </thead>
               <tbody>
@@ -1085,19 +1131,19 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-[#cedc28]/20">
-                  <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 rounded-tl-xl">{selectedPhases.length > 0 ? 'Phase / Channel' : 'Channel'}</th>
-                  {userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('Spend')) && <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">Spend</th>}
-                  {(overallMetrics.includes('All') || overallMetrics.includes('Impressions')) && <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">Impressions</th>}
-                  {(overallMetrics.includes('All') || overallMetrics.includes('Clicks')) && <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">Clicks</th>}
-                  {(overallMetrics.includes('All') || overallMetrics.includes('Video Views')) && <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">Video Views</th>}
-                  {(overallMetrics.includes('All') || overallMetrics.includes('Completed Views')) && <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">Completed Views</th>}
-                  {(overallMetrics.includes('All') || overallMetrics.includes('Conversions')) && <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">Conversions</th>}
-                  {userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPA')) && <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">CPA</th>}
-                  {(overallMetrics.includes('All') || overallMetrics.includes('CR')) && <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">CR</th>}
-                  {(overallMetrics.includes('All') || overallMetrics.includes('CTR')) && <th className={`py-4 px-4 text-[10px] font-black text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right ${userRole === 'non-finance' ? 'rounded-tr-xl' : ''}`}>CTR</th>}
-                  {userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPM')) && <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">CPM</th>}
-                  {userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPC')) && <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">CPC</th>}
-                  {userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPV')) && <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right rounded-tr-xl">CPV</th>}
+                  <th onClick={() => handleSort('channel')} className="cursor-pointer py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 rounded-tl-xl">{selectedPhases.length > 0 ? 'Phase / Channel' : 'Channel'} {sortConfig?.key === 'channel' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>
+                  {userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('Spend')) && <th onClick={() => handleSort('spend')} className="cursor-pointer py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">Spend {sortConfig?.key === 'spend' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>}
+                  {(overallMetrics.includes('All') || overallMetrics.includes('Impressions')) && <th onClick={() => handleSort('impressions')} className="cursor-pointer py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">Impressions {sortConfig?.key === 'impressions' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>}
+                  {(overallMetrics.includes('All') || overallMetrics.includes('Clicks')) && <th onClick={() => handleSort('clicks')} className="cursor-pointer py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">Clicks {sortConfig?.key === 'clicks' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>}
+                  {(overallMetrics.includes('All') || overallMetrics.includes('Video Views')) && <th onClick={() => handleSort('views')} className="cursor-pointer py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">Video Views {sortConfig?.key === 'views' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>}
+                  {(overallMetrics.includes('All') || overallMetrics.includes('Completed Views')) && <th onClick={() => handleSort('completions')} className="cursor-pointer py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">Completed Views {sortConfig?.key === 'completions' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>}
+                  {(overallMetrics.includes('All') || overallMetrics.includes('Conversions')) && <th onClick={() => handleSort('conversions')} className="cursor-pointer py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">Conversions {sortConfig?.key === 'conversions' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>}
+                  {userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPA')) && <th onClick={() => handleSort('cpa')} className="cursor-pointer py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">CPA {sortConfig?.key === 'cpa' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>}
+                  {(overallMetrics.includes('All') || overallMetrics.includes('CR')) && <th onClick={() => handleSort('cr')} className="cursor-pointer py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">CR {sortConfig?.key === 'cr' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>}
+                  {(overallMetrics.includes('All') || overallMetrics.includes('CTR')) && <th onClick={() => handleSort('ctr')} className={`cursor-pointer py-4 px-4 text-[10px] font-black text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right ${userRole === 'non-finance' ? 'rounded-tr-xl' : ''}`}>CTR {sortConfig?.key === 'ctr' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>}
+                  {userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPM')) && <th onClick={() => handleSort('cpm')} className="cursor-pointer py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">CPM {sortConfig?.key === 'cpm' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>}
+                  {userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPC')) && <th onClick={() => handleSort('cpc')} className="cursor-pointer py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">CPC {sortConfig?.key === 'cpc' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>}
+                  {userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPV')) && <th onClick={() => handleSort('cpv')} className="cursor-pointer py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right rounded-tr-xl">CPV {sortConfig?.key === 'cpv' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>}
                 </tr>
               </thead>
               <tbody>
@@ -1155,21 +1201,21 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="border-b border-[#cedc28]/20">
-                    <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 rounded-tl-xl">{selectedPhases.length > 0 ? 'Phase / Channel' : 'Channel'}</th>
-                    <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50">Buying Type</th>
-                    <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">Planned Cost</th>
-                    <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">Delivered Cost</th>
-                    <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">Booked Units</th>
-                    <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">Delivered Units</th>
-                    {(plannedMetrics.includes('% Delivered') || plannedMetrics.includes('All')) && <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right rounded-tr-xl">% Delivered</th>}
-                    {(plannedMetrics.includes('% Pacing') || plannedMetrics.includes('All')) && <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right rounded-tr-xl">% Pacing</th>}
+                    <th onClick={() => handlePlannedSort('channel')} className="cursor-pointer py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 rounded-tl-xl">{selectedPhases.length > 0 ? 'Phase / Channel' : 'Channel'} {plannedSortConfig?.key === 'channel' ? (plannedSortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>
+                    <th onClick={() => handlePlannedSort('buyingType')} className="cursor-pointer py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50">Buying Type {plannedSortConfig?.key === 'buyingType' ? (plannedSortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>
+                    <th onClick={() => handlePlannedSort('plannedCost')} className="cursor-pointer py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">Planned Cost {plannedSortConfig?.key === 'plannedCost' ? (plannedSortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>
+                    <th onClick={() => handlePlannedSort('deliveredCost')} className="cursor-pointer py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">Delivered Cost {plannedSortConfig?.key === 'deliveredCost' ? (plannedSortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>
+                    <th onClick={() => handlePlannedSort('bookedUnits')} className="cursor-pointer py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">Booked Units {plannedSortConfig?.key === 'bookedUnits' ? (plannedSortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>
+                    <th onClick={() => handlePlannedSort('deliveredUnits')} className="cursor-pointer py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">Delivered Units {plannedSortConfig?.key === 'deliveredUnits' ? (plannedSortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>
+                    {(plannedMetrics.includes('% Delivered') || plannedMetrics.includes('All')) && <th onClick={() => handlePlannedSort('pctDelivered')} className="cursor-pointer py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right rounded-tr-xl">% Delivered {plannedSortConfig?.key === 'pctDelivered' ? (plannedSortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>}
+                    {(plannedMetrics.includes('% Pacing') || plannedMetrics.includes('All')) && <th onClick={() => handlePlannedSort('pctPacing')} className="cursor-pointer py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right rounded-tr-xl">% Pacing {plannedSortConfig?.key === 'pctPacing' ? (plannedSortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>}
                     {(plannedMetrics.includes('Cost compare') || plannedMetrics.includes('All')) && (
                       <>
-                        <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">Planned Unit Cost</th>
-                        <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right rounded-tr-xl">Delivered Unit Cost</th>
+                        <th onClick={() => handlePlannedSort('plannedUnitCost')} className="cursor-pointer py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">Planned Unit Cost {plannedSortConfig?.key === 'plannedUnitCost' ? (plannedSortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>
+                        <th onClick={() => handlePlannedSort('deliveredUnitCost')} className="cursor-pointer py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right rounded-tr-xl">Delivered Unit Cost {plannedSortConfig?.key === 'deliveredUnitCost' ? (plannedSortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>
                       </>
                     )}
-                    {(plannedMetrics.includes('% difference of unit cost') || plannedMetrics.includes('All')) && <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right rounded-tr-xl">% Diff Unit Cost</th>}
+                    {(plannedMetrics.includes('% difference of unit cost') || plannedMetrics.includes('All')) && <th onClick={() => handlePlannedSort('pctDiffUnitCost')} className="cursor-pointer py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right rounded-tr-xl">% Diff Unit Cost {plannedSortConfig?.key === 'pctDiffUnitCost' ? (plannedSortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>}
                   </tr>
                 </thead>
                 <tbody>

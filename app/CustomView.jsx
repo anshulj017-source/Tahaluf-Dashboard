@@ -208,6 +208,16 @@ export default function CustomView({ adData = [], exRate = 1, exSym = "$", forma
     userRole === 'non-finance' ? ['impressions', 'clicks', 'purchases'] : ['cost', 'impressions', 'clicks', 'purchases']
   );
 
+  const [sortConfig, setSortConfig] = useState({ key: 'impressions', direction: 'desc' });
+
+  const handleSort = (key) => {
+    let direction = 'desc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'desc') {
+      direction = 'asc';
+    }
+    setSortConfig({ key, direction });
+  };
+
   // Dynamic Line Chart Data
   const dynamicChartData = useMemo(() => {
       let grouped;
@@ -346,7 +356,12 @@ export default function CustomView({ adData = [], exRate = 1, exSym = "$", forma
       
       // Sort rows
       return rows.sort((a,b) => {
-         return (b.impressions || 0) - (a.impressions || 0);
+         if (!sortConfig) return 0;
+         let valA = a[sortConfig.key];
+         let valB = b[sortConfig.key];
+         if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+         if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+         return 0;
       });
   }, [filteredData, tableDims]);
 
@@ -538,17 +553,17 @@ export default function CustomView({ adData = [], exRate = 1, exSym = "$", forma
                      <thead>
                         <tr className="border-b border-[#cedc28]/20">
                            {tableDims.map((dim) => (
-                             <th key={dim} className="py-4 px-4 text-[#14a6d9] font-bold text-xs uppercase tracking-widest whitespace-nowrap">
+                             <th onClick={() => handleSort(dim)} key={dim} className="cursor-pointer py-4 px-4 text-[#14a6d9] font-bold text-xs uppercase tracking-widest whitespace-nowrap">
                                {DIMENSIONS.find(d => d.key === dim)?.label || dim}
-                             </th>
+                              {sortConfig?.key === dim ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>
                            ))}
                            {selectedMetrics.map((metricKey) => {
                               const mDef = AVAILABLE_METRICS.find(m => m.key === metricKey);
                               if (!mDef) return null;
                               return (
-                                <th key={metricKey} className="py-4 px-4 text-[#14a6d9] font-bold text-xs uppercase tracking-widest text-right whitespace-nowrap">
+                                <th onClick={() => handleSort(metricKey)} key={metricKey} className="cursor-pointer py-4 px-4 text-[#14a6d9] font-bold text-xs uppercase tracking-widest text-right whitespace-nowrap">
                                   {mDef.label}
-                                </th>
+                                 {sortConfig?.key === metricKey ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>
                               )
                            })}
                         </tr>

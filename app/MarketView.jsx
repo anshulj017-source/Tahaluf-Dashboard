@@ -87,6 +87,16 @@ export default function MarketView({ adData, gaData, exRate = 1, exSym = '$', fo
   const [channelMetric, setChannelMetric] = useState(userRole === 'non-finance' ? 'impressions' : 'spend'); // For chart 2
   const [trendMetric, setTrendMetric] = useState(userRole === 'non-finance' ? 'impressions' : 'spend'); // For chart 1
 
+  const [sortConfig, setSortConfig] = useState({ key: 'spend', direction: 'desc' });
+
+  const handleSort = (key) => {
+    let direction = 'desc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'desc') {
+      direction = 'asc';
+    }
+    setSortConfig({ key, direction });
+  };
+
   const exportChart = async (chartId, filename) => {
     try {
       const el = document.getElementById(chartId);
@@ -320,8 +330,22 @@ export default function MarketView({ adData, gaData, exRate = 1, exSym = '$', fo
         });
       });
     });
-    return flattened.sort((a,b) => b.spend - a.spend);
-  }, [selectedMarketAdData]);
+    return flattened.sort((a,b) => {
+      if (!sortConfig) return 0;
+      let valA = a[sortConfig.key];
+      let valB = b[sortConfig.key];
+      if (sortConfig.key === 'event') {
+        valA = a.campaign;
+        valB = b.campaign;
+      } else if (sortConfig.key === 'market') {
+        valA = a.country;
+        valB = b.country;
+      }
+      if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [selectedMarketAdData, sortConfig]);
 
   const channelChartData = useMemo(() => {
      if (selectedMarketAdData.length === 0) return [];
@@ -622,10 +646,10 @@ export default function MarketView({ adData, gaData, exRate = 1, exSym = '$', fo
                 <table className="w-full text-left border-collapse whitespace-nowrap">
                   <thead>
                     <tr className="border-b-2 border-[#cedc28]/30">
-                      <th className="px-4 py-3 text-xs font-bold text-[#14a6d9] uppercase tracking-wider sticky left-0 bg-[#0a2442] z-10">Event Phase</th>
-                      <th className="px-4 py-3 text-xs font-bold text-[#14a6d9] uppercase tracking-wider">Market</th>
+                      <th onClick={() => handleSort('event')} className="cursor-pointer px-4 py-3 text-xs font-bold text-[#14a6d9] uppercase tracking-wider sticky left-0 bg-[#0a2442] z-10">Event Phase {sortConfig?.key === 'event' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>
+                      <th onClick={() => handleSort('market')} className="cursor-pointer px-4 py-3 text-xs font-bold text-[#14a6d9] uppercase tracking-wider">Market {sortConfig?.key === 'market' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>
                       {AVAILABLE_METRICS.filter(m => selectedMetrics.includes(m.key)).map(m => (
-                         <th key={m.key} className="px-4 py-3 text-xs font-bold text-[#14a6d9] uppercase tracking-wider text-right">{m.label}</th>
+                         <th onClick={() => handleSort(m.key)} key={m.key} className="cursor-pointer px-4 py-3 text-xs font-bold text-[#14a6d9] uppercase tracking-wider text-right">{m.label} {sortConfig?.key === m.key ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>
                       ))}
                     </tr>
                   </thead>
