@@ -84,7 +84,8 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
         Clicks: d3.sum(v, d => d.clicks),
         CPM: d3.sum(v, d => d.impressions) > 0 ? (d3.sum(v, d => d.cost) / d3.sum(v, d => d.impressions)) * 1000 : 0,
         CPC: d3.sum(v, d => d.clicks) > 0 ? d3.sum(v, d => d.cost) / d3.sum(v, d => d.clicks) : 0,
-        Conversions: d3.sum(v, d => d.purchases)
+        Conversions: d3.sum(v, d => d.purchases),
+        CPA: d3.sum(v, d => d.purchases) > 0 ? d3.sum(v, d => d.cost) / d3.sum(v, d => d.purchases) : 0
       }),
       d => d3.timeFormat('%Y-%m-%d')(d.dateObj),
       d => chartPhases.length === 1 && chartPhases[0] === 'All Phases' ? 'All Phases' : (chartPhases.includes(d.phase) ? d.phase : 'Other')
@@ -103,6 +104,7 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
           row[`${p}_CPM`] = metrics.CPM;
           row[`${p}_CPC`] = metrics.CPC;
           row[`${p}_Conversions`] = metrics.Conversions;
+          row[`${p}_CPA`] = metrics.CPA;
         } else {
           row[`${p}_Spend`] = 0;
           row[`${p}_Impressions`] = 0;
@@ -110,6 +112,7 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
           row[`${p}_CPM`] = 0;
           row[`${p}_CPC`] = 0;
           row[`${p}_Conversions`] = 0;
+          row[`${p}_CPA`] = 0;
         }
       });
       return row;
@@ -172,6 +175,96 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
     return { phases: phaseList, campaignMinDate: cMin, campaignMaxDate: cMax };
   }, [campaignData]);
 
+  const uniqueEvents = useMemo(() => Array.from(new Set(campaignData.map(d => d.eventNameDB))).filter(e => e && e !== 'Unknown').sort(), [campaignData]);
+
+  const relativeChartData = useMemo(() => {
+    if (uniqueEvents.length <= 1) return [];
+
+    const eventLaunchDates = {};
+    uniqueEvents.forEach(evt => {
+      const rows = campaignData.filter(d => d.eventNameDB === evt);
+      if (rows.length > 0) {
+        eventLaunchDates[evt] = d3.min(rows, d => d.dateObj);
+      }
+    });
+
+    const dayMap = {}; 
+    campaignData.forEach(d => {
+      const evt = d.eventNameDB;
+      const launch = eventLaunchDates[evt];
+      if (!launch || !d.dateObj) return;
+
+      const diffTime = Math.abs(d.dateObj - launch);
+      const relativeDay = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+      if (!dayMap[relativeDay]) {
+        dayMap[relativeDay] = { Day: relativeDay, date: `Day ${relativeDay}` };
+      }
+      
+      const dayObj = dayMap[relativeDay];
+      if (!dayObj[`${evt}_rawSpend`]) {
+        dayObj[`${evt}_rawSpend`] = 0;
+        dayObj[`${evt}_rawImp`] = 0;
+        dayObj[`${evt}_rawClk`] = 0;
+        dayObj[`${evt}_rawConv`] = 0;
+      }
+
+      dayObj[`${evt}_rawSpend`] += d.cost;
+      dayObj[`${evt}_rawImp`] += d.impressions;
+      dayObj[`${evt}_rawClk`] += d.clicks;
+      dayObj[`${evt}_rawConv`] += d.purchases;
+    });
+
+    const dataArray = Object.values(dayMap).sort((a, b) => a.Day - b.Day);
+    dataArray.forEach(dayObj => {
+      uniqueEvents.forEach(evt => {
+        if (dayObj[`${evt}_rawSpend`] !== undefined) {
+          const s = dayObj[`${evt}_rawSpend`];
+          const i = dayObj[`${evt}_rawImp`];
+          const c = dayObj[`${evt}_rawClk`];
+          const cv = dayObj[`${evt}_rawConv`];
+
+          dayObj[`${evt}_Spend`] = s;
+          dayObj[`${evt}_Impressions`] = i;
+          dayObj[`${evt}_Clicks`] = c;
+          dayObj[`${evt}_Conversions`] = cv;
+          dayObj[`${evt}_CPM`] = i > 0 ? (s / i) * 1000 : 0;
+          dayObj[`${evt}_CPC`] = c > 0 ? s / c : 0;
+          dayObj[`${evt}_CPA`] = cv > 0 ? s / cv : 0;
+        }
+      });
+    });
+
+    return dataArray;
+  }, [campaignData, uniqueEvents]);
+
+  const comparisonTableData = useMemo(() => {
+    if (uniqueEvents.length <= 1) return [];
+    
+    return uniqueEvents.map(evt => {
+      const rows = campaignData.filter(d => d.eventNameDB === evt);
+      const minDate = rows.length > 0 ? d3.min(rows, d => d.dateObj) : null;
+      const spend = d3.sum(rows, d => d.cost);
+      const imp = d3.sum(rows, d => d.impressions);
+      const clk = d3.sum(rows, d => d.clicks);
+      const conv = d3.sum(rows, d => d.purchases);
+      
+      return {
+        event: evt,
+        startDate: minDate ? d3.timeFormat('%b %d, %Y')(minDate) : 'N/A',
+        spend,
+        impressions: imp,
+        clicks: clk,
+        cpm: imp > 0 ? (spend / imp) * 1000 : 0,
+        cpc: clk > 0 ? spend / clk : 0,
+        ctr: imp > 0 ? (clk / imp) * 100 : 0,
+        conversions: conv,
+        cpa: conv > 0 ? spend / conv : 0,
+        cr: clk > 0 ? (conv / clk) * 100 : 0
+      };
+    });
+  }, [campaignData, uniqueEvents]);
+
   // Create time scale for percentage calculations
   const timeScale = useMemo(() => {
     if (!campaignMinDate || !campaignMaxDate) return null;
@@ -213,8 +306,9 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
   // Calculate table data based on selections
   const tableData = useMemo(() => {
     let data = campaignData;
+    const isPhaseFiltered = selectedPhases.length > 0;
 
-    if (selectedPhases.length > 0) {
+    if (isPhaseFiltered) {
       data = data.filter(d => selectedPhases.includes(d.phase));
       const hasAnyChannelSelection = selectedPhases.some(p => selectedChannels[p] && selectedChannels[p].length > 0);
       if (hasAnyChannelSelection) {
@@ -225,7 +319,9 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
       }
     }
 
-    const grouped = d3.groups(data, d => d.channel).map(([channel, rows]) => {
+    const groupFn = d => isPhaseFiltered ? `${d.phase} - ${d.channel}` : d.channel;
+
+    const grouped = d3.groups(data, groupFn).map(([label, rows]) => {
       const impressions = d3.sum(rows, d => d.impressions);
       const clicks = d3.sum(rows, d => d.clicks);
       const views = d3.sum(rows, d => d.videoViews);
@@ -233,7 +329,7 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
       const conversions = d3.sum(rows, d => d.purchases || 0);
       
       return {
-        channel,
+        channel: label,
         spend,
         impressions,
         clicks,
@@ -279,17 +375,23 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
       }
     }
 
-    const pKeys = new Set(pData.map(d => `${d.channel.toLowerCase()}_${d.buyingType.toLowerCase()}`));
-    const aKeys = new Set(actualData.map(d => `${d.channel.toLowerCase()}_${d.buyingType.toLowerCase()}`));
+    const isPhaseFiltered = selectedPhases.length > 0;
+    const keyFn = d => isPhaseFiltered ? `${d.phase}_${d.channel}_${d.buyingType}`.toLowerCase() : `${d.channel}_${d.buyingType}`.toLowerCase();
+
+    const pKeys = new Set(pData.map(keyFn));
+    const aKeys = new Set(actualData.map(keyFn));
     const allKeys = Array.from(new Set([...pKeys, ...aKeys]));
 
     const combined = allKeys.map(key => {
-      const pMatching = pData.filter(d => `${d.channel.toLowerCase()}_${d.buyingType.toLowerCase()}` === key);
-      const aMatching = actualData.filter(d => `${d.channel.toLowerCase()}_${d.buyingType.toLowerCase()}` === key);
+      const pMatching = pData.filter(d => keyFn(d) === key);
+      const aMatching = actualData.filter(d => keyFn(d) === key);
       
-      const channel = pMatching.length > 0 ? (pMatching[0].channel || '') : (aMatching.length > 0 ? aMatching[0].channel || '' : '');
+      const rawChannel = pMatching.length > 0 ? (pMatching[0].channel || '') : (aMatching.length > 0 ? aMatching[0].channel || '' : '');
+      const rawPhase = pMatching.length > 0 ? (pMatching[0].phase || '') : (aMatching.length > 0 ? aMatching[0].phase || '' : '');
       const buyingType = pMatching.length > 0 ? (pMatching[0].buyingType || '') : (aMatching.length > 0 ? aMatching[0].buyingType || '' : '');
       
+      const channelLabel = isPhaseFiltered ? `${rawPhase} - ${rawChannel}` : rawChannel;
+
       const plannedCost = d3.sum(pMatching, d => d.plannedCost || 0);
       const bookedUnits = d3.sum(pMatching, d => d.bookedUnits || 0);
       const deliveredCost = d3.sum(aMatching, d => d.cost || 0);
@@ -314,7 +416,7 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
       const pctDiffUnitCost = plannedUnitCost > 0 ? ((deliveredUnitCost - plannedUnitCost) / plannedUnitCost) * 100 : 0;
 
       return {
-        channel,
+        channel: channelLabel,
         buyingType,
         plannedCost,
         deliveredCost,
@@ -335,9 +437,10 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
 
   const handleExportCSV = () => {
     let csvContent = "data:text/csv;charset=utf-8,";
+    const headerTitle = selectedPhases.length > 0 ? 'Phase / Channel' : 'Channel';
     
     if (viewMode === 'overall') {
-      const headers = ['Channel'];
+      const headers = [headerTitle];
       if (userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('Spend'))) headers.push('Spend');
       if (overallMetrics.includes('All') || overallMetrics.includes('Impressions')) headers.push('Impressions');
       if (overallMetrics.includes('All') || overallMetrics.includes('Clicks')) headers.push('Clicks');
@@ -402,7 +505,7 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
       }
 
     } else {
-      const headers = ['Channel', 'Buying Type', 'Planned Cost', 'Delivered Cost', 'Booked Units', 'Delivered Units'];
+      const headers = [selectedPhases.length > 0 ? 'Phase / Channel' : 'Channel', 'Buying Type', 'Planned Cost', 'Delivered Cost', 'Booked Units', 'Delivered Units'];
       if (plannedMetrics.includes('% Delivered') || plannedMetrics.includes('All')) headers.push('% Delivered');
       if (plannedMetrics.includes('% Pacing') || plannedMetrics.includes('All')) headers.push('% Pacing');
       if (plannedMetrics.includes('Cost compare') || plannedMetrics.includes('All')) headers.push('Planned Unit Cost', 'Delivered Unit Cost');
@@ -447,8 +550,213 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
     document.body.removeChild(link);
   };
 
+  const handleExportComparisonCSV = () => {
+    let csvContent = "data:text/csv;charset=utf-8,";
+    
+    // Headers
+    const headers = ['Event', 'Launch Date'];
+    if (userRole !== 'non-finance') headers.push('Spend');
+    headers.push('Impressions', 'Clicks', 'CTR');
+    if (userRole !== 'non-finance') headers.push('CPC', 'CPM');
+    headers.push('Conversions', 'CR');
+    if (userRole !== 'non-finance') headers.push('CPA');
+    csvContent += headers.join(",") + "\r\n";
+    
+    // Rows
+    comparisonTableData.forEach(row => {
+      const rowData = [row.event, row.startDate];
+      if (userRole !== 'non-finance') rowData.push((row.spend * exRate).toFixed(2));
+      rowData.push(row.impressions, row.clicks, `${row.ctr.toFixed(2)}%`);
+      if (userRole !== 'non-finance') rowData.push((row.cpc * exRate).toFixed(2), (row.cpm * exRate).toFixed(2));
+      rowData.push(row.conversions, `${row.cr.toFixed(2)}%`);
+      if (userRole !== 'non-finance') rowData.push((row.cpa * exRate).toFixed(2));
+      csvContent += rowData.join(",") + "\r\n";
+    });
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    const dateStr = d3.timeFormat('%Y-%m-%d')(new Date());
+    link.setAttribute("download", `Event_Comparison_${dateStr}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  if (uniqueEvents.length > 1) {
+    return (
+      <div className="flex flex-col gap-8 w-full max-w-7xl mx-auto pb-12">
+        <div className="card-surface backdrop-blur-2xl p-8 rounded-3xl border border-[#cedc28]/20 shadow-xl overflow-hidden">
+          <h3 className="text-2xl font-anton uppercase text-[#eef7f5] flex items-center gap-3 mb-2">
+            <Activity className="text-[#cedc28]" /> Event Comparison (Relative Timeline)
+          </h3>
+          <p className="text-xs text-[#14a6d9] mb-8 font-bold tracking-wider">COMPARING DAILY TRAJECTORIES FROM DAY 1 OF EACH EVENT'S LAUNCH</p>
+          
+          <div className="flex justify-between items-center mb-6">
+            <div className="flex bg-[#0a2442] rounded-lg p-1 border border-[#cedc28]/20 overflow-x-auto custom-scrollbar">
+              {['Spend', 'Impressions', 'Clicks', 'CPM', 'CPC', 'Conversions', 'CPA'].filter(m => userRole !== 'non-finance' || (m !== 'Spend' && m !== 'CPM' && m !== 'CPC' && m !== 'CPA')).map(m => (
+                <button
+                  key={m}
+                  onClick={() => setChartMetric(m)}
+                  className={`px-4 py-2 rounded text-[10px] font-bold transition-all whitespace-nowrap ${chartMetric === m ? 'bg-[#cedc28] text-[#1a302e]' : 'text-[#14a6d9] hover:bg-[#cedc28]/10'}`}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
+            
+            <button
+              onClick={async () => {
+                try {
+                  const el = document.getElementById('comparison-chart-container');
+                  if (el) {
+                    const svg = el.querySelector('svg');
+                    if (svg) {
+                      const svgData = new XMLSerializer().serializeToString(svg);
+                      const canvas = document.createElement('canvas');
+                      const svgSize = svg.getBoundingClientRect();
+                      canvas.width = svgSize.width * 2;
+                      canvas.height = svgSize.height * 2;
+                      const ctx = canvas.getContext('2d');
+                      
+                      ctx.fillStyle = '#0a2442';
+                      ctx.fillRect(0, 0, canvas.width, canvas.height);
+                      
+                      const img = new Image();
+                      img.onload = () => {
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                        const link = document.createElement('a');
+                        link.download = `event-comparison-${chartMetric}.png`;
+                        link.href = canvas.toDataURL('image/png');
+                        link.click();
+                      };
+                      img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+                    }
+                  }
+                } catch (err) {
+                  console.error("Error downloading chart:", err);
+                  alert("Could not download chart. Please try again.");
+                }
+              }}
+              className="p-2 rounded-lg bg-[#0a2442] border border-[#cedc28]/20 text-[#cedc28] hover:bg-[#cedc28]/10 transition-colors"
+              title="Download Chart as Image"
+            >
+              <Camera size={14} />
+            </button>
+          </div>
+
+          <div className="w-full h-[400px] mt-4 bg-[#0a2442]/30 rounded-xl p-4 border border-[#cedc28]/10" id="comparison-chart-container">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={relativeChartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#cedc28" opacity={0.1} vertical={false} />
+                <XAxis 
+                  dataKey="date" 
+                  stroke="#14a6d9" 
+                  tick={{ fill: '#14a6d9', fontSize: 10, fontWeight: 700 }}
+                  tickLine={false}
+                  axisLine={false}
+                  dy={10}
+                  interval="preserveStartEnd"
+                  minTickGap={30}
+                />
+                <YAxis 
+                  stroke="#14a6d9" 
+                  tick={{ fill: '#14a6d9', fontSize: 10, fontWeight: 700 }}
+                  tickLine={false}
+                  axisLine={false}
+                  dx={-10}
+                  tickFormatter={formatShort}
+                />
+                <RechartsTooltip 
+                  contentStyle={{ backgroundColor: '#0a2442', borderColor: '#cedc28', borderRadius: '12px', color: '#eef7f5', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.5)' }}
+                  itemStyle={{ fontWeight: 700, fontSize: '12px' }}
+                  labelStyle={{ color: '#14a6d9', fontWeight: 900, marginBottom: '8px', fontSize: '14px', borderBottom: '1px solid rgba(20, 166, 217, 0.2)', paddingBottom: '4px' }}
+                  formatter={(value, name) => [
+                    chartMetric === 'Spend' || chartMetric === 'CPA' || chartMetric === 'CPC' || chartMetric === 'CPM'
+                      ? `${exSym}${(value * exRate).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`
+                      : value.toLocaleString(),
+                    name.replace(`_${chartMetric}`, '')
+                  ]}
+                />
+                <Legend 
+                  wrapperStyle={{ paddingTop: '20px' }}
+                  iconType="circle"
+                />
+                {uniqueEvents.map((evt, i) => (
+                  <Line 
+                    key={evt}
+                    type="monotone"
+                    dataKey={`${evt}_${chartMetric}`}
+                    name={evt}
+                    stroke={COLORS[i % COLORS.length]}
+                    strokeWidth={3}
+                    dot={false}
+                    activeDot={{ r: 6, strokeWidth: 0 }}
+                    connectNulls={true}
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Comparison Data Table */}
+        <div className="card-surface backdrop-blur-2xl p-8 rounded-3xl border border-[#cedc28]/20 shadow-xl overflow-hidden mt-8">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-xl font-anton uppercase text-[#eef7f5] flex items-center gap-3">
+              <Layers className="text-[#cedc28]" /> Event Performance Summary
+            </h3>
+            <button
+              onClick={handleExportComparisonCSV}
+              className="px-3 py-2 flex items-center gap-2 rounded-lg bg-[#0a2442] border border-[#cedc28]/20 text-[#cedc28] hover:bg-[#cedc28]/10 transition-colors shadow-[0_0_10px_rgba(200,130,20,0.1)] text-xs font-bold"
+              title="Export Comparison to CSV"
+            >
+              <Download size={14} /> Export Table
+            </button>
+          </div>
+          <div className="overflow-x-auto rounded-xl border border-[#cedc28]/20 bg-[#0a2442]/50 custom-scrollbar">
+            <table className="w-full text-left border-collapse whitespace-nowrap">
+              <thead>
+                <tr className="bg-[#0a2442]/80 border-b border-[#cedc28]/20">
+                  <th className="px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest">Event</th>
+                  <th className="px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest">Launch Date</th>
+                  {userRole !== 'non-finance' && <th className="px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest text-right">Spend</th>}
+                  <th className="px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest text-right">Impressions</th>
+                  <th className="px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest text-right">Clicks</th>
+                  <th className="px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest text-right">CTR</th>
+                  {userRole !== 'non-finance' && <th className="px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest text-right">CPC</th>}
+                  {userRole !== 'non-finance' && <th className="px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest text-right">CPM</th>}
+                  <th className="px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest text-right">Conversions</th>
+                  <th className="px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest text-right">CR</th>
+                  {userRole !== 'non-finance' && <th className="px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest text-right">CPA</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {comparisonTableData.map((row, idx) => (
+                  <tr key={idx} className="border-b border-[#cedc28]/10 hover:bg-[#cedc28]/5 transition-colors">
+                    <td className="px-6 py-4 text-sm font-bold text-[#eef7f5]">{row.event}</td>
+                    <td className="px-6 py-4 text-sm font-bold text-[#14a6d9]">{row.startDate}</td>
+                    {userRole !== 'non-finance' && <td className="px-6 py-4 text-sm font-bold text-[#cedc28] text-right">{exSym}{(row.spend * exRate).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>}
+                    <td className="px-6 py-4 text-sm font-bold text-[#eef7f5] text-right">{row.impressions.toLocaleString()}</td>
+                    <td className="px-6 py-4 text-sm font-bold text-[#eef7f5] text-right">{row.clicks.toLocaleString()}</td>
+                    <td className="px-6 py-4 text-sm font-bold text-[#eef7f5] text-right">{row.ctr.toFixed(2)}%</td>
+                    {userRole !== 'non-finance' && <td className="px-6 py-4 text-sm font-bold text-[#eef7f5] text-right">{exSym}{(row.cpc * exRate).toFixed(2)}</td>}
+                    {userRole !== 'non-finance' && <td className="px-6 py-4 text-sm font-bold text-[#eef7f5] text-right">{exSym}{(row.cpm * exRate).toFixed(2)}</td>}
+                    <td className="px-6 py-4 text-sm font-bold text-[#10B981] text-right">{row.conversions.toLocaleString()}</td>
+                    <td className="px-6 py-4 text-sm font-bold text-[#eef7f5] text-right">{row.cr.toFixed(2)}%</td>
+                    {userRole !== 'non-finance' && <td className="px-6 py-4 text-sm font-bold text-[#10B981] text-right">{exSym}{(row.cpa * exRate).toFixed(2)}</td>}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col gap-8 w-full max-w-7xl mx-auto">
+    <div className="flex flex-col gap-8 w-full max-w-7xl mx-auto pb-12">
       {/* Top Controls */}
       {phases.length > 0 && (
         <div className="card-surface backdrop-blur-2xl p-6 rounded-3xl border border-[#cedc28]/20 shadow-xl flex flex-col gap-4 export-slide" data-title="Event Top Stats">
@@ -628,7 +936,7 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
                 <h4 className="text-sm font-bold text-[#14a6d9] uppercase tracking-widest">Daily Progress</h4>
                 <div className="flex items-center gap-2">
                   <div className="flex bg-[#0a2442] rounded-lg p-1 border border-[#cedc28]/20">
-                    {['Spend', 'Impressions', 'Clicks', 'CPM', 'CPC', 'Conversions'].filter(m => userRole !== 'non-finance' || (m !== 'Spend' && m !== 'CPM' && m !== 'CPC')).map(m => (
+                    {['Spend', 'Impressions', 'Clicks', 'CPM', 'CPC', 'Conversions', 'CPA'].filter(m => userRole !== 'non-finance' || (m !== 'Spend' && m !== 'CPM' && m !== 'CPC' && m !== 'CPA')).map(m => (
                       <button
                         key={m}
                         onClick={() => setChartMetric(m)}
@@ -723,7 +1031,7 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
                         name={p}
                         stroke={COLORS[idx % COLORS.length]} 
                         strokeWidth={3}
-                        dot={{ fill: '#0a2442', stroke: COLORS[idx % COLORS.length], strokeWidth: 2, r: 4 }}
+                        dot={false}
                         activeDot={{ r: 6, fill: COLORS[idx % COLORS.length], stroke: '#0a2442' }}
                       />
                     ))}
@@ -777,7 +1085,7 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-[#cedc28]/20">
-                  <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 rounded-tl-xl">Channel</th>
+                  <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 rounded-tl-xl">{selectedPhases.length > 0 ? 'Phase / Channel' : 'Channel'}</th>
                   {userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('Spend')) && <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">Spend</th>}
                   {(overallMetrics.includes('All') || overallMetrics.includes('Impressions')) && <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">Impressions</th>}
                   {(overallMetrics.includes('All') || overallMetrics.includes('Clicks')) && <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">Clicks</th>}
@@ -847,7 +1155,7 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="border-b border-[#cedc28]/20">
-                    <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 rounded-tl-xl">Channel</th>
+                    <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 rounded-tl-xl">{selectedPhases.length > 0 ? 'Phase / Channel' : 'Channel'}</th>
                     <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50">Buying Type</th>
                     <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">Planned Cost</th>
                     <th className="py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">Delivered Cost</th>

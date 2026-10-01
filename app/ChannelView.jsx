@@ -179,6 +179,11 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
         else if (trendMetric === 'impressions') val = d3.sum(chVals, d => d.impressions);
         else if (trendMetric === 'clicks') val = d3.sum(chVals, d => d.clicks);
         else if (trendMetric === 'views') val = d3.sum(chVals, d => d.videoViews);
+        else if (trendMetric === 'purchases') val = d3.sum(chVals, d => d.purchases || 0);
+        else if (trendMetric === 'cpa') {
+          const p = d3.sum(chVals, d => d.purchases || 0);
+          val = p > 0 ? (d3.sum(chVals, d => d.cost) * exRate) / p : 0;
+        }
         row[ch] = val;
       });
       return row;
@@ -457,6 +462,8 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
                 <option value="impressions">Impressions</option>
                 <option value="clicks">Clicks</option>
                 <option value="views">Video Views</option>
+                <option value="purchases">Conversions</option>
+                {userRole !== 'non-finance' && <option value="cpa">CPA</option>}
               </select>
               <button onClick={() => exportChart('comparison-trend-chart', 'comparison_trend')} className="p-1.5 rounded-lg bg-[#0a2442] border border-[#cedc28]/20 text-[#cedc28] hover:bg-[#cedc28]/10 transition-colors shadow-[0_0_10px_rgba(200,130,20,0.1)] text-xs font-bold" title="Export Image" data-html2canvas-ignore="true">
                 <Camera size={14} />
@@ -473,7 +480,7 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
                 <RechartsTooltip content={<TrendTooltip />} />
                 <Legend wrapperStyle={{ paddingTop: '20px' }} />
                 {activeChannels.map((ch, idx) => (
-                  <Line key={ch} type="monotone" dataKey={ch} name={ch} stroke={COLORS[idx % COLORS.length]} strokeWidth={3} dot={{r:4, fill: '#0C272D', strokeWidth: 2}} activeDot={{r:6}} />
+                  <Line key={ch} type="monotone" dataKey={ch} name={ch} stroke={COLORS[idx % COLORS.length]} strokeWidth={3} dot={false} activeDot={{r:6}} />
                 ))}
               </LineChart>
             </ResponsiveContainer>

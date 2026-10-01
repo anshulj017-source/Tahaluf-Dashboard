@@ -86,7 +86,7 @@ export default function CreativeView({ data, exRate = 1, exSym = '$', formatShor
   };
 
   const uniqueChannels = useMemo(() => Array.from(new Set(data.map(x => x.channel))).filter(Boolean).sort(), [data]);
-  const uniquePhases = useMemo(() => Array.from(new Set(data.map(x => x.eventNameDB))).filter(Boolean).sort(), [data]);
+  const uniquePhases = useMemo(() => Array.from(new Set(data.map(x => x.phase))).filter(Boolean).sort(), [data]);
 
   // Aggregate creative performance
   const creativeTabData = useMemo(() => {
@@ -95,7 +95,7 @@ export default function CreativeView({ data, exRate = 1, exSym = '$', formatShor
 
     const filtered = data.filter(d => {
       if (!filterChannels.includes('All') && !filterChannels.includes(d.channel)) return false;
-      if (!filterPhases.includes('All') && !filterPhases.includes(d.eventNameDB)) return false;
+      if (!filterPhases.includes('All') && !filterPhases.includes(d.phase)) return false;
       if (searchQuery) {
         const sq = searchQuery.toLowerCase();
         if (!(d.creativeName && d.creativeName.toLowerCase().includes(sq)) && !(d.adName && d.adName.toLowerCase().includes(sq))) {
@@ -117,9 +117,30 @@ export default function CreativeView({ data, exRate = 1, exSym = '$', formatShor
       const cpv = views > 0 ? cst / views : 0;
       const cpa = purch > 0 ? cst / purch : 0;
       const cr = clk > 0 ? purch / clk : 0;
-      const isLive = rows.some(r => r.dateObj && r.dateObj >= twoDaysAgo && r.cost > 0);
-      const status = isLive ? 'Live' : 'Paused';
+      const rowsWith10Imp = rows.filter(r => r.impressions >= 10 && r.dateObj && !isNaN(r.dateObj));
+      const rowsWithSpend = rows.filter(r => r.cost > 0 && r.dateObj && !isNaN(r.dateObj));
       
+      let startDateStr = 'N/A';
+      let endDateStr = 'N/A';
+      let status = 'Paused';
+      
+      if (rowsWith10Imp.length > 0) {
+        rowsWith10Imp.sort((a, b) => a.dateObj - b.dateObj);
+        const sd = rowsWith10Imp[0].dateObj;
+        startDateStr = `${sd.getDate()} ${sd.toLocaleString('en-US', { month: 'short' })} ${sd.getFullYear()}`;
+      }
+
+      const activeRows = rowsWithSpend.length > 0 ? rowsWithSpend : rowsWith10Imp;
+      if (activeRows.length > 0) {
+        activeRows.sort((a, b) => a.dateObj - b.dateObj);
+        const ed = activeRows[activeRows.length - 1].dateObj;
+        endDateStr = `${ed.getDate()} ${ed.toLocaleString('en-US', { month: 'short' })} ${ed.getFullYear()}`;
+        
+        if (ed >= twoDaysAgo) {
+          status = 'Live';
+        }
+      }
+
       return {
         adName,
         creativeName: rows[0].creativeName,
@@ -141,6 +162,8 @@ export default function CreativeView({ data, exRate = 1, exSym = '$', formatShor
         cpv,
         cpa,
         cr,
+        startDate: startDateStr,
+        endDate: endDateStr,
       };
     }).filter(c => filterStatuses.includes('All') || filterStatuses.includes(c.status))
     .sort((a,b) => {
@@ -339,6 +362,8 @@ export default function CreativeView({ data, exRate = 1, exSym = '$', formatShor
                     
                     <th className="px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest">Preview</th>
                     {renderSortHeader('Creative Name', 'creativeName')}
+                    <th className="px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest">Start Date</th>
+                    <th className="px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest">Last Served On</th>
                     {renderSortHeader('Status', 'status')}
                     {selectedMetrics.includes('Spend') && renderSortHeader('Spend', 'cost')}
                     {selectedMetrics.includes('Impressions') && renderSortHeader('Impr', 'impressions')}
@@ -382,6 +407,12 @@ export default function CreativeView({ data, exRate = 1, exSym = '$', formatShor
                        </td>
                        <td className="px-6 py-4 text-sm font-bold text-[#eef7f5] whitespace-normal break-words min-w-[200px] max-w-[400px]">
                           {c.creativeName}
+                       </td>
+                       <td className="px-6 py-4 text-xs font-medium text-[#eef7f5] whitespace-nowrap">
+                          {c.startDate}
+                       </td>
+                       <td className="px-6 py-4 text-xs font-medium text-[#eef7f5] whitespace-nowrap">
+                          {c.endDate}
                        </td>
                        <td className="px-6 py-4">
                           <span className={`px-2 py-1 text-[8px] font-black uppercase tracking-widest rounded-md ${c.status === 'Live' ? 'bg-[#74FA93]/20 text-[#cedc28]' : 'bg-gray-500/20 text-gray-400'}`}>

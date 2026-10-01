@@ -267,6 +267,10 @@ export default function MarketView({ adData, gaData, exRate = 1, exSym = '$', fo
                   else if (trendMetric === 'impressions') val = d3.sum(dayAd[1], d => d.impressions);
                   else if (trendMetric === 'clicks') val = d3.sum(dayAd[1], d => d.clicks);
                   else if (trendMetric === 'purchases') val = d3.sum(dayAd[1], d => d.purchases);
+                  else if (trendMetric === 'cpa') {
+                    const p = d3.sum(dayAd[1], d => d.purchases);
+                    val = p > 0 ? (d3.sum(dayAd[1], d => d.cost) * exRate) / p : 0;
+                  }
                }
             }
          }
@@ -496,6 +500,7 @@ export default function MarketView({ adData, gaData, exRate = 1, exSym = '$', fo
                   <option value="impressions">Impressions</option>
                   <option value="clicks">Clicks</option>
                   <option value="purchases">Conversions</option>
+                  {userRole !== 'non-finance' && <option value="cpa">CPA</option>}
                 </select>
                 <button onClick={() => exportChart('export-trend-chart', 'Daily_Comparison_Trend')} className="html2canvas-ignore p-2 rounded-full hover:bg-white/10 text-white/50 hover:text-white transition-colors" title="Export Chart">
                   <Camera className="w-4 h-4" />
@@ -536,6 +541,7 @@ export default function MarketView({ adData, gaData, exRate = 1, exSym = '$', fo
                     <option value="impressions">Impressions</option>
                     <option value="clicks">Clicks</option>
                     <option value="purchases">Conversions</option>
+                    {userRole !== 'non-finance' && <option value="cpa">CPA</option>}
                   </select>
                   <button onClick={() => exportChart('export-channel-split', 'Channel_Budget_Split')} className="html2canvas-ignore p-2 rounded-full hover:bg-white/10 text-white/50 hover:text-white transition-colors" title="Export Chart">
                     <Camera className="w-4 h-4" />

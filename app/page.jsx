@@ -344,9 +344,13 @@ export default function App() {
     const isMetaOrLinkedin = channel.toLowerCase().includes('meta') || channel.toLowerCase().includes('linkedin') || channel.toLowerCase().includes('fb') || channel.toLowerCase().includes('ig') || channel.toLowerCase().includes('facebook') || channel.toLowerCase().includes('instagram');
     
     const rowVals = Object.values(row);
-    const creativeName = isGoogle 
+    let creativeName = isGoogle 
         ? (rowVals[11] || row['Ad set name'] || 'Unknown') 
         : (rowVals[12] || row['Ad name'] || 'Unknown');
+        
+    if (eventNameDB.toUpperCase().includes('GSTS')) {
+        creativeName = row['Creative Name DB'] || rowVals[30] || creativeName;
+    }
         
     const previewLink = isMetaOrLinkedin ? (rowVals[14] || '') : '';
 
@@ -382,16 +386,18 @@ export default function App() {
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    // Fetch from GSTS (default gid), SAIF (gid=1196409184), and KoG 2026 (gid=1486784585) sheets
+    // Fetch from GSTS (default gid), SAIF (gid=1196409184), KoG 2026 (gid=1486784585), and Black Hat (gid=659941332) sheets
     Promise.all([
       d3.csv(BASE_URL),
       d3.csv(BASE_URL + '&gid=1196409184'),
-      d3.csv(BASE_URL + '&gid=1486784585')
-    ]).then(([gstsRaw, saifRaw, kogRaw]) => {
+      d3.csv(BASE_URL + '&gid=1486784585'),
+      d3.csv(BASE_URL + '&gid=659941332')
+    ]).then(([gstsRaw, saifRaw, kogRaw, blackHatRaw]) => {
       const gstsAds = gstsRaw.map(parseRow);
       const saifAds = saifRaw.map(parseRow);
       const kogAds = kogRaw.map(parseRow);
-      const combinedAds = [...gstsAds, ...saifAds, ...kogAds];
+      const blackHatAds = blackHatRaw.map(parseRow);
+      const combinedAds = [...gstsAds, ...saifAds, ...kogAds, ...blackHatAds];
 
       setAdData(combinedAds);
       setGaData([]);
@@ -1112,6 +1118,7 @@ export default function App() {
     if (activeTab === 'creative') {
       const filteredCreativeData = creativeData.filter(d => {
         if (!filterCampaigns.includes('All') && !filterCampaigns.includes(d.campaignName)) return false;
+        if (!filterEvents.includes('All') && !filterEvents.includes(d.eventNameDB)) return false;
         if (dateRange.start && d.date && d.date < new Date(dateRange.start)) return false;
         if (dateRange.end && d.date && d.date > new Date(dateRange.end)) return false;
         return true;
