@@ -366,7 +366,7 @@ export default function CustomView({ adData = [], exRate = 1, exSym = "$", forma
          if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
          return 0;
       });
-  }, [filteredData, tableDims]);
+  }, [filteredData, tableDims, sortConfig]);
 
   const exportCSV = () => {
      if (dynamicTableData.length === 0) return;
