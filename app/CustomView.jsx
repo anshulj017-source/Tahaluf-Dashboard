@@ -146,19 +146,22 @@ export default function CustomView({ adData = [], exRate = 1, exSym = "$", forma
   // Filters State
   const [fChannels, setFChannels] = useState([]);
   const [fMarkets, setFMarkets] = useState([]);
+  const [fPhases, setFPhases] = useState([]);
 
   // Extract distinct filter options
   const optChannels = useMemo(() => Array.from(new Set(enrichedData.map(d => d.channel).filter(Boolean))).sort(), [enrichedData]);
   const optMarkets = useMemo(() => Array.from(new Set(enrichedData.map(d => d.market).filter(Boolean))).sort(), [enrichedData]);
+  const optPhases = useMemo(() => Array.from(new Set(enrichedData.map(d => d.phase).filter(Boolean))).sort(), [enrichedData]);
 
   // Apply filters
   const filteredData = useMemo(() => {
     return enrichedData.filter(d => {
        const mChan = fChannels.length === 0 || fChannels.includes(d.channel);
        const mMarket = fMarkets.length === 0 || fMarkets.includes(d.market);
-       return mChan && mMarket;
+       const mPhase = fPhases.length === 0 || fPhases.includes(d.phase);
+       return mChan && mMarket && mPhase;
     });
-  }, [enrichedData, fChannels, fMarkets]);
+  }, [enrichedData, fChannels, fMarkets, fPhases]);
 
   const AVAILABLE_METRICS = useMemo(() => {
     const base = [
@@ -427,6 +430,7 @@ export default function CustomView({ adData = [], exRate = 1, exSym = "$", forma
         </div>
         
         <div className="flex flex-wrap gap-4 items-center w-full xl:w-auto relative z-50">
+           <MultiSelectDropdown label="Event Phase" options={optPhases} selected={fPhases} onChange={setFPhases} />
            <MultiSelectDropdown label="Market" options={optMarkets} selected={fMarkets} onChange={setFMarkets} />
            <MultiSelectDropdown label="Channel" options={optChannels} selected={fChannels} onChange={setFChannels} />
         </div>
