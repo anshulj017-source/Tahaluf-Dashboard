@@ -386,6 +386,7 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
       if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
       return 0;
     });
+    return grouped;
   }, [campaignData, selectedPhases, selectedChannels, sortConfig]);
 
   // Calculate planned table data based on selections
@@ -477,6 +478,7 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
       if (valA > valB) return plannedSortConfig.direction === 'asc' ? 1 : -1;
       return 0;
     });
+    return combined;
   }, [campaignData, plannedData, selectedPhases, selectedChannels, filterMarkets, plannedSortConfig]);
 
 
