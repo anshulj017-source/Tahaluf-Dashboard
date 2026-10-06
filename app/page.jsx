@@ -298,6 +298,13 @@ export default function App() {
   }, [userRole, perfMetric]);
 
   useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      setIsAuthenticated(true);
+      setUserRole('admin');
+      setIsAuthLoading(false);
+      return;
+    }
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         setIsAuthenticated(true);
