@@ -67,7 +67,7 @@ export default function CreativeView({ data, exRate = 1, exSym = '$', formatShor
   const [filterChannels, setFilterChannels] = useState(['All']);
   const [filterStatuses, setFilterStatuses] = useState(['All']);
   const [filterPhases, setFilterPhases] = useState(['All']);
-  const availableMetrics = userRole === 'non-finance' ? ['Impressions', 'Clicks', 'CTR', 'Views', 'Conversions', 'CR'] : ['Spend', 'Impressions', 'Clicks', 'CTR', 'CPC', 'Views', 'Conversions', 'CPA', 'CR'];
+  const availableMetrics = userRole === 'non-finance' ? ['Impressions', 'Clicks', 'CTR', 'Views', 'Conversions', 'CVR'] : ['Spend', 'Impressions', 'Clicks', 'CTR', 'CPC', 'Views', 'Conversions', 'CPA', 'CVR'];
   const [selectedMetrics, setSelectedMetrics] = useState(availableMetrics);
 
   const [sortConfig, setSortConfig] = useState({ key: 'cost', direction: 'desc' });
@@ -334,7 +334,7 @@ export default function CreativeView({ data, exRate = 1, exSym = '$', formatShor
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8 border-b border-[#cedc28]/20 pb-6 relative z-[60]">
         <MultiSelectDropdown label="Channel" options={uniqueChannels} selected={filterChannels} onChange={setFilterChannels} />
-        <MultiSelectDropdown label="Event Phase" options={uniquePhases} selected={filterPhases} onChange={setFilterPhases} />
+        <MultiSelectDropdown label="Funnel Stage" options={uniquePhases} selected={filterPhases} onChange={setFilterPhases} />
         <MultiSelectDropdown label="Status" options={['Live', 'Paused']} selected={filterStatuses} onChange={setFilterStatuses} />
       </div>
 
@@ -373,7 +373,7 @@ export default function CreativeView({ data, exRate = 1, exSym = '$', formatShor
                     {selectedMetrics.includes('Views') && renderSortHeader('Views', 'views')}
                     {selectedMetrics.includes('Conversions') && renderSortHeader('Conversions', 'purchases')}
                     {selectedMetrics.includes('CPA') && renderSortHeader('CPA', 'cpa')}
-                    {selectedMetrics.includes('CR') && renderSortHeader('CR', 'cr')}
+                    {selectedMetrics.includes('CVR') && renderSortHeader('CVR', 'cr')}
 
                  </tr>
               </thead>
@@ -427,7 +427,7 @@ export default function CreativeView({ data, exRate = 1, exSym = '$', formatShor
                        {selectedMetrics.includes('Views') && <td className="px-6 py-4 text-sm font-bold text-amber-400 whitespace-nowrap">{formatShort(c.views)}</td>}
                        {selectedMetrics.includes('Conversions') && <td className="px-6 py-4 text-sm font-bold text-[#74FA93] whitespace-nowrap">{formatShort(c.purchases)}</td>}
                        {selectedMetrics.includes('CPA') && <td className="px-6 py-4 text-sm font-medium text-[#eef7f5] whitespace-nowrap">{exSym}{d3.format(",.2f")(c.cpa * exRate)}</td>}
-                       {selectedMetrics.includes('CR') && <td className="px-6 py-4 text-sm font-medium text-[#eef7f5] whitespace-nowrap">{(c.cr * 100).toFixed(2)}%</td>}
+                       {selectedMetrics.includes('CVR') && <td className="px-6 py-4 text-sm font-medium text-[#eef7f5] whitespace-nowrap">{(c.cr * 100).toFixed(2)}%</td>}
 
                     </tr>
                  ))}

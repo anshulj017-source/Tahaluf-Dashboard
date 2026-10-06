@@ -170,7 +170,7 @@ export default function CustomView({ adData = [], exRate = 1, exSym = "$", forma
       { key: 'clicks', label: 'Clicks', format: v => d3.format(",")((v||0)) },
       { key: 'purchases', label: 'Conversions', format: v => d3.format(",")((v||0)) },
       { key: 'cpa', label: 'CPA', format: v => `${exSym}${d3.format(",.2f")((v||0) * exRate)}` },
-      { key: 'cr', label: 'CR', format: v => `${(v||0).toFixed(2)}%` },
+      { key: 'cr', label: 'CVR', format: v => `${(v||0).toFixed(2)}%` },
       { key: 'videoViews', label: 'Video Views', format: v => formatShort(v||0) },
       { key: 'videoViews6s', label: '6s Views', format: v => formatShort(v||0) },
       { key: 'videoViews15s', label: '15s Views', format: v => formatShort(v||0) },
@@ -193,7 +193,7 @@ export default function CustomView({ adData = [], exRate = 1, exSym = "$", forma
     { key: 'market', label: 'Market' },
     { key: 'campaignName', label: 'Campaign' },
     { key: 'channel', label: 'Channel' },
-    { key: 'phase', label: 'Event Phase' }
+    { key: 'phase', label: 'Funnel Stage' }
   ];
   
   const PIE_DIMENSIONS = DIMENSIONS.filter(d => d.key !== 'date' && d.key !== 'week' && d.key !== 'campaignName');
@@ -430,7 +430,7 @@ export default function CustomView({ adData = [], exRate = 1, exSym = "$", forma
         </div>
         
         <div className="flex flex-wrap gap-4 items-center w-full xl:w-auto relative z-50">
-           <MultiSelectDropdown label="Event Phase" options={optPhases} selected={fPhases} onChange={setFPhases} />
+           <MultiSelectDropdown label="Funnel Stage" options={optPhases} selected={fPhases} onChange={setFPhases} />
            <MultiSelectDropdown label="Market" options={optMarkets} selected={fMarkets} onChange={setFMarkets} />
            <MultiSelectDropdown label="Channel" options={optChannels} selected={fChannels} onChange={setFChannels} />
         </div>

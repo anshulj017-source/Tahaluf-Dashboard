@@ -114,7 +114,7 @@ export default function MarketView({ adData, gaData, exRate = 1, exSym = '$', fo
 
   const handleExportDetailedMetrics = () => {
     try {
-      let csvContent = "data:text/csv;charset=utf-8,Event Phase,Market,";
+      let csvContent = "data:text/csv;charset=utf-8,Funnel Stage,Market,";
       const metricsToExport = AVAILABLE_METRICS.filter(m => selectedMetrics.includes(m.key));
       csvContent += metricsToExport.map(m => m.label).join(",") + "\n";
       
@@ -146,7 +146,7 @@ export default function MarketView({ adData, gaData, exRate = 1, exSym = '$', fo
       { key: 'clicks', label: 'Clicks', format: v => d3.format(",")(v) },
       { key: 'purchases', label: 'Conversions', format: v => d3.format(",")(v) },
       { key: 'cpa', label: 'CPA', format: v => `${exSym}${d3.format(",.2f")(v * exRate)}` },
-      { key: 'cr', label: 'CR', format: v => `${v.toFixed(2)}%` },
+      { key: 'cr', label: 'CVR', format: v => `${v.toFixed(2)}%` },
       { key: 'views', label: 'Video Views', format: v => d3.format(",")(v) },
       { key: 'views6s', label: '6s Views', format: v => d3.format(",")(v) },
       { key: 'views15s', label: '15s Views', format: v => d3.format(",")(v) },
@@ -624,7 +624,7 @@ export default function MarketView({ adData, gaData, exRate = 1, exSym = '$', fo
           {/* TOURNAMENT DATA TABLE */}
           <div id="export-detailed-metrics" className="card-surface backdrop-blur-2xl border border-[#cedc28]/20 rounded-3xl p-6 overflow-hidden export-slide" data-title="Detailed Market Metrics">
              <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 gap-4">
-               <h3 className="text-lg font-bold text-white flex items-center gap-2">Detailed Event Phase Metrics</h3>
+               <h3 className="text-lg font-bold text-white flex items-center gap-2">Detailed Funnel Stage Metrics</h3>
                <div className="flex items-center gap-4">
                  <div className="html2canvas-ignore">
                    <MetricMultiSelectDropdown 
@@ -646,7 +646,7 @@ export default function MarketView({ adData, gaData, exRate = 1, exSym = '$', fo
                 <table className="w-full text-left border-collapse whitespace-nowrap">
                   <thead>
                     <tr className="border-b-2 border-[#cedc28]/30">
-                      <th onClick={() => handleSort('event')} className="cursor-pointer px-4 py-3 text-xs font-bold text-[#14a6d9] uppercase tracking-wider sticky left-0 bg-[#0a2442] z-10">Event Phase {sortConfig?.key === 'event' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>
+                      <th onClick={() => handleSort('event')} className="cursor-pointer px-4 py-3 text-xs font-bold text-[#14a6d9] uppercase tracking-wider sticky left-0 bg-[#0a2442] z-10">Funnel Stage {sortConfig?.key === 'event' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>
                       <th onClick={() => handleSort('market')} className="cursor-pointer px-4 py-3 text-xs font-bold text-[#14a6d9] uppercase tracking-wider">Market {sortConfig?.key === 'market' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>
                       {AVAILABLE_METRICS.filter(m => selectedMetrics.includes(m.key)).map(m => (
                          <th onClick={() => handleSort(m.key)} key={m.key} className="cursor-pointer px-4 py-3 text-xs font-bold text-[#14a6d9] uppercase tracking-wider text-right">{m.label} {sortConfig?.key === m.key ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>
