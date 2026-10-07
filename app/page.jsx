@@ -1729,6 +1729,10 @@ export default function App() {
         </main>
         )}
       </div>
+      <div className="fixed bottom-4 right-4 z-[999] text-white/30 flex items-center gap-1 opacity-50 hover:opacity-100 transition-opacity bg-black/40 px-2 py-1 rounded-full border border-white/10 backdrop-blur-sm">
+        <Check className="w-3.5 h-3.5 text-[#cedc28]" />
+        <span className="text-[9px] font-bold tracking-widest uppercase">V1</span>
+      </div>
     </div>
   );
 }
