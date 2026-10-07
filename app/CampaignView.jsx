@@ -58,7 +58,7 @@ const MetricMultiSelectDropdown = ({ options, selected, onChange }) => {
   );
 };
 
-export default function CampaignView({ adData, plannedData = [], exRate = 1, exSym = '$', formatShort = (v) => v, userRole, filterMarkets }) {
+export default function CampaignView({ adData, plannedData = [], exRate = 1, exSym = '$', formatShort = (v) => v, userRole, filterMarkets, filterEvents = ['All'] }) {
   const [selectedPhases, setSelectedPhases] = useState([]);
   const [selectedChannels, setSelectedChannels] = useState({}); // { phaseName: [channelNames] }
   const [viewMode, setViewMode] = useState('overall'); // 'overall' or 'planned'
@@ -496,7 +496,7 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
       if (overallMetrics.includes('All') || overallMetrics.includes('Completed Views')) headers.push('Completed Views');
       if (overallMetrics.includes('All') || overallMetrics.includes('Conversions')) headers.push('Conversions');
       if (userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPA'))) headers.push('CPA');
-      if (overallMetrics.includes('All') || overallMetrics.includes('CR')) headers.push('CR');
+      if (overallMetrics.includes('All') || overallMetrics.includes('CVR')) headers.push('CVR');
       if (overallMetrics.includes('All') || overallMetrics.includes('CTR')) headers.push('CTR');
       if (userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPM'))) headers.push('CPM');
       if (userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPC'))) headers.push('CPC');
@@ -513,7 +513,7 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
         if (overallMetrics.includes('All') || overallMetrics.includes('Completed Views')) rowData.push(row.completions);
         if (overallMetrics.includes('All') || overallMetrics.includes('Conversions')) rowData.push(row.conversions);
         if (userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPA'))) rowData.push((row.cpa * exRate).toFixed(2));
-        if (overallMetrics.includes('All') || overallMetrics.includes('CR')) rowData.push(row.cr.toFixed(2) + '%');
+        if (overallMetrics.includes('All') || overallMetrics.includes('CVR')) rowData.push(row.cr.toFixed(2) + '%');
         if (overallMetrics.includes('All') || overallMetrics.includes('CTR')) rowData.push(row.ctr.toFixed(2) + '%');
         if (userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPM'))) rowData.push((row.cpm * exRate).toFixed(2));
         if (userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPC'))) rowData.push((row.cpc * exRate).toFixed(2));
@@ -544,7 +544,7 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
         if (overallMetrics.includes('All') || overallMetrics.includes('Completed Views')) totalsRow.push(tCompletions);
         if (overallMetrics.includes('All') || overallMetrics.includes('Conversions')) totalsRow.push(tConversions);
         if (userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPA'))) totalsRow.push((tCpa * exRate).toFixed(2));
-        if (overallMetrics.includes('All') || overallMetrics.includes('CR')) totalsRow.push(tCr.toFixed(2) + '%');
+        if (overallMetrics.includes('All') || overallMetrics.includes('CVR')) totalsRow.push(tCr.toFixed(2) + '%');
         if (overallMetrics.includes('All') || overallMetrics.includes('CTR')) totalsRow.push(tCtr.toFixed(2) + '%');
         if (userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPM'))) totalsRow.push((tCpm * exRate).toFixed(2));
         if (userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPC'))) totalsRow.push((tCpc * exRate).toFixed(2));
@@ -606,7 +606,7 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
     if (userRole !== 'non-finance') headers.push('Spend');
     headers.push('Impressions', 'Clicks', 'CTR');
     if (userRole !== 'non-finance') headers.push('CPC', 'CPM');
-    headers.push('Conversions', 'CR');
+    headers.push('Conversions', 'CVR');
     if (userRole !== 'non-finance') headers.push('CPA');
     csvContent += headers.join(",") + "\r\n";
     
@@ -630,6 +630,16 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
     link.click();
     document.body.removeChild(link);
   };
+
+  if (filterEvents.includes('All')) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] w-full max-w-7xl mx-auto card-surface backdrop-blur-2xl p-8 rounded-3xl border border-[#cedc28]/20 shadow-xl gap-4">
+        <Activity size={48} className="text-[#14a6d9] opacity-50" />
+        <h2 className="text-xl font-bold text-[#eef7f5]">Select an event to see details</h2>
+        <p className="text-sm text-[#14a6d9]">Or select more than one event to compare them.</p>
+      </div>
+    );
+  }
 
   if (uniqueEvents.length > 1) {
     return (
@@ -775,7 +785,7 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
                   {userRole !== 'non-finance' && <th onClick={() => handleComparisonSort('cpc')} className="cursor-pointer px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest text-right">CPC {comparisonSortConfig?.key === 'cpc' ? (comparisonSortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>}
                   {userRole !== 'non-finance' && <th onClick={() => handleComparisonSort('cpm')} className="cursor-pointer px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest text-right">CPM {comparisonSortConfig?.key === 'cpm' ? (comparisonSortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>}
                   <th onClick={() => handleComparisonSort('conversions')} className="cursor-pointer px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest text-right">Conversions {comparisonSortConfig?.key === 'conversions' ? (comparisonSortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>
-                  <th onClick={() => handleComparisonSort('cr')} className="cursor-pointer px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest text-right">CR {comparisonSortConfig?.key === 'cr' ? (comparisonSortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>
+                  <th onClick={() => handleComparisonSort('cr')} className="cursor-pointer px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest text-right">CVR {comparisonSortConfig?.key === 'cr' ? (comparisonSortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>
                   {userRole !== 'non-finance' && <th onClick={() => handleComparisonSort('cpa')} className="cursor-pointer px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest text-right">CPA {comparisonSortConfig?.key === 'cpa' ? (comparisonSortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>}
                 </tr>
               </thead>
@@ -1121,7 +1131,7 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
               />
             ) : (
               <MetricMultiSelectDropdown
-                options={['Spend', 'Impressions', 'Clicks', 'Video Views', 'Completed Views', 'Conversions', 'CPA', 'CR', 'CTR', 'CPM', 'CPC', 'CPV']}
+                options={['Spend', 'Impressions', 'Clicks', 'Video Views', 'Completed Views', 'Conversions', 'CPA', 'CVR', 'CTR', 'CPM', 'CPC', 'CPV']}
                 selected={overallMetrics}
                 onChange={setOverallMetrics}
               />
@@ -1141,7 +1151,7 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
                   {(overallMetrics.includes('All') || overallMetrics.includes('Completed Views')) && <th onClick={() => handleSort('completions')} className="cursor-pointer py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">Completed Views {sortConfig?.key === 'completions' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>}
                   {(overallMetrics.includes('All') || overallMetrics.includes('Conversions')) && <th onClick={() => handleSort('conversions')} className="cursor-pointer py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">Conversions {sortConfig?.key === 'conversions' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>}
                   {userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPA')) && <th onClick={() => handleSort('cpa')} className="cursor-pointer py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">CPA {sortConfig?.key === 'cpa' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>}
-                  {(overallMetrics.includes('All') || overallMetrics.includes('CR')) && <th onClick={() => handleSort('cr')} className="cursor-pointer py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">CR {sortConfig?.key === 'cr' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>}
+                  {(overallMetrics.includes('All') || overallMetrics.includes('CVR')) && <th onClick={() => handleSort('cr')} className="cursor-pointer py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">CVR {sortConfig?.key === 'cr' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>}
                   {(overallMetrics.includes('All') || overallMetrics.includes('CTR')) && <th onClick={() => handleSort('ctr')} className={`cursor-pointer py-4 px-4 text-[10px] font-black text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right ${userRole === 'non-finance' ? 'rounded-tr-xl' : ''}`}>CTR {sortConfig?.key === 'ctr' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>}
                   {userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPM')) && <th onClick={() => handleSort('cpm')} className="cursor-pointer py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">CPM {sortConfig?.key === 'cpm' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>}
                   {userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPC')) && <th onClick={() => handleSort('cpc')} className="cursor-pointer py-4 px-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest bg-[#0a2442]/50 text-right">CPC {sortConfig?.key === 'cpc' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>}
@@ -1159,7 +1169,7 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
                     {(overallMetrics.includes('All') || overallMetrics.includes('Completed Views')) && <td className="py-4 px-4 text-sm font-medium text-white text-right">{formatShort(row.completions)}</td>}
                     {(overallMetrics.includes('All') || overallMetrics.includes('Conversions')) && <td className="py-4 px-4 text-sm font-medium text-white text-right">{d3.format(",")(row.conversions)}</td>}
                     {userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPA')) && <td className="py-4 px-4 text-sm font-medium text-white text-right">{exSym}{d3.format(",.2f")(row.cpa * exRate)}</td>}
-                    {(overallMetrics.includes('All') || overallMetrics.includes('CR')) && <td className="py-4 px-4 text-sm font-medium text-white text-right">{row.cr.toFixed(2)}%</td>}
+                    {(overallMetrics.includes('All') || overallMetrics.includes('CVR')) && <td className="py-4 px-4 text-sm font-medium text-white text-right">{row.cr.toFixed(2)}%</td>}
                     {(overallMetrics.includes('All') || overallMetrics.includes('CTR')) && <td className="py-4 px-4 text-sm font-bold text-white text-right">{row.ctr.toFixed(2)}%</td>}
                     {userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPM')) && <td className="py-4 px-4 text-sm font-medium text-white text-right">{exSym}{d3.format(",.2f")(row.cpm * exRate)}</td>}
                     {userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPC')) && <td className="py-4 px-4 text-sm font-medium text-white text-right">{exSym}{d3.format(",.2f")(row.cpc * exRate)}</td>}
@@ -1189,7 +1199,7 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
                       {(overallMetrics.includes('All') || overallMetrics.includes('Completed Views')) && <td className="py-4 px-4 text-sm font-bold text-[#cedc28] text-right">{formatShort(tCompletions)}</td>}
                       {(overallMetrics.includes('All') || overallMetrics.includes('Conversions')) && <td className="py-4 px-4 text-sm font-bold text-[#cedc28] text-right">{d3.format(",")(tConversions)}</td>}
                       {userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPA')) && <td className="py-4 px-4 text-sm font-bold text-[#cedc28] text-right">{exSym}{d3.format(",.2f")(tCpa * exRate)}</td>}
-                      {(overallMetrics.includes('All') || overallMetrics.includes('CR')) && <td className="py-4 px-4 text-sm font-bold text-[#cedc28] text-right">{tCr.toFixed(2)}%</td>}
+                      {(overallMetrics.includes('All') || overallMetrics.includes('CVR')) && <td className="py-4 px-4 text-sm font-bold text-[#cedc28] text-right">{tCr.toFixed(2)}%</td>}
                       {(overallMetrics.includes('All') || overallMetrics.includes('CTR')) && <td className="py-4 px-4 text-sm font-bold text-[#cedc28] text-right">{tCtr.toFixed(2)}%</td>}
                       {userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPM')) && <td className="py-4 px-4 text-sm font-bold text-[#cedc28] text-right">{exSym}{d3.format(",.2f")(tCpm * exRate)}</td>}
                       {userRole !== 'non-finance' && (overallMetrics.includes('All') || overallMetrics.includes('CPC')) && <td className="py-4 px-4 text-sm font-bold text-[#cedc28] text-right">{exSym}{d3.format(",.2f")(tCpc * exRate)}</td>}

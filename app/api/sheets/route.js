@@ -29,10 +29,17 @@ export async function GET(request) {
   }
 
   try {
-    const response = await fetch(url, { next: { revalidate: 60 } }); // Cache for 60 seconds
+    let response = await fetch(url, { next: { revalidate: 60 } }); // Cache for 60 seconds
     if (!response.ok) throw new Error('Failed to fetch from Google Sheets');
     
-    const text = await response.text();
+    let text = await response.text();
+
+    if (text.startsWith('Loading...')) {
+      console.log(`Google Sheets returned Loading... Retrying without cache for ${url}`);
+      response = await fetch(url, { cache: 'no-store' });
+      if (!response.ok) throw new Error('Failed to fetch from Google Sheets on retry');
+      text = await response.text();
+    }
     
     return new NextResponse(text, {
       status: 200,

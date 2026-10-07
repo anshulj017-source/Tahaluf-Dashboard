@@ -84,15 +84,15 @@ const normalizeMarket = (marketName) => {
 
 // --- COMPONENTS ---
 const MetricCard = ({ label, value, color, icon: Icon, definition }) => (
-  <div className="card-surface backdrop-blur-2xl p-6 rounded-2xl border border-[#cedc28]/20 shadow-lg relative overflow-hidden group hover:-translate-y-1 transition-transform">
-    <div className="absolute top-0 right-0 w-24 h-24 bg-[#cedc28]/10 rounded-full blur-2xl -mr-8 -mt-8 group-hover:bg-[#cedc28]/20 transition-colors duration-500"></div>
+  <div className="card-surface backdrop-blur-2xl p-4 rounded-xl border border-[#cedc28]/20 shadow-md relative overflow-hidden group hover:-translate-y-1 transition-transform">
+    <div className="absolute top-0 right-0 w-16 h-16 bg-[#cedc28]/10 rounded-full blur-xl -mr-4 -mt-4 group-hover:bg-[#cedc28]/20 transition-colors duration-500"></div>
     <div className="flex justify-between items-start relative z-10">
       <div>
-        <div className="flex items-center gap-2 mb-2">
-          <p className="text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest">{label}</p>
+        <div className="flex items-center gap-1.5 mb-1.5">
+          <p className="text-[9px] font-bold text-[#14a6d9] uppercase tracking-wider">{label}</p>
 
         </div>
-        <h3 className={`text-2xl font-black ${color} truncate`} title={value}>{value}</h3>
+        <h3 className={`text-xl font-black ${color} truncate`} title={value}>{value}</h3>
       </div>
     </div>
   </div>
@@ -120,7 +120,7 @@ const DateRangeFilter = ({ label, dateRange, onChange }) => {
   };
 
   return (
-    <div ref={wrapperRef} className="relative w-[180px] z-30">
+    <div ref={wrapperRef} className="relative w-[140px] xl:w-[150px] shrink-0 z-30">
       <span className="text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest mb-1.5 block">{label}</span>
       <div 
         onClick={() => setIsOpen(!isOpen)}
@@ -173,11 +173,11 @@ const MultiSelect = ({ label, options, selected, onChange }) => {
   }, []);
 
   return (
-    <div ref={wrapperRef} className="relative w-[160px] z-30">
+    <div ref={wrapperRef} className="relative w-[120px] xl:w-[130px] shrink-0 z-30">
       <span className="text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest mb-1.5 block">{label}</span>
       <div 
         onClick={() => setIsOpen(!isOpen)}
-        className="px-2.5 py-1.5 surface-inset border border-[#cedc28]/30 rounded-lg text-xs font-bold text-[#eef7f5] cursor-pointer flex justify-between items-center hover:border-[#cedc28] transition-colors"
+        className="px-2.5 py-1.5 surface-inset border border-[#cedc28]/30 rounded-lg text-[10px] font-bold text-[#eef7f5] cursor-pointer flex justify-between items-center hover:border-[#cedc28] transition-colors"
       >
         <span className="truncate pr-2">{selected.includes('All') ? 'All Selected' : selected.join(', ')}</span>
         <ChevronDown className={`w-4 h-4 flex-shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
@@ -187,11 +187,11 @@ const MultiSelect = ({ label, options, selected, onChange }) => {
           <div className="w-full mt-2 card-surface backdrop-blur-3xl bg-[#0a2442]/90 border border-[#cedc28]/30 rounded-xl shadow-2xl flex flex-col max-h-64 overflow-hidden">
             <div className="p-2 border-b border-[#cedc28]/10 relative">
               <Search className="w-4 h-4 text-[#14a6d9] absolute left-4 top-1/2 -translate-y-1/2" />
-              <input type="text" placeholder="Search..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full bg-black/30 text-[#eef7f5] text-xs font-bold pl-9 pr-3 py-2 rounded-lg outline-none border border-transparent focus:border-[#cedc28]/50" />
+              <input type="text" placeholder="Search..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full bg-black/30 text-[#eef7f5] text-[10px] font-bold pl-9 pr-3 py-2 rounded-lg outline-none border border-transparent focus:border-[#cedc28]/50" />
             </div>
             <div className="overflow-y-auto p-2 flex-1 custom-scrollbar">
-              <div onClick={() => { onChange(['All']); setIsOpen(false); setSearchTerm(''); }} className={`px-3 py-2 rounded-lg text-sm font-bold cursor-pointer flex justify-between ${selected.includes('All') ? 'bg-[#cedc28]/20 text-[#cedc28]' : 'text-[#eef7f5] hover:bg-[#0a2442]'}`}>
-                All <Check className={`w-4 h-4 ${selected.includes('All') ? 'opacity-100' : 'opacity-0'}`} />
+              <div onClick={() => { onChange(['All']); setIsOpen(false); setSearchTerm(''); }} className={`px-3 py-2 rounded-lg text-[11px] font-bold cursor-pointer flex justify-between ${selected.includes('All') ? 'bg-[#cedc28]/20 text-[#cedc28]' : 'text-[#eef7f5] hover:bg-[#0a2442]'}`}>
+                All <Check className={`w-3.5 h-3.5 ${selected.includes('All') ? 'opacity-100' : 'opacity-0'}`} />
               </div>
               {filtered.map(opt => {
                 const isSel = selected.includes(opt);
@@ -204,8 +204,8 @@ const MultiSelect = ({ label, options, selected, onChange }) => {
                       if (next.length === 0) next = ['All'];
                     } else { next.push(opt); }
                     onChange(next);
-                  }} className={`px-3 py-2 mt-1 rounded-lg text-sm font-bold cursor-pointer flex justify-between ${isSel ? 'bg-[#cedc28]/20 text-[#cedc28]' : 'text-[#eef7f5] hover:bg-[#0a2442]'}`}>
-                    <span className="truncate pr-2">{opt}</span> <Check className={`w-4 h-4 flex-shrink-0 ${isSel ? 'opacity-100' : 'opacity-0'}`} />
+                  }} className={`px-3 py-2 mt-1 rounded-lg text-[11px] font-bold cursor-pointer flex justify-between ${isSel ? 'bg-[#cedc28]/20 text-[#cedc28]' : 'text-[#eef7f5] hover:bg-[#0a2442]'}`}>
+                    <span className="truncate pr-2">{opt}</span> <Check className={`w-3.5 h-3.5 flex-shrink-0 ${isSel ? 'opacity-100' : 'opacity-0'}`} />
                   </div>
                 )
               })}
@@ -217,42 +217,252 @@ const MultiSelect = ({ label, options, selected, onChange }) => {
   );
 };
 
-const DataTable = ({ data, columns, totals }) => (
-  <div className="overflow-x-auto card-surface rounded-2xl border border-[#cedc28]/20 z-10 relative">
-    <table className="w-full text-left border-collapse">
-      <thead>
-        <tr className="bg-black/25 border-b border-[#cedc28]/20">
-          {columns.map((col, i) => (
-            <th key={i} className="px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest whitespace-nowrap">{col.label}</th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {data.map((row, i) => (
-          <tr key={i} className="border-b border-[#cedc28]/10 hover:bg-[#cedc28]/5 transition-colors">
-            {columns.map((col, j) => (
-              <td key={j} className="px-6 py-4 text-sm font-medium text-[#eef7f5] whitespace-nowrap">
-                {col.format ? col.format(row[col.key], row) : row[col.key]}
-              </td>
-            ))}
-          </tr>
-        ))}
-        {totals && data.length > 0 && (
-          <tr className="bg-black/40 border-t-2 border-[#cedc28]/50">
-            {columns.map((col, j) => (
-              <td key={j} className="px-6 py-4 text-sm font-bold text-[#cedc28] whitespace-nowrap">
-                {totals[col.key] !== undefined 
-                  ? (col.format ? col.format(totals[col.key], totals) : totals[col.key])
-                  : ''}
-              </td>
-            ))}
-          </tr>
-        )}
-        {data.length === 0 && <tr><td colSpan={columns.length} className="px-6 py-8 text-center text-[#14a6d9] text-sm">No data available</td></tr>}
-      </tbody>
-    </table>
+const DataTable = ({ title, data, columns, totals, onRowClick, selectedRowId, rowKey, showBars = false, allowColumnSelect = false }) => {
+  const [selectedLabels, setSelectedLabels] = useState(columns.slice(1).map(c => c.label));
+  
+  const activeColumns = allowColumnSelect 
+    ? columns.filter((c, i) => i === 0 || selectedLabels.includes(c.label) || selectedLabels.includes('All'))
+    : columns;
+
+  const maxValues = {};
+  if (showBars && data.length > 0) {
+    activeColumns.forEach(col => {
+      if (col.key !== columns[0].key) {
+        maxValues[col.key] = Math.max(...data.map(r => r[col.key] || 0));
+      }
+    });
+  }
+
+  const exportCSV = () => {
+    let csvContent = "";
+    const headerRow = activeColumns.map(c => `"${c.label}"`).join(",");
+    csvContent += headerRow + "\r\n";
+    
+    data.forEach(row => {
+      const rowData = activeColumns.map(c => {
+         let val = row[c.key];
+         if (val === undefined || val === null) val = '';
+         if (typeof val === 'number') val = Math.round(val * 100) / 100;
+         if (typeof val === 'string') val = val.replace(/"/g, '""');
+         return `"${val}"`;
+      });
+      csvContent += rowData.join(",") + "\r\n";
+    });
+    
+    if (totals && data.length > 0) {
+      const totalsRow = activeColumns.map(c => {
+         let val = totals[c.key] !== undefined ? totals[c.key] : '';
+         if (typeof val === 'number') val = Math.round(val * 100) / 100;
+         if (typeof val === 'string') val = val.replace(/"/g, '""');
+         return `"${val}"`;
+      });
+      csvContent += totalsRow.join(",") + "\r\n";
+    }
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `${title ? String(title).replace(/\s+/g, '_') : 'export'}_data.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 100);
+  };
+
+  return (
+    <div className="flex flex-col gap-3">
+      {(title || allowColumnSelect) && (
+        <div className={`flex justify-between items-end relative z-20 ${!title ? 'justify-end' : ''}`}>
+          {title ? <h3 className="text-[#eef7f5] font-bold mb-1">{title}</h3> : <div />}
+          <div className="flex items-end gap-3">
+            <button 
+              onClick={exportCSV}
+              title="Export as CSV"
+              className="p-1.5 flex items-center justify-center surface-inset border border-[#cedc28]/30 rounded-lg text-[#cedc28] hover:bg-[#cedc28] hover:text-[#1a302e] transition-colors"
+            >
+              <Download className="w-4 h-4" />
+            </button>
+            {allowColumnSelect && (
+              <MultiSelect 
+                label="Metrics" 
+                options={columns.slice(1).map(c => c.label)} 
+                selected={selectedLabels} 
+                onChange={setSelectedLabels} 
+              />
+            )}
+          </div>
+        </div>
+      )}
+      <div className="overflow-x-auto card-surface rounded-2xl border border-[#cedc28]/20 z-10 relative">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-black/25 border-b border-[#cedc28]/20">
+              {activeColumns.map((col, i) => (
+                <th key={i} className="px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest whitespace-nowrap">{col.label}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {data.map((row, i) => {
+              const isSelected = rowKey && selectedRowId === row[rowKey];
+              return (
+                <tr 
+                  key={i} 
+                  onClick={() => onRowClick && onRowClick(row)}
+                  className={`border-b border-[#cedc28]/10 transition-colors ${onRowClick ? 'cursor-pointer hover:bg-[#cedc28]/15' : 'hover:bg-[#cedc28]/5'} ${isSelected ? 'bg-[#cedc28]/50 drop-shadow-md' : ''}`}
+                >
+                  {activeColumns.map((col, j) => {
+                     const isMetric = j !== 0 && showBars;
+                     const pct = isMetric && maxValues[col.key] ? (row[col.key] / maxValues[col.key]) * 100 : 0;
+                     const barColor = pct > 75 ? 'rgba(206, 220, 40, 0.35)' : pct > 40 ? 'rgba(20, 166, 217, 0.3)' : 'rgba(0, 147, 123, 0.25)';
+                     return (
+                      <td key={j} className={`px-6 py-4 text-[11px] whitespace-nowrap relative ${isSelected ? 'font-bold text-white' : 'font-medium text-[#eef7f5]'}`}>
+                        {isMetric && (
+                          <div className="absolute inset-y-1.5 left-2 rounded -z-10" style={{ width: `calc(${pct}% - 16px)`, backgroundColor: barColor }}></div>
+                        )}
+                        <span className="relative z-10">{col.format ? col.format(row[col.key], row) : row[col.key]}</span>
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+            {totals && data.length > 0 && (
+              <tr className="bg-black/40 border-t-2 border-[#cedc28]/50">
+                {activeColumns.map((col, j) => (
+                  <td key={j} className="px-6 py-4 text-[11px] font-bold text-[#cedc28] whitespace-nowrap relative">
+                    <span className="relative z-10">{totals[col.key] !== undefined ? (col.format ? col.format(totals[col.key], totals) : totals[col.key]) : ''}</span>
+                  </td>
+                ))}
+              </tr>
+            )}
+            {data.length === 0 && <tr><td colSpan={activeColumns.length} className="px-6 py-8 text-center text-[#14a6d9] text-[11px]">No data available</td></tr>}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
+const MetricTrendChart = ({ data, dataKey, name, format, color }) => (
+  <div className="card-surface p-4 rounded-xl border border-[#cedc28]/10 h-[200px] flex flex-col">
+    <h4 className="text-[#14a6d9] text-[10px] font-bold uppercase tracking-widest mb-2">{name}</h4>
+    <div className="flex-1 min-h-0">
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={data} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
+          <XAxis dataKey="key" stroke="#14a6d9" fontSize={8} minTickGap={15} />
+          <YAxis stroke="#14a6d9" fontSize={9} tickFormatter={format} />
+          <Tooltip
+            contentStyle={{ backgroundColor: '#0a2442', borderColor: '#cedc2830', color: '#fff', borderRadius: '8px', fontSize: '10px' }}
+            cursor={{ stroke: '#ffffff20' }}
+            formatter={(val) => [format ? format(val) : val, name]}
+          />
+          <Line type="monotone" dataKey={dataKey} stroke={color} strokeWidth={2} dot={{ r: 1.5, fill: color, strokeWidth: 0 }} activeDot={{ r: 3, fill: color, strokeWidth: 0 }} />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
   </div>
 );
+
+const TrendSection = ({ title, trendData, currentTrendView, setViewFn, userRole, exSym, formatShort }) => {
+  const [showInsights, setShowInsights] = useState(false);
+
+  if (!trendData || trendData.length === 0) return null;
+
+  const generateInsights = (data) => {
+    if (!data || data.length < 2) return ["Not enough data to generate insights. Need at least 2 data points."];
+    const current = data[data.length - 1];
+    const last = data[data.length - 2];
+    const twoWeeksAgo = data.length > 2 ? data[data.length - 3] : null;
+
+    const calcChange = (curr, prev) => {
+       if (prev === 0 && curr > 0) return 'increased by 100+%';
+       if (prev === 0 && curr === 0) return 'remained flat';
+       const pct = ((curr - prev) / prev) * 100;
+       const abs = Math.abs(pct).toFixed(0);
+       return pct > 0 ? `increased by ${abs}%` : `decreased by ${abs}%`;
+    };
+
+    const insights = [];
+    const metrics = [
+      { key: 'cpa', name: 'CPA' },
+      { key: 'ctr', name: 'CTR' },
+      { key: 'cvr', name: 'CVR' },
+      { key: 'cpm', name: 'CPM' },
+      { key: 'cpc', name: 'CPC' },
+      { key: 'spend', name: 'Spend' },
+      { key: 'impressions', name: 'Impressions' },
+      { key: 'clicks', name: 'Clicks' },
+      { key: 'purchases', name: 'Conversions' }
+    ];
+
+    metrics.forEach(m => {
+      if (userRole === 'non-finance' && ['cpa', 'cpm', 'cpc', 'spend'].includes(m.key)) return;
+      if (current[m.key] !== undefined && last[m.key] !== undefined) {
+        let text = `${m.name} ${calcChange(current[m.key], last[m.key])} ${currentTrendView === 'Weekly' ? 'WoW' : 'DoD'}`;
+        if (twoWeeksAgo) {
+           text += ` and ${calcChange(current[m.key], twoWeeksAgo[m.key])} compared to ${currentTrendView === 'Weekly' ? 'two weeks ago' : 'two days ago'}`;
+        }
+        insights.push(text + '.');
+      }
+    });
+    return insights;
+  };
+
+  return (
+    <div className="mt-8 pt-8 border-t border-[#cedc28]/20">
+      <div className="flex justify-between items-center mb-6">
+        <h4 className="text-[#eef7f5] font-bold flex items-center gap-2">
+          <TrendingUp className="w-4 h-4 text-[#cedc28]" />
+          {title} Trends
+        </h4>
+        <div className="flex items-center gap-3">
+          <button 
+             onClick={() => setShowInsights(!showInsights)}
+             className={`px-3 py-1.5 text-[10px] font-bold rounded-lg border transition-colors ${showInsights ? 'bg-[#cedc28] text-[#1a302e] border-[#cedc28]' : 'bg-[#0a2442] text-[#cedc28] border-[#cedc28]/30 hover:border-[#cedc28]'}`}
+          >
+            {showInsights ? 'Hide Insights' : 'View Insights'}
+          </button>
+          <div className="flex bg-[#0a2442] p-1 rounded-lg border border-[#cedc28]/20">
+            <button onClick={() => setViewFn('Weekly')} className={`px-3 py-1 text-[10px] font-bold rounded transition-colors ${currentTrendView === 'Weekly' ? 'bg-[#cedc28] text-[#1a302e]' : 'text-slate-400 hover:text-white'}`}>Weekly</button>
+            <button onClick={() => setViewFn('Daily')} className={`px-3 py-1 text-[10px] font-bold rounded transition-colors ${currentTrendView === 'Daily' ? 'bg-[#cedc28] text-[#1a302e]' : 'text-slate-400 hover:text-white'}`}>Daily</button>
+          </div>
+        </div>
+      </div>
+      
+      {showInsights && (
+        <div className="mb-6 p-4 rounded-xl bg-[#cedc28]/10 border border-[#cedc28]/30">
+          <h5 className="text-[11px] font-bold text-[#cedc28] uppercase tracking-widest mb-3">Performance Insights</h5>
+          <ul className="list-disc pl-5 space-y-1">
+            {generateInsights(trendData).map((insight, idx) => (
+               <li key={idx} className="text-xs text-[#eef7f5] leading-relaxed">{insight}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {userRole !== 'non-finance' && (
+          <MetricTrendChart data={trendData} dataKey="spend" name="Spend" format={(v) => `${exSym}${d3.format(",.0f")(v)}`} color="#cedc28" />
+        )}
+        <MetricTrendChart data={trendData} dataKey="impressions" name="Impressions" format={(v) => formatShort(v)} color="#14a6d9" />
+        <MetricTrendChart data={trendData} dataKey="clicks" name="Clicks" format={(v) => formatShort(v)} color="#00937b" />
+        <MetricTrendChart data={trendData} dataKey="ctr" name="CTR" format={(v) => `${v.toFixed(2)}%`} color="#cedc28" />
+        {userRole !== 'non-finance' && (
+          <>
+            <MetricTrendChart data={trendData} dataKey="cpm" name="CPM" format={(v) => `${exSym}${v.toFixed(2)}`} color="#14a6d9" />
+            <MetricTrendChart data={trendData} dataKey="cpc" name="CPC" format={(v) => `${exSym}${v.toFixed(2)}`} color="#00937b" />
+            <MetricTrendChart data={trendData} dataKey="cpa" name="CPA" format={(v) => `${exSym}${v.toFixed(2)}`} color="#cedc28" />
+          </>
+        )}
+        <MetricTrendChart data={trendData} dataKey="cvr" name="Conv. Rate" format={(v) => `${v.toFixed(2)}%`} color="#14a6d9" />
+        <MetricTrendChart data={trendData} dataKey="purchases" name="Conversions" format={(v) => d3.format(",.0f")(v)} color="#00937b" />
+      </div>
+    </div>
+  );
+};
 
 // --- MAIN APP ---
 export default function App() {
@@ -267,18 +477,29 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [activeTab, setActiveTab] = useState('summary');
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [trendView, setTrendView] = useState('Weekly');
+  const [selectedPhase, setSelectedPhase] = useState(null);
+  const [phaseTrendView, setPhaseTrendView] = useState('Weekly');
+  const [selectedChannel, setSelectedChannel] = useState(null);
+  const [channelTrendView, setChannelTrendView] = useState('Weekly');
+  const [selectedMarket, setSelectedMarket] = useState(null);
+  const [marketTrendView, setMarketTrendView] = useState('Weekly');
   const [isGenerating, setIsGenerating] = useState(false);
   
   // State: Global Filters
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
   const [filterCampaigns, setFilterCampaigns] = useState(['All']);
   const [filterMarkets, setFilterMarkets] = useState(['All']);
+  const [filterChannels, setFilterChannels] = useState(['All']);
+  const [filterPhases, setFilterPhases] = useState(['All']);
   const [filterPaidOrganic, setFilterPaidOrganic] = useState(['All']);
   const [filterGa4Properties, setFilterGa4Properties] = useState(['All']);
-  const [filterPortfolio, setFilterPortfolio] = useState('All');
   const [filterEvents, setFilterEvents] = useState(['All']);
   const [filterEventTypes, setFilterEventTypes] = useState(['All']);
+  const [filterPortfolios, setFilterPortfolios] = useState(['All']);
   const [filterWeeks, setFilterWeeks] = useState(['All']);
+  const [localWeeklyViewWeeks, setLocalWeeklyViewWeeks] = useState(['All']);
   
   // State: Currency
   const [currency, setCurrency] = useState('USD'); // 'USD' or 'SAR'
@@ -336,28 +557,29 @@ export default function App() {
     router.push('/login');
   };
 
-  const parseRow = (row) => {
+  const parseRow = (row, sourceEventName = '') => {
     const rawCost = parseMetric(row['Cost'] || row['Spend'] || 0);
-    const eventNameDB = (row['Event Name DB'] || '').trim();
+    const eventNameDB = (row['Event Name DB'] || '').trim() || sourceEventName;
     const eventTypeDB = (row['Event Type DB'] || '').trim();
     const channel = row['Channel'] || 'Unknown';
-    // Derive portfolio: GSTS and SAIF belong to P1
-    let portfolio = 'Other';
-    if (eventNameDB.toUpperCase().includes('GSTS') || eventNameDB.toUpperCase().includes('SAIF')) {
-      portfolio = 'P1';
+    // Derive portfolio: Default to P1, SMLC to P3
+    let portfolio = 'P1';
+    if (eventNameDB.toUpperCase().includes('SMLC')) {
+      portfolio = 'P3';
     }
 
     const isGoogle = channel.toLowerCase().includes('google');
     const isMetaOrLinkedin = channel.toLowerCase().includes('meta') || channel.toLowerCase().includes('linkedin') || channel.toLowerCase().includes('fb') || channel.toLowerCase().includes('ig') || channel.toLowerCase().includes('facebook') || channel.toLowerCase().includes('instagram');
     
     const rowVals = Object.values(row);
-    let creativeName = isGoogle 
-        ? (rowVals[11] || row['Ad set name'] || 'Unknown') 
-        : (rowVals[12] || row['Ad name'] || 'Unknown');
-        
-    if (eventNameDB.toUpperCase().includes('GSTS')) {
-        creativeName = row['Creative Name DB'] || rowVals[30] || creativeName;
+    let creativeName = row['Creative Name DB'] || rowVals[30];
+    if (!creativeName || creativeName.trim() === '') {
+      creativeName = isGoogle 
+          ? (rowVals[11] || row['Ad set name'] || 'Unknown') 
+          : (rowVals[12] || row['Ad name'] || 'Unknown');
     }
+    
+    let marketName = rowVals[26] || row['Market'] || row['Targeting country location'] || 'Unknown';
         
     const previewLink = isMetaOrLinkedin ? (rowVals[14] || '') : '';
 
@@ -367,7 +589,7 @@ export default function App() {
       campaignName: row['Campaign name'] || row['Campaign DB'] || 'Unknown',
       phase: row['Funnel Stage DB'] || row['Activity'] || row['Campaign Type'] || 'Unknown',
       buyingType: 'Unknown',
-      country: normalizeMarket(row['Market'] || row['Targeting country location'] || 'Unknown'),
+      country: normalizeMarket(marketName),
       language: 'Unknown',
       channel: channel,
       adName: creativeName,
@@ -393,18 +615,60 @@ export default function App() {
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    // Fetch from GSTS (default gid), SAIF (gid=1196409184), KoG 2026 (gid=1486784585), and Black Hat (gid=659941332) sheets
+    // Fetch from GSTS (default gid), SAIF (gid=1196409184), KoG 2026 (gid=1486784585), Black Hat (gid=659941332), and SMLC (gid=1526538255) sheets
     Promise.all([
       d3.csv(BASE_URL),
       d3.csv(BASE_URL + '&gid=1196409184'),
       d3.csv(BASE_URL + '&gid=1486784585'),
-      d3.csv(BASE_URL + '&gid=659941332')
-    ]).then(([gstsRaw, saifRaw, kogRaw, blackHatRaw]) => {
-      const gstsAds = gstsRaw.map(parseRow);
-      const saifAds = saifRaw.map(parseRow);
-      const kogAds = kogRaw.map(parseRow);
-      const blackHatAds = blackHatRaw.map(parseRow);
-      const combinedAds = [...gstsAds, ...saifAds, ...kogAds, ...blackHatAds];
+      d3.csv(BASE_URL + '&gid=659941332'),
+      d3.csv(BASE_URL + '&gid=1526538255')
+    ]).then(([gstsRaw, saifRaw, kogRaw, blackHatRaw, smlcRaw]) => {
+      const gstsAds = gstsRaw.map(r => parseRow(r, 'GSTS'));
+      const saifAds = saifRaw.map(r => parseRow(r, 'SAIF'));
+      const kogAds = kogRaw.map(r => parseRow(r, 'KOG'));
+      const blackHatAds = blackHatRaw.map(r => parseRow(r, 'BLACK HAT'));
+      const smlcAds = smlcRaw.map(r => parseRow(r, 'SMLC'));
+      const combinedAds = [...gstsAds, ...saifAds, ...kogAds, ...blackHatAds, ...smlcAds];
+
+      // --- Dynamic Week DB Calculation ---
+      const eventStartDates = {
+        'GSTS': new Date(Date.UTC(2026, 11, 18)), // Dec 18 2026
+        'SAIF': new Date(Date.UTC(2026, 10, 24)), // Nov 24 2026
+        'KOG': new Date(Date.UTC(2026, 11, 1)),   // Dec 1 2026
+        'BLACK HAT': new Date(Date.UTC(2026, 11, 1)),
+        'SMLC': new Date(Date.UTC(2026, 9, 21))   // Oct 21 2026
+      };
+
+      const firstImps = {};
+      combinedAds.forEach(d => {
+        if (d.impressions > 0 && d.dateObj) {
+           const ev = (d.eventNameDB || '').toUpperCase();
+           const dUTC = new Date(Date.UTC(d.dateObj.getFullYear(), d.dateObj.getMonth(), d.dateObj.getDate()));
+           if (!firstImps[ev] || dUTC < firstImps[ev]) {
+              firstImps[ev] = dUTC;
+           }
+        }
+      });
+
+      const MS_PER_DAY = 1000 * 60 * 60 * 24;
+      combinedAds.forEach(d => {
+        if (!d.dateObj) return;
+        const ev = (d.eventNameDB || '').toUpperCase();
+        const campStart = firstImps[ev];
+        const eventStart = Object.entries(eventStartDates).find(([k]) => ev.includes(k))?.[1];
+        
+        if (campStart && eventStart) {
+           const dUTC = new Date(Date.UTC(d.dateObj.getFullYear(), d.dateObj.getMonth(), d.dateObj.getDate()));
+           const rowDays = Math.floor((dUTC - campStart) / MS_PER_DAY);
+           const rowBlock = Math.floor(rowDays / 7);
+           
+           const eventDays = Math.floor((eventStart - campStart) / MS_PER_DAY);
+           const eventBlock = Math.floor(eventDays / 7);
+           
+           d.weekDB = `W${eventBlock - rowBlock}`;
+        }
+      });
+      // ------------------------------------
 
       setAdData(combinedAds);
       setGaData([]);
@@ -431,31 +695,54 @@ export default function App() {
   const resetFilters = () => {
     setFilterCampaigns(['All']);
     setFilterMarkets(['All']);
+    setFilterChannels(['All']);
+    setFilterPhases(['All']);
     setFilterPaidOrganic(['All']);
     setFilterGa4Properties(['All']);
-    setFilterPortfolio('All');
     setFilterEvents(['All']);
     setFilterEventTypes(['All']);
+    setFilterPortfolios(['All']);
     setFilterWeeks(['All']);
     setDateRange({ start: '', end: '' });
   };
 
   const uniqueCampaigns = useMemo(() => Array.from(new Set(adData.map(d => d.campaignName))).sort(), [adData]);
+  const uniqueChannels = useMemo(() => Array.from(new Set(adData.map(d => d.channel))).filter(Boolean).sort(), [adData]);
+  const uniquePhases = useMemo(() => Array.from(new Set(adData.map(d => d.phase))).filter(Boolean).sort(), [adData]);
   const uniqueMarkets = useMemo(() => {
     const combined = [...adData.map(d => d.country), ...gaData.map(d => d.country)];
     return Array.from(new Set(combined)).filter(Boolean).sort();
   }, [adData, gaData]);
   const uniquePaidOrganic = useMemo(() => Array.from(new Set(gaData.map(d => d.paidOrganic))).sort(), [gaData]);
   const uniqueGa4Properties = useMemo(() => Array.from(new Set(gaData.map(d => d.ga4Property))).filter(Boolean).sort(), [gaData]);
-  const uniqueEvents = useMemo(() => Array.from(new Set(adData.map(d => d.eventNameDB))).filter(e => e && e !== 'Unknown').sort(), [adData]);
-  const uniqueEventTypes = useMemo(() => Array.from(new Set(adData.map(d => d.eventTypeDB))).filter(e => e && e !== 'Unknown').sort(), [adData]);
+  const uniquePortfolios = useMemo(() => Array.from(new Set(adData.map(d => d.portfolio))).filter(Boolean).sort(), [adData]);
+  const eventsData = useMemo(() => filterPortfolios.includes('All') ? adData : adData.filter(d => filterPortfolios.includes(d.portfolio)), [adData, filterPortfolios]);
+  const uniqueEvents = useMemo(() => Array.from(new Set(eventsData.map(d => d.eventNameDB))).filter(e => e && e !== 'Unknown').sort(), [eventsData]);
+  const eventTypesData = useMemo(() => filterEvents.includes('All') ? eventsData : eventsData.filter(d => filterEvents.includes(d.eventNameDB)), [eventsData, filterEvents]);
+  const uniqueEventTypes = useMemo(() => Array.from(new Set(eventTypesData.map(d => d.eventTypeDB))).filter(e => e && e !== 'Unknown').sort(), [eventTypesData]);
+
+  useEffect(() => {
+    if (filterEvents.includes('All')) return;
+    const validEvents = filterEvents.filter(e => uniqueEvents.includes(e));
+    if (validEvents.length !== filterEvents.length) {
+      setFilterEvents(validEvents.length ? validEvents : ['All']);
+    }
+  }, [uniqueEvents, filterEvents]);
+
+  useEffect(() => {
+    if (filterEventTypes.includes('All')) return;
+    const validTypes = filterEventTypes.filter(e => uniqueEventTypes.includes(e));
+    if (validTypes.length !== filterEventTypes.length) {
+      setFilterEventTypes(validTypes.length ? validTypes : ['All']);
+    }
+  }, [uniqueEventTypes, filterEventTypes]);
   const uniqueWeeks = useMemo(() => {
     const weeks = Array.from(new Set(adData.map(d => d.weekDB))).filter(w => w && w !== 'Unknown');
-    // Sort weeks numerically: e.g. "W39 '26" -> 39
+    // Sort weeks numerically in countdown order (e.g. W12, W11 ... W0)
     return weeks.sort((a, b) => {
-      const numA = parseInt(a.replace(/\D/g, ''));
-      const numB = parseInt(b.replace(/\D/g, ''));
-      return numA - numB;
+      const numA = parseInt(a.replace(/[^\d-]/g, ''), 10);
+      const numB = parseInt(b.replace(/[^\d-]/g, ''), 10);
+      return numB - numA;
     });
   }, [adData]);
 
@@ -464,15 +751,17 @@ export default function App() {
     return adData.filter(d => {
       if (!filterCampaigns.includes('All') && !filterCampaigns.includes(d.campaignName)) return false;
       if (!filterMarkets.includes('All') && !filterMarkets.includes(d.country)) return false;
-      if (filterPortfolio !== 'All' && d.portfolio !== filterPortfolio) return false;
+      if (!filterChannels.includes('All') && !filterChannels.includes(d.channel)) return false;
+      if (!filterPhases.includes('All') && !filterPhases.includes(d.phase)) return false;
       if (!filterEvents.includes('All') && !filterEvents.includes(d.eventNameDB)) return false;
+      if (!filterPortfolios.includes('All') && !filterPortfolios.includes(d.portfolio)) return false;
       if (!filterEventTypes.includes('All') && !filterEventTypes.includes(d.eventTypeDB)) return false;
       if (!filterWeeks.includes('All') && !filterWeeks.includes(d.weekDB)) return false;
       if (dateRange.start && d.dateObj && d.dateObj < new Date(dateRange.start)) return false;
       if (dateRange.end && d.dateObj && d.dateObj > new Date(dateRange.end)) return false;
       return true;
     });
-  }, [adData, filterCampaigns, filterMarkets, filterPortfolio, filterEvents, filterEventTypes, filterWeeks, dateRange]);
+  }, [adData, filterCampaigns, filterMarkets, filterChannels, filterPhases, filterEvents, filterPortfolios, filterEventTypes, filterWeeks, dateRange]);
 
   const coreAdData = useMemo(() => filteredAdData.filter(d => !d.isAuxiliaryData), [filteredAdData]);
 
@@ -647,8 +936,9 @@ export default function App() {
   })).sort((a,b) => b.cost - a.cost);
 
   const NAV_ITEMS = [
-    { id: 'summary', label: 'Summary View', icon: Grid },
+    { id: 'summary', label: 'Overview', icon: Grid },
     { id: 'campaign', label: 'Event View', icon: Activity },
+    { id: 'weekly', label: 'Weekly View', icon: Calendar },
     { id: 'channel', label: 'Channel View', icon: MonitorPlay },
     { id: 'market', label: 'Market View', icon: Map },
     { id: 'detailed', label: 'Detailed View', icon: PieChart },
@@ -776,11 +1066,84 @@ export default function App() {
   };
 
   const renderContent = () => {
+      const getMetricsData = (data, groupKeyFunc, keyName) => d3.groups(data, groupKeyFunc).map(([key, vals]) => {
+        const spend = d3.sum(vals, d => d.cost) * exRate;
+        const impressions = d3.sum(vals, d => d.impressions);
+        const clicks = d3.sum(vals, d => d.clicks);
+        const purchases = d3.sum(vals, d => d.purchases || 0);
+        const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;
+        const cpm = impressions > 0 ? (spend / impressions) * 1000 : 0;
+        const cpc = clicks > 0 ? (spend / clicks) : 0;
+        const cpa = purchases > 0 ? (spend / purchases) : 0;
+        const cvr = clicks > 0 ? (purchases / clicks) * 100 : 0;
+        return { [keyName]: key || 'Unknown', spend, impressions, clicks, ctr, cpm, cpc, cpa, cvr, purchases };
+      }).sort((a, b) => b.spend - a.spend);
+
+      const getTotals = (data) => {
+        const spend = d3.sum(data, d => d.cost) * exRate;
+        const impressions = d3.sum(data, d => d.impressions);
+        const clicks = d3.sum(data, d => d.clicks);
+        const purchases = d3.sum(data, d => d.purchases || 0);
+        const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;
+        const cpm = impressions > 0 ? (spend / impressions) * 1000 : 0;
+        const cpc = clicks > 0 ? (spend / clicks) : 0;
+        const cpa = purchases > 0 ? (spend / purchases) : 0;
+        const cvr = clicks > 0 ? (purchases / clicks) * 100 : 0;
+        return { spend, impressions, clicks, ctr, cpm, cpc, cpa, cvr, purchases };
+      };
+
+      const getTrendDataForSelection = (selection, keyField, currentTrendView, allowedWeeks = null) => {
+        if (!selection) return [];
+        let evData = selectedEvent ? filteredAdData.filter(d => d.eventNameDB === selectedEvent) : filteredAdData;
+        evData = evData.filter(d => d[keyField] === selection);
+        
+        if (allowedWeeks && !allowedWeeks.includes('All')) {
+            evData = evData.filter(d => allowedWeeks.includes(d.weekDB));
+        }
+        
+        const groupKey = currentTrendView === 'Daily' ? d => d.date : d => d.weekDB;
+        const grouped = d3.groups(evData, groupKey).filter(([k]) => k && k !== 'Unknown');
+        return grouped.map(([key, vals]) => {
+          const spend = d3.sum(vals, d => d.cost) * exRate;
+          const impressions = d3.sum(vals, d => d.impressions);
+          const clicks = d3.sum(vals, d => d.clicks);
+          const purchases = d3.sum(vals, d => d.purchases || 0);
+          const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;
+          const cpm = impressions > 0 ? (spend / impressions) * 1000 : 0;
+          const cpc = clicks > 0 ? (spend / clicks) : 0;
+          const cpa = purchases > 0 ? (spend / purchases) : 0;
+          const cvr = clicks > 0 ? (purchases / clicks) * 100 : 0;
+          return { key, spend, impressions, clicks, purchases, ctr, cpm, cpc, cpa, cvr };
+        }).sort((a, b) => {
+          if (currentTrendView === 'Daily') return new Date(a.key) - new Date(b.key);
+          const numA = parseInt(a.key.replace(/[^\d-]/g, ''), 10) || 0;
+          const numB = parseInt(b.key.replace(/[^\d-]/g, ''), 10) || 0;
+          return numB - numA; // Sort descending so W12 is on left, W0 is on right
+        });
+      };
+
+      const createColumns = (key, label) => [
+        { key: key, label: label },
+        ...(userRole !== 'non-finance' ? [{ key: 'spend', label: 'Spend', format: (v) => `${exSym}${d3.format(",.0f")(v)}` }] : []),
+        { key: 'impressions', label: 'Impressions', format: (v) => d3.format(",")(v) },
+        { key: 'clicks', label: 'Clicks', format: (v) => d3.format(",")(v) },
+        { key: 'ctr', label: 'CTR', format: (v) => `${v.toFixed(2)}%` },
+        ...(userRole !== 'non-finance' ? [
+          { key: 'cpm', label: 'CPM', format: (v) => `${exSym}${v.toFixed(2)}` },
+          { key: 'cpc', label: 'CPC', format: (v) => `${exSym}${v.toFixed(2)}` },
+          { key: 'cpa', label: 'CPA', format: (v) => `${exSym}${v.toFixed(2)}` }
+        ] : []),
+        { key: 'cvr', label: 'CVR', format: (v) => `${v.toFixed(2)}%` },
+        { key: 'purchases', label: 'Conversions', format: (v) => d3.format(",")(v) }
+      ];
+
     if (activeTab === 'summary') {
       // Computed metrics for summary
       const totalCTR = agg.impressions > 0 ? ((agg.clicks / agg.impressions) * 100) : 0;
       const totalCPM = agg.impressions > 0 ? ((agg.cost * exRate) / agg.impressions * 1000) : 0;
       const totalCPC = agg.clicks > 0 ? ((agg.cost * exRate) / agg.clicks) : 0;
+      const totalCPA = agg.purchases > 0 ? ((agg.cost * exRate) / agg.purchases) : 0;
+      const totalCVR = agg.clicks > 0 ? ((agg.purchases / agg.clicks) * 100) : 0;
 
       // AI Insights generation from data
       const topChannel = channelSpendData.length > 0 ? channelSpendData[0] : null;
@@ -790,10 +1153,74 @@ export default function App() {
       const avgDailySpend = dailySpendData.length > 0 ? d3.mean(dailySpendData, d => d.spend) : 0;
       const peakSpendDay = dailySpendData.length > 0 ? dailySpendData.reduce((max, d) => d.spend > max.spend ? d : max, dailySpendData[0]) : null;
 
+      const subTableAdData = selectedEvent ? filteredAdData.filter(d => d.eventNameDB === selectedEvent) : filteredAdData;
+      const subTableTotals = getTotals(subTableAdData);
+
+      const eventMetricsData = getMetricsData(filteredAdData, d => d.eventNameDB, 'eventName');
+      const phaseMetricsData = getMetricsData(subTableAdData, d => d.phase, 'phase');
+      const channelMetricsData = getMetricsData(subTableAdData, d => d.channel, 'channel');
+      const marketMetricsData = getMetricsData(subTableAdData, d => d.country, 'market');
+
+      const eventColumns = createColumns('eventName', 'Event');
+      const phaseColumns = createColumns('phase', 'Funnel Stage');
+      const channelColumns = createColumns('channel', 'Channel');
+
+      const MARKET_MAPPING = {
+        'GSTS': {
+          'Cluster 2': 'UAE, Qatar, Oman, Bahrain, Kuwait',
+          'Cluster 3': 'UK, France, Germany',
+          'Cluster 4': 'Singapore, South Korea'
+        },
+        'KOG': {
+          'Investment markets': 'USA, Canada, UK, France, Germany, Finland, Sweden, Poland, Japan, South Korea, Singapore',
+          'Emerging Markets': 'Morocco, Tunisia, Nigeria, South Africa, Indonesia, Malaysia, Phillipines, Brazil'
+        }
+      };
+
+      const marketColumns = createColumns('market', 'Market');
+      marketColumns[0].format = (v) => {
+         let tooltipText = '';
+         const vClean = (v || '').toString().trim().toLowerCase();
+         const activeEventContext = selectedEvent || (filterEvents.length === 1 && !filterEvents.includes('All') ? filterEvents[0] : null);
+         if (activeEventContext) {
+             const mappingKey = Object.keys(MARKET_MAPPING).find(k => activeEventContext.toUpperCase().includes(k));
+             if (mappingKey) {
+                 const matchKey = Object.keys(MARKET_MAPPING[mappingKey]).find(k => k.toLowerCase() === vClean);
+                 if (matchKey) tooltipText = MARKET_MAPPING[mappingKey][matchKey];
+             }
+         }
+         
+         if (tooltipText) {
+             return (
+               <span 
+                 data-tooltip-id="market-tooltip" 
+                 data-tooltip-content={tooltipText}
+                 className="underline decoration-dashed decoration-[#14a6d9]/80 underline-offset-4 cursor-help"
+               >
+                 {v}
+               </span>
+             );
+         }
+         return v;
+      };
+
+      const commonTotals = {
+        spend: agg.cost * exRate,
+        impressions: agg.impressions,
+        clicks: agg.clicks,
+        ctr: totalCTR,
+        cpm: totalCPM,
+        cpc: totalCPC,
+        cpa: totalCPA,
+        cvr: totalCVR,
+        purchases: agg.purchases
+      };
+
+
       return (
-        <div className="space-y-8">
+        <div className="space-y-6">
           {/* 1. Top Metric Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 export-slide" data-title="Summary Metrics">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 export-slide" data-title="Summary Metrics">
             {userRole !== 'non-finance' && (
               <MetricCard definition="The total amount of money spent on advertising campaigns across all channels." label="Total Spends" value={`${exSym}${formatShort(agg.cost * exRate)}`} color="text-white" icon={DollarSign} />
             )}
@@ -804,117 +1231,167 @@ export default function App() {
               <>
                 <MetricCard definition="Cost Per Mille: the average cost per 1,000 impressions." label="CPM" value={`${exSym}${totalCPM.toFixed(2)}`} color="text-[#cedc28]" icon={BarChart3} />
                 <MetricCard definition="Cost Per Click: the average cost for each ad click." label="CPC" value={`${exSym}${totalCPC.toFixed(2)}`} color="text-[#14a6d9]" icon={MousePointer2} />
+                <MetricCard definition="Cost Per Acquisition: the average cost per conversion." label="CPA" value={`${exSym}${totalCPA.toFixed(2)}`} color="text-[#cedc28]" icon={BarChart3} />
               </>
             )}
+            <MetricCard definition="CVR: the percentage of clicks that resulted in a conversion." label="CVR" value={`${totalCVR.toFixed(2)}%`} color="text-[#00937b]" icon={TrendingUp} />
             <MetricCard definition="Total number of conversions (purchases, sign-ups, etc.) tracked from the campaigns." label="Total Conversions" value={formatShort(totalConversions)} color="text-white" icon={ShoppingCart} />
           </div>
           
-          {/* 2. Daily Spends Trend (Full Width) */}
-          <div className="card-surface backdrop-blur-2xl p-6 rounded-3xl border border-[#cedc28]/20 shadow-xl h-[350px] export-slide" data-title="Daily Spend Trend">
-            <h3 className="text-[#eef7f5] font-bold mb-4 flex items-center gap-2">
-              Daily Spends Trend
-
-            </h3>
-            <ResponsiveContainer width="100%" height="85%">
-              <AreaChart data={dailySpendData}>
-                <defs>
-                  <linearGradient id="colorDailySpend" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#cedc28" stopOpacity={0.4}/>
-                    <stop offset="95%" stopColor="#cedc28" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" />
-                <XAxis dataKey="day" stroke="#14a6d9" fontSize={9} angle={-45} textAnchor="end" height={50} interval={Math.max(0, Math.floor(dailySpendData.length / 15))} />
-                <YAxis stroke="#cedc28" fontSize={10} tickFormatter={(t) => `${exSym}${d3.format(",.0f")(t)}`} />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#0a2442', borderColor: '#cedc2830', color: '#fff', borderRadius: '12px' }} 
-                  formatter={(value) => [`${exSym}${d3.format(",.2f")(value)}`, 'Spend']}
-                />
-                <Area type="monotone" dataKey="spend" name="Spend" stroke="#cedc28" strokeWidth={2} fillOpacity={1} fill="url(#colorDailySpend)" />
-              </AreaChart>
-            </ResponsiveContainer>
+          {/* 2. Event Metrics Table */}
+          <div className="card-surface backdrop-blur-2xl p-6 rounded-3xl border border-[#cedc28]/20 shadow-xl export-slide" data-title="Event Metrics">
+            <DataTable 
+              title={<div className="flex items-center gap-2">Metrics by Event <span className="text-[10px] text-slate-400 font-normal">(Click a row to view trends)</span></div>}
+              data={eventMetricsData} 
+              columns={eventColumns} 
+              onRowClick={(row) => setSelectedEvent(selectedEvent === row.eventName ? null : row.eventName)}
+              selectedRowId={selectedEvent}
+              rowKey="eventName"
+              totals={{ eventName: 'TOTAL', ...commonTotals }}
+            />
+            
+            {selectedEvent && <TrendSection title={selectedEvent} trendData={getTrendDataForSelection(selectedEvent, 'eventNameDB', trendView)} currentTrendView={trendView} setViewFn={setTrendView} userRole={userRole} exSym={exSym} formatShort={formatShort} />}
           </div>
 
-          {/* 3. Two side-by-side charts */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Chart A: Performance by Channel */}
-            <div className="card-surface backdrop-blur-2xl p-6 rounded-3xl border border-[#cedc28]/20 shadow-xl h-[350px] flex flex-col export-slide" data-title="Channel Performance">
-              <div className="flex justify-between items-start mb-4">
-                <h3 className="text-[#eef7f5] font-bold flex items-center gap-2">
-                  Metrics By Channel
-
-                </h3>
-                <div className="flex gap-2">
-                  <div className="flex bg-[#0a2442] p-1 rounded-lg border border-[#cedc28]/20">
-                    <button onClick={() => setPerfMetric('CPM')} className={`px-2 py-1 text-[10px] font-bold rounded transition-colors ${perfMetric === 'CPM' ? 'bg-[#cedc28] text-[#1a302e]' : 'text-slate-400 hover:text-white'}`}>CPM</button>
-                    <button onClick={() => setPerfMetric('CPC')} className={`px-2 py-1 text-[10px] font-bold rounded transition-colors ${perfMetric === 'CPC' ? 'bg-[#cedc28] text-[#1a302e]' : 'text-slate-400 hover:text-white'}`}>CPC</button>
-                    <button onClick={() => setPerfMetric('CTR')} className={`px-2 py-1 text-[10px] font-bold rounded transition-colors ${perfMetric === 'CTR' ? 'bg-[#cedc28] text-[#1a302e]' : 'text-slate-400 hover:text-white'}`}>CTR</button>
-                  </div>
-                </div>
-              </div>
-              <ResponsiveContainer width="100%" height="85%">
-                <BarChart data={channelPerformance} margin={{ left: 10 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
-                  <XAxis dataKey="channel" stroke="#14a6d9" fontSize={10} />
-                  <YAxis stroke="#14a6d9" fontSize={10} tickFormatter={(t) => ['CPM', 'CPC'].includes(perfMetric) ? `${exSym}${d3.format(",.1f")(t)}` : `${t.toFixed(2)}%`} />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: '#0a2442', borderColor: '#cedc2830', color: '#fff', borderRadius: '12px' }}
-                    cursor={{fill: '#ffffff08'}}
-                    formatter={(value) => [['CPM', 'CPC'].includes(perfMetric) ? `${exSym}${d3.format(",.2f")(value)}` : `${d3.format(".2f")(value)}%`, perfMetric]}
-                  />
-                  <Bar dataKey={perfMetric.toLowerCase()} name={perfMetric} fill={perfMetric === 'CPC' ? '#14a6d9' : '#cedc28'} radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-
-            {/* Chart B: Spends by Channel */}
-            <div className="card-surface backdrop-blur-2xl p-6 rounded-3xl border border-[#cedc28]/20 shadow-xl h-[350px] flex flex-col export-slide" data-title="Spends by Channel">
-              <h3 className="text-[#eef7f5] font-bold mb-4 flex items-center gap-2">
-                Spends by Channel
-
-              </h3>
-              <ResponsiveContainer width="100%" height="85%">
-                <BarChart data={channelSpendData} margin={{ left: 10 }}>
-                  <defs>
-                    <linearGradient id="spendBarGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#00937b" />
-                      <stop offset="100%" stopColor="#006050" />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
-                  <XAxis dataKey="channel" stroke="#14a6d9" fontSize={10} />
-                  <YAxis stroke="#14a6d9" fontSize={10} tickFormatter={(t) => `${exSym}${d3.format(",.0f")(t)}`} />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: '#0a2442', borderColor: '#cedc2830', color: '#fff', borderRadius: '12px' }}
-                    cursor={{fill: '#ffffff08'}}
-                    formatter={(value) => [`${exSym}${d3.format(",.2f")(value)}`, 'Spend']}
-                  />
-                  <Bar dataKey="spend" name="Spend" fill="url(#spendBarGrad)" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+          {/* 3. Phase Metrics Table */}
+          <div className="card-surface backdrop-blur-2xl p-6 rounded-3xl border border-[#cedc28]/20 shadow-xl export-slide" data-title="Phase Metrics">
+            <DataTable 
+              title={<div className="flex items-center gap-2">Metrics by Funnel Stage <span className="text-[10px] text-slate-400 font-normal">({selectedEvent ? "Click a row to view trends" : "Select an event to view trends"})</span></div>}
+              data={phaseMetricsData} columns={phaseColumns} totals={{ phase: 'TOTAL', ...subTableTotals }} 
+              onRowClick={selectedEvent ? ((row) => setSelectedPhase(selectedPhase === row.phase ? null : row.phase)) : undefined}
+              selectedRowId={selectedPhase} rowKey="phase"
+              showBars={true} allowColumnSelect={true}
+            />
+            {selectedPhase && <TrendSection title={selectedPhase} trendData={getTrendDataForSelection(selectedPhase, 'phase', phaseTrendView)} currentTrendView={phaseTrendView} setViewFn={setPhaseTrendView} userRole={userRole} exSym={exSym} formatShort={formatShort} />}
           </div>
 
-          {/* 4. AI Insights */}
-          <div className="card-surface-gold p-8 rounded-3xl border border-[#cedc28]/30 shadow-2xl relative overflow-hidden export-slide" data-title="AI Insights">
-            <div className="absolute top-0 right-0 p-8 opacity-10"><Zap className="w-32 h-32 text-[#cedc28]" /></div>
-            <h3 className="text-xl font-bold text-white mb-5 flex items-center gap-3"><Zap className="text-[#cedc28] w-5 h-5"/> AI Performance Insights </h3>
-            <div className="text-[#eef7f5] leading-relaxed max-w-5xl space-y-3 relative z-10 text-sm">
-              {topChannel && (
-                <p>• <strong>{topChannel.channel}</strong> is the highest-spending channel at <strong>{exSym}{d3.format(",.0f")(topChannel.spend)}</strong>, accounting for <strong>{((topChannel.spend / (agg.cost * exRate)) * 100).toFixed(1)}%</strong> of total budget.</p>
-              )}
-              {lowestCPMChannel && (
-                <p>• <strong>{lowestCPMChannel.channel}</strong> delivers the most cost-efficient impressions with a CPM of <strong>{exSym}{d3.format(",.2f")(lowestCPMChannel.cpm)}</strong> — making it the best value channel for reach.</p>
-              )}
-              {highestCTRChannel && (
-                <p>• <strong>{highestCTRChannel.channel}</strong> leads in engagement with the highest CTR of <strong>{d3.format(".2f")(highestCTRChannel.ctr)}%</strong>, indicating strong creative resonance with the audience.</p>
-              )}
-              {peakSpendDay && (
-                <p>• Peak daily spend of <strong>{exSym}{d3.format(",.0f")(peakSpendDay.spend)}</strong> occurred on <strong>{peakSpendDay.day}</strong>. Average daily spend sits at <strong>{exSym}{d3.format(",.0f")(avgDailySpend)}</strong> across {dailySpendData.length} active days.</p>
-              )}
-              <p>• Across all channels, campaigns have generated <strong>{formatShort(agg.impressions)}</strong> impressions, <strong>{formatShort(agg.clicks)}</strong> clicks, and <strong>{formatShort(totalConversions)}</strong> conversions with an overall CTR of <strong>{totalCTR.toFixed(2)}%</strong> and CPC of <strong>{exSym}{totalCPC.toFixed(2)}</strong>.</p>
+          {/* 4. Channel Metrics Table */}
+          <div className="card-surface backdrop-blur-2xl p-6 rounded-3xl border border-[#cedc28]/20 shadow-xl export-slide" data-title="Channel Metrics">
+            <DataTable 
+              title={<div className="flex items-center gap-2">Metrics by Channel <span className="text-[10px] text-slate-400 font-normal">({selectedEvent ? "Click a row to view trends" : "Select an event to view trends"})</span></div>}
+              data={channelMetricsData} columns={channelColumns} totals={{ channel: 'TOTAL', ...subTableTotals }} 
+              onRowClick={selectedEvent ? ((row) => setSelectedChannel(selectedChannel === row.channel ? null : row.channel)) : undefined}
+              selectedRowId={selectedChannel} rowKey="channel"
+              showBars={true} allowColumnSelect={true}
+            />
+            {selectedChannel && <TrendSection title={selectedChannel} trendData={getTrendDataForSelection(selectedChannel, 'channel', channelTrendView)} currentTrendView={channelTrendView} setViewFn={setChannelTrendView} userRole={userRole} exSym={exSym} formatShort={formatShort} />}
+          </div>
+
+          {/* 5. Market Metrics Table */}
+          <div className="card-surface backdrop-blur-2xl p-6 rounded-3xl border border-[#cedc28]/20 shadow-xl export-slide" data-title="Market Metrics">
+            <DataTable 
+              title={<div className="flex items-center gap-2">Metrics by Market <span className="text-[10px] text-slate-400 font-normal">({selectedEvent ? "Click a row to view trends" : "Select an event to view trends"})</span></div>}
+              data={marketMetricsData} columns={marketColumns} totals={{ market: 'TOTAL', ...subTableTotals }} 
+              onRowClick={selectedEvent ? ((row) => setSelectedMarket(selectedMarket === row.market ? null : row.market)) : undefined}
+              selectedRowId={selectedMarket} rowKey="market"
+              showBars={true} allowColumnSelect={true}
+            />
+            {selectedMarket && <TrendSection title={selectedMarket} trendData={getTrendDataForSelection(selectedMarket, 'country', marketTrendView)} currentTrendView={marketTrendView} setViewFn={setMarketTrendView} userRole={userRole} exSym={exSym} formatShort={formatShort} />}
+          </div>
+
+        </div>
+      );
+    }
+
+    if (activeTab === 'weekly') {
+      const activeEventContext = selectedEvent || (filterEvents.length === 1 && !filterEvents.includes('All') ? filterEvents[0] : null);
+
+      if (!activeEventContext) {
+         return (
+           <div className="flex flex-col items-center justify-center h-[60vh] text-center w-full">
+             <Calendar className="w-20 h-20 text-[#cedc28]/40 mb-6" />
+             <h2 className="text-3xl font-anton uppercase text-white mb-3">Select an Event</h2>
+             <p className="text-[#eef7f5]/70 max-w-lg text-sm">
+               Please select exactly one event from the master filter at the top right, or click an event in the Overview tab, to unlock its full weekly breakdown and trend analysis.
+             </p>
+           </div>
+         );
+      }
+
+      let baseWeeklyData = filteredAdData.filter(d => d.eventNameDB === activeEventContext);
+      
+      const eventUniqueWeeks = Array.from(new Set(baseWeeklyData.map(d => d.weekDB))).filter(Boolean).sort((a, b) => {
+          const numA = parseInt(a.replace(/[^\d-]/g, '') || '0', 10);
+          const numB = parseInt(b.replace(/[^\d-]/g, '') || '0', 10);
+          return numB - numA;
+      });
+
+      let subTableAdData = baseWeeklyData;
+      if (!localWeeklyViewWeeks.includes('All')) {
+          subTableAdData = subTableAdData.filter(d => localWeeklyViewWeeks.includes(d.weekDB));
+      }
+
+      const getWeekDateRange = (weekStr) => {
+         const weekData = baseWeeklyData.filter(d => d.weekDB === weekStr);
+         if (weekData.length === 0) return '';
+         const dates = weekData.map(d => new Date(d.date)).filter(d => !isNaN(d));
+         if (dates.length === 0) return '';
+         const minDate = new Date(Math.min(...dates));
+         const maxDate = new Date(Math.max(...dates));
+         
+         const monthMin = minDate.toLocaleDateString('en-US', { month: 'short' });
+         const dayMin = minDate.getDate();
+         const yearMin = minDate.getFullYear();
+         
+         const monthMax = maxDate.toLocaleDateString('en-US', { month: 'short' });
+         const dayMax = maxDate.getDate();
+         const yearMax = maxDate.getFullYear();
+         
+         if (yearMin === yearMax) {
+             if (monthMin === monthMax) {
+                 return `${monthMin} ${dayMin}-${dayMax}, ${yearMax}`;
+             }
+             return `${monthMin} ${dayMin} - ${monthMax} ${dayMax}, ${yearMax}`;
+         }
+         return `${monthMin} ${dayMin}, ${yearMin} - ${monthMax} ${dayMax}, ${yearMax}`;
+      };
+
+      const weeklyMetricsData = getMetricsData(subTableAdData, d => d.weekDB, 'week');
+      weeklyMetricsData.forEach(row => {
+          row.dateRange = getWeekDateRange(row.week);
+      });
+      
+      weeklyMetricsData.sort((a, b) => {
+          const numA = parseInt(a.week.replace(/[^\d-]/g, '') || '0', 10);
+          const numB = parseInt(b.week.replace(/[^\d-]/g, '') || '0', 10);
+          return numB - numA;
+      });
+
+      const weeklyColumns = createColumns('week', 'Week');
+      weeklyColumns.splice(1, 0, { key: 'dateRange', label: 'Date Range' });
+      const weekTotals = getTotals(subTableAdData);
+      weekTotals.week = 'TOTAL';
+      weekTotals.dateRange = '-';
+
+      return (
+        <div className="space-y-8 w-full">
+          <div className="flex justify-between items-center card-surface backdrop-blur-2xl p-6 rounded-3xl border border-[#cedc28]/20 shadow-xl mb-4 relative z-30" style={{ overflow: 'visible' }}>
+            <h2 className="text-3xl font-anton uppercase text-white flex items-center gap-3"><Calendar className="text-[#cedc28]" /> Weekly View: {activeEventContext}</h2>
+            <div className="w-64">
+               <MultiSelect label="Select Weeks" options={eventUniqueWeeks} selected={localWeeklyViewWeeks} onChange={setLocalWeeklyViewWeeks} />
             </div>
           </div>
+          
+          <div className="card-surface p-6 rounded-3xl border border-[#cedc28]/10 shadow-lg relative z-20 overflow-visible">
+            <DataTable 
+              title={`Weekly Breakdown - ${activeEventContext}`} 
+              data={weeklyMetricsData} 
+              columns={weeklyColumns} 
+              totals={weekTotals}
+              showBars={true}
+              allowColumnSelect={true}
+            />
+          </div>
+          
+          <TrendSection 
+             title={activeEventContext} 
+             trendData={getTrendDataForSelection(activeEventContext, 'eventNameDB', trendView, localWeeklyViewWeeks)} 
+             currentTrendView={trendView} 
+             setViewFn={setTrendView} 
+             userRole={userRole} 
+             exSym={exSym} 
+             formatShort={formatShort} 
+          />
         </div>
       );
     }
@@ -922,7 +1399,7 @@ export default function App() {
     if (activeTab === 'campaign') {
       return (
         <div className="w-full h-full">
-           <CampaignView adData={filteredAdData} plannedData={plannedData} exRate={exRate} exSym={exSym} formatShort={formatShort} userRole={userRole} filterMarkets={filterMarkets} />
+           <CampaignView adData={filteredAdData} plannedData={plannedData} exRate={exRate} exSym={exSym} formatShort={formatShort} userRole={userRole} filterMarkets={filterMarkets} filterEvents={filterEvents} />
         </div>
       );
     }
@@ -1144,9 +1621,9 @@ export default function App() {
       {/* HEADER */}
       <header className="sticky top-0 z-50 bg-[#0a2442]/95 backdrop-blur-xl border-b border-[#cedc28]/20 px-6 py-3 shadow-2xl relative">
         <div className="pattern-overlay absolute inset-0 z-0 pointer-events-none"></div>
-        <div className="flex items-center gap-4 relative z-10">
-          {/* LEFT: Logo + Dates + Week */}
-          <div className="flex items-center gap-4 shrink-0">
+        <div className="flex items-start gap-4 relative z-10 w-full justify-between">
+          {/* LEFT: Logo */}
+          <div className="flex items-center gap-4 shrink-0 mt-1">
             <div className="flex flex-col items-start gap-0.5 mr-2">
               <div className="flex items-center gap-2">
                 <img src="/tahaluf-logo.svg" alt="Tahaluf Logo" className="h-8 object-contain" onError={(e) => e.target.style.display = 'none'} />
@@ -1156,39 +1633,29 @@ export default function App() {
               </div>
               <p className="text-[9px] font-bold text-[#cedc28] uppercase tracking-[0.1em]">Performance Dashboard</p>
             </div>
-            <div className="h-10 w-px bg-[#cedc28]/20 hidden md:block"></div>
+            <div className="h-10 w-px bg-[#cedc28]/20 hidden xl:block"></div>
           </div>
 
           {/* RIGHT: Filters + Actions */}
-          <div className="flex gap-3 flex-wrap flex-1 justify-end items-end">
+          <div className="flex gap-1.5 flex-wrap flex-1 justify-start items-end xl:ml-4">
             <DateRangeFilter label="Date Range" dateRange={dateRange} onChange={setDateRange} />
             <MultiSelect label="Week" options={uniqueWeeks} selected={filterWeeks} onChange={setFilterWeeks} />
-            
-            {/* Portfolio Filter (single select) */}
-            <div className="flex flex-col gap-1">
-              <span className="text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest block">Portfolio</span>
-              <select 
-                value={filterPortfolio} 
-                onChange={e => setFilterPortfolio(e.target.value)}
-                className="w-[120px] cursor-pointer px-2 py-1.5 surface-inset border border-[#cedc28]/30 rounded-lg text-xs font-bold text-[#eef7f5] outline-none focus:border-[#cedc28] transition-colors bg-transparent appearance-none"
-              >
-                <option value="All" className="bg-[#0a2442] text-white">All</option>
-                <option value="P1" className="bg-[#0a2442] text-white">P1</option>
-              </select>
-            </div>
-
+            <MultiSelect label="Event Portfolio" options={uniquePortfolios} selected={filterPortfolios} onChange={setFilterPortfolios} />
             <MultiSelect label="Event" options={uniqueEvents} selected={filterEvents} onChange={setFilterEvents} />
             <MultiSelect label="Event Type" options={uniqueEventTypes} selected={filterEventTypes} onChange={setFilterEventTypes} />
-
-
-            <button onClick={resetFilters} className="px-2 py-1 bg-[#cedc28]/10 border border-[#cedc28]/50 text-[#cedc28] text-[8px] uppercase font-bold rounded-lg hover:bg-[#cedc28]/20 hover:text-white transition-colors flex items-center justify-center gap-1 self-end"><RefreshCw className="w-2.5 h-2.5"/> Reset</button>
+            <MultiSelect label="Funnel Stage" options={uniquePhases} selected={filterPhases} onChange={setFilterPhases} />
+            <MultiSelect label="Channel" options={uniqueChannels} selected={filterChannels} onChange={setFilterChannels} />
+            <MultiSelect label="Market" options={uniqueMarkets} selected={filterMarkets} onChange={setFilterMarkets} />
+            
+            <div className="ml-auto shrink-0 flex items-end">
+              <button onClick={resetFilters} title="Reset Filters" className="h-[34px] w-[34px] bg-[#cedc28]/10 border border-[#cedc28]/50 text-[#cedc28] rounded-lg hover:bg-[#cedc28]/20 hover:text-white transition-colors flex items-center justify-center"><RefreshCw className="w-4 h-4"/></button>
+            </div>
           </div>
         </div>
       </header>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* SIDEBAR TABS */}
-        <div className="w-64 border-r border-[#cedc28]/10 bg-[#0a2442] flex flex-col gap-2 overflow-y-auto z-20 relative">
+        <div className="w-52 border-r border-[#cedc28]/10 bg-[#0a2442] flex flex-col gap-2 overflow-y-auto z-20 relative">
           <div className="pattern-overlay absolute inset-0 z-0 pointer-events-none" style={{ opacity: 0.20 }}></div>
           <div className="p-6 pb-2 relative z-10">
             <div className="text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest mb-4 px-4">Navigation</div>
@@ -1198,11 +1665,11 @@ export default function App() {
               <button 
                 key={t.id}
                 onClick={() => setActiveTab(t.id)}
-                className={`flex items-center gap-3 w-full px-4 py-3 rounded-xl font-bold transition-all ${
+                className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-xl font-bold text-[13px] transition-all ${
                   active ? 'bg-[#cedc28] text-[#1a302e] shadow-[0_0_15px_rgba(200,130,20,0.35)]' : 'text-[#eef7f5] hover:bg-[#cedc28]/10 hover:text-[#cedc28]'
                 }`}
               >
-                <t.icon className="w-5 h-5" />
+                <t.icon className="w-4 h-4" />
                 {t.label}
               </button>
             )
@@ -1256,6 +1723,7 @@ export default function App() {
           <AdminView />
         ) : (
         <main className="flex-1 overflow-y-auto p-8 custom-scrollbar relative z-10">
+          <ReactTooltip id="market-tooltip" className="z-50" style={{ backgroundColor: '#0a2442', color: '#eef7f5', border: '1px solid #cedc2830', borderRadius: '8px', zIndex: 1000 }} />
           <div className="absolute top-0 right-0 w-full h-[500px] bg-gradient-to-br from-[#062f2e]/20 via-transparent to-transparent pointer-events-none -z-10"></div>
           {renderContent()}
         </main>

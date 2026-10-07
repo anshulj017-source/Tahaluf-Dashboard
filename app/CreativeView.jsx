@@ -67,7 +67,7 @@ export default function CreativeView({ data, exRate = 1, exSym = '$', formatShor
   const [filterChannels, setFilterChannels] = useState(['All']);
   const [filterStatuses, setFilterStatuses] = useState(['All']);
   const [filterPhases, setFilterPhases] = useState(['All']);
-  const availableMetrics = userRole === 'non-finance' ? ['Impressions', 'Clicks', 'CTR', 'Views', 'Conversions', 'CR'] : ['Spend', 'Impressions', 'Clicks', 'CTR', 'CPC', 'Views', 'Conversions', 'CPA', 'CR'];
+  const availableMetrics = userRole === 'non-finance' ? ['Impressions', 'Clicks', 'CTR', 'Views', 'Conversions', 'CVR'] : ['Spend', 'Impressions', 'Clicks', 'CTR', 'CPC', 'Views', 'Conversions', 'CPA', 'CVR'];
   const [selectedMetrics, setSelectedMetrics] = useState(availableMetrics);
 
   const [sortConfig, setSortConfig] = useState({ key: 'cost', direction: 'desc' });
@@ -197,7 +197,7 @@ export default function CreativeView({ data, exRate = 1, exSym = '$', formatShor
 
   const renderSortHeader = (label, key) => (
     <th 
-      className="px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest cursor-pointer hover:text-[#eef7f5] transition-colors"
+      className="px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest cursor-pointer hover:text-[#eef7f5] transition-colors whitespace-nowrap"
       onClick={() => handleSort(key)}
     >
       <div className="flex items-center gap-1">
@@ -334,7 +334,7 @@ export default function CreativeView({ data, exRate = 1, exSym = '$', formatShor
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8 border-b border-[#cedc28]/20 pb-6 relative z-[60]">
         <MultiSelectDropdown label="Channel" options={uniqueChannels} selected={filterChannels} onChange={setFilterChannels} />
-        <MultiSelectDropdown label="Event Phase" options={uniquePhases} selected={filterPhases} onChange={setFilterPhases} />
+        <MultiSelectDropdown label="Funnel Stage" options={uniquePhases} selected={filterPhases} onChange={setFilterPhases} />
         <MultiSelectDropdown label="Status" options={['Live', 'Paused']} selected={filterStatuses} onChange={setFilterStatuses} />
       </div>
 
@@ -355,16 +355,17 @@ export default function CreativeView({ data, exRate = 1, exSym = '$', formatShor
       </div>
 
 
-        <div className="card-surface backdrop-blur-2xl rounded-3xl border border-[#cedc28]/20 overflow-x-auto shadow-xl export-slide" data-title="Creative Data Breakdown">
-           <table className="w-full text-left border-collapse">
-              <thead>
-                 <tr className="bg-[#0a2442] border-b border-[#cedc28]/20">
-                    
-                    <th className="px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest">Preview</th>
-                    {renderSortHeader('Creative Name', 'creativeName')}
-                    <th className="px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest">Start Date</th>
-                    <th className="px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest">Last Served On</th>
-                    {renderSortHeader('Status', 'status')}
+        <div className="card-surface backdrop-blur-2xl rounded-3xl border border-[#cedc28]/20 shadow-xl export-slide overflow-hidden" data-title="Creative Data Breakdown">
+           <div className="overflow-x-auto w-full custom-scrollbar">
+              <table className="w-full text-left border-collapse min-w-max">
+                 <thead>
+                    <tr className="bg-[#0a2442] border-b border-[#cedc28]/20">
+                       
+                       <th className="px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest whitespace-nowrap">Preview</th>
+                       {renderSortHeader('Creative Name', 'creativeName')}
+                       <th className="px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest whitespace-nowrap">Start Date</th>
+                       <th className="px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest whitespace-nowrap">Last Served On</th>
+                       {renderSortHeader('Status', 'status')}
                     {selectedMetrics.includes('Spend') && renderSortHeader('Spend', 'cost')}
                     {selectedMetrics.includes('Impressions') && renderSortHeader('Impr', 'impressions')}
                     {selectedMetrics.includes('Clicks') && renderSortHeader('Clicks', 'clicks')}
@@ -373,7 +374,7 @@ export default function CreativeView({ data, exRate = 1, exSym = '$', formatShor
                     {selectedMetrics.includes('Views') && renderSortHeader('Views', 'views')}
                     {selectedMetrics.includes('Conversions') && renderSortHeader('Conversions', 'purchases')}
                     {selectedMetrics.includes('CPA') && renderSortHeader('CPA', 'cpa')}
-                    {selectedMetrics.includes('CR') && renderSortHeader('CR', 'cr')}
+                    {selectedMetrics.includes('CVR') && renderSortHeader('CVR', 'cr')}
 
                  </tr>
               </thead>
@@ -427,13 +428,14 @@ export default function CreativeView({ data, exRate = 1, exSym = '$', formatShor
                        {selectedMetrics.includes('Views') && <td className="px-6 py-4 text-sm font-bold text-amber-400 whitespace-nowrap">{formatShort(c.views)}</td>}
                        {selectedMetrics.includes('Conversions') && <td className="px-6 py-4 text-sm font-bold text-[#74FA93] whitespace-nowrap">{formatShort(c.purchases)}</td>}
                        {selectedMetrics.includes('CPA') && <td className="px-6 py-4 text-sm font-medium text-[#eef7f5] whitespace-nowrap">{exSym}{d3.format(",.2f")(c.cpa * exRate)}</td>}
-                       {selectedMetrics.includes('CR') && <td className="px-6 py-4 text-sm font-medium text-[#eef7f5] whitespace-nowrap">{(c.cr * 100).toFixed(2)}%</td>}
+                       {selectedMetrics.includes('CVR') && <td className="px-6 py-4 text-sm font-medium text-[#eef7f5] whitespace-nowrap">{(c.cr * 100).toFixed(2)}%</td>}
 
                     </tr>
                  ))}
                  {paginatedData.length === 0 && <tr><td colSpan={10} className="px-6 py-8 text-center text-[#14a6d9] text-sm font-bold">No creatives match the current filters</td></tr>}
               </tbody>
            </table>
+          </div>
         </div>
 
       {totalPages > 1 && (

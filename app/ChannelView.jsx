@@ -85,7 +85,7 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
       { key: 'completions', label: 'Completed Views', format: v => d3.format(",")(v) },
       { key: 'purchases', label: 'Conversions', format: v => d3.format(",")(v) },
       { key: 'cpa', label: 'CPA', format: v => `${exSym}${d3.format(",.2f")(v * exRate)}` },
-      { key: 'cr', label: 'CR', format: v => `${v.toFixed(2)}%` },
+      { key: 'cr', label: 'CVR', format: v => `${v.toFixed(2)}%` },
       { key: 'cpc', label: 'CPC', format: v => `${exSym}${d3.format(",.2f")(v * exRate)}` },
       { key: 'cpm', label: 'CPM', format: v => `${exSym}${d3.format(",.2f")(v * exRate)}` },
       { key: 'ctr', label: 'CTR', format: v => `${v.toFixed(2)}%` },
@@ -327,7 +327,7 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
   };
 
   const handleExportDetailedMetrics = () => {
-     const headers = ["Event Phase", "Channel", ...AVAILABLE_METRICS.filter(m => selectedMetrics.includes(m.key)).map(m => m.label)];
+     const headers = ["Funnel Stage", "Channel", ...AVAILABLE_METRICS.filter(m => selectedMetrics.includes(m.key)).map(m => m.label)];
      let csv = headers.join(",") + "\r\n";
      campaignBreakdown.forEach(row => {
         let csvRow = [row.campaign, row.channel];
@@ -572,7 +572,7 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
           <div className="card-surface backdrop-blur-2xl border border-[#cedc28]/20 rounded-3xl p-6 overflow-hidden export-slide" data-title="Detailed Channel Metrics">
              <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 gap-4">
                <div className="flex items-center gap-4">
-                 <h3 className="text-lg font-bold text-white flex items-center gap-2">Detailed Event Phase Metrics</h3>
+                 <h3 className="text-lg font-bold text-white flex items-center gap-2">Detailed Funnel Stage Metrics</h3>
                  <button onClick={handleExportDetailedMetrics} className="p-1.5 rounded-lg bg-[#0a2442] border border-[#cedc28]/20 text-[#cedc28] hover:bg-[#cedc28]/10 transition-colors shadow-[0_0_10px_rgba(200,130,20,0.1)] text-xs font-bold" title="Export CSV">
                    <Download size={14} />
                  </button>
@@ -588,7 +588,7 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
                 <table className="w-full text-left border-collapse whitespace-nowrap">
                   <thead>
                     <tr className="border-b-2 border-[#cedc28]/30">
-                      <th onClick={() => handleSort('event')} className="cursor-pointer px-4 py-3 text-xs font-bold text-[#14a6d9] uppercase tracking-wider sticky left-0 bg-[#0a2442] z-10">Event Phase {sortConfig?.key === 'event' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>
+                      <th onClick={() => handleSort('event')} className="cursor-pointer px-4 py-3 text-xs font-bold text-[#14a6d9] uppercase tracking-wider sticky left-0 bg-[#0a2442] z-10">Funnel Stage {sortConfig?.key === 'event' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>
                       <th onClick={() => handleSort('channel')} className="cursor-pointer px-4 py-3 text-xs font-bold text-[#14a6d9] uppercase tracking-wider">Channel {sortConfig?.key === 'channel' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>
                       {AVAILABLE_METRICS.filter(m => selectedMetrics.includes(m.key)).map(m => (
                          <th onClick={() => handleSort(m.key)} key={m.key} className="cursor-pointer px-4 py-3 text-xs font-bold text-[#14a6d9] uppercase tracking-wider text-right">{m.label} {sortConfig?.key === m.key ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>
