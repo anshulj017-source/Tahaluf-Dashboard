@@ -1151,7 +1151,7 @@ export default function App() {
               <div className="flex items-center gap-2">
                 <img src="/tahaluf-logo.svg" alt="Tahaluf Logo" className="h-8 object-contain" onError={(e) => e.target.style.display = 'none'} />
                 {activeTab === 'summary' && (
-                  <span className="text-[10px] font-bold text-red-500 uppercase tracking-widest bg-red-500/10 px-2 py-0.5 rounded border border-red-500/30">this is test version</span>
+                  <span className="text-[10px] font-bold text-red-500 uppercase tracking-widest bg-red-500/10 px-2 py-0.5 rounded border border-red-500/30">THIS IS DRAFT VERSION</span>
                 )}
               </div>
               <p className="text-[9px] font-bold text-[#cedc28] uppercase tracking-[0.1em]">Performance Dashboard</p>
