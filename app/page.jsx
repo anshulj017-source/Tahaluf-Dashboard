@@ -519,13 +519,6 @@ export default function App() {
   }, [userRole, perfMetric]);
 
   useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
-      setIsAuthenticated(true);
-      setUserRole('admin');
-      setIsAuthLoading(false);
-      return;
-    }
-
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         setIsAuthenticated(true);
@@ -1625,12 +1618,7 @@ export default function App() {
           {/* LEFT: Logo */}
           <div className="flex items-center gap-4 shrink-0 mt-1">
             <div className="flex flex-col items-start gap-0.5 mr-2">
-              <div className="flex items-center gap-2">
-                <img src="/tahaluf-logo.svg" alt="Tahaluf Logo" className="h-8 object-contain" onError={(e) => e.target.style.display = 'none'} />
-                {activeTab === 'summary' && (
-                  <span className="text-[10px] font-bold text-red-500 uppercase tracking-widest bg-red-500/10 px-2 py-0.5 rounded border border-red-500/30">THIS IS DRAFT VERSION</span>
-                )}
-              </div>
+              <img src="/tahaluf-logo.svg" alt="Tahaluf Logo" className="h-8 object-contain" onError={(e) => e.target.style.display = 'none'} />
               <p className="text-[9px] font-bold text-[#cedc28] uppercase tracking-[0.1em]">Performance Dashboard</p>
             </div>
             <div className="h-10 w-px bg-[#cedc28]/20 hidden xl:block"></div>
