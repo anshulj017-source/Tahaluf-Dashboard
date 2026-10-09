@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import * as d3 from 'd3';
-import { Search, ChevronDown } from 'lucide-react';
+import { Search, ChevronDown, Download } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area } from 'recharts';
 
 export const GaChannelTable = ({ rawData, formatShort }) => {
@@ -96,6 +96,50 @@ export const GaChannelTable = ({ rawData, formatShort }) => {
     setModalOpen(true);
   };
 
+  const handleDownloadCSV = () => {
+    if (sortedAgg.length === 0) return;
+
+    const headers = [
+      viewBy === 'sourceMedium' ? 'Source / Medium' : viewBy === 'country' ? 'Country' : 'Property',
+      'Sessions',
+      'Users',
+      'Engaged',
+      'New Users',
+      'Avg Duration (s)',
+      'Item Views',
+      'Add to Carts',
+      'Checkouts',
+      'Purchases',
+      'Ticket Sales'
+    ];
+
+    const csvRows = [
+      headers.join(','),
+      ...sortedAgg.map(row => [
+        `"${row.dimension}"`,
+        row.sessions,
+        row.users,
+        row.engagedSessions,
+        row.newUsers,
+        row.avgSessionDuration.toFixed(1),
+        row.itemViews,
+        row.addToCarts,
+        row.checkouts,
+        row.purchases,
+        row.gaTickets
+      ].join(','))
+    ];
+
+    const csvContent = "data:text/csv;charset=utf-8," + csvRows.join('\\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `web_traffic_${viewBy}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   // Prepare chart data
   const chartData = useMemo(() => {
     if (!modalOpen) return [];
@@ -161,6 +205,14 @@ export const GaChannelTable = ({ rawData, formatShort }) => {
               className="bg-[#0a2442] text-[#eef7f5] text-sm pl-9 pr-4 py-2 rounded-full outline-none border border-[#cedc28]/30 focus:border-[#cedc28]"
             />
           </div>
+          <button 
+            onClick={handleDownloadCSV}
+            className="px-4 py-2 rounded-full text-sm font-bold bg-[#0a2442] text-[#cedc28] border border-[#cedc28]/30 hover:bg-[#cedc28] hover:text-[#1a302e] transition-colors flex items-center gap-2"
+            title="Download CSV"
+          >
+            <Download size={16} />
+            CSV
+          </button>
           <button 
             onClick={openCompare}
             disabled={selectedChannels.length === 0}

@@ -83,7 +83,7 @@ const normalizeMarket = (marketName) => {
 };
 
 // --- COMPONENTS ---
-const MetricCard = ({ label, value, color, icon: Icon, definition }) => (
+const MetricCard = ({ label, value, color, icon: Icon, definition, subContent }) => (
   <div className="card-surface backdrop-blur-2xl p-4 rounded-xl border border-[#cedc28]/20 shadow-md relative overflow-hidden group hover:-translate-y-1 transition-transform">
     <div className="absolute top-0 right-0 w-16 h-16 bg-[#cedc28]/10 rounded-full blur-xl -mr-4 -mt-4 group-hover:bg-[#cedc28]/20 transition-colors duration-500"></div>
     <div className="flex justify-between items-start relative z-10">
@@ -93,6 +93,7 @@ const MetricCard = ({ label, value, color, icon: Icon, definition }) => (
 
         </div>
         <h3 className={`text-xl font-black ${color} truncate`} title={value}>{value}</h3>
+        {subContent && <div className="mt-1">{subContent}</div>}
       </div>
     </div>
   </div>
@@ -218,7 +219,12 @@ const MultiSelect = ({ label, options, selected, onChange }) => {
 };
 
 const DataTable = ({ title, data, columns, totals, onRowClick, selectedRowId, rowKey, showBars = false, allowColumnSelect = false }) => {
-  const [selectedLabels, setSelectedLabels] = useState(columns.slice(1).map(c => c.label));
+  const [selectedLabels, setSelectedLabels] = useState(['All']);
+
+  useEffect(() => {
+    // If the columns change (e.g., dynamic KoG columns injected), default back to showing all
+    setSelectedLabels(['All']);
+  }, [columns.length]);
   
   const activeColumns = allowColumnSelect 
     ? columns.filter((c, i) => i === 0 || selectedLabels.includes(c.label) || selectedLabels.includes('All'))
@@ -614,20 +620,61 @@ export default function App() {
       d3.csv(BASE_URL + '&gid=1196409184'),
       d3.csv(BASE_URL + '&gid=1486784585'),
       d3.csv(BASE_URL + '&gid=659941332'),
-      d3.csv(BASE_URL + '&gid=1526538255')
-    ]).then(([gstsRaw, saifRaw, kogRaw, blackHatRaw, smlcRaw]) => {
+      d3.csv(BASE_URL + '&gid=1526538255'),
+      d3.csv(BASE_URL + '&gid=1766297835'), // KOG Planned Data
+      d3.csv(BASE_URL + '&gid=570639072')  // SAIF Planned Data
+    ]).then(([gstsRaw, saifRaw, kogRaw, blackHatRaw, smlcRaw, kogPlannedRaw, saifPlannedRaw]) => {
       const gstsAds = gstsRaw.map(r => parseRow(r, 'GSTS'));
-      const saifAds = saifRaw.map(r => parseRow(r, 'SAIF'));
-      const kogAds = kogRaw.map(r => parseRow(r, 'KOG'));
+      const saifAds = saifRaw.map(r => parseRow(r, 'SAIF 26'));
+      const kogAds = kogRaw.map(r => parseRow(r, 'KoG 26'));
+      console.log("KOG Raw Data First Row:", kogRaw[0]);
+      console.log("KOG Parsed Data First Row:", kogAds[0]);
       const blackHatAds = blackHatRaw.map(r => parseRow(r, 'BLACK HAT'));
       const smlcAds = smlcRaw.map(r => parseRow(r, 'SMLC'));
       const combinedAds = [...gstsAds, ...saifAds, ...kogAds, ...blackHatAds, ...smlcAds];
 
+      const parsePlannedRows = (rawData, eventName) => {
+        return rawData.filter(r => r.Channel && r.Channel.trim() !== '').map(r => {
+          let pChannel = r.Channel.toLowerCase();
+          let normalizedChannel = 'Unknown';
+          if (pChannel.includes('meta') || pChannel.includes('fb') || pChannel.includes('ig')) normalizedChannel = 'Meta';
+          else if (pChannel.includes('linkedin')) normalizedChannel = 'LinkedIn';
+          else if (pChannel.includes('demand gen') || pChannel.includes('pmax')) normalizedChannel = 'Google Ads';
+          else if (pChannel.includes('google') || pChannel.includes('youtube')) normalizedChannel = 'Google';
+          else if (pChannel.includes('tiktok')) normalizedChannel = 'TikTok';
+          else if (pChannel.includes('snapchat')) normalizedChannel = 'Snapchat';
+          else if (pChannel.includes('dv360')) normalizedChannel = 'DV360';
+          else if (pChannel.includes('amazon')) normalizedChannel = 'Amazon';
+          else if (pChannel === 'x' || pChannel.includes('twitter')) normalizedChannel = 'X';
+          else normalizedChannel = r.Channel.trim();
+
+          let phaseRaw = r['Funnel Stage'] ? r['Funnel Stage'].trim() : '';
+          let normalizedPhase = phaseRaw;
+          if (phaseRaw.toLowerCase() === 'consideration') normalizedPhase = 'Traffic';
+          else if (phaseRaw.toLowerCase() === 'conversion') normalizedPhase = 'Conversions';
+
+          return {
+            event: eventName,
+            channel: normalizedChannel,
+            phase: normalizedPhase,
+            plannedBudget: parseMetric(r['Planned Budget']),
+            plannedViews: parseMetric(r['Planned Views']),
+            plannedClicks: parseMetric(r['Planned Clicks']),
+            plannedConversions: parseMetric(r['Planned Conversions'])
+          };
+        });
+      };
+
+      const parsedPlannedData = [
+        ...parsePlannedRows(kogPlannedRaw, 'KoG 26'),
+        ...parsePlannedRows(saifPlannedRaw, 'SAIF 26')
+      ];
+
       // --- Dynamic Week DB Calculation ---
       const eventStartDates = {
         'GSTS': new Date(Date.UTC(2026, 11, 18)), // Dec 18 2026
-        'SAIF': new Date(Date.UTC(2026, 10, 24)), // Nov 24 2026
-        'KOG': new Date(Date.UTC(2026, 11, 1)),   // Dec 1 2026
+        'SAIF 26': new Date(Date.UTC(2026, 10, 24)), // Nov 24 2026
+        'KoG 26': new Date(Date.UTC(2026, 11, 1)),   // Dec 1 2026
         'BLACK HAT': new Date(Date.UTC(2026, 11, 1)),
         'SMLC': new Date(Date.UTC(2026, 9, 21))   // Oct 21 2026
       };
@@ -666,7 +713,7 @@ export default function App() {
       setAdData(combinedAds);
       setGaData([]);
       setCreativeData(combinedAds);
-      setPlannedData([]);
+      setPlannedData(parsedPlannedData);
       
       const allDates = combinedAds
         .map(d => d.dateObj)
@@ -1069,7 +1116,31 @@ export default function App() {
         const cpc = clicks > 0 ? (spend / clicks) : 0;
         const cpa = purchases > 0 ? (spend / purchases) : 0;
         const cvr = clicks > 0 ? (purchases / clicks) * 100 : 0;
-        return { [keyName]: key || 'Unknown', spend, impressions, clicks, ctr, cpm, cpc, cpa, cvr, purchases };
+        
+        let row = { [keyName]: key || 'Unknown', spend, impressions, clicks, ctr, cpm, cpc, cpa, cvr, purchases };
+        
+        const activePlannedEvent = (filterEvents.length === 1 && ['KoG 26', 'SAIF 26'].includes(filterEvents[0])) ? filterEvents[0] : (['KoG 26', 'SAIF 26'].includes(selectedEvent) ? selectedEvent : null);
+        if (plannedData.length > 0) {
+             let pBudget = 0;
+             if (keyName === 'eventName') {
+                 const pData = plannedData.filter(p => p.event === key);
+                 pBudget = d3.sum(pData, p => p.plannedBudget);
+             } else if (activePlannedEvent) {
+                 if (keyName === 'channel') {
+                     const pData = plannedData.filter(p => p.channel === key && p.event === activePlannedEvent);
+                     pBudget = d3.sum(pData, p => p.plannedBudget);
+                 } else if (keyName === 'phase') {
+                     const pData = plannedData.filter(p => p.phase === key && p.event === activePlannedEvent);
+                     pBudget = d3.sum(pData, p => p.plannedBudget);
+                 }
+             }
+             if(pBudget > 0) {
+               const convertedBudget = pBudget * exRate;
+               row.plannedBudget = convertedBudget;
+               row.budgetSpentPct = convertedBudget > 0 ? (spend / convertedBudget) * 100 : 0;
+             }
+          }
+        return row;
       }).sort((a, b) => b.spend - a.spend);
 
       const getTotals = (data) => {
@@ -1082,7 +1153,23 @@ export default function App() {
         const cpc = clicks > 0 ? (spend / clicks) : 0;
         const cpa = purchases > 0 ? (spend / purchases) : 0;
         const cvr = clicks > 0 ? (purchases / clicks) * 100 : 0;
-        return { spend, impressions, clicks, ctr, cpm, cpc, cpa, cvr, purchases };
+        
+        let totals = { spend, impressions, clicks, ctr, cpm, cpc, cpa, cvr, purchases };
+        
+        const activePlannedEvent = (filterEvents.length === 1 && ['KoG 26', 'SAIF 26'].includes(filterEvents[0])) ? filterEvents[0] : (['KoG 26', 'SAIF 26'].includes(selectedEvent) ? selectedEvent : null);
+        if (plannedData.length > 0) {
+           let pData = plannedData;
+           if (activePlannedEvent) {
+               pData = plannedData.filter(p => p.event === activePlannedEvent);
+           }
+           const pBudget = d3.sum(pData, p => p.plannedBudget);
+           if (pBudget > 0) {
+             const convertedBudget = pBudget * exRate;
+             totals.plannedBudget = convertedBudget;
+             totals.budgetSpentPct = convertedBudget > 0 ? (spend / convertedBudget) * 100 : 0;
+           }
+        }
+        return totals;
       };
 
       const getTrendDataForSelection = (selection, keyField, currentTrendView, allowedWeeks = null) => {
@@ -1115,20 +1202,42 @@ export default function App() {
         });
       };
 
-      const createColumns = (key, label) => [
-        { key: key, label: label },
-        ...(userRole !== 'non-finance' ? [{ key: 'spend', label: 'Spend', format: (v) => `${exSym}${d3.format(",.0f")(v)}` }] : []),
-        { key: 'impressions', label: 'Impressions', format: (v) => d3.format(",")(v) },
-        { key: 'clicks', label: 'Clicks', format: (v) => d3.format(",")(v) },
-        { key: 'ctr', label: 'CTR', format: (v) => `${v.toFixed(2)}%` },
-        ...(userRole !== 'non-finance' ? [
-          { key: 'cpm', label: 'CPM', format: (v) => `${exSym}${v.toFixed(2)}` },
-          { key: 'cpc', label: 'CPC', format: (v) => `${exSym}${v.toFixed(2)}` },
-          { key: 'cpa', label: 'CPA', format: (v) => `${exSym}${v.toFixed(2)}` }
-        ] : []),
-        { key: 'cvr', label: 'CVR', format: (v) => `${v.toFixed(2)}%` },
-        { key: 'purchases', label: 'Conversions', format: (v) => d3.format(",")(v) }
-      ];
+      const createColumns = (key, label) => {
+        const activePlannedEvent = (filterEvents.length === 1 && ['KoG 26', 'SAIF 26'].includes(filterEvents[0])) ? filterEvents[0] : (['KoG 26', 'SAIF 26'].includes(selectedEvent) ? selectedEvent : null);
+        const showPlanned = key === 'eventName' || (activePlannedEvent && key !== 'market');
+          let cols = [
+            { key: key, label: label },
+            ...(userRole !== 'non-finance' ? [{
+               key: 'spend',
+               label: 'Delivered Budget',
+               format: (v, row) => {
+                  if (showPlanned && row && row.plannedBudget > 0) {
+                     return (
+                        <div className="flex flex-col">
+                           <span>{`${exSym}${d3.format(",.0f")(v)}`}</span>
+                           <span className="text-[10px] text-[#cedc28] mt-0.5 font-bold">{`${exSym}${d3.format(",.0f")(row.plannedBudget)}`} ({row.budgetSpentPct.toFixed(1)}%)</span>
+                        </div>
+                     );
+                  }
+                  return `${exSym}${d3.format(",.0f")(v)}`;
+               }
+            }] : [])
+          ];
+
+        cols.push(
+          { key: 'impressions', label: 'Impressions', format: (v) => d3.format(",")(v) },
+          { key: 'clicks', label: 'Clicks', format: (v) => d3.format(",")(v) },
+          { key: 'ctr', label: 'CTR', format: (v) => `${v.toFixed(2)}%` },
+          ...(userRole !== 'non-finance' ? [
+            { key: 'cpm', label: 'CPM', format: (v) => `${exSym}${v.toFixed(2)}` },
+            { key: 'cpc', label: 'CPC', format: (v) => `${exSym}${v.toFixed(2)}` },
+            { key: 'cpa', label: 'CPA', format: (v) => `${exSym}${v.toFixed(2)}` }
+          ] : []),
+          { key: 'cvr', label: 'CVR', format: (v) => `${v.toFixed(2)}%` },
+          { key: 'purchases', label: 'Conversions', format: (v) => d3.format(",")(v) }
+        );
+        return cols;
+      };
 
     if (activeTab === 'summary') {
       // Computed metrics for summary
@@ -1164,7 +1273,7 @@ export default function App() {
           'Cluster 3': 'UK, France, Germany',
           'Cluster 4': 'Singapore, South Korea'
         },
-        'KOG': {
+        'KoG 26': {
           'Investment markets': 'USA, Canada, UK, France, Germany, Finland, Sweden, Poland, Japan, South Korea, Singapore',
           'Emerging Markets': 'Morocco, Tunisia, Nigeria, South Africa, Indonesia, Malaysia, Phillipines, Brazil'
         }
@@ -1176,7 +1285,7 @@ export default function App() {
          const vClean = (v || '').toString().trim().toLowerCase();
          const activeEventContext = selectedEvent || (filterEvents.length === 1 && !filterEvents.includes('All') ? filterEvents[0] : null);
          if (activeEventContext) {
-             const mappingKey = Object.keys(MARKET_MAPPING).find(k => activeEventContext.toUpperCase().includes(k));
+             const mappingKey = Object.keys(MARKET_MAPPING).find(k => activeEventContext.toUpperCase().includes(k.toUpperCase()));
              if (mappingKey) {
                  const matchKey = Object.keys(MARKET_MAPPING[mappingKey]).find(k => k.toLowerCase() === vClean);
                  if (matchKey) tooltipText = MARKET_MAPPING[mappingKey][matchKey];
@@ -1215,7 +1324,14 @@ export default function App() {
           {/* 1. Top Metric Cards */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3 export-slide" data-title="Summary Metrics">
             {userRole !== 'non-finance' && (
-              <MetricCard definition="The total amount of money spent on advertising campaigns across all channels." label="Total Spends" value={`${exSym}${formatShort(agg.cost * exRate)}`} color="text-white" icon={DollarSign} />
+              <MetricCard 
+                definition="The total amount of money spent on advertising campaigns across all channels." 
+                label="Delivered Budget" 
+                value={`${exSym}${formatShort(agg.cost * exRate)}`} 
+                color="text-white" 
+                icon={DollarSign} 
+                
+              />
             )}
             <MetricCard definition="The total number of times your ads were displayed on screen to users." label="Impressions" value={formatShort(agg.impressions)} color="text-[#cedc28]" icon={Eye} />
             <MetricCard definition="The number of times users clicked on your ads." label="Clicks" value={formatShort(agg.clicks)} color="text-[#14a6d9]" icon={MousePointer2} />
