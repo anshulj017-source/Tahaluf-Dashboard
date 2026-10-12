@@ -637,8 +637,9 @@ export default function App() {
       d3.csv(BASE_URL + '&gid=1526538255'),
       d3.csv(BASE_URL + '&gid=1766297835'), // KOG Planned Data
       d3.csv(BASE_URL + '&gid=570639072'),  // SAIF Planned Data
-      d3.csv(BASE_URL + '&gid=1121987876')  // IDWS Sheet
-    ]).then(([gstsRaw, saifRaw, kogRaw, blackHatRaw, smlcRaw, kogPlannedRaw, saifPlannedRaw, idwsRaw]) => {
+      d3.csv(BASE_URL + '&gid=1121987876'), // IDWS Sheet
+      d3.csv(BASE_URL + '&gid=2019892532')  // GSTS Planned Data
+    ]).then(([gstsRaw, saifRaw, kogRaw, blackHatRaw, smlcRaw, kogPlannedRaw, saifPlannedRaw, idwsRaw, gstsPlannedRaw]) => {
       const gstsAds = gstsRaw.map(r => parseRow(r, 'GSTS'));
       const saifAds = saifRaw.map(r => parseRow(r, 'SAIF 26'));
       const kogAds = kogRaw.map(r => parseRow(r, 'KoG 26'));
@@ -685,7 +686,8 @@ export default function App() {
 
       const parsedPlannedData = [
         ...parsePlannedRows(kogPlannedRaw, 'KoG 26'),
-        ...parsePlannedRows(saifPlannedRaw, 'SAIF 26')
+        ...parsePlannedRows(saifPlannedRaw, 'SAIF 26'),
+        ...parsePlannedRows(gstsPlannedRaw, 'GSTS 26')
       ];
 
       // --- Dynamic Week DB Calculation ---
@@ -1153,7 +1155,7 @@ export default function App() {
         
         let row = { [keyName]: key || 'Unknown', spend, impressions, clicks, ctr, cpm, cpc, cpa, cvr, purchases };
         
-        const activePlannedEvent = (filterEvents.length === 1 && ['KoG 26', 'SAIF 26'].includes(filterEvents[0])) ? filterEvents[0] : (['KoG 26', 'SAIF 26'].includes(selectedEvent) ? selectedEvent : null);
+        const activePlannedEvent = (filterEvents.length === 1 && ['KoG 26', 'SAIF 26', 'GSTS 26'].includes(filterEvents[0])) ? filterEvents[0] : (['KoG 26', 'SAIF 26', 'GSTS 26'].includes(selectedEvent) ? selectedEvent : null);
         if (plannedData.length > 0) {
              let pBudget = 0;
              if (keyName === 'eventName') {
@@ -1190,7 +1192,7 @@ export default function App() {
         
         let totals = { spend, impressions, clicks, ctr, cpm, cpc, cpa, cvr, purchases };
         
-        const activePlannedEvent = (filterEvents.length === 1 && ['KoG 26', 'SAIF 26'].includes(filterEvents[0])) ? filterEvents[0] : (['KoG 26', 'SAIF 26'].includes(selectedEvent) ? selectedEvent : null);
+        const activePlannedEvent = (filterEvents.length === 1 && ['KoG 26', 'SAIF 26', 'GSTS 26'].includes(filterEvents[0])) ? filterEvents[0] : (['KoG 26', 'SAIF 26', 'GSTS 26'].includes(selectedEvent) ? selectedEvent : null);
         if (plannedData.length > 0) {
            let pData = plannedData;
            if (activePlannedEvent) {
@@ -1237,7 +1239,7 @@ export default function App() {
       };
 
       const createColumns = (key, label) => {
-        const activePlannedEvent = (filterEvents.length === 1 && ['KoG 26', 'SAIF 26'].includes(filterEvents[0])) ? filterEvents[0] : (['KoG 26', 'SAIF 26'].includes(selectedEvent) ? selectedEvent : null);
+        const activePlannedEvent = (filterEvents.length === 1 && ['KoG 26', 'SAIF 26', 'GSTS 26'].includes(filterEvents[0])) ? filterEvents[0] : (['KoG 26', 'SAIF 26', 'GSTS 26'].includes(selectedEvent) ? selectedEvent : null);
         const showPlanned = key === 'eventName' || (activePlannedEvent && key !== 'market');
           let cols = [
             { key: key, label: label },
