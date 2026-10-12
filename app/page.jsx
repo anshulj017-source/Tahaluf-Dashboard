@@ -1544,7 +1544,7 @@ export default function App() {
     if (activeTab === 'campaign') {
       return (
         <div className="w-full h-full">
-           <CampaignView adData={filteredAdData} plannedData={plannedData} exRate={exRate} exSym={exSym} formatShort={formatShort} userRole={userRole} filterMarkets={filterMarkets} filterEvents={filterEvents} />
+           <CampaignView adData={filteredAdData} plannedData={[]} exRate={exRate} exSym={exSym} formatShort={formatShort} userRole={userRole} filterMarkets={filterMarkets} filterEvents={filterEvents} />
         </div>
       );
     }
@@ -1861,10 +1861,6 @@ export default function App() {
           {renderContent()}
         </main>
         )}
-      </div>
-      <div className="fixed bottom-4 right-4 z-[999] text-white/30 flex items-center gap-1 opacity-50 hover:opacity-100 transition-opacity bg-black/40 px-2 py-1 rounded-full border border-white/10 backdrop-blur-sm">
-        <Check className="w-3.5 h-3.5 text-[#cedc28]" />
-        <span className="text-[9px] font-bold tracking-widest uppercase">V1</span>
       </div>
     </div>
   );

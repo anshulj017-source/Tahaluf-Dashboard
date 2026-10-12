@@ -1107,22 +1107,24 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
             >
               <Download size={14} /> Export Table
             </button>
-            <div className="flex bg-[#0a2442] rounded-lg p-1 border border-[#cedc28]/20">
-              <button 
-                onClick={() => setViewMode('overall')} 
-                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${viewMode === 'overall' ? 'bg-[#cedc28] text-[#1a302e] shadow-[0_0_15px_rgba(200,130,20,0.35)]' : 'text-[#14a6d9] hover:bg-[#cedc28]/10 hover:text-[#cedc28] border border-[#cedc28]/20'}`}
-              >
-                Overall Data
-              </button>
-              <button 
-                onClick={() => { if (plannedTableData.length > 0) setViewMode('planned'); }}
-                disabled={plannedTableData.length === 0}
-                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${viewMode === 'planned' ? 'bg-[#cedc28] text-[#1a302e] shadow-[0_0_15px_rgba(200,130,20,0.35)]' : 'text-[#14a6d9] hover:bg-[#cedc28]/10 hover:text-[#cedc28] border border-[#cedc28]/20'} ${plannedTableData.length === 0 ? 'opacity-50 cursor-not-allowed bg-black/20' : ''}`}
-                title={plannedTableData.length === 0 ? 'No planned data available for the current selection' : ''}
-              >
-                Planned v/s Delivered
-              </button>
-            </div>
+            {plannedTableData.length > 0 && (
+              <div className="flex bg-[#0a2442] rounded-lg p-1 border border-[#cedc28]/20">
+                <button 
+                  onClick={() => setViewMode('overall')} 
+                  className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${viewMode === 'overall' ? 'bg-[#cedc28] text-[#1a302e] shadow-[0_0_15px_rgba(200,130,20,0.35)]' : 'text-[#14a6d9] hover:bg-[#cedc28]/10 hover:text-[#cedc28] border border-[#cedc28]/20'}`}
+                >
+                  Overall Data
+                </button>
+                <button 
+                  onClick={() => { if (plannedTableData.length > 0) setViewMode('planned'); }}
+                  disabled={plannedTableData.length === 0}
+                  className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${viewMode === 'planned' ? 'bg-[#cedc28] text-[#1a302e] shadow-[0_0_15px_rgba(200,130,20,0.35)]' : 'text-[#14a6d9] hover:bg-[#cedc28]/10 hover:text-[#cedc28] border border-[#cedc28]/20'} ${plannedTableData.length === 0 ? 'opacity-50 cursor-not-allowed bg-black/20' : ''}`}
+                  title={plannedTableData.length === 0 ? 'No planned data available for the current selection' : ''}
+                >
+                  Planned v/s Delivered
+                </button>
+              </div>
+            )}
             {viewMode === 'planned' ? (
               <MetricMultiSelectDropdown
                 options={['% Delivered', '% Pacing', 'Cost compare', '% difference of unit cost']}
