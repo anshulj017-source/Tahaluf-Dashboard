@@ -142,8 +142,8 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
     const byClicks = [...channelStats].sort((a, b) => b.clicks - a.clicks)[0];
     const byConversions = [...channelStats].sort((a, b) => b.purchases - a.purchases)[0];
     
-    const validCpc = channelStats.filter(c => c.clicks > 100 && c.cpc !== Infinity);
-    const byEfficiency = validCpc.sort((a, b) => a.cpc - b.cpc)[0] || channelStats[0];
+    const validCpa = channelStats.filter(c => c.purchases > 0 && c.cpa > 0 && c.cpa !== Infinity);
+    const byEfficiency = validCpa.sort((a, b) => a.cpa - b.cpa)[0] || channelStats[0];
 
     return { impressions: byImp, clicks: byClicks, conversions: byConversions, efficiency: byEfficiency };
   }, [channelStats]);
@@ -421,7 +421,7 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
                   <div className="absolute -right-4 -top-4 opacity-5 group-hover:opacity-10 transition-opacity"><Target className="w-32 h-32 text-[#cedc28]" /></div>
                   <p className="text-[#14a6d9] text-xs font-bold uppercase tracking-widest mb-1 flex items-center gap-2"><Target className="w-4 h-4 text-[#cedc28]"/> Most Efficient</p>
                   <p className="text-3xl font-anton uppercase text-white truncate">{topCards.efficiency.channel}</p>
-                  <p className="text-[#cedc28] font-bold text-lg mt-2">{exSym}{d3.format(",.2f")(topCards.efficiency.cpc * exRate)} <span className="text-xs text-[#14a6d9] font-medium">CPC</span></p>
+                  <p className="text-[#cedc28] font-bold text-lg mt-2">{exSym}{d3.format(",.2f")((topCards.efficiency.cpa || 0) * exRate)} <span className="text-xs text-[#14a6d9] font-medium">CPA</span></p>
                 </div>
               )}
             </div>
@@ -584,14 +584,14 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
                />
              </div>
              
-             <div className="overflow-x-auto">
+             <div className="custom-scrollbar" style={{ overflowY: 'scroll', overflowX: 'auto', maxHeight: '600px' }}>
                 <table className="w-full text-left border-collapse whitespace-nowrap">
-                  <thead>
-                    <tr className="border-b-2 border-[#cedc28]/30">
-                      <th onClick={() => handleSort('event')} className="cursor-pointer px-4 py-3 text-xs font-bold text-[#14a6d9] uppercase tracking-wider sticky left-0 bg-[#0a2442] z-10">Funnel Stage {sortConfig?.key === 'event' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>
-                      <th onClick={() => handleSort('channel')} className="cursor-pointer px-4 py-3 text-xs font-bold text-[#14a6d9] uppercase tracking-wider">Channel {sortConfig?.key === 'channel' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>
+                  <thead className="sticky top-0 z-20 bg-[#0a2442]">
+                    <tr className="border-b-2 border-[#cedc28]/30 bg-[#0a2442]">
+                      <th onClick={() => handleSort('event')} className="cursor-pointer px-4 py-3 text-xs font-bold text-[#14a6d9] uppercase tracking-wider sticky top-0 left-0 bg-[#0a2442] z-30">Funnel Stage {sortConfig?.key === 'event' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>
+                      <th onClick={() => handleSort('channel')} className="cursor-pointer px-4 py-3 text-xs font-bold text-[#14a6d9] uppercase tracking-wider sticky top-0 bg-[#0a2442] z-20">Channel {sortConfig?.key === 'channel' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>
                       {AVAILABLE_METRICS.filter(m => selectedMetrics.includes(m.key)).map(m => (
-                         <th onClick={() => handleSort(m.key)} key={m.key} className="cursor-pointer px-4 py-3 text-xs font-bold text-[#14a6d9] uppercase tracking-wider text-right">{m.label} {sortConfig?.key === m.key ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>
+                         <th onClick={() => handleSort(m.key)} key={m.key} className="cursor-pointer px-4 py-3 text-xs font-bold text-[#14a6d9] uppercase tracking-wider text-right sticky top-0 bg-[#0a2442] z-20">{m.label} {sortConfig?.key === m.key ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>
                       ))}
                     </tr>
                   </thead>

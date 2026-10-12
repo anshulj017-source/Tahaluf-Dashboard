@@ -223,11 +223,11 @@ export const GaChannelTable = ({ rawData, formatShort }) => {
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-[#cedc28]/10">
+      <div className="rounded-xl border border-[#cedc28]/10 custom-scrollbar" style={{ overflowY: 'scroll', overflowX: 'auto', maxHeight: '600px' }}>
         <table className="w-full text-left border-collapse">
-          <thead>
+          <thead className="sticky top-0 z-20 bg-[#0a2442]">
             <tr className="bg-[#0a2442] border-b border-[#cedc28]/20 select-none">
-              <th className="px-3 py-3 w-12 text-center">
+              <th className="px-3 py-3 w-12 text-center sticky top-0 bg-[#0a2442] z-20">
                 <input type="checkbox" checked={selectedChannels.length === sortedAgg.length && sortedAgg.length > 0} onChange={toggleAll} className="accent-[#cedc28] cursor-pointer" />
               </th>
               {[
@@ -243,7 +243,7 @@ export const GaChannelTable = ({ rawData, formatShort }) => {
                 { key: 'purchases', label: 'Purchases' },
                 { key: 'gaTickets', label: 'Ticket Sales' },
               ].map(col => (
-                <th key={col.key} onClick={() => handleSort(col.key)} className="px-3 py-3 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest whitespace-nowrap cursor-pointer hover:text-[#cedc28] transition-colors">
+                <th key={col.key} onClick={() => handleSort(col.key)} className="px-3 py-3 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest whitespace-nowrap cursor-pointer hover:text-[#cedc28] transition-colors sticky top-0 bg-[#0a2442] z-20">
                   <div className="flex items-center gap-1">
                     {col.label}
                     {sortKey === col.key && (sortDir === 'desc' ? <ChevronDown size={12} /> : <ChevronDown size={12} className="rotate-180" />)}

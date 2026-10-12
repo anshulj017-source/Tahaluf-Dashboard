@@ -552,12 +552,12 @@ export default function CustomView({ adData = [], exRate = 1, exSym = "$", forma
                    </button>
                  </div>
               </div>
-              <div className="overflow-x-auto custom-scrollbar relative z-10 pb-4">
+              <div className="rounded-xl border border-[#cedc28]/10 custom-scrollbar relative z-10 pb-4" style={{ overflowY: 'scroll', overflowX: 'auto', maxHeight: '600px' }}>
                   <table className="w-full text-left border-collapse min-w-[800px]">
-                     <thead>
-                        <tr className="border-b border-[#cedc28]/20">
+                     <thead className="sticky top-0 z-20 bg-[#0a2442]">
+                        <tr className="bg-[#0a2442] border-b border-[#cedc28]/20">
                            {tableDims.map((dim) => (
-                             <th onClick={() => handleSort(dim)} key={dim} className="cursor-pointer py-4 px-4 text-[#14a6d9] font-bold text-xs uppercase tracking-widest whitespace-nowrap">
+                             <th onClick={() => handleSort(dim)} key={dim} className="cursor-pointer py-4 px-4 text-[#14a6d9] font-bold text-xs uppercase tracking-widest whitespace-nowrap sticky top-0 bg-[#0a2442] z-20">
                                {DIMENSIONS.find(d => d.key === dim)?.label || dim}
                               {sortConfig?.key === dim ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>
                            ))}
@@ -565,7 +565,7 @@ export default function CustomView({ adData = [], exRate = 1, exSym = "$", forma
                               const mDef = AVAILABLE_METRICS.find(m => m.key === metricKey);
                               if (!mDef) return null;
                               return (
-                                <th onClick={() => handleSort(metricKey)} key={metricKey} className="cursor-pointer py-4 px-4 text-[#14a6d9] font-bold text-xs uppercase tracking-widest text-right whitespace-nowrap">
+                                <th onClick={() => handleSort(metricKey)} key={metricKey} className="cursor-pointer py-4 px-4 text-[#14a6d9] font-bold text-xs uppercase tracking-widest text-right whitespace-nowrap sticky top-0 bg-[#0a2442] z-20">
                                   {mDef.label}
                                  {sortConfig?.key === metricKey ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>
                               )

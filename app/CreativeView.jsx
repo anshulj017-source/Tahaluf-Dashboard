@@ -64,9 +64,7 @@ export default function CreativeView({ data, exRate = 1, exSym = '$', formatShor
   const [creativePage, setCreativePage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   
-  const [filterChannels, setFilterChannels] = useState(['All']);
   const [filterStatuses, setFilterStatuses] = useState(['All']);
-  const [filterPhases, setFilterPhases] = useState(['All']);
   const availableMetrics = userRole === 'non-finance' ? ['Impressions', 'Clicks', 'CTR', 'Views', 'Conversions', 'CVR'] : ['Spend', 'Impressions', 'Clicks', 'CTR', 'CPC', 'Views', 'Conversions', 'CPA', 'CVR'];
   const [selectedMetrics, setSelectedMetrics] = useState(availableMetrics);
 
@@ -74,7 +72,7 @@ export default function CreativeView({ data, exRate = 1, exSym = '$', formatShor
 
   useEffect(() => {
     setCreativePage(1);
-  }, [filterChannels, filterStatuses, filterPhases, searchQuery]);
+  }, [filterStatuses, searchQuery]);
 
 
   const handleSort = (key) => {
@@ -85,17 +83,12 @@ export default function CreativeView({ data, exRate = 1, exSym = '$', formatShor
     setSortConfig({ key, direction });
   };
 
-  const uniqueChannels = useMemo(() => Array.from(new Set(data.map(x => x.channel))).filter(Boolean).sort(), [data]);
-  const uniquePhases = useMemo(() => Array.from(new Set(data.map(x => x.phase))).filter(Boolean).sort(), [data]);
-
   // Aggregate creative performance
   const creativeTabData = useMemo(() => {
     const maxDate = d3.max(data, d => d.dateObj);
     const twoDaysAgo = maxDate ? new Date(maxDate.getTime() - 48 * 60 * 60 * 1000) : new Date();
 
     const filtered = data.filter(d => {
-      if (!filterChannels.includes('All') && !filterChannels.includes(d.channel)) return false;
-      if (!filterPhases.includes('All') && !filterPhases.includes(d.phase)) return false;
       if (searchQuery) {
         const sq = searchQuery.toLowerCase();
         if (!(d.creativeName && d.creativeName.toLowerCase().includes(sq)) && !(d.adName && d.adName.toLowerCase().includes(sq))) {
@@ -184,18 +177,18 @@ export default function CreativeView({ data, exRate = 1, exSym = '$', formatShor
       if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [data, filterChannels, filterStatuses, filterPhases, exRate, searchQuery, sortConfig]);
+  }, [data, filterStatuses, exRate, searchQuery, sortConfig]);
 
   const topCTR = [...creativeTabData].filter(x => x.impressions > 500).sort((a,b) => b.ctr - a.ctr).slice(0, 5);
-  const topCPC = [...creativeTabData].filter(x => x.clicks > 10).sort((a,b) => a.cpc - b.cpc).slice(0, 5); // Lowest CPC
+  const topCPA = [...creativeTabData].filter(x => x.purchases > 0 && x.cpa > 0).sort((a,b) => a.cpa - b.cpa).slice(0, 5); // Lowest CPA
   const topCost = [...creativeTabData].filter(x => x.cost > 0).sort((a,b) => b.cost - a.cost).slice(0, 5); // Highest Spend
   const topPurchases = [...creativeTabData].filter(x => x.purchases > 0).sort((a,b) => b.purchases - a.purchases).slice(0, 5); // Highest Conversions
 
-  const bestCPC = topCPC[0];
+  const bestCPA = topCPA[0];
   const bestCTR = topCTR[0];
   let insightText = "Not enough data to generate insights.";
-  if (bestCPC && bestCTR) {
-    insightText = `Creative "${bestCPC.creativeName}" is driving the most cost-efficient clicks at ${exSym}${d3.format(",.2f")(bestCPC.cpc)} CPC. Meanwhile, "${bestCTR.creativeName}" is capturing the highest attention with a ${(bestCTR.ctr*100).toFixed(2)}% CTR.`;
+  if (bestCPA && bestCTR) {
+    insightText = `Creative "${bestCPA.creativeName}" is driving the most cost-efficient conversions at ${exSym}${d3.format(",.2f")(bestCPA.cpa * exRate)} CPA. Meanwhile, "${bestCTR.creativeName}" is capturing the highest attention with a ${(bestCTR.ctr*100).toFixed(2)}% CTR.`;
   }
 
   const paginatedData = creativeTabData.slice((creativePage - 1) * CREATIVES_PER_PAGE, creativePage * CREATIVES_PER_PAGE);
@@ -267,7 +260,7 @@ export default function CreativeView({ data, exRate = 1, exSym = '$', formatShor
 
   const renderSortHeader = (label, key) => (
     <th 
-      className="px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest cursor-pointer hover:text-[#eef7f5] transition-colors whitespace-nowrap"
+      className="px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest cursor-pointer hover:text-[#eef7f5] transition-colors whitespace-nowrap sticky top-0 bg-[#0a2442] z-20"
       onClick={() => handleSort(key)}
     >
       <div className="flex items-center gap-1">
@@ -317,9 +310,9 @@ export default function CreativeView({ data, exRate = 1, exSym = '$', formatShor
          
          {userRole !== 'non-finance' && (
            <div className="card-surface backdrop-blur-2xl rounded-2xl border border-[#cedc28]/20 p-6 shadow-xl flex flex-col">
-              <h3 className="text-sm font-bold text-[#eef7f5] uppercase tracking-widest mb-4 flex items-center gap-2"><BarChart3 className="w-4 h-4 text-[#cedc28]"/> Top 5 by CPC (Lowest)</h3>
+              <h3 className="text-sm font-bold text-[#eef7f5] uppercase tracking-widest mb-4 flex items-center gap-2"><BarChart3 className="w-4 h-4 text-[#cedc28]"/> Top 5 by CPA (Lowest)</h3>
               <div className="flex-1 space-y-3">
-                 {topCPC.map((c, i) => (
+                 {topCPA.map((c, i) => (
                     <div key={i} className="flex flex-col gap-1">
                        <div className="flex justify-between text-xs text-[#14a6d9]">
                           <span className="flex-1 pr-2 break-words leading-tight" title={c.creativeName}>
@@ -330,14 +323,14 @@ export default function CreativeView({ data, exRate = 1, exSym = '$', formatShor
                               c.creativeName
                             )}
                           </span>
-                          <span className="font-bold text-[#cedc28]">{exSym}{d3.format(",.2f")(c.cpc)}</span>
+                          <span className="font-bold text-[#cedc28]">{exSym}{d3.format(",.2f")(c.cpa * exRate)}</span>
                        </div>
                        <div className="w-full bg-[#0a2442] h-1.5 rounded-full overflow-hidden">
-                          <div className="bg-[#74FA93] h-full rounded-full" style={{width: `${Math.min(100, (c.cpc / (topCPC[topCPC.length-1]?.cpc || 1)) * 100)}%`}}></div>
+                          <div className="bg-[#74FA93] h-full rounded-full" style={{width: `${Math.min(100, (c.cpa / (topCPA[topCPA.length-1]?.cpa || 1)) * 100)}%`}}></div>
                        </div>
                     </div>
                  ))}
-                 {topCPC.length === 0 && <div className="text-[#14a6d9] text-xs py-4 text-center">No data available</div>}
+                 {topCPA.length === 0 && <div className="text-[#14a6d9] text-xs py-4 text-center">No data available</div>}
               </div>
            </div>
          )}
@@ -402,10 +395,10 @@ export default function CreativeView({ data, exRate = 1, exSym = '$', formatShor
          <p className="text-sm text-[#eef7f5] font-medium">{insightText}</p>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8 border-b border-[#cedc28]/20 pb-6 relative z-[60]">
-        <MultiSelectDropdown label="Channel" options={uniqueChannels} selected={filterChannels} onChange={setFilterChannels} />
-        <MultiSelectDropdown label="Funnel Stage" options={uniquePhases} selected={filterPhases} onChange={setFilterPhases} />
-        <MultiSelectDropdown label="Status" options={['Live', 'Paused']} selected={filterStatuses} onChange={setFilterStatuses} />
+      <div className="flex flex-wrap gap-4 mb-8 border-b border-[#cedc28]/20 pb-6 relative z-[60]">
+        <div className="w-48">
+          <MultiSelectDropdown label="Status" options={['Live', 'Paused']} selected={filterStatuses} onChange={setFilterStatuses} />
+        </div>
       </div>
 
       <div className="flex flex-wrap justify-between items-end gap-4 mb-6 mt-4">
@@ -434,15 +427,15 @@ export default function CreativeView({ data, exRate = 1, exSym = '$', formatShor
 
 
         <div className="card-surface backdrop-blur-2xl rounded-3xl border border-[#cedc28]/20 shadow-xl export-slide overflow-hidden" data-title="Creative Data Breakdown">
-           <div className="overflow-x-auto w-full custom-scrollbar">
+           <div className="w-full custom-scrollbar" style={{ overflowY: 'scroll', overflowX: 'auto', maxHeight: '650px' }}>
               <table className="w-full text-left border-collapse min-w-max">
-                 <thead>
+                 <thead className="sticky top-0 z-20 bg-[#0a2442] shadow-sm">
                     <tr className="bg-[#0a2442] border-b border-[#cedc28]/20">
                        
-                       <th className="px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest whitespace-nowrap">Preview</th>
+                       <th className="px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest whitespace-nowrap sticky top-0 bg-[#0a2442] z-20">Preview</th>
                        {renderSortHeader('Creative Name', 'creativeName')}
-                       <th className="px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest whitespace-nowrap">Start Date</th>
-                       <th className="px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest whitespace-nowrap">Last Served On</th>
+                       <th className="px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest whitespace-nowrap sticky top-0 bg-[#0a2442] z-20">Start Date</th>
+                       <th className="px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest whitespace-nowrap sticky top-0 bg-[#0a2442] z-20">Last Served On</th>
                        {renderSortHeader('Status', 'status')}
                     {selectedMetrics.includes('Spend') && renderSortHeader('Spend', 'cost')}
                     {selectedMetrics.includes('Impressions') && renderSortHeader('Impr', 'impressions')}

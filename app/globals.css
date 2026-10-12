@@ -60,18 +60,30 @@ body {
   background: linear-gradient(135deg, #14a6d9, #118eb9); 
 }
 
-/* Custom Scrollbar for sleek look */
+/* Custom Scrollbar for sleek look and visible scrolling */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #cedc28 #0a2442;
+}
 .custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 10px;
+  height: 10px;
+  display: block;
 }
 .custom-scrollbar::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.02);
+  background: #0a2442;
+  border-radius: 8px;
+  border-left: 1px solid rgba(206, 220, 40, 0.2);
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(206, 220, 40, 0.2); /* Palm Glow */
-  border-radius: 10px;
+  background: #cedc28; /* Palm Glow */
+  border-radius: 8px;
+  border: 2px solid #0a2442;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(206, 220, 40, 0.4);
+  background: #e6f338;
 }
+.custom-scrollbar::-webkit-scrollbar-corner {
+  background: #0a2442;
+}
+

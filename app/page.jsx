@@ -156,7 +156,7 @@ const DateRangeFilter = ({ label, dateRange, onChange }) => {
   );
 };
 
-const MultiSelect = ({ label, options, selected, onChange }) => {
+const MultiSelect = ({ label, options, selected, onChange, widthClass }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const wrapperRef = useRef(null);
@@ -174,7 +174,7 @@ const MultiSelect = ({ label, options, selected, onChange }) => {
   }, []);
 
   return (
-    <div ref={wrapperRef} className="relative w-[120px] xl:w-[130px] shrink-0 z-30">
+    <div ref={wrapperRef} className={`relative ${widthClass || 'w-[120px] xl:w-[130px]'} shrink-0 z-30`}>
       <span className="text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest mb-1.5 block">{label}</span>
       <div 
         onClick={() => setIsOpen(!isOpen)}
@@ -184,7 +184,7 @@ const MultiSelect = ({ label, options, selected, onChange }) => {
         <ChevronDown className={`w-4 h-4 flex-shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </div>
       {isOpen && (
-        <div className="absolute top-full left-0 w-full h-0 z-50">
+        <div className="absolute top-full left-0 min-w-[200px] w-full h-0 z-50">
           <div className="w-full mt-2 card-surface backdrop-blur-3xl bg-[#0a2442]/90 border border-[#cedc28]/30 rounded-xl shadow-2xl flex flex-col max-h-64 overflow-hidden">
             <div className="p-2 border-b border-[#cedc28]/10 relative">
               <Search className="w-4 h-4 text-[#14a6d9] absolute left-4 top-1/2 -translate-y-1/2" />
@@ -280,7 +280,16 @@ const DataTable = ({ title, data, columns, totals, onRowClick, selectedRowId, ro
     <div className="flex flex-col gap-3">
       {(title || allowColumnSelect) && (
         <div className={`flex justify-between items-end relative z-20 ${!title ? 'justify-end' : ''}`}>
-          {title ? <h3 className="text-[#eef7f5] font-bold mb-1">{title}</h3> : <div />}
+          {title ? (
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
+              <h3 className="text-[#eef7f5] font-bold">{title}</h3>
+              {data.length > 0 && (
+                <span className="text-[10px] text-[#14a6d9] font-medium bg-[#14a6d9]/10 px-2 py-0.5 rounded-full border border-[#14a6d9]/20">
+                  {data.length} rows
+                </span>
+              )}
+            </div>
+          ) : <div />}
           <div className="flex items-end gap-3">
             <button 
               onClick={exportCSV}
@@ -300,12 +309,12 @@ const DataTable = ({ title, data, columns, totals, onRowClick, selectedRowId, ro
           </div>
         </div>
       )}
-      <div className="overflow-x-auto card-surface rounded-2xl border border-[#cedc28]/20 z-10 relative">
+      <div className="rounded-2xl border border-[#cedc28]/20 z-10 relative custom-scrollbar bg-[#0a2442]" style={{ overflowY: 'scroll', overflowX: 'auto', maxHeight: '550px' }}>
         <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-black/25 border-b border-[#cedc28]/20">
+          <thead className="sticky top-0 z-20 bg-[#0a2442] shadow-md">
+            <tr className="bg-[#0a2442] border-b border-[#cedc28]/20">
               {activeColumns.map((col, i) => (
-                <th key={i} className="px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest whitespace-nowrap">{col.label}</th>
+                <th key={i} className="px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest whitespace-nowrap sticky top-0 bg-[#0a2442] z-20">{col.label}</th>
               ))}
             </tr>
           </thead>
@@ -334,17 +343,19 @@ const DataTable = ({ title, data, columns, totals, onRowClick, selectedRowId, ro
                 </tr>
               );
             })}
-            {totals && data.length > 0 && (
-              <tr className="bg-black/40 border-t-2 border-[#cedc28]/50">
+            {data.length === 0 && <tr><td colSpan={activeColumns.length} className="px-6 py-8 text-center text-[#14a6d9] text-[11px]">No data available</td></tr>}
+          </tbody>
+          {totals && data.length > 0 && (
+            <tfoot className="sticky bottom-0 z-20 bg-[#071a30] shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.3)]">
+              <tr className="bg-[#071a30] border-t-2 border-[#cedc28]/50">
                 {activeColumns.map((col, j) => (
-                  <td key={j} className="px-6 py-4 text-[11px] font-bold text-[#cedc28] whitespace-nowrap relative">
+                  <td key={j} className="px-6 py-4 text-[11px] font-bold text-[#cedc28] whitespace-nowrap relative bg-[#071a30] sticky bottom-0 z-20">
                     <span className="relative z-10">{totals[col.key] !== undefined ? (col.format ? col.format(totals[col.key], totals) : totals[col.key]) : ''}</span>
                   </td>
                 ))}
               </tr>
-            )}
-            {data.length === 0 && <tr><td colSpan={activeColumns.length} className="px-6 py-8 text-center text-[#14a6d9] text-[11px]">No data available</td></tr>}
-          </tbody>
+            </tfoot>
+          )}
         </table>
       </div>
     </div>
@@ -705,17 +716,30 @@ export default function App() {
         if (!d.dateObj) return;
         const ev = (d.eventNameDB || '').toUpperCase();
         const campStart = firstImps[ev];
-        const eventStart = Object.entries(eventStartDates).find(([k]) => ev.includes(k))?.[1];
+        const eventEntry = Object.entries(eventStartDates).find(([k]) => ev.includes(k.toUpperCase()));
+        const eventStart = eventEntry?.[1];
         
         if (campStart && eventStart) {
            const dUTC = new Date(Date.UTC(d.dateObj.getFullYear(), d.dateObj.getMonth(), d.dateObj.getDate()));
-           const rowDays = Math.floor((dUTC - campStart) / MS_PER_DAY);
-           const rowBlock = Math.floor(rowDays / 7);
            
-           const eventDays = Math.floor((eventStart - campStart) / MS_PER_DAY);
-           const eventBlock = Math.floor(eventDays / 7);
-           
-           d.weekDB = `W${eventBlock - rowBlock}`;
+           // Helper to calculate week index from campStart (Week 0 is campStart until the immediate following Sunday)
+           // Then Week 1 is Monday to Sunday, Week 2 is Monday to Sunday, and so on.
+           const getWeekIndex = (targetDate) => {
+             const daysToSunday = (7 - campStart.getUTCDay()) % 7;
+             const firstWeekEnd = new Date(campStart.getTime() + daysToSunday * MS_PER_DAY);
+             if (targetDate <= firstWeekEnd) return 0;
+             const diffFromNextMonday = Math.floor((targetDate.getTime() - (firstWeekEnd.getTime() + MS_PER_DAY)) / MS_PER_DAY);
+             return 1 + Math.floor(diffFromNextMonday / 7);
+           };
+
+           const rowWeekIdx = getWeekIndex(dUTC);
+           const totalWeeks = getWeekIndex(eventStart);
+           const countdown = Math.max(0, totalWeeks - rowWeekIdx);
+           const yearSuffix = (eventStart.getUTCFullYear() % 100);
+           d.weekDB = `W${countdown} '${yearSuffix}`;
+        } else if (d.weekDB && /^W\d+$/i.test(d.weekDB)) {
+           const yr = d.dateObj ? (d.dateObj.getFullYear() % 100) : 26;
+           d.weekDB = `${d.weekDB} '${yr}`;
         }
       });
       // ------------------------------------
@@ -790,8 +814,8 @@ export default function App() {
     const weeks = Array.from(new Set(adData.map(d => d.weekDB))).filter(w => w && w !== 'Unknown');
     // Sort weeks numerically in countdown order (e.g. W12, W11 ... W0)
     return weeks.sort((a, b) => {
-      const numA = parseInt(a.replace(/[^\d-]/g, ''), 10);
-      const numB = parseInt(b.replace(/[^\d-]/g, ''), 10);
+      const numA = parseInt(a.match(/^W(\d+)/i)?.[1] || a.replace(/[^\d-]/g, '') || '0', 10);
+      const numB = parseInt(b.match(/^W(\d+)/i)?.[1] || b.replace(/[^\d-]/g, '') || '0', 10);
       return numB - numA;
     });
   }, [adData]);
@@ -1430,8 +1454,8 @@ export default function App() {
       let baseWeeklyData = filteredAdData.filter(d => d.eventNameDB === activeEventContext);
       
       const eventUniqueWeeks = Array.from(new Set(baseWeeklyData.map(d => d.weekDB))).filter(Boolean).sort((a, b) => {
-          const numA = parseInt(a.replace(/[^\d-]/g, '') || '0', 10);
-          const numB = parseInt(b.replace(/[^\d-]/g, '') || '0', 10);
+          const numA = parseInt(a.match(/^W(\d+)/i)?.[1] || a.replace(/[^\d-]/g, '') || '0', 10);
+          const numB = parseInt(b.match(/^W(\d+)/i)?.[1] || b.replace(/[^\d-]/g, '') || '0', 10);
           return numB - numA;
       });
 
@@ -1719,16 +1743,9 @@ export default function App() {
     }
 
     if (activeTab === 'creative') {
-      const filteredCreativeData = creativeData.filter(d => {
-        if (!filterCampaigns.includes('All') && !filterCampaigns.includes(d.campaignName)) return false;
-        if (!filterEvents.includes('All') && !filterEvents.includes(d.eventNameDB)) return false;
-        if (dateRange.start && d.date && d.date < new Date(dateRange.start)) return false;
-        if (dateRange.end && d.date && d.date > new Date(dateRange.end)) return false;
-        return true;
-      });
       return (
         <div className="w-full h-full">
-          <CreativeView data={filteredCreativeData} exRate={exRate} exSym={exSym} formatShort={formatShort} userRole={userRole} />
+          <CreativeView data={filteredAdData} exRate={exRate} exSym={exSym} formatShort={formatShort} userRole={userRole} />
         </div>
       );
     }
@@ -1759,7 +1776,7 @@ export default function App() {
             <MultiSelect label="Event Type" options={uniqueEventTypes} selected={filterEventTypes} onChange={setFilterEventTypes} />
             <MultiSelect label="Funnel Stage" options={uniquePhases} selected={filterPhases} onChange={setFilterPhases} />
             <MultiSelect label="Channel" options={uniqueChannels} selected={filterChannels} onChange={setFilterChannels} />
-            <MultiSelect label="Market" options={uniqueMarkets} selected={filterMarkets} onChange={setFilterMarkets} />
+            <MultiSelect label="Market" options={uniqueMarkets} selected={filterMarkets} onChange={setFilterMarkets} widthClass="w-[160px] xl:w-[185px]" />
             
             <div className="ml-auto shrink-0 flex items-end">
               <button onClick={resetFilters} title="Reset Filters" className="h-[34px] w-[34px] bg-[#cedc28]/10 border border-[#cedc28]/50 text-[#cedc28] rounded-lg hover:bg-[#cedc28]/20 hover:text-white transition-colors flex items-center justify-center"><RefreshCw className="w-4 h-4"/></button>
