@@ -558,12 +558,15 @@ export default function App() {
 
   const parseRow = (row, sourceEventName = '') => {
     const rawCost = parseMetric(row['Cost'] || row['Spend'] || 0);
-    const eventNameDB = (row['Event Name DB'] || '').trim() || sourceEventName;
+    let eventNameDB = (row['Event Name DB'] || '').trim() || sourceEventName;
+    if (eventNameDB === 'SMLC') {
+      eventNameDB = 'SMLC 26';
+    }
     const eventTypeDB = (row['Event Type DB'] || '').trim();
     const channel = row['Channel'] || 'Unknown';
-    // Derive portfolio: Default to P1, SMLC to P3
+    // Derive portfolio: Default to P1, SMLC & IDWS to P3
     let portfolio = 'P1';
-    if (eventNameDB.toUpperCase().includes('SMLC')) {
+    if (eventNameDB.toUpperCase().includes('SMLC') || eventNameDB.toUpperCase().includes('IDWS')) {
       portfolio = 'P3';
     }
 
@@ -614,7 +617,7 @@ export default function App() {
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    // Fetch from GSTS (default gid), SAIF (gid=1196409184), KoG 2026 (gid=1486784585), Black Hat (gid=659941332), and SMLC (gid=1526538255) sheets
+    // Fetch from GSTS (default gid), SAIF (gid=1196409184), KoG 2026 (gid=1486784585), Black Hat (gid=659941332), SMLC (gid=1526538255), and IDWS (gid=1121987876) sheets
     Promise.all([
       d3.csv(BASE_URL),
       d3.csv(BASE_URL + '&gid=1196409184'),
@@ -622,16 +625,20 @@ export default function App() {
       d3.csv(BASE_URL + '&gid=659941332'),
       d3.csv(BASE_URL + '&gid=1526538255'),
       d3.csv(BASE_URL + '&gid=1766297835'), // KOG Planned Data
-      d3.csv(BASE_URL + '&gid=570639072')  // SAIF Planned Data
-    ]).then(([gstsRaw, saifRaw, kogRaw, blackHatRaw, smlcRaw, kogPlannedRaw, saifPlannedRaw]) => {
+      d3.csv(BASE_URL + '&gid=570639072'),  // SAIF Planned Data
+      d3.csv(BASE_URL + '&gid=1121987876')  // IDWS Sheet
+    ]).then(([gstsRaw, saifRaw, kogRaw, blackHatRaw, smlcRaw, kogPlannedRaw, saifPlannedRaw, idwsRaw]) => {
       const gstsAds = gstsRaw.map(r => parseRow(r, 'GSTS'));
       const saifAds = saifRaw.map(r => parseRow(r, 'SAIF 26'));
       const kogAds = kogRaw.map(r => parseRow(r, 'KoG 26'));
       console.log("KOG Raw Data First Row:", kogRaw[0]);
       console.log("KOG Parsed Data First Row:", kogAds[0]);
       const blackHatAds = blackHatRaw.map(r => parseRow(r, 'BLACK HAT'));
-      const smlcAds = smlcRaw.map(r => parseRow(r, 'SMLC'));
-      const combinedAds = [...gstsAds, ...saifAds, ...kogAds, ...blackHatAds, ...smlcAds];
+      const smlcAds = smlcRaw.map(r => parseRow(r, 'SMLC 26'));
+      const idwsAds = idwsRaw
+        .filter(r => r.Date && r.Date >= '2026-06-01')
+        .map(r => parseRow(r, 'IDWS 26'));
+      const combinedAds = [...gstsAds, ...saifAds, ...kogAds, ...blackHatAds, ...smlcAds, ...idwsAds];
 
       const parsePlannedRows = (rawData, eventName) => {
         return rawData.filter(r => r.Channel && r.Channel.trim() !== '').map(r => {
@@ -676,7 +683,10 @@ export default function App() {
         'SAIF 26': new Date(Date.UTC(2026, 10, 24)), // Nov 24 2026
         'KoG 26': new Date(Date.UTC(2026, 11, 1)),   // Dec 1 2026
         'BLACK HAT': new Date(Date.UTC(2026, 11, 1)),
-        'SMLC': new Date(Date.UTC(2026, 9, 21))   // Oct 21 2026
+        'SMLC 26': new Date(Date.UTC(2026, 9, 21)),   // Oct 21 2026
+        'SMLC': new Date(Date.UTC(2026, 9, 21)),
+        'IDWS 26': new Date(Date.UTC(2026, 11, 14)), // Dec 14 2026
+        'IDWS': new Date(Date.UTC(2026, 11, 14))
       };
 
       const firstImps = {};

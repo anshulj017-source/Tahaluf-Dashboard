@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import * as d3 from 'd3';
-import { BarChart3, Zap, Grid, List, Check, Search, ChevronDown, MonitorPlay } from 'lucide-react';
+import { BarChart3, Zap, Grid, List, Check, Search, ChevronDown, MonitorPlay, Download } from 'lucide-react';
 
 const formatC = (val, dec=2) => val != null ? `$${d3.format(`,.${dec}f`)(val)}` : '$0.00';
 
@@ -141,13 +141,19 @@ export default function CreativeView({ data, exRate = 1, exSym = '$', formatShor
         }
       }
 
+      const previewUrl = rows.find(r => r.videoUrl)?.videoUrl || rows.find(r => r.postUrl)?.postUrl || rows.find(r => r.adImageUrl)?.adImageUrl || rows[0].videoUrl || rows[0].postUrl || rows[0].adImageUrl || '';
+      const adImageUrl = rows.find(r => r.adImageUrl)?.adImageUrl || rows[0].adImageUrl;
+      const videoUrl = rows.find(r => r.videoUrl)?.videoUrl || rows[0].videoUrl;
+      const postUrl = rows.find(r => r.postUrl)?.postUrl || rows[0].postUrl;
+
       return {
         adName,
         creativeName: rows[0].creativeName,
         campaignName: rows[0].campaignName,
-        adImageUrl: rows[0].adImageUrl,
-        videoUrl: rows[0].videoUrl,
-        postUrl: rows[0].postUrl,
+        adImageUrl,
+        videoUrl,
+        postUrl,
+        previewUrl,
         tiktokItemId: rows[0].tiktokItemId,
         channel: rows[0].channel,
         language: rows[0].language,
@@ -194,6 +200,70 @@ export default function CreativeView({ data, exRate = 1, exSym = '$', formatShor
 
   const paginatedData = creativeTabData.slice((creativePage - 1) * CREATIVES_PER_PAGE, creativePage * CREATIVES_PER_PAGE);
   const totalPages = Math.ceil(creativeTabData.length / CREATIVES_PER_PAGE);
+
+  const exportCSV = () => {
+    let csvContent = "";
+    
+    const cols = [
+      { label: "Creative Name", getVal: c => c.creativeName || c.adName || '' },
+      { label: "Preview Link", getVal: c => c.previewUrl || c.videoUrl || c.postUrl || c.adImageUrl || '' },
+      { label: "Channel", getVal: c => c.channel || '' },
+      { label: "Start Date", getVal: c => c.startDate || '' },
+      { label: "Last Served On", getVal: c => c.endDate || '' },
+      { label: "Status", getVal: c => c.status || '' }
+    ];
+
+    if (selectedMetrics.includes('Spend')) {
+      cols.push({ label: `Spend (${exSym})`, getVal: c => c.cost != null ? (Math.round(c.cost * 100) / 100).toFixed(2) : '0.00' });
+    }
+    if (selectedMetrics.includes('Impressions')) {
+      cols.push({ label: "Impressions", getVal: c => c.impressions || 0 });
+    }
+    if (selectedMetrics.includes('Clicks')) {
+      cols.push({ label: "Clicks", getVal: c => c.clicks || 0 });
+    }
+    if (selectedMetrics.includes('CTR')) {
+      cols.push({ label: "CTR (%)", getVal: c => c.ctr != null ? +(c.ctr * 100).toFixed(2) : 0 });
+    }
+    if (selectedMetrics.includes('CPC')) {
+      cols.push({ label: `CPC (${exSym})`, getVal: c => c.cpc != null ? (Math.round(c.cpc * 100) / 100).toFixed(2) : '0.00' });
+    }
+    if (selectedMetrics.includes('Views')) {
+      cols.push({ label: "Views", getVal: c => c.views || 0 });
+    }
+    if (selectedMetrics.includes('Conversions')) {
+      cols.push({ label: "Conversions", getVal: c => c.purchases || 0 });
+    }
+    if (selectedMetrics.includes('CPA')) {
+      cols.push({ label: `CPA (${exSym})`, getVal: c => c.cpa != null ? (Math.round(c.cpa * exRate * 100) / 100).toFixed(2) : '0.00' });
+    }
+    if (selectedMetrics.includes('CVR')) {
+      cols.push({ label: "CVR (%)", getVal: c => c.cr != null ? +(c.cr * 100).toFixed(2) : 0 });
+    }
+
+    const headerRow = cols.map(c => `"${c.label}"`).join(",");
+    csvContent += headerRow + "\r\n";
+
+    creativeTabData.forEach(c => {
+      const rowData = cols.map(col => {
+        let val = col.getVal(c);
+        if (val === undefined || val === null) val = '';
+        if (typeof val === 'string') val = val.replace(/"/g, '""');
+        return `"${val}"`;
+      });
+      csvContent += rowData.join(",") + "\r\n";
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `Creative_Performance_Data.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 100);
+  };
 
   const renderSortHeader = (label, key) => (
     <th 
@@ -340,7 +410,15 @@ export default function CreativeView({ data, exRate = 1, exSym = '$', formatShor
 
       <div className="flex flex-wrap justify-between items-end gap-4 mb-6 mt-4">
          <h3 className="text-lg font-bold text-[#eef7f5] tracking-tight">Creative Library ({creativeTabData.length})</h3>
-         <div className="flex gap-4 items-end w-full md:w-auto">
+         <div className="flex gap-3 items-end w-full md:w-auto">
+           <button 
+             onClick={exportCSV}
+             title="Export as CSV"
+             className="h-[34px] px-3 flex items-center justify-center gap-1.5 bg-[#0a2442] border border-[#cedc28]/30 rounded-lg text-[#cedc28] hover:bg-[#cedc28]/20 hover:border-[#cedc28] hover:text-[#cedc28] transition-colors text-xs font-bold shadow-sm"
+           >
+             <Download className="w-4 h-4 flex-shrink-0 text-[#cedc28]" />
+             <span className="whitespace-nowrap text-[#cedc28]">Export CSV</span>
+           </button>
            <div className="w-full md:w-64">
               <MultiSelectDropdown label="Metrics" options={availableMetrics} selected={selectedMetrics} onChange={setSelectedMetrics} />
            </div>
@@ -385,9 +463,10 @@ export default function CreativeView({ data, exRate = 1, exSym = '$', formatShor
                        <td className="px-6 py-3">
                           <div 
                              onClick={(e) => { 
-                                if(c.adImageUrl || c.videoUrl || c.postUrl) window.open(c.videoUrl || c.postUrl || c.adImageUrl, '_blank');
+                                const targetUrl = c.previewUrl || c.videoUrl || c.postUrl || c.adImageUrl;
+                                if (targetUrl) window.open(targetUrl, '_blank');
                              }}
-                             className={`group w-16 h-10 bg-[#0a2442] rounded-lg overflow-hidden border border-[#cedc28]/20 flex items-center justify-center relative ${c.adImageUrl || c.videoUrl || c.postUrl ? 'cursor-pointer' : 'cursor-default'}`}
+                             className={`group w-16 h-10 bg-[#0a2442] rounded-lg overflow-hidden border border-[#cedc28]/20 flex items-center justify-center relative ${c.previewUrl || c.adImageUrl || c.videoUrl || c.postUrl ? 'cursor-pointer' : 'cursor-default'}`}
                           >
                              {c.videoUrl && (
                                 <video 
