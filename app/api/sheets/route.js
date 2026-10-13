@@ -29,27 +29,46 @@ export async function GET(request) {
   }
 
   try {
-    let response = await fetch(url, { next: { revalidate: 60 } }); // Cache for 60 seconds
-    if (!response.ok) throw new Error('Failed to fetch from Google Sheets');
+    let response = await fetch(url, { cache: 'no-store', redirect: 'follow' });
+    if (!response.ok) {
+      console.warn(`Google Sheets returned status ${response.status} for ${url}`);
+      return new NextResponse('', {
+        status: 200,
+        headers: { 'Content-Type': 'text/csv' }
+      });
+    }
     
     let text = await response.text();
 
+    if (text.startsWith('<!DOCTYPE') || text.startsWith('<html')) {
+      console.warn(`Google Sheets returned HTML instead of CSV for ${url}`);
+      return new NextResponse('', {
+        status: 200,
+        headers: { 'Content-Type': 'text/csv' }
+      });
+    }
+
     if (text.startsWith('Loading...')) {
       console.log(`Google Sheets returned Loading... Retrying without cache for ${url}`);
-      response = await fetch(url, { cache: 'no-store' });
-      if (!response.ok) throw new Error('Failed to fetch from Google Sheets on retry');
-      text = await response.text();
+      await new Promise(r => setTimeout(r, 1000));
+      response = await fetch(url, { cache: 'no-store', redirect: 'follow' });
+      if (response.ok) {
+        text = await response.text();
+      }
     }
     
     return new NextResponse(text, {
       status: 200,
       headers: {
         'Content-Type': 'text/csv',
-        'Cache-Control': 's-maxage=60, stale-while-revalidate=120',
+        'Cache-Control': 'no-cache',
       },
     });
   } catch (error) {
     console.error('Error fetching sheet:', error);
-    return new NextResponse('Error fetching data', { status: 500 });
+    return new NextResponse('', {
+      status: 200,
+      headers: { 'Content-Type': 'text/csv' }
+    });
   }
 }

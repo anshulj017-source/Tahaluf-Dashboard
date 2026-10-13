@@ -12,6 +12,10 @@ export default function Login() {
   const router = useRouter();
 
   useEffect(() => {
+    if (process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true') {
+      router.push('/');
+      return;
+    }
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
         router.push('/');
@@ -101,6 +105,15 @@ export default function Login() {
           >
             {loading ? 'Authenticating...' : 'Sign In'}
           </button>
+          {process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true' && (
+            <button 
+              type="button" 
+              onClick={() => router.push('/')}
+              className="w-full bg-[#14a6d9]/20 hover:bg-[#14a6d9]/30 text-[#14a6d9] border border-[#14a6d9]/40 rounded-xl py-2.5 text-xs font-bold uppercase tracking-wider transition-all"
+            >
+              ⚡ Bypass Login (Local Testing)
+            </button>
+          )}
         </form>
       </div>
     </div>
