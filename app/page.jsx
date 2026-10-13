@@ -655,8 +655,9 @@ export default function App() {
       fetchCsvSafe(BASE_URL + '&gid=1766297835'), // KOG Planned Data
       fetchCsvSafe(BASE_URL + '&gid=570639072'),  // SAIF Planned Data
       fetchCsvSafe(BASE_URL + '&gid=1121987876'), // IDWS Sheet
-      fetchCsvSafe(BASE_URL + '&gid=2019892532')  // GSTS Planned Data
-    ]).then(([gstsRaw = [], saifRaw = [], kogRaw = [], blackHatRaw = [], smlcRaw = [], kogPlannedRaw = [], saifPlannedRaw = [], idwsRaw = [], gstsPlannedRaw = []]) => {
+      fetchCsvSafe(BASE_URL + '&gid=2019892532'), // GSTS Planned Data
+      d3.text(BASE_URL + '&gid=277310277').catch(() => '') // Black Hat Planned Data (Exprom @ AB2, Visprom @ AB12)
+    ]).then(([gstsRaw = [], saifRaw = [], kogRaw = [], blackHatRaw = [], smlcRaw = [], kogPlannedRaw = [], saifPlannedRaw = [], idwsRaw = [], gstsPlannedRaw = [], blackHatPlannedText = '']) => {
       const gstsAds = gstsRaw.map(r => parseRow(r, 'GSTS'));
       const saifAds = saifRaw.map(r => parseRow(r, 'SAIF 26'));
       const kogAds = kogRaw.map(r => parseRow(r, 'KoG 26'));
@@ -688,6 +689,7 @@ export default function App() {
           let normalizedPhase = phaseRaw;
           if (phaseRaw.toLowerCase() === 'consideration') normalizedPhase = 'Traffic';
           else if (phaseRaw.toLowerCase() === 'conversion') normalizedPhase = 'Conversions';
+          else if (phaseRaw.toLowerCase().startsWith('boost')) normalizedPhase = 'Boosting';
 
           return {
             event: eventName,
@@ -701,10 +703,33 @@ export default function App() {
         });
       };
 
+      // Black Hat planned sheet: two tables in columns AB:AD (Channel, Funnel Stage, Planned Budget),
+      // preceded by an "Exprom" / "Visprom" label row. Parse by section label.
+      const parseBlackHatPlanned = (text) => {
+        if (!text) return [];
+        const rows = d3.csvParseRows(text);
+        const COL = 27; // AB
+        const out = [];
+        let section = null;
+        rows.forEach(r => {
+          const c0 = (r[COL] || '').trim();
+          const c1 = (r[COL + 1] || '').trim();
+          const c2 = (r[COL + 2] || '').trim();
+          if (/^exprom$/i.test(c0)) { section = 'Exprom'; return; }
+          if (/^visprom$/i.test(c0)) { section = 'Visprom'; return; }
+          if (!section || !c0 || c0.toLowerCase() === 'channel' || /^total/i.test(c0)) return;
+          out.push({ Channel: c0, 'Funnel Stage': c1, 'Planned Budget': c2, __eventType: section });
+        });
+        return out;
+      };
+      const bhRows = parseBlackHatPlanned(blackHatPlannedText);
+      const blackHatPlanned = parsePlannedRows(bhRows, 'Black Hat').map((p, i) => ({ ...p, eventType: bhRows.filter(r => r.Channel && r.Channel.trim() !== '')[i].__eventType }));
+
       const parsedPlannedData = [
         ...parsePlannedRows(kogPlannedRaw, 'KoG 26'),
         ...parsePlannedRows(saifPlannedRaw, 'SAIF 26'),
-        ...parsePlannedRows(gstsPlannedRaw, 'GSTS 26')
+        ...parsePlannedRows(gstsPlannedRaw, 'GSTS 26'),
+        ...blackHatPlanned
       ];
 
       // --- Dynamic Week DB Calculation ---
@@ -1063,6 +1088,13 @@ export default function App() {
 
   // Removed unused getTotals
 
+  // Planned data scoped by Event Type master filter (rows with an eventType, e.g. Black Hat Exprom/Visprom,
+  // are kept only when their type is selected; with no filter, both types are summed).
+  const PLANNED_EVENTS = ['KoG 26', 'SAIF 26', 'GSTS 26', 'Black Hat'];
+  const scopedPlannedData = filterEventTypes.includes('All')
+    ? plannedData
+    : plannedData.filter(p => !p.eventType || filterEventTypes.includes(p.eventType));
+
   const generatePpt = async () => {
       if (isGenerating) return;
       setIsGenerating(true);
@@ -1172,18 +1204,18 @@ export default function App() {
         
         let row = { [keyName]: key || 'Unknown', spend, impressions, clicks, ctr, cpm, cpc, cpa, cvr, purchases };
         
-        const activePlannedEvent = (filterEvents.length === 1 && ['KoG 26', 'SAIF 26', 'GSTS 26'].includes(filterEvents[0])) ? filterEvents[0] : (['KoG 26', 'SAIF 26', 'GSTS 26'].includes(selectedEvent) ? selectedEvent : null);
-        if (plannedData.length > 0) {
+        const activePlannedEvent = (filterEvents.length === 1 && PLANNED_EVENTS.includes(filterEvents[0])) ? filterEvents[0] : (PLANNED_EVENTS.includes(selectedEvent) ? selectedEvent : null);
+        if (scopedPlannedData.length > 0) {
              let pBudget = 0;
              if (keyName === 'eventName') {
-                 const pData = plannedData.filter(p => p.event === key);
+                 const pData = scopedPlannedData.filter(p => p.event === key);
                  pBudget = d3.sum(pData, p => p.plannedBudget);
              } else if (activePlannedEvent) {
                  if (keyName === 'channel') {
-                     const pData = plannedData.filter(p => p.channel === key && p.event === activePlannedEvent);
+                     const pData = scopedPlannedData.filter(p => p.channel === key && p.event === activePlannedEvent);
                      pBudget = d3.sum(pData, p => p.plannedBudget);
                  } else if (keyName === 'phase') {
-                     const pData = plannedData.filter(p => p.phase === key && p.event === activePlannedEvent);
+                     const pData = scopedPlannedData.filter(p => p.phase === key && p.event === activePlannedEvent);
                      pBudget = d3.sum(pData, p => p.plannedBudget);
                  }
              }
@@ -1209,11 +1241,11 @@ export default function App() {
         
         let totals = { spend, impressions, clicks, ctr, cpm, cpc, cpa, cvr, purchases };
         
-        const activePlannedEvent = (filterEvents.length === 1 && ['KoG 26', 'SAIF 26', 'GSTS 26'].includes(filterEvents[0])) ? filterEvents[0] : (['KoG 26', 'SAIF 26', 'GSTS 26'].includes(selectedEvent) ? selectedEvent : null);
-        if (plannedData.length > 0) {
-           let pData = plannedData;
+        const activePlannedEvent = (filterEvents.length === 1 && PLANNED_EVENTS.includes(filterEvents[0])) ? filterEvents[0] : (PLANNED_EVENTS.includes(selectedEvent) ? selectedEvent : null);
+        if (scopedPlannedData.length > 0) {
+           let pData = scopedPlannedData;
            if (activePlannedEvent) {
-               pData = plannedData.filter(p => p.event === activePlannedEvent);
+               pData = scopedPlannedData.filter(p => p.event === activePlannedEvent);
            }
            const pBudget = d3.sum(pData, p => p.plannedBudget);
            if (pBudget > 0) {
@@ -1256,7 +1288,7 @@ export default function App() {
       };
 
       const createColumns = (key, label) => {
-        const activePlannedEvent = (filterEvents.length === 1 && ['KoG 26', 'SAIF 26', 'GSTS 26'].includes(filterEvents[0])) ? filterEvents[0] : (['KoG 26', 'SAIF 26', 'GSTS 26'].includes(selectedEvent) ? selectedEvent : null);
+        const activePlannedEvent = (filterEvents.length === 1 && PLANNED_EVENTS.includes(filterEvents[0])) ? filterEvents[0] : (PLANNED_EVENTS.includes(selectedEvent) ? selectedEvent : null);
         const showPlanned = key === 'eventName' || (activePlannedEvent && key !== 'market');
           let cols = [
             { key: key, label: label },
