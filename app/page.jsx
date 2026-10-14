@@ -645,7 +645,7 @@ export default function App() {
       return [];
     });
 
-    // Fetch from GSTS (default gid), SAIF (gid=1196409184), KoG 2026 (gid=1486784585), Black Hat (gid=659941332), SMLC (gid=1526538255), and IDWS (gid=1121987876) sheets
+    // Fetch from GSTS (default gid), SAIF (gid=1196409184), KoG 2026 (gid=1486784585), Black Hat (gid=659941332), SMLC (gid=1526538255), IDWS (gid=1121987876), BIO/CPHI (gid=1728688512), and CPHI LinkedIn (gid=208497314)
     Promise.all([
       fetchCsvSafe(BASE_URL),
       fetchCsvSafe(BASE_URL + '&gid=1196409184'),
@@ -656,8 +656,10 @@ export default function App() {
       fetchCsvSafe(BASE_URL + '&gid=570639072'),  // SAIF Planned Data
       fetchCsvSafe(BASE_URL + '&gid=1121987876'), // IDWS Sheet
       fetchCsvSafe(BASE_URL + '&gid=2019892532'), // GSTS Planned Data
-      d3.text(BASE_URL + '&gid=277310277').catch(() => '') // Black Hat Planned Data (Exprom @ AB2, Visprom @ AB12)
-    ]).then(([gstsRaw = [], saifRaw = [], kogRaw = [], blackHatRaw = [], smlcRaw = [], kogPlannedRaw = [], saifPlannedRaw = [], idwsRaw = [], gstsPlannedRaw = [], blackHatPlannedText = '']) => {
+      d3.text(BASE_URL + '&gid=277310277').catch(() => ''), // Black Hat Planned Data (Exprom @ AB2, Visprom @ AB12)
+      fetchCsvSafe(BASE_URL + '&gid=1728688512'), // BIO 26 & CPHI 26 (Meta, Google Ads, LinkedIn for BIO)
+      fetchCsvSafe(BASE_URL + '&gid=208497314')   // CPHI 26 (LinkedIn)
+    ]).then(([gstsRaw = [], saifRaw = [], kogRaw = [], blackHatRaw = [], smlcRaw = [], kogPlannedRaw = [], saifPlannedRaw = [], idwsRaw = [], gstsPlannedRaw = [], blackHatPlannedText = '', bioCphiRaw = [], cphiLiRaw = []]) => {
       const gstsAds = gstsRaw.map(r => parseRow(r, 'GSTS'));
       const saifAds = saifRaw.map(r => parseRow(r, 'SAIF 26'));
       const kogAds = kogRaw.map(r => parseRow(r, 'KoG 26'));
@@ -668,7 +670,13 @@ export default function App() {
       const idwsAds = idwsRaw
         .filter(r => r.Date && r.Date >= '2026-06-01')
         .map(r => parseRow(r, 'IDWS 26'));
-      const combinedAds = [...gstsAds, ...saifAds, ...kogAds, ...blackHatAds, ...smlcAds, ...idwsAds];
+      const bioCphiAds = bioCphiRaw
+        .filter(r => r.Date && r.Date.startsWith('2026'))
+        .map(r => parseRow(r));
+      const cphiLiAds = cphiLiRaw
+        .filter(r => !r.Date || r.Date.startsWith('2026'))
+        .map(r => parseRow(r, 'CPHI 26'));
+      const combinedAds = [...gstsAds, ...saifAds, ...kogAds, ...blackHatAds, ...smlcAds, ...idwsAds, ...bioCphiAds, ...cphiLiAds];
 
       const parsePlannedRows = (rawData, eventName) => {
         return rawData.filter(r => r.Channel && r.Channel.trim() !== '').map(r => {
@@ -741,7 +749,11 @@ export default function App() {
         'SMLC 26': new Date(Date.UTC(2026, 9, 21)),   // Oct 21 2026
         'SMLC': new Date(Date.UTC(2026, 9, 21)),
         'IDWS 26': new Date(Date.UTC(2026, 11, 14)), // Dec 14 2026
-        'IDWS': new Date(Date.UTC(2026, 11, 14))
+        'IDWS': new Date(Date.UTC(2026, 11, 14)),
+        'BIO 26': new Date(Date.UTC(2026, 11, 14)),  // Dec 14 2026
+        'BIO': new Date(Date.UTC(2026, 11, 14)),
+        'CPHI 26': new Date(Date.UTC(2026, 11, 14)), // Dec 14 2026
+        'CPHI': new Date(Date.UTC(2026, 11, 14))
       };
 
       const firstImps = {};
