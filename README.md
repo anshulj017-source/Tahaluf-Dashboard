@@ -1,3 +1,10 @@
+# Tahaluf Dashboard
+
+## Quick Links
+- **Live Dashboard**: [https://tahaluf-dashboard.vercel.app](https://tahaluf-dashboard.vercel.app)
+- **GitHub Repository**: [anshulj017-source/Tahaluf-Dashboard](https://github.com/anshulj017-source/Tahaluf-Dashboard)
+- **Local Dev**: [http://localhost:3000](http://localhost:3000)
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started
@@ -15,6 +22,25 @@ bun dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+
+## Automated Testing & Validation
+
+The repository includes a comprehensive 94-check test suite (`tests/dashboard.test.mjs`) that verifies:
+- Mathematical parsing & zero-division safety (CTR, CPM, CPC, CPA).
+- Event name and portfolio normalizations (P1 vs P3, SMLC 26, BIO 26, CPHI 26, etc.).
+- Dynamic countdown week calculations (`W20 '26` down to `W0 '26`).
+- Connectivity and row volume for all 12 sheet endpoints.
+- In-memory caching resilience and latency (<200ms).
+
+To run the test suite:
+```bash
+npm test
+```
+
+To run both the test suite and a production build verification:
+```bash
+npm run prepublish-check
+```
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 

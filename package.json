@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "node tests/dashboard.test.mjs",
+    "prepublish-check": "node tests/dashboard.test.mjs && next build"
   },
   "dependencies": {
     "@clerk/themes": "^2.0.0",
