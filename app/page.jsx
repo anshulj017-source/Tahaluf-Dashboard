@@ -2009,7 +2009,10 @@ export default function App() {
         
         {/* TABS CONTENT */}
         {activeTab === 'admin' ? (
-          <AdminView currentUserEmail={userEmail || (auth?.currentUser?.email) || 'admin@tahaluf.com'} />
+          <AdminView 
+            currentUserEmail={userEmail || (auth?.currentUser?.email) || 'admin@tahaluf.com'} 
+            initialEvents={eventsConfiguration}
+          />
         ) : (
         <main className="flex-1 overflow-y-auto p-8 custom-scrollbar relative z-10">
           <ReactTooltip id="market-tooltip" className="z-50" style={{ backgroundColor: '#0a2442', color: '#eef7f5', border: '1px solid #cedc2830', borderRadius: '8px', zIndex: 1000 }} />

@@ -8,22 +8,26 @@ export async function GET(req) {
   try {
     const { adminAuth, adminDb } = getFirebaseAdmin();
     const listUsersResult = await adminAuth.listUsers(1000);
-    const users = [];
 
-    // Fetch isAdmin from Firestore for each user
-    for (const userRecord of listUsersResult.users) {
-      const docRef = adminDb.collection('users').doc(userRecord.uid);
-      const docSnap = await docRef.get();
-      const userData = docSnap.exists ? docSnap.data() : {};
-      
-      users.push({
+    // Fetch all user roles from Firestore in a single query instead of sequential roundtrips
+    const usersSnapshot = await adminDb.collection('users').get().catch(() => null);
+    const userRolesMap = new Map();
+    if (usersSnapshot && !usersSnapshot.empty) {
+      usersSnapshot.forEach(doc => {
+        userRolesMap.set(doc.id, doc.data());
+      });
+    }
+
+    const users = listUsersResult.users.map(userRecord => {
+      const userData = userRolesMap.get(userRecord.uid) || {};
+      return {
         uid: userRecord.uid,
         email: userRecord.email,
         role: userData.role || (userData.isAdmin ? 'admin' : 'standard'),
         lastSignInTime: userData.lastActive || userRecord.metadata.lastSignInTime || null,
         creationTime: userRecord.metadata.creationTime || null,
-      });
-    }
+      };
+    });
 
     return NextResponse.json({ users });
   } catch (error) {

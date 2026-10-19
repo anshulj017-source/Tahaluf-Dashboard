@@ -8,12 +8,13 @@ import {
   Shield, Lock, Eye, EyeOff, User
 } from 'lucide-react';
 
-export default function EventsAdmin({ currentUserEmail = 'admin@tahaluf.com' }) {
+export default function EventsAdmin({ currentUserEmail = 'admin@tahaluf.com', initialEvents = [] }) {
   const currentAuthor = currentUserEmail || 'admin@tahaluf.com';
-  const [config, setConfig] = useState(null);
-  const [events, setEvents] = useState([]);
+  const hasInitial = Array.isArray(initialEvents) && initialEvents.length > 0;
+  const [config, setConfig] = useState(hasInitial ? { events: initialEvents, version: 'v1.0.0' } : null);
+  const [events, setEvents] = useState(hasInitial ? initialEvents : []);
   const [history, setHistory] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!hasInitial);
   const [error, setError] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -40,8 +41,8 @@ export default function EventsAdmin({ currentUserEmail = 'admin@tahaluf.com' }) 
   const [quickEndDate, setQuickEndDate] = useState('');
 
   // Fetch events config and version history
-  const fetchConfig = async () => {
-    setLoading(true);
+  const fetchConfig = async (isBackground = false) => {
+    if (!isBackground) setLoading(true);
     setError(null);
     try {
       const res = await fetch('/api/admin/events');
@@ -55,14 +56,14 @@ export default function EventsAdmin({ currentUserEmail = 'admin@tahaluf.com' }) 
       setHistory(data.history || []);
     } catch (err) {
       console.error(err);
-      setError(err.message || 'Error connecting to events admin API');
+      if (!isBackground) setError(err.message || 'Error connecting to events admin API');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchConfig();
+    fetchConfig(hasInitial);
   }, []);
 
   const showNotification = (msg) => {

@@ -3,10 +3,10 @@ import React, { useState, useEffect } from 'react';
 import { Trash2, UserPlus, Shield, User, RefreshCw, CheckCircle2, Key, Layers, Users as UsersIcon } from 'lucide-react';
 import EventsAdmin from './components/EventsAdmin';
 
-export default function AdminView({ currentUserEmail = 'admin@tahaluf.com' }) {
+export default function AdminView({ currentUserEmail = 'admin@tahaluf.com', initialEvents = [] }) {
   const [activeSection, setActiveSection] = useState('events'); // 'events' | 'users'
   const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   
   // New user form state
@@ -46,9 +46,12 @@ export default function AdminView({ currentUserEmail = 'admin@tahaluf.com' }) {
     }
   };
 
+  // Only fetch users on demand when switching to the users section
   useEffect(() => {
-    fetchUsers();
-  }, []);
+    if (activeSection === 'users' && users.length === 0) {
+      fetchUsers();
+    }
+  }, [activeSection]);
 
   const handleAddUser = async (e) => {
     e.preventDefault();
@@ -190,7 +193,7 @@ export default function AdminView({ currentUserEmail = 'admin@tahaluf.com' }) {
 
         {/* SECTION 1: EVENTS & DATA CONFIGURATION */}
         {activeSection === 'events' && (
-          <EventsAdmin currentUserEmail={currentUserEmail} />
+          <EventsAdmin currentUserEmail={currentUserEmail} initialEvents={initialEvents} />
         )}
 
         {/* SECTION 2: USER ACCESS MANAGEMENT */}
