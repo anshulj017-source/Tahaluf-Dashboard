@@ -194,6 +194,10 @@ async function testApiEndpoints() {
   // Test In-Memory Caching on SMLC
   console.log('\n--- 5. Testing In-Memory Caching & Performance ---');
   const cacheTestUrl = `${LOCAL_API_BASE}?type=combined&gid=1526538255`;
+  // Prime the cache with an initial request
+  await fetch(cacheTestUrl);
+  
+  // Measure cached request performance
   const t0 = Date.now();
   const cachedRes = await fetch(cacheTestUrl);
   const elapsed = Date.now() - t0;
@@ -204,6 +208,130 @@ async function testApiEndpoints() {
   assert(xCache === 'HIT', `X-Cache header indicates cache HIT (got: ${xCache})`);
   assert(cacheControl && cacheControl.includes('stale-while-revalidate'), `Cache-Control includes stale-while-revalidate (got: ${cacheControl})`);
   assert(elapsed < 200, `Cached response returned in <200ms (actual: ${elapsed}ms)`);
+}
+
+// -------------------------------------------------------------
+// 6. INTEGRATION TESTS: ADMIN EVENTS CONFIG & VERSION CONTROL
+// -------------------------------------------------------------
+async function testAdminEventsApi() {
+  console.log('\n--- 6. Testing Admin Events Configuration & Version Control ---');
+  const adminEventsUrl = `http://localhost:${PORT}/api/admin/events`;
+
+  try {
+    const res = await fetch(adminEventsUrl);
+    assert(res.status === 200, 'Admin Events API: Returns HTTP 200');
+
+    const data = await res.json();
+    assert(data.success === true, 'Admin Events API: Returns success: true');
+    assert(data.config && Array.isArray(data.config.events), 'Admin Events API: Returns events array');
+    assert(data.config.events.length >= 8, `Admin Events API: Contains at least 8 events (found: ${data.config?.events?.length})`);
+
+    // Verify key events exist in config
+    const eventNames = data.config.events.map(e => e.name);
+    assert(eventNames.includes('CPHI 26 (LinkedIn)') || eventNames.some(n => n.includes('CPHI')), 'Config includes CPHI event');
+    assert(eventNames.some(n => n.includes('BIO')), 'Config includes BIO event');
+    assert(eventNames.includes('SMLC 26'), 'Config includes SMLC 26 event');
+    assert(eventNames.includes('IDWS 26'), 'Config includes IDWS 26 event');
+    assert(eventNames.includes('GSTS 26'), 'Config includes GSTS 26 event');
+    assert(eventNames.includes('SAIF 26'), 'Config includes SAIF 26 event');
+    assert(eventNames.includes('KoG 26'), 'Config includes KoG 26 event');
+    assert(eventNames.includes('Black Hat'), 'Config includes Black Hat event');
+
+    // Verify Version Control & History
+    assert(Array.isArray(data.history), 'Admin Events API: History array is present');
+    assert(data.history.length > 0, `Admin Events API: History contains snapshots (found: ${data.history?.length})`);
+    const latestVersion = data.history[0];
+    assert(Boolean(latestVersion.versionId), `Latest version has valid versionId (${latestVersion?.versionId})`);
+    assert(Boolean(latestVersion.timestamp), 'Latest version has valid timestamp');
+    assert(Boolean(latestVersion.snapshot), 'Latest version includes complete config snapshot');
+
+    // Test Toggle action with rollback
+    const toggleRes = await fetch(adminEventsUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'toggle',
+        eventId: 'gsts-26',
+        enabled: true,
+        author: 'Automated Test'
+      })
+    });
+    const toggleData = await toggleRes.json();
+    assert(toggleData.success === true, 'Admin Events API: Toggle event succeeds');
+    assert(toggleData.config?.version !== undefined, 'Admin Events API: Increments version on change');
+
+    // Test Validate Sheet Action
+    const validateRes = await fetch(adminEventsUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'validate-sheet',
+        gid: '1526538255' // SMLC sheet GID
+      })
+    });
+    const validateData = await validateRes.json();
+    assert(validateData.success === true, 'Admin Events API: Sheet validator succeeds');
+    assert(validateData.valid === true, 'Admin Events API: Validates live sheet correctly');
+    assert(validateData.rowCount > 5000, `Admin Events API: Detected accurate row volume (${validateData.rowCount} rows)`);
+    assert(validateData.hasSpend === true, 'Admin Events API: Identifies Spend/Cost column');
+    assert(validateData.hasDate === true, 'Admin Events API: Identifies Date column');
+
+    // Test Promote Action (Testing Admin Only -> Active)
+    const promoteRes = await fetch(adminEventsUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'promote',
+        eventId: 'smlc-26',
+        author: 'Automated Test'
+      })
+    });
+    const promoteData = await promoteRes.json();
+    assert(promoteData.success === true, 'Admin Events API: Promote event succeeds');
+    const smlcEvent = promoteData.config?.events?.find(e => e.id === 'smlc-26');
+    assert(smlcEvent?.status === 'active', 'Promoted event has status: active');
+    assert(smlcEvent?.visibility === 'public', 'Promoted event has visibility: public');
+    assert(smlcEvent?.enabled === true, 'Promoted event is enabled');
+
+    // Test Admin Attribution & Action Tagging
+    const authorRes = await fetch(adminEventsUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'set-status',
+        eventId: 'smlc-26',
+        status: 'admin_only',
+        author: 'admin@tahaluf.com'
+      })
+    });
+    const authorData = await authorRes.json();
+    assert(authorData.success === true, 'Admin Events API: Status change succeeds');
+    assert(authorData.config?.updatedBy === 'admin@tahaluf.com', 'Admin Attribution: Configuration updatedBy matches admin email');
+    const latestHistory = authorData.history?.[0];
+    assert(latestHistory?.author === 'admin@tahaluf.com', 'Admin Attribution: Version history entry author matches admin email');
+    assert(latestHistory?.action === 'STATUS_CHANGE', 'Audit Trail: Action type correctly tagged as STATUS_CHANGE');
+
+    // Test 1-Click Restore / Rollback functionality
+    const targetVersionId = authorData.history?.[1]?.versionId;
+    if (targetVersionId) {
+      const revertRes = await fetch(adminEventsUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'revert',
+          versionId: targetVersionId,
+          author: 'recovery-admin@tahaluf.com'
+        })
+      });
+      const revertData = await revertRes.json();
+      assert(revertRes.ok && revertData.success === true, '1-Click Restore: Rollback action succeeds');
+      assert(revertData.history?.[0]?.action === 'REVERT', '1-Click Restore: History records action REVERT');
+      assert(revertData.history?.[0]?.author === 'recovery-admin@tahaluf.com', '1-Click Restore: Rollback records restoring admin author');
+      assert(revertData.config?.updatedBy === 'recovery-admin@tahaluf.com', '1-Click Restore: Config updatedBy reflects restoring admin');
+    }
+  } catch (err) {
+    assert(false, `Admin Events API: Exception (${err.message})`);
+  }
 }
 
 // -------------------------------------------------------------
@@ -223,6 +351,7 @@ async function runAllTests() {
     const health = await fetch(`http://localhost:${PORT}`);
     if (health.status === 200) {
       await testApiEndpoints();
+      await testAdminEventsApi();
     } else {
       console.warn(`Local server responded with status ${health.status}, skipping live API tests.`);
     }

@@ -3,7 +3,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import * as d3 from 'd3';
 import { 
   TrendingUp, Globe, Layers, Activity, DollarSign, MousePointer2, 
-  Eye, Zap, LayoutDashboard, ChevronDown, Search, Check, ShoppingCart,
+  Eye, EyeOff, Shield, Zap, LayoutDashboard, ChevronDown, Search, Check, ShoppingCart,
   TableProperties, MonitorPlay, BarChart3, Smartphone, List, Download, RefreshCw, Users, Calendar, LayoutTemplate, PieChart, Grid, Map, LogOut
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, AreaChart, Area } from 'recharts';
@@ -487,6 +487,7 @@ export default function App() {
   const isDevBypass = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
   const [isAuthenticated, setIsAuthenticated] = useState(isDevBypass);
   const [userRole, setUserRole] = useState(isDevBypass ? 'admin' : 'standard');
+  const [userEmail, setUserEmail] = useState(isDevBypass ? 'admin@tahaluf.com' : '');
   const [isAuthLoading, setIsAuthLoading] = useState(!isDevBypass);
   const [adData, setAdData] = useState([]);
   const [gaData, setGaData] = useState([]);
@@ -504,6 +505,8 @@ export default function App() {
   const [selectedMarket, setSelectedMarket] = useState(null);
   const [marketTrendView, setMarketTrendView] = useState('Weekly');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [eventsConfiguration, setEventsConfiguration] = useState([]);
+  const [simulatingStandardUser, setSimulatingStandardUser] = useState(false);
   
   // State: Global Filters
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
@@ -547,6 +550,7 @@ export default function App() {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         setIsAuthenticated(true);
+        setUserEmail(user.email || user.displayName || 'admin@tahaluf.com');
         try {
           const userDoc = await getDoc(doc(db, 'users', user.uid));
           if (userDoc.exists()) {
@@ -579,18 +583,38 @@ export default function App() {
     router.push('/login');
   };
 
-  const parseRow = (row, sourceEventName = '') => {
-    const rawCost = parseMetric(row['Cost'] || row['Spend'] || 0);
-    let eventNameDB = (row['Event Name DB'] || '').trim() || sourceEventName;
+  const parseRow = (row, sourceEventName = '', forcedPortfolio = null, fieldAliases = null) => {
+    const rawCost = parseMetric(
+      (fieldAliases?.spend && row[fieldAliases.spend] !== undefined)
+        ? row[fieldAliases.spend]
+        : (row['Cost'] || row['Spend'] || row['Media Spend'] || 0)
+    );
+
+    const rowDate = (fieldAliases?.date && row[fieldAliases.date] !== undefined)
+      ? row[fieldAliases.date]
+      : row['Date'];
+
+    let eventNameDB = (fieldAliases?.event && row[fieldAliases.event] !== undefined)
+      ? String(row[fieldAliases.event]).trim()
+      : ((row['Event Name DB'] || '').trim() || sourceEventName);
     if (eventNameDB === 'SMLC') {
       eventNameDB = 'SMLC 26';
     }
+    // Auto-resolve combined BIO / CPHI sheet rows when Event Name DB is empty or generic
+    if (!eventNameDB || eventNameDB === 'BIO / CPHI' || eventNameDB === 'Unknown') {
+      const cName = (row['Campaign Name'] || row['Campaign name'] || row['Campaign DB'] || '').toUpperCase();
+      if (cName.includes('CPHI')) eventNameDB = 'CPHI 26';
+      else if (cName.includes('BIO')) eventNameDB = 'BIO 26';
+    }
     const eventTypeDB = (row['Event Type DB'] || '').trim();
     const channel = row['Channel'] || 'Unknown';
-    // Derive portfolio: Default to P1, SMLC & IDWS to P3
-    let portfolio = 'P1';
-    if (eventNameDB.toUpperCase().includes('SMLC') || eventNameDB.toUpperCase().includes('IDWS')) {
-      portfolio = 'P3';
+    // Derive portfolio: prioritize forcedPortfolio from admin config, else fallback to standard contracts
+    let portfolio = forcedPortfolio || 'P1';
+    if (!forcedPortfolio) {
+      const upper = (eventNameDB || '').toUpperCase();
+      if (upper.includes('SMLC') || upper.includes('IDWS') || upper.includes('BIO') || upper.includes('CPHI')) {
+        portfolio = 'P3';
+      }
     }
 
     const isGoogle = channel.toLowerCase().includes('google');
@@ -609,8 +633,8 @@ export default function App() {
     const previewLink = isMetaOrLinkedin ? (rowVals[14] || '') : '';
 
     return {
-      date: row['Date'],
-      dateObj: row['Date'] ? new Date(row['Date']) : null,
+      date: rowDate,
+      dateObj: rowDate ? new Date(rowDate) : null,
       campaignName: row['Campaign name'] || row['Campaign DB'] || 'Unknown',
       phase: row['Funnel Stage DB'] || row['Activity'] || row['Campaign Type'] || 'Unknown',
       buyingType: 'Unknown',
@@ -645,116 +669,177 @@ export default function App() {
       return [];
     });
 
-    // Fetch from GSTS (default gid), SAIF (gid=1196409184), KoG 2026 (gid=1486784585), Black Hat (gid=659941332), SMLC (gid=1526538255), IDWS (gid=1121987876), BIO/CPHI (gid=1728688512), and CPHI LinkedIn (gid=208497314)
-    Promise.all([
-      fetchCsvSafe(BASE_URL),
-      fetchCsvSafe(BASE_URL + '&gid=1196409184'),
-      fetchCsvSafe(BASE_URL + '&gid=1486784585'),
-      fetchCsvSafe(BASE_URL + '&gid=659941332'),
-      fetchCsvSafe(BASE_URL + '&gid=1526538255'),
-      fetchCsvSafe(BASE_URL + '&gid=1766297835'), // KOG Planned Data
-      fetchCsvSafe(BASE_URL + '&gid=570639072'),  // SAIF Planned Data
-      fetchCsvSafe(BASE_URL + '&gid=1121987876'), // IDWS Sheet
-      fetchCsvSafe(BASE_URL + '&gid=2019892532'), // GSTS Planned Data
-      d3.text(BASE_URL + '&gid=277310277').catch(() => ''), // Black Hat Planned Data (Exprom @ AB2, Visprom @ AB12)
-      fetchCsvSafe(BASE_URL + '&gid=1728688512'), // BIO 26 & CPHI 26 (Meta, Google Ads, LinkedIn for BIO)
-      fetchCsvSafe(BASE_URL + '&gid=208497314')   // CPHI 26 (LinkedIn)
-    ]).then(([gstsRaw = [], saifRaw = [], kogRaw = [], blackHatRaw = [], smlcRaw = [], kogPlannedRaw = [], saifPlannedRaw = [], idwsRaw = [], gstsPlannedRaw = [], blackHatPlannedText = '', bioCphiRaw = [], cphiLiRaw = []]) => {
-      const gstsAds = gstsRaw.map(r => parseRow(r, 'GSTS'));
-      const saifAds = saifRaw.map(r => parseRow(r, 'SAIF 26'));
-      const kogAds = kogRaw.map(r => parseRow(r, 'KoG 26'));
-      console.log("KOG Raw Data First Row:", kogRaw[0]);
-      console.log("KOG Parsed Data First Row:", kogAds[0]);
-      const blackHatAds = blackHatRaw.map(r => parseRow(r, 'BLACK HAT'));
-      const smlcAds = smlcRaw.map(r => parseRow(r, 'SMLC 26'));
-      const idwsAds = idwsRaw
-        .filter(r => r.Date && r.Date >= '2026-06-01')
-        .map(r => parseRow(r, 'IDWS 26'));
-      const bioCphiAds = bioCphiRaw
-        .filter(r => r.Date && r.Date.startsWith('2026'))
-        .map(r => parseRow(r));
-      const cphiLiAds = cphiLiRaw
-        .filter(r => !r.Date || r.Date.startsWith('2026'))
-        .map(r => parseRow(r, 'CPHI 26'));
-      const combinedAds = [...gstsAds, ...saifAds, ...kogAds, ...blackHatAds, ...smlcAds, ...idwsAds, ...bioCphiAds, ...cphiLiAds];
+    const parsePlannedRows = (rawData, eventName) => {
+      return rawData.filter(r => r.Channel && r.Channel.trim() !== '').map(r => {
+        let pChannel = r.Channel.toLowerCase();
+        let normalizedChannel = 'Unknown';
+        if (pChannel.includes('meta') || pChannel.includes('fb') || pChannel.includes('ig')) normalizedChannel = 'Meta';
+        else if (pChannel.includes('linkedin')) normalizedChannel = 'LinkedIn';
+        else if (pChannel.includes('demand gen') || pChannel.includes('pmax')) normalizedChannel = 'Google Ads';
+        else if (pChannel.includes('google') || pChannel.includes('youtube')) normalizedChannel = 'Google';
+        else if (pChannel.includes('tiktok')) normalizedChannel = 'TikTok';
+        else if (pChannel.includes('snapchat')) normalizedChannel = 'Snapchat';
+        else if (pChannel.includes('dv360')) normalizedChannel = 'DV360';
+        else if (pChannel.includes('amazon')) normalizedChannel = 'Amazon';
+        else if (pChannel === 'x' || pChannel.includes('twitter')) normalizedChannel = 'X';
+        else normalizedChannel = r.Channel.trim();
 
-      const parsePlannedRows = (rawData, eventName) => {
-        return rawData.filter(r => r.Channel && r.Channel.trim() !== '').map(r => {
-          let pChannel = r.Channel.toLowerCase();
-          let normalizedChannel = 'Unknown';
-          if (pChannel.includes('meta') || pChannel.includes('fb') || pChannel.includes('ig')) normalizedChannel = 'Meta';
-          else if (pChannel.includes('linkedin')) normalizedChannel = 'LinkedIn';
-          else if (pChannel.includes('demand gen') || pChannel.includes('pmax')) normalizedChannel = 'Google Ads';
-          else if (pChannel.includes('google') || pChannel.includes('youtube')) normalizedChannel = 'Google';
-          else if (pChannel.includes('tiktok')) normalizedChannel = 'TikTok';
-          else if (pChannel.includes('snapchat')) normalizedChannel = 'Snapchat';
-          else if (pChannel.includes('dv360')) normalizedChannel = 'DV360';
-          else if (pChannel.includes('amazon')) normalizedChannel = 'Amazon';
-          else if (pChannel === 'x' || pChannel.includes('twitter')) normalizedChannel = 'X';
-          else normalizedChannel = r.Channel.trim();
+        let phaseRaw = r['Funnel Stage'] ? r['Funnel Stage'].trim() : '';
+        let normalizedPhase = phaseRaw;
+        if (phaseRaw.toLowerCase() === 'consideration') normalizedPhase = 'Traffic';
+        else if (phaseRaw.toLowerCase() === 'conversion') normalizedPhase = 'Conversions';
+        else if (phaseRaw.toLowerCase().startsWith('boost')) normalizedPhase = 'Boosting';
 
-          let phaseRaw = r['Funnel Stage'] ? r['Funnel Stage'].trim() : '';
-          let normalizedPhase = phaseRaw;
-          if (phaseRaw.toLowerCase() === 'consideration') normalizedPhase = 'Traffic';
-          else if (phaseRaw.toLowerCase() === 'conversion') normalizedPhase = 'Conversions';
-          else if (phaseRaw.toLowerCase().startsWith('boost')) normalizedPhase = 'Boosting';
+        return {
+          event: eventName,
+          channel: normalizedChannel,
+          phase: normalizedPhase,
+          plannedBudget: parseMetric(r['Planned Budget']),
+          plannedViews: parseMetric(r['Planned Views']),
+          plannedClicks: parseMetric(r['Planned Clicks']),
+          plannedConversions: parseMetric(r['Planned Conversions'])
+        };
+      });
+    };
 
-          return {
-            event: eventName,
-            channel: normalizedChannel,
-            phase: normalizedPhase,
-            plannedBudget: parseMetric(r['Planned Budget']),
-            plannedViews: parseMetric(r['Planned Views']),
-            plannedClicks: parseMetric(r['Planned Clicks']),
-            plannedConversions: parseMetric(r['Planned Conversions'])
-          };
+    const parseBlackHatPlanned = (text) => {
+      if (!text) return [];
+      const rows = d3.csvParseRows(text);
+      const COL = 27; // AB
+      const out = [];
+      let section = null;
+      rows.forEach(r => {
+        const c0 = (r[COL] || '').trim();
+        const c1 = (r[COL + 1] || '').trim();
+        const c2 = (r[COL + 2] || '').trim();
+        if (/^exprom$/i.test(c0)) { section = 'Exprom'; return; }
+        if (/^visprom$/i.test(c0)) { section = 'Visprom'; return; }
+        if (!section || !c0 || c0.toLowerCase() === 'channel' || /^total/i.test(c0)) return;
+        out.push({ Channel: c0, 'Funnel Stage': c1, 'Planned Budget': c2, __eventType: section });
+      });
+      return out;
+    };
+
+    const loadDashboardData = async () => {
+      // 1. Fetch dynamic event configurations from Admin API
+      let configuredEvents = [];
+      try {
+        const eventsRes = await fetch('/api/admin/events');
+        if (eventsRes.ok) {
+          const eventsData = await eventsRes.json();
+          if (eventsData.config && Array.isArray(eventsData.config.events)) {
+            configuredEvents = eventsData.config.events;
+          }
+        }
+      } catch (e) {
+        console.warn('Could not load dynamic events config from API, using fallback:', e);
+      }
+
+      // Fallback defaults
+      if (!configuredEvents || configuredEvents.length === 0) {
+        configuredEvents = [
+          { id: 'gsts-26', name: 'GSTS 26', sourceName: 'GSTS', portfolio: 'P1', enabled: true, gid: '', plannedGid: '2019892532', launchDate: '2026-12-18' },
+          { id: 'saif-26', name: 'SAIF 26', sourceName: 'SAIF 26', portfolio: 'P1', enabled: true, gid: '1196409184', plannedGid: '570639072', launchDate: '2026-11-24' },
+          { id: 'kog-26', name: 'KoG 26', sourceName: 'KoG 26', portfolio: 'P1', enabled: true, gid: '1486784585', plannedGid: '1766297835', launchDate: '2026-12-01' },
+          { id: 'black-hat', name: 'Black Hat', sourceName: 'BLACK HAT', portfolio: 'P1', enabled: true, gid: '659941332', plannedGid: '277310277', plannedType: 'blackhat-text', launchDate: '2026-12-01' },
+          { id: 'smlc-26', name: 'SMLC 26', sourceName: 'SMLC 26', portfolio: 'P3', enabled: true, gid: '1526538255', launchDate: '2026-10-21' },
+          { id: 'idws-26', name: 'IDWS 26', sourceName: 'IDWS 26', portfolio: 'P3', enabled: true, gid: '1121987876', startDate: '2026-06-01', launchDate: '2026-12-14' },
+          { id: 'bio-cphi-main', name: 'BIO 26 & CPHI 26', sourceName: 'BIO / CPHI', portfolio: 'P3', enabled: true, gid: '1728688512', dateFilterMode: 'year-2026', launchDate: '2026-12-14' },
+          { id: 'cphi-li', name: 'CPHI 26 (LinkedIn)', sourceName: 'CPHI 26', portfolio: 'P3', enabled: true, gid: '208497314', dateFilterMode: 'year-2026', launchDate: '2026-12-14' }
+        ];
+      }
+
+      setEventsConfiguration(configuredEvents);
+
+      const effectiveRole = (userRole === 'admin' && !simulatingStandardUser) ? 'admin' : 'standard';
+
+      // Filter for active events based on effectiveRole & auto-publish:
+      // - 'active' (public): visible to all users
+      // - 'admin_only' (testing): visible ONLY if effectiveRole === 'admin'
+      // - 'autoPublishDate': if reached, promotes event to public active automatically
+      const activeEvents = configuredEvents.filter(ev => {
+        if (ev.enabled === false || ev.status === 'inactive') return false;
+
+        const isAutoPublished = ev.autoPublishDate && new Date(ev.autoPublishDate) <= new Date();
+        const effectiveStatus = isAutoPublished ? 'active' : ev.status;
+        const effectiveVisibility = isAutoPublished ? 'public' : ev.visibility;
+
+        if (effectiveVisibility === 'admin_only' || effectiveStatus === 'admin_only') {
+          return effectiveRole === 'admin';
+        }
+        return true;
+      });
+
+      // Fetch actuals for active events
+      const actualsPromises = activeEvents.map(ev => {
+        const url = BASE_URL + (ev.gid ? `&gid=${ev.gid}` : '');
+        return fetchCsvSafe(url).then(rawRows => {
+          let rows = rawRows;
+          if (ev.startDate) {
+            rows = rows.filter(r => r.Date && r.Date >= ev.startDate);
+          }
+          if (ev.endDate) {
+            rows = rows.filter(r => r.Date && r.Date <= ev.endDate);
+          }
+          if (ev.dateFilterMode === 'year-2026') {
+            rows = rows.filter(r => !r.Date || r.Date.startsWith('2026'));
+          }
+          return rows.map(r => parseRow(r, ev.sourceName || ev.name, ev.portfolio, ev.fieldAliases));
         });
-      };
+      });
 
-      // Black Hat planned sheet: two tables in columns AB:AD (Channel, Funnel Stage, Planned Budget),
-      // preceded by an "Exprom" / "Visprom" label row. Parse by section label.
-      const parseBlackHatPlanned = (text) => {
-        if (!text) return [];
-        const rows = d3.csvParseRows(text);
-        const COL = 27; // AB
-        const out = [];
-        let section = null;
-        rows.forEach(r => {
-          const c0 = (r[COL] || '').trim();
-          const c1 = (r[COL + 1] || '').trim();
-          const c2 = (r[COL + 2] || '').trim();
-          if (/^exprom$/i.test(c0)) { section = 'Exprom'; return; }
-          if (/^visprom$/i.test(c0)) { section = 'Visprom'; return; }
-          if (!section || !c0 || c0.toLowerCase() === 'channel' || /^total/i.test(c0)) return;
-          out.push({ Channel: c0, 'Funnel Stage': c1, 'Planned Budget': c2, __eventType: section });
+      // Fetch planned data for active events
+      const plannedPromises = activeEvents
+        .filter(ev => ev.plannedGid)
+        .map(ev => {
+          const url = BASE_URL + `&gid=${ev.plannedGid}`;
+          if (ev.plannedType === 'blackhat-text' || ev.id === 'black-hat') {
+            return d3.text(url).catch(() => '').then(text => {
+              const bhRows = parseBlackHatPlanned(text);
+              return parsePlannedRows(bhRows, 'Black Hat').map((p, i) => ({
+                ...p,
+                eventType: bhRows.filter(r => r.Channel && r.Channel.trim() !== '')[i]?.__eventType || 'Exhibition'
+              }));
+            });
+          } else {
+            return fetchCsvSafe(url).then(rows => parsePlannedRows(rows, ev.name));
+          }
         });
-        return out;
-      };
-      const bhRows = parseBlackHatPlanned(blackHatPlannedText);
-      const blackHatPlanned = parsePlannedRows(bhRows, 'Black Hat').map((p, i) => ({ ...p, eventType: bhRows.filter(r => r.Channel && r.Channel.trim() !== '')[i].__eventType }));
 
-      const parsedPlannedData = [
-        ...parsePlannedRows(kogPlannedRaw, 'KoG 26'),
-        ...parsePlannedRows(saifPlannedRaw, 'SAIF 26'),
-        ...parsePlannedRows(gstsPlannedRaw, 'GSTS 26'),
-        ...blackHatPlanned
-      ];
+      const [allActualsArrays, allPlannedArrays] = await Promise.all([
+        Promise.all(actualsPromises),
+        Promise.all(plannedPromises)
+      ]);
 
-      // --- Dynamic Week DB Calculation ---
+      const combinedAds = allActualsArrays.flat();
+      const parsedPlannedData = allPlannedArrays.flat();
+
+      // Dynamic Week DB Countdown Calculation
       const eventStartDates = {
-        'GSTS': new Date(Date.UTC(2026, 11, 18)), // Dec 18 2026
-        'SAIF 26': new Date(Date.UTC(2026, 10, 24)), // Nov 24 2026
-        'KoG 26': new Date(Date.UTC(2026, 11, 1)),   // Dec 1 2026
+        'GSTS': new Date(Date.UTC(2026, 11, 18)),
+        'SAIF 26': new Date(Date.UTC(2026, 10, 24)),
+        'KoG 26': new Date(Date.UTC(2026, 11, 1)),
         'BLACK HAT': new Date(Date.UTC(2026, 11, 1)),
-        'SMLC 26': new Date(Date.UTC(2026, 9, 21)),   // Oct 21 2026
+        'SMLC 26': new Date(Date.UTC(2026, 9, 21)),
         'SMLC': new Date(Date.UTC(2026, 9, 21)),
-        'IDWS 26': new Date(Date.UTC(2026, 11, 14)), // Dec 14 2026
+        'IDWS 26': new Date(Date.UTC(2026, 11, 14)),
         'IDWS': new Date(Date.UTC(2026, 11, 14)),
-        'BIO 26': new Date(Date.UTC(2026, 11, 14)),  // Dec 14 2026
+        'BIO 26': new Date(Date.UTC(2026, 11, 14)),
         'BIO': new Date(Date.UTC(2026, 11, 14)),
-        'CPHI 26': new Date(Date.UTC(2026, 11, 14)), // Dec 14 2026
+        'CPHI 26': new Date(Date.UTC(2026, 11, 14)),
         'CPHI': new Date(Date.UTC(2026, 11, 14))
       };
+
+      activeEvents.forEach(ev => {
+        if (ev.launchDate) {
+          const parts = ev.launchDate.split('-').map(Number);
+          if (parts.length === 3) {
+            const lDate = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
+            eventStartDates[ev.name] = lDate;
+            if (ev.sourceName) eventStartDates[ev.sourceName] = lDate;
+          }
+        }
+      });
 
       const firstImps = {};
       combinedAds.forEach(d => {
@@ -777,9 +862,6 @@ export default function App() {
         
         if (campStart && eventStart) {
            const dUTC = new Date(Date.UTC(d.dateObj.getFullYear(), d.dateObj.getMonth(), d.dateObj.getDate()));
-           
-           // Helper to calculate week index from campStart (Week 0 is campStart until the immediate following Sunday)
-           // Then Week 1 is Monday to Sunday, Week 2 is Monday to Sunday, and so on.
            const getWeekIndex = (targetDate) => {
              const daysToSunday = (7 - campStart.getUTCDay()) % 7;
              const firstWeekEnd = new Date(campStart.getTime() + daysToSunday * MS_PER_DAY);
@@ -798,7 +880,6 @@ export default function App() {
            d.weekDB = `${d.weekDB} '${yr}`;
         }
       });
-      // ------------------------------------
 
       setAdData(combinedAds);
       setGaData([]);
@@ -814,11 +895,13 @@ export default function App() {
         setLastUpdated(new Date());
       }
       setLoading(false);
-    }).catch(err => {
+    };
+
+    loadDashboardData().catch(err => {
       console.error(err);
       setLoading(false);
     });
-  }, [isAuthenticated]);
+  }, [isAuthenticated, userRole, simulatingStandardUser]);
 
   
 
@@ -1873,7 +1956,7 @@ export default function App() {
           
           <div className="flex flex-col gap-2 px-6 pb-6 mt-auto z-30">
             {userRole === 'admin' && (
-              <div className="flex justify-start">
+              <div className="flex flex-col gap-1.5 px-3 mb-1">
                 <button 
                   onClick={() => setActiveTab('admin')}
                   className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
@@ -1882,6 +1965,18 @@ export default function App() {
                 >
                   <Users className="w-3.5 h-3.5" />
                   Admin
+                </button>
+                <button 
+                  onClick={() => setSimulatingStandardUser(!simulatingStandardUser)}
+                  className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all border ${
+                    simulatingStandardUser 
+                      ? 'bg-amber-500/25 text-amber-300 border-amber-500/50 shadow-[0_0_10px_rgba(245,158,11,0.2)]' 
+                      : 'bg-[#041628] text-gray-400 border-gray-700/60 hover:text-white hover:border-gray-500'
+                  }`}
+                  title={simulatingStandardUser ? "Click to exit simulation" : "Preview dashboard as regular standard user"}
+                >
+                  {simulatingStandardUser ? <EyeOff className="w-3.5 h-3.5 text-amber-400" /> : <Eye className="w-3.5 h-3.5 text-[#14a6d9]" />}
+                  <span>{simulatingStandardUser ? 'Exit Simulation' : 'Preview As Viewer'}</span>
                 </button>
               </div>
             )}
@@ -1914,11 +2009,45 @@ export default function App() {
         
         {/* TABS CONTENT */}
         {activeTab === 'admin' ? (
-          <AdminView />
+          <AdminView currentUserEmail={userEmail || (auth?.currentUser?.email) || 'admin@tahaluf.com'} />
         ) : (
         <main className="flex-1 overflow-y-auto p-8 custom-scrollbar relative z-10">
           <ReactTooltip id="market-tooltip" className="z-50" style={{ backgroundColor: '#0a2442', color: '#eef7f5', border: '1px solid #cedc2830', borderRadius: '8px', zIndex: 1000 }} />
           <div className="absolute top-0 right-0 w-full h-[500px] bg-gradient-to-br from-[#062f2e]/20 via-transparent to-transparent pointer-events-none -z-10"></div>
+          
+          {/* 1. Standard User Preview Simulation Banner */}
+          {simulatingStandardUser && (
+            <div className="mb-6 p-3.5 bg-amber-500/15 border border-amber-500/40 rounded-2xl flex items-center justify-between text-xs text-amber-200 shadow-xl backdrop-blur-md">
+              <div className="flex items-center gap-2.5">
+                <EyeOff className="w-4 h-4 text-amber-400 animate-pulse flex-shrink-0" />
+                <span>
+                  <strong>Standard User Preview Active:</strong> All admin-only staging events are hidden. You are viewing the dashboard exactly as a regular viewer does.
+                </span>
+              </div>
+              <button
+                onClick={() => setSimulatingStandardUser(false)}
+                className="px-3 py-1 bg-amber-500/30 hover:bg-amber-500 text-amber-100 hover:text-black rounded-lg font-bold text-[10px] uppercase tracking-wider transition-all"
+              >
+                Exit Preview
+              </button>
+            </div>
+          )}
+
+          {/* 2. Admin Staging Watermark Banner when an Admin-Only event is selected */}
+          {selectedEvent && eventsConfiguration.some(ev => (ev.status === 'admin_only' || ev.visibility === 'admin_only') && (ev.name === selectedEvent || ev.sourceName === selectedEvent)) && (
+            <div className="mb-4 p-3 bg-purple-950/40 border border-purple-500/50 rounded-2xl flex items-center justify-between text-xs text-purple-200 shadow-[0_0_15px_rgba(168,85,247,0.2)]">
+              <div className="flex items-center gap-2.5">
+                <Shield className="w-4 h-4 text-purple-400 animate-pulse flex-shrink-0" />
+                <span>
+                  <strong>Admin Staging Mode:</strong> You are viewing live numbers for <em>"{selectedEvent}"</em>. This event is strictly hidden from regular dashboard users until promoted to Public Active.
+                </span>
+              </div>
+              <span className="px-2 py-0.5 rounded text-[9px] font-extrabold uppercase bg-purple-500/25 text-purple-300 border border-purple-500/40 flex-shrink-0">
+                Staging Isolation
+              </span>
+            </div>
+          )}
+
           {renderContent()}
         </main>
         )}

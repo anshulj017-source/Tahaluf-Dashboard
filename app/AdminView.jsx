@@ -1,8 +1,10 @@
 "use client";
 import React, { useState, useEffect } from 'react';
-import { Trash2, UserPlus, Shield, User, RefreshCw, CheckCircle2, Key } from 'lucide-react';
+import { Trash2, UserPlus, Shield, User, RefreshCw, CheckCircle2, Key, Layers, Users as UsersIcon } from 'lucide-react';
+import EventsAdmin from './components/EventsAdmin';
 
-export default function AdminView() {
+export default function AdminView({ currentUserEmail = 'admin@tahaluf.com' }) {
+  const [activeSection, setActiveSection] = useState('events'); // 'events' | 'users'
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -160,29 +162,63 @@ export default function AdminView() {
   return (
     <div className="flex-1 p-8 overflow-auto pb-32">
       <div className="max-w-6xl mx-auto">
-        <div className="flex justify-between items-end mb-8">
-          <div>
-            <h2 className="text-3xl font-bold text-white tracking-widest uppercase mb-1">User Management</h2>
-            <p className="text-[#14a6d9] text-sm font-medium">Control dashboard access and administrator privileges</p>
-          </div>
-          
-          <div className="flex gap-3">
-            <button 
-              onClick={fetchUsers}
-              className="px-4 py-2 bg-[#0a2442] border border-[#cedc28]/30 text-[#cedc28] hover:bg-[#cedc28]/10 hover:text-white rounded-xl transition-all text-xs font-bold uppercase tracking-widest flex items-center gap-2"
-            >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-              Refresh
-            </button>
-            <button 
-              onClick={() => setShowAddForm(!showAddForm)}
-              className="px-4 py-2 bg-[#cedc28]/20 border border-[#cedc28]/50 text-[#cedc28] hover:bg-[#cedc28]/40 hover:text-white rounded-xl transition-all text-xs font-bold uppercase tracking-widest flex items-center gap-2 shadow-[0_0_15px_rgba(200,130,20,0.15)]"
-            >
-              <UserPlus className="w-4 h-4" />
-              {showAddForm ? 'Cancel' : 'Add User'}
-            </button>
-          </div>
+        {/* ADMIN SUB-TABS */}
+        <div className="flex border-b border-gray-700/60 mb-8 gap-6">
+          <button
+            onClick={() => setActiveSection('events')}
+            className={`pb-3 text-xs font-bold uppercase tracking-wider flex items-center gap-2 border-b-2 transition-all ${
+              activeSection === 'events'
+                ? 'border-[#cedc28] text-[#cedc28]'
+                : 'border-transparent text-gray-400 hover:text-white'
+            }`}
+          >
+            <Layers className="w-4 h-4" />
+            Events & Data Configuration
+          </button>
+          <button
+            onClick={() => setActiveSection('users')}
+            className={`pb-3 text-xs font-bold uppercase tracking-wider flex items-center gap-2 border-b-2 transition-all ${
+              activeSection === 'users'
+                ? 'border-[#cedc28] text-[#cedc28]'
+                : 'border-transparent text-gray-400 hover:text-white'
+            }`}
+          >
+            <UsersIcon className="w-4 h-4" />
+            User Access Management
+          </button>
         </div>
+
+        {/* SECTION 1: EVENTS & DATA CONFIGURATION */}
+        {activeSection === 'events' && (
+          <EventsAdmin currentUserEmail={currentUserEmail} />
+        )}
+
+        {/* SECTION 2: USER ACCESS MANAGEMENT */}
+        {activeSection === 'users' && (
+          <div>
+            <div className="flex justify-between items-end mb-8">
+              <div>
+                <h2 className="text-3xl font-bold text-white tracking-widest uppercase mb-1">User Management</h2>
+                <p className="text-[#14a6d9] text-sm font-medium">Control dashboard access and administrator privileges</p>
+              </div>
+              
+              <div className="flex gap-3">
+                <button 
+                  onClick={fetchUsers}
+                  className="px-4 py-2 bg-[#0a2442] border border-[#cedc28]/30 text-[#cedc28] hover:bg-[#cedc28]/10 hover:text-white rounded-xl transition-all text-xs font-bold uppercase tracking-widest flex items-center gap-2"
+                >
+                  <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                  Refresh
+                </button>
+                <button 
+                  onClick={() => setShowAddForm(!showAddForm)}
+                  className="px-4 py-2 bg-[#cedc28]/20 border border-[#cedc28]/50 text-[#cedc28] hover:bg-[#cedc28]/40 hover:text-white rounded-xl transition-all text-xs font-bold uppercase tracking-widest flex items-center gap-2 shadow-[0_0_15px_rgba(200,130,20,0.15)]"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  {showAddForm ? 'Cancel' : 'Add User'}
+                </button>
+              </div>
+            </div>
 
         {error && (
           <div className="bg-red-500/10 border border-red-500/30 text-red-400 p-4 rounded-2xl text-sm font-medium mb-6 flex items-center gap-3 shadow-lg">
@@ -351,6 +387,8 @@ export default function AdminView() {
             </table>
           </div>
         </div>
+      </div>
+      )}
 
       </div>
     </div>
