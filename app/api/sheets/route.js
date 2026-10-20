@@ -92,6 +92,10 @@ export async function GET(request) {
       return serveFallbackOrEmpty('Google Sheets returned HTML instead of CSV');
     }
 
+    if (text.startsWith('#REF!') || text.startsWith('#VALUE!') || text.startsWith('#ERROR!')) {
+      return serveFallbackOrEmpty('Google Sheets returned spreadsheet formula error');
+    }
+
     if (text.startsWith('Loading...')) {
       console.log(`Google Sheets returned Loading... Retrying for ${url}`);
       await new Promise(r => setTimeout(r, 1000));

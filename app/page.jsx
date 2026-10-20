@@ -23,6 +23,7 @@ import MarketView from './MarketView';
 
 const CustomView = dynamic(() => import('./CustomView'), { ssr: false });
 import CreativeView from './CreativeView';
+import DetailedDateFilter from './components/DetailedDateFilter';
 
 const GEO_URL = "https://unpkg.com/world-atlas@2.0.2/countries-110m.json";
 
@@ -99,62 +100,7 @@ const MetricCard = ({ label, value, color, icon: Icon, definition, subContent })
   </div>
 );
 
-const DateRangeFilter = ({ label, dateRange, onChange }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const wrapperRef = useRef(null);
-
-  useEffect(() => {
-    function handleClickOutside(event) {
-      if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
-        setIsOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const formatDisplay = () => {
-    if (!dateRange.start && !dateRange.end) return 'All Dates';
-    const s = dateRange.start ? new Date(dateRange.start).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }) : '...';
-    const e = dateRange.end ? new Date(dateRange.end).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }) : '...';
-    return `${s} - ${e}`;
-  };
-
-  return (
-    <div ref={wrapperRef} className="relative w-[140px] xl:w-[150px] shrink-0 z-30">
-      <span className="text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest mb-1.5 block">{label}</span>
-      <div 
-        onClick={() => setIsOpen(!isOpen)}
-        className="px-2.5 py-1.5 surface-inset border border-[#cedc28]/30 rounded-lg text-xs font-bold text-[#eef7f5] cursor-pointer flex justify-between items-center hover:border-[#cedc28] transition-colors"
-      >
-        <span className="truncate pr-2">{formatDisplay()}</span>
-        <Calendar className={`w-4 h-4 flex-shrink-0 text-[#cedc28]`} />
-      </div>
-      {isOpen && (
-        <div className="absolute top-full left-0 w-[240px] h-0 z-50">
-          <div className="w-full mt-2 card-surface backdrop-blur-3xl bg-[#0a2442]/95 border border-[#cedc28]/30 rounded-xl shadow-2xl flex flex-col overflow-hidden p-4 gap-4">
-            <div className="flex flex-col gap-1">
-              <span className="text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest block">Start Date</span>
-              <input type="date" value={dateRange.start} onClick={e => e.target.showPicker && e.target.showPicker()} onChange={e => onChange({ ...dateRange, start: e.target.value })} className="w-full cursor-pointer px-3 py-2 bg-black/30 border border-[#cedc28]/30 rounded-lg text-xs font-bold text-[#eef7f5] outline-none focus:border-[#cedc28] transition-colors [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-100" />
-            </div>
-            <div className="flex flex-col gap-1">
-              <span className="text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest block">End Date</span>
-              <input type="date" value={dateRange.end} onClick={e => e.target.showPicker && e.target.showPicker()} onChange={e => onChange({ ...dateRange, end: e.target.value })} className="w-full cursor-pointer px-3 py-2 bg-black/30 border border-[#cedc28]/30 rounded-lg text-xs font-bold text-[#eef7f5] outline-none focus:border-[#cedc28] transition-colors [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-100" />
-            </div>
-            {(dateRange.start || dateRange.end) && (
-              <button 
-                onClick={() => onChange({ start: '', end: '' })}
-                className="w-full px-3 py-2 bg-red-500/10 text-red-400 border border-red-500/30 rounded-lg text-xs font-bold hover:bg-red-500/20 transition-colors mt-2"
-              >
-                Clear Dates
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
+const DateRangeFilter = DetailedDateFilter;
 
 const MultiSelect = ({ label, options, selected, onChange, widthClass }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -509,7 +455,7 @@ export default function App() {
   const [simulatingStandardUser, setSimulatingStandardUser] = useState(false);
   
   // State: Global Filters
-  const [dateRange, setDateRange] = useState({ start: '', end: '' });
+  const [dateRange, setDateRange] = useState({ start: '', end: '', preset: 'auto' });
   const [filterCampaigns, setFilterCampaigns] = useState(['All']);
   const [filterMarkets, setFilterMarkets] = useState(['All']);
   const [filterChannels, setFilterChannels] = useState(['All']);
@@ -916,7 +862,7 @@ export default function App() {
     setFilterEventTypes(['All']);
     setFilterPortfolios(['All']);
     setFilterWeeks(['All']);
-    setDateRange({ start: '', end: '' });
+    setDateRange({ start: '', end: '', preset: 'auto' });
   };
 
   const uniqueCampaigns = useMemo(() => Array.from(new Set(adData.map(d => d.campaignName))).sort(), [adData]);
@@ -970,8 +916,14 @@ export default function App() {
       if (!filterPortfolios.includes('All') && !filterPortfolios.includes(d.portfolio)) return false;
       if (!filterEventTypes.includes('All') && !filterEventTypes.includes(d.eventTypeDB)) return false;
       if (!filterWeeks.includes('All') && !filterWeeks.includes(d.weekDB)) return false;
-      if (dateRange.start && d.dateObj && d.dateObj < new Date(dateRange.start)) return false;
-      if (dateRange.end && d.dateObj && d.dateObj > new Date(dateRange.end)) return false;
+      if (dateRange.start && d.dateObj) {
+        const startBound = new Date(dateRange.start + 'T00:00:00');
+        if (d.dateObj < (isNaN(startBound.getTime()) ? new Date(dateRange.start) : startBound)) return false;
+      }
+      if (dateRange.end && d.dateObj) {
+        const endBound = new Date(dateRange.end + 'T23:59:59.999');
+        if (d.dateObj > (isNaN(endBound.getTime()) ? new Date(dateRange.end) : endBound)) return false;
+      }
       return true;
     });
   }, [adData, filterCampaigns, filterMarkets, filterChannels, filterPhases, filterEvents, filterPortfolios, filterEventTypes, filterWeeks, dateRange]);
@@ -994,8 +946,14 @@ export default function App() {
       if (!filterMarkets.includes('All') && !filterMarkets.includes(d.country)) return false;
       if (!filterPaidOrganic.includes('All') && !filterPaidOrganic.includes(d.paidOrganic)) return false;
       if (!filterGa4Properties.includes('All') && !filterGa4Properties.includes(d.ga4Property)) return false;
-      if (dateRange.start && d.dateObj && d.dateObj < new Date(dateRange.start)) return false;
-      if (dateRange.end && d.dateObj && d.dateObj > new Date(dateRange.end)) return false;
+      if (dateRange.start && d.dateObj) {
+        const startBound = new Date(dateRange.start + 'T00:00:00');
+        if (d.dateObj < (isNaN(startBound.getTime()) ? new Date(dateRange.start) : startBound)) return false;
+      }
+      if (dateRange.end && d.dateObj) {
+        const endBound = new Date(dateRange.end + 'T23:59:59.999');
+        if (d.dateObj > (isNaN(endBound.getTime()) ? new Date(dateRange.end) : endBound)) return false;
+      }
       return true;
     });
   }, [gaData, filterCampaigns, filterMarkets, filterPaidOrganic, filterGa4Properties, dateRange]);
