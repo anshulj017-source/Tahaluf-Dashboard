@@ -17,7 +17,8 @@ import {
   getSheetSnapshot,
   recordSheetFailure,
   storeSheetSnapshot,
-  summarizeSheetData
+  summarizeSheetData,
+  writeSnapshotChunks
 } from '../lib/sheetCache.mjs';
 import {
   DEFAULT_HEALTH_NOTIFICATION_SETTINGS,
@@ -323,6 +324,41 @@ async function testLastKnownGoodSheetCache() {
   assert(successHealth[cacheKey]?.state === 'healthy', 'Successful refresh clears the active sheet issue');
 }
 
+async function testFirestoreChunkBatching() {
+  console.log('\n--- 3.7 Testing Large Firestore Snapshot Batching ---');
+  const snapshotBytes = Buffer.alloc(13 * 1024 * 1024, 'x');
+  const committedBatches = [];
+  const fakeAdminDb = {
+    batch() {
+      const writes = [];
+      return {
+        set(_ref, value) {
+          writes.push(value);
+          return this;
+        },
+        async commit() {
+          committedBatches.push(writes);
+        }
+      };
+    }
+  };
+  const snapshotRef = { collection: () => ({ doc: index => ({ id: index }) }) };
+
+  await writeSnapshotChunks(fakeAdminDb, snapshotRef, snapshotBytes);
+
+  const allChunks = committedBatches.flat();
+  const largestBatchBytes = Math.max(...committedBatches.map(batch =>
+    batch.reduce((total, chunk) => total + Buffer.byteLength(chunk.content) + 1024, 0)
+  ));
+  const restoredBytes = Buffer.concat(allChunks
+    .sort((left, right) => left.index - right.index)
+    .map(chunk => Buffer.from(chunk.content, 'base64')));
+
+  assert(committedBatches.length > 1, 'Large snapshots are split across multiple Firestore batches');
+  assert(largestBatchBytes <= 8 * 1024 * 1024, `Each Firestore batch stays below the 8 MiB safety limit (largest: ${largestBatchBytes} bytes)`);
+  assert(restoredBytes.equals(snapshotBytes), 'Batched Firestore chunks reconstruct the complete snapshot in order');
+}
+
 // -------------------------------------------------------------
 // 4. INTEGRATION TESTS: LOCAL API ENDPOINTS & CACHING
 // -------------------------------------------------------------
@@ -548,6 +584,7 @@ async function runAllTests() {
   testDynamicWeekLogic();
   testDetailedDateFilterLogic();
   await testLastKnownGoodSheetCache();
+  await testFirestoreChunkBatching();
 
   // Check if local dev server is running before attempting API integration tests
   try {
