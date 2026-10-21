@@ -24,6 +24,7 @@ import MarketView from './MarketView';
 const CustomView = dynamic(() => import('./CustomView'), { ssr: false });
 import CreativeView from './CreativeView';
 import DetailedDateFilter from './components/DetailedDateFilter';
+import HealthAlertBanner from './components/HealthAlertBanner';
 
 const GEO_URL = "https://unpkg.com/world-atlas@2.0.2/countries-110m.json";
 
@@ -1975,6 +1976,9 @@ export default function App() {
         <main className="flex-1 overflow-y-auto p-8 custom-scrollbar relative z-10">
           <ReactTooltip id="market-tooltip" className="z-50" style={{ backgroundColor: '#0a2442', color: '#eef7f5', border: '1px solid #cedc2830', borderRadius: '8px', zIndex: 1000 }} />
           <div className="absolute top-0 right-0 w-full h-[500px] bg-gradient-to-br from-[#062f2e]/20 via-transparent to-transparent pointer-events-none -z-10"></div>
+          {userRole === 'admin' && !simulatingStandardUser && (
+            <HealthAlertBanner onOpenHealthMonitor={() => setActiveTab('admin')} />
+          )}
           
           {/* 1. Standard User Preview Simulation Banner */}
           {simulatingStandardUser && (

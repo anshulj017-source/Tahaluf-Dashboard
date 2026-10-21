@@ -1,9 +1,83 @@
 import { NextResponse } from 'next/server';
+import {
+  getSheetCacheKey,
+  getSheetSnapshot,
+  recordSheetFailure,
+  storeSheetSnapshot,
+  summarizeSheetData
+} from '../../../lib/sheetCache.mjs';
+import { getEventsConfig } from '../../../lib/eventsConfig.js';
+import { observeHealthSource } from '../../../lib/healthNotifications.mjs';
+import { getHealthIssues } from '../../../lib/healthNotificationUtils.mjs';
 
 // In-memory cache for sheets: Map<url, { data: string, timestamp: number }>
 // TTL: 5 minutes fresh cache. If Google Sheets fails/times out, stale data is served as resilient fallback.
 const sheetCache = new Map();
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const sourceMapCache = { expiresAt: 0, byCacheKey: new Map() };
+const getSpreadsheetFormulaError = (text) =>
+  text.trimStart().match(/^#(?:REF!|VALUE!|ERROR!)/)?.[0] || null;
+
+function getEventDataStats(source, health) {
+  const eventMatches = Object.entries(health.eventBreakdown || {}).filter(([sheetEventName]) => {
+    const normalizedSheetName = sheetEventName.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const candidates = [source.eventName, source.sourceName]
+      .filter(Boolean)
+      .flatMap(name => name.split(/[\/&]+/))
+      .map(name => name.toLowerCase().replace(/[^a-z0-9]/g, ''))
+      .filter(name => name.length > 2);
+    return candidates.some(candidate =>
+      normalizedSheetName.includes(candidate) || candidate.includes(normalizedSheetName)
+    );
+  });
+  const eventRows = eventMatches.reduce((sum, [, stats]) => sum + stats.rows, 0);
+  return {
+    eventDataStatus: source.kind !== 'Actuals'
+      ? (health.rowCount > 0 ? 'unverified' : 'missing')
+      : !health.eventColumn
+        ? 'unverified'
+        : eventRows > 0 ? 'present' : 'missing',
+    eventRows
+  };
+}
+
+async function getConfiguredSourcesByCacheKey() {
+  if (sourceMapCache.expiresAt > Date.now()) return sourceMapCache.byCacheKey;
+  const baseUrl = process.env.COMBINED_COUNTRY_CSV_URL;
+  if (!baseUrl) return new Map();
+  const config = await getEventsConfig();
+  const byCacheKey = new Map();
+  config.events.forEach(event => {
+    const sources = [
+      { eventId: event.id, eventName: event.name, sourceName: event.sourceName || event.name, kind: 'Actuals', gid: event.gid || '' },
+      ...(event.plannedGid
+        ? [{ eventId: event.id, eventName: event.name, sourceName: event.sourceName || event.name, kind: 'Planned', gid: event.plannedGid }]
+        : [])
+    ];
+    sources.forEach(source => {
+      const cacheKey = getSheetCacheKey(baseUrl + (source.gid ? `&gid=${source.gid}` : ''));
+      byCacheKey.set(cacheKey, [...(byCacheKey.get(cacheKey) || []), source]);
+    });
+  });
+  sourceMapCache.byCacheKey = byCacheKey;
+  sourceMapCache.expiresAt = Date.now() + CACHE_TTL_MS;
+  return byCacheKey;
+}
+
+async function reportHealthForSheet(cacheKey, health = {}) {
+  try {
+    const byCacheKey = await getConfiguredSourcesByCacheKey();
+    const sources = byCacheKey.get(cacheKey) || [];
+
+    for (const source of sources) {
+      const monitoredSource = { ...source, ...health, ...getEventDataStats(source, health) };
+      const issue = getHealthIssues([monitoredSource])[0] || null;
+      await observeHealthSource(`${source.eventId}:${source.kind}`, issue);
+    }
+  } catch (error) {
+    console.error('[HEALTH ALERT] Could not process a sheet health update:', error);
+  }
+}
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -35,7 +109,22 @@ export async function GET(request) {
   }
 
   const now = Date.now();
-  const cached = sheetCache.get(url);
+  const cacheKey = getSheetCacheKey(url);
+  let cached = sheetCache.get(url);
+  if (!cached) {
+    try {
+      const snapshot = await getSheetSnapshot(cacheKey);
+      if (snapshot?.data) {
+        cached = {
+          data: snapshot.data,
+          timestamp: Date.parse(snapshot.fetchedAt) || 0
+        };
+        sheetCache.set(url, cached);
+      }
+    } catch (error) {
+      console.error(`[SHEET CACHE] Could not load persisted snapshot for ${type}/${searchParams.get('gid') || 'default'}:`, error);
+    }
+  }
 
   // Return fresh cached data immediately if not forcing refresh
   if (!forceRefresh && cached && (now - cached.timestamp < CACHE_TTL_MS)) {
@@ -49,7 +138,13 @@ export async function GET(request) {
     });
   }
 
-  const serveFallbackOrEmpty = (reason) => {
+  const serveFallbackOrEmpty = async (reason) => {
+    try {
+      const health = await recordSheetFailure(cacheKey, reason);
+      await reportHealthForSheet(cacheKey, health);
+    } catch (error) {
+      console.error('[SHEET CACHE] Could not record sheet failure:', error);
+    }
     if (cached && cached.data) {
       console.warn(`[CACHE RESILIENCE] ${reason} for ${url}. Serving stale cached data as fallback.`);
       return new NextResponse(cached.data, {
@@ -83,21 +178,21 @@ export async function GET(request) {
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      return serveFallbackOrEmpty(`Google Sheets returned HTTP status ${response.status}`);
+      return await serveFallbackOrEmpty(`Google Sheets returned HTTP status ${response.status}`);
     }
     
     let text = await response.text();
 
     if (text.startsWith('<!DOCTYPE') || text.startsWith('<html')) {
-      return serveFallbackOrEmpty('Google Sheets returned HTML instead of CSV');
+      return await serveFallbackOrEmpty('Google Sheets returned HTML instead of CSV');
     }
 
-    if (text.startsWith('#REF!') || text.startsWith('#VALUE!') || text.startsWith('#ERROR!')) {
-      return serveFallbackOrEmpty('Google Sheets returned spreadsheet formula error');
-    }
-
-    if (text.startsWith('Loading...')) {
-      console.log(`Google Sheets returned Loading... Retrying for ${url}`);
+    const formulaError = getSpreadsheetFormulaError(text);
+    if (text.startsWith('Loading...') || formulaError) {
+      const retryReason = formulaError
+        ? `Google Sheets returned ${formulaError}`
+        : 'Google Sheets returned Loading...';
+      console.log(`${retryReason}. Retrying for ${url}`);
       await new Promise(r => setTimeout(r, 1000));
       const retryController = new AbortController();
       const retryTimeout = setTimeout(() => retryController.abort(), 10000);
@@ -111,26 +206,63 @@ export async function GET(request) {
       if (response.ok) {
         text = await response.text();
       }
-      if (!response.ok || text.startsWith('<!DOCTYPE') || text.startsWith('<html') || text.startsWith('Loading...')) {
-        return serveFallbackOrEmpty('Google Sheets retry failed or returned invalid response');
+      const retryFormulaError = getSpreadsheetFormulaError(text);
+      if (!response.ok || text.startsWith('<!DOCTYPE') || text.startsWith('<html') || text.startsWith('Loading...') || retryFormulaError) {
+        const retryFailure = retryFormulaError
+          ? `Google Sheets retry returned spreadsheet formula error (${retryFormulaError})`
+          : 'Google Sheets retry failed or returned invalid response';
+        return await serveFallbackOrEmpty(retryFailure);
       }
     }
 
-    // Save successfully fetched data to in-memory cache
-    if (text.length > 50) {
-      sheetCache.set(url, { data: text, timestamp: Date.now() });
+    let dataSummary;
+    try {
+      dataSummary = summarizeSheetData(text);
+    } catch (error) {
+      return await serveFallbackOrEmpty(`Google Sheets returned invalid CSV: ${error.message}`);
     }
-    
+    if (text.trim().length <= 50 || dataSummary.rowCount === 0) {
+      return await serveFallbackOrEmpty('Google Sheets returned an empty or incomplete CSV response');
+    }
+
+    let health;
+    try {
+      health = await storeSheetSnapshot(cacheKey, text, dataSummary);
+      sheetCache.set(url, { data: text, timestamp: Date.now() });
+    } catch (error) {
+      console.error('[SHEET CACHE] Could not persist successfully fetched sheet:', error);
+      try {
+        health = await recordSheetFailure(cacheKey, `Cache storage failed: ${error.message || error}`, 'storage-error');
+        await reportHealthForSheet(cacheKey, health);
+      } catch (statusError) {
+        console.error('[SHEET CACHE] Could not record cache storage failure:', statusError);
+      }
+      if (cached?.data) {
+        return new NextResponse(cached.data, {
+          status: 200,
+          headers: {
+            'Content-Type': 'text/csv',
+            'Cache-Control': 'public, max-age=60, stale-while-revalidate=300',
+            'X-Cache': 'STALE-FALLBACK'
+          }
+        });
+      }
+      return new NextResponse('', {
+        status: 200,
+        headers: { 'Content-Type': 'text/csv', 'X-Cache': 'MISS-EMPTY' }
+      });
+    }
+
+    await reportHealthForSheet(cacheKey, health);
     return new NextResponse(text, {
       status: 200,
       headers: {
         'Content-Type': 'text/csv',
         'Cache-Control': 'public, max-age=300, stale-while-revalidate=600',
-        'X-Cache': 'MISS'
+        'X-Cache': health?.state === 'storage-error' ? 'MISS-PERSISTENCE-ERROR' : 'MISS'
       },
     });
   } catch (error) {
-    return serveFallbackOrEmpty(`Error fetching sheet: ${error.message || error}`);
+    return await serveFallbackOrEmpty(`Error fetching sheet: ${error.message || error}`);
   }
 }
-

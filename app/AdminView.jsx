@@ -1,11 +1,14 @@
 "use client";
 import React, { useState, useEffect } from 'react';
-import { Trash2, UserPlus, Shield, User, RefreshCw, CheckCircle2, Key, Layers, Users as UsersIcon } from 'lucide-react';
+import { Trash2, UserPlus, Shield, User, RefreshCw, CheckCircle2, Key, Layers, Activity, Users as UsersIcon } from 'lucide-react';
 import EventsAdmin from './components/EventsAdmin';
+import DataHealthAdmin from './components/DataHealthAdmin';
 
 export default function AdminView({ currentUserEmail = 'admin@tahaluf.com', initialEvents = [] }) {
-  const [activeSection, setActiveSection] = useState('events'); // 'events' | 'users'
+  const [activeSection, setActiveSection] = useState('events');
   const [users, setUsers] = useState([]);
+  const [healthIssueCount, setHealthIssueCount] = useState(0);
+  const [dashboardAlertsEnabled, setDashboardAlertsEnabled] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   
@@ -165,6 +168,16 @@ export default function AdminView({ currentUserEmail = 'admin@tahaluf.com', init
   return (
     <div className="flex-1 p-8 overflow-auto pb-32">
       <div className="max-w-6xl mx-auto">
+        {dashboardAlertsEnabled && healthIssueCount > 0 && (
+          <button
+            onClick={() => setActiveSection('health')}
+            className="w-full mb-5 rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-left text-xs text-amber-200 hover:bg-amber-500/15"
+          >
+            <span className="font-bold">{healthIssueCount} active data health issue{healthIssueCount === 1 ? '' : 's'}.</span>
+            {' '}Open Health Monitor to review.
+          </button>
+        )}
+
         {/* ADMIN SUB-TABS */}
         <div className="flex border-b border-gray-700/60 mb-8 gap-6">
           <button
@@ -177,6 +190,20 @@ export default function AdminView({ currentUserEmail = 'admin@tahaluf.com', init
           >
             <Layers className="w-4 h-4" />
             Events & Data Configuration
+          </button>
+          <button
+            onClick={() => setActiveSection('health')}
+            className={`pb-3 text-xs font-bold uppercase tracking-wider flex items-center gap-2 border-b-2 transition-all ${
+              activeSection === 'health'
+                ? 'border-[#cedc28] text-[#cedc28]'
+                : 'border-transparent text-gray-400 hover:text-white'
+            }`}
+          >
+            <Activity className="w-4 h-4" />
+            Health Monitor
+            {dashboardAlertsEnabled && healthIssueCount > 0 && (
+              <span className="rounded-full bg-red-500 px-1.5 py-0.5 text-[9px] leading-none text-white">{healthIssueCount}</span>
+            )}
           </button>
           <button
             onClick={() => setActiveSection('users')}
@@ -195,6 +222,12 @@ export default function AdminView({ currentUserEmail = 'admin@tahaluf.com', init
         {activeSection === 'events' && (
           <EventsAdmin currentUserEmail={currentUserEmail} initialEvents={initialEvents} />
         )}
+
+        <DataHealthAdmin
+          active={activeSection === 'health'}
+          onIssueCountChange={setHealthIssueCount}
+          onDashboardAlertsEnabledChange={setDashboardAlertsEnabled}
+        />
 
         {/* SECTION 2: USER ACCESS MANAGEMENT */}
         {activeSection === 'users' && (

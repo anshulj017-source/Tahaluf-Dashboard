@@ -12,6 +12,19 @@
 import * as d3 from 'd3-dsv';
 import * as d3Array from 'd3';
 import datePresets from '../app/utils/datePresets.js';
+import {
+  getSheetCacheHealth,
+  getSheetSnapshot,
+  recordSheetFailure,
+  storeSheetSnapshot,
+  summarizeSheetData
+} from '../lib/sheetCache.mjs';
+import {
+  DEFAULT_HEALTH_NOTIFICATION_SETTINGS,
+  getHealthIssues,
+  normalizeHealthNotificationSettings
+} from '../lib/healthNotificationUtils.mjs';
+import { getSmtpTransportConfig } from '../lib/healthEmailTransport.mjs';
 const { 
   formatYMD, 
   calculatePresetRange, 
@@ -87,6 +100,71 @@ function testUnitLogic() {
   assert(calcCPC(100, 0) === 0, 'CPC handles 0 clicks safely');
   assert(calcCPA(200, 4) === 50, 'CPA calculates correctly');
   assert(calcCPA(200, 0) === 0, 'CPA handles 0 conversions safely');
+}
+
+function testSheetSummaries() {
+  console.log('\n--- Testing Sheet Data Health Summaries ---');
+  const summary = summarizeSheetData([
+    'Date,Event Name DB,Spend',
+    '2026-03-04,KoG 26,125',
+    '2026-02-01,KoG 26,75',
+    '2026-01-15,SAIF 26,50'
+  ].join('\n'));
+
+  assert(summary.rowCount === 3, 'Sheet health summary counts data rows');
+  assert(summary.eventColumn === 'Event Name DB', 'Sheet health summary identifies event-name column');
+  assert(summary.dateColumn === 'Date', 'Sheet health summary identifies date column');
+  assert(summary.eventBreakdown['KoG 26']?.rows === 2, 'Sheet health summary counts rows by event tag');
+  assert(summary.eventBreakdown['KoG 26']?.firstDate === '2026-02-01', 'Sheet health summary finds the first event date');
+  assert(summary.eventBreakdown['KoG 26']?.lastDate === '2026-03-04', 'Sheet health summary finds the last event date');
+}
+
+function testHealthNotifications() {
+  console.log('\n--- Testing Health Notification Settings & Issue Detection ---');
+  const settings = normalizeHealthNotificationSettings({
+    ...DEFAULT_HEALTH_NOTIFICATION_SETTINGS,
+    emailRecipients: [' Admin@Example.com ', 'admin@example.com', 'alerts@example.com'],
+    frequency: 'immediate_and_daily'
+  });
+  assert(settings.emailRecipients.length === 2, 'Notification settings normalize and deduplicate email recipients');
+  assert(settings.emailRecipients[0] === 'admin@example.com', 'Notification recipient addresses are normalized');
+  assert(settings.frequency === 'immediate_and_daily', 'Notification settings accept immediate and daily delivery');
+
+  let invalidEmailRejected = false;
+  try {
+    normalizeHealthNotificationSettings({ emailRecipients: ['invalid-address'] });
+  } catch {
+    invalidEmailRejected = true;
+  }
+  assert(invalidEmailRejected, 'Notification settings reject invalid email recipients');
+
+  const issues = getHealthIssues([
+    { eventId: 'kog-26', eventName: 'KoG 26', kind: 'Actuals', state: 'healthy', eventDataStatus: 'present' },
+    { eventId: 'smlc-26', eventName: 'SMLC 26', kind: 'Actuals', state: 'healthy', eventDataStatus: 'missing' },
+    { eventId: 'saif-26', eventName: 'SAIF 26', kind: 'Planned', state: 'stale', lastError: 'Upstream timeout' }
+  ]);
+  assert(issues.length === 2, 'Health issue detection ignores healthy feeds and flags missing/stale sources');
+  assert(issues.some(issue => issue.key === 'smlc-26:Actuals' && issue.status === 'missing-data'), 'Health issue detection identifies missing event rows');
+  assert(issues.some(issue => issue.key === 'saif-26:Planned' && issue.status === 'stale'), 'Health issue detection identifies stale planned data');
+
+  const smtpConfig = getSmtpTransportConfig({
+    SMTP_HOST: 'smtp.gmail.com',
+    SMTP_PORT: '587',
+    SMTP_USER: 'admin@example.com',
+    SMTP_PASS: 'test app-password'
+  });
+  assert(smtpConfig.host === 'smtp.gmail.com' && smtpConfig.port === 587, 'Gmail SMTP settings parse correctly');
+  assert(smtpConfig.requireTLS && !smtpConfig.secure, 'Port 587 requires STARTTLS');
+  assert(smtpConfig.auth.user === 'admin@example.com', 'SMTP transport uses configured username');
+  assert(smtpConfig.auth.pass === 'testapp-password', 'SMTP transport removes App Password display spaces');
+
+  let missingSmtpSettingsRejected = false;
+  try {
+    getSmtpTransportConfig({});
+  } catch {
+    missingSmtpSettingsRejected = true;
+  }
+  assert(missingSmtpSettingsRejected, 'SMTP transport rejects missing credentials');
 }
 
 // -------------------------------------------------------------
@@ -222,6 +300,29 @@ function testDetailedDateFilterLogic() {
   assert(catNames.includes('Days') && catNames.includes('Weeks') && catNames.includes('Months & Quarters'), 'Includes expected category groups');
 }
 
+async function testLastKnownGoodSheetCache() {
+  console.log('\n--- 3.6 Testing Last-Known-Good Sheet Cache ---');
+  const cacheKey = `automated-test-${Date.now()}`;
+  const previousData = `Channel,Event Name DB,Cost\nMeta,KoG 26,100\n${'previous data,'.repeat(8)}100`;
+  const refreshedData = `Channel,Event Name DB,Cost\nGoogle,KoG 26,200\n${'refreshed data,'.repeat(8)}200`;
+
+  await storeSheetSnapshot(cacheKey, previousData);
+  await recordSheetFailure(cacheKey, 'Google Sheets returned #REF!');
+  const afterFailure = await getSheetSnapshot(cacheKey);
+  const failureHealth = await getSheetCacheHealth([cacheKey]);
+
+  assert(afterFailure?.data === previousData, 'Failed refresh leaves previous good sheet data unchanged');
+  assert(failureHealth[cacheKey]?.state === 'stale', 'Failed refresh reports stale cached data');
+  assert(failureHealth[cacheKey]?.hasCachedData === true, 'Failed refresh retains cached-data availability');
+
+  await storeSheetSnapshot(cacheKey, refreshedData);
+  const afterSuccess = await getSheetSnapshot(cacheKey);
+  const successHealth = await getSheetCacheHealth([cacheKey]);
+
+  assert(afterSuccess?.data === refreshedData, 'Successful refresh replaces the previous snapshot');
+  assert(successHealth[cacheKey]?.state === 'healthy', 'Successful refresh clears the active sheet issue');
+}
+
 // -------------------------------------------------------------
 // 4. INTEGRATION TESTS: LOCAL API ENDPOINTS & CACHING
 // -------------------------------------------------------------
@@ -241,11 +342,22 @@ async function testApiEndpoints() {
       const xCache = res.headers.get('x-cache');
       if (xCache === 'MISS-EMPTY' || text.length === 0 || text.startsWith('#REF!') || text.startsWith('#VALUE!') || text.startsWith('#ERROR!')) {
         console.warn(`  ⚠ Note: ${sheet.name} returned upstream spreadsheet formula error from Google Docs (handled safely via fallback, X-Cache: ${xCache}).`);
-        assert(true, `${sheet.name}: Handled upstream sheet condition gracefully`);
+        assert(
+          sheet.gid !== '1486784585',
+          'KoG actuals sheet returns data rather than an upstream spreadsheet error'
+        );
+        if (sheet.gid !== '1486784585') {
+          assert(true, `${sheet.name}: Handled upstream sheet condition gracefully`);
+        }
       } else {
         assert(text.length > 50, `${sheet.name}: Non-empty body (${text.length} bytes)`);
         const rows = d3.csvParse(text);
         assert(rows.length > 0, `${sheet.name}: Parsed valid CSV rows (${rows.length} rows)`);
+
+        if (sheet.gid === '1486784585') {
+          const hasKoGEvent = rows.some(r => (r['Event Name DB'] || '').trim() === 'KoG 26');
+          assert(hasKoGEvent, 'KoG actuals sheet contains records with KoG 26 in Event Name DB');
+        }
 
         // Special check for SMLC sheet
         if (sheet.gid === '1526538255') {
@@ -293,6 +405,7 @@ async function testAdminEventsApi() {
     assert(data.success === true, 'Admin Events API: Returns success: true');
     assert(data.config && Array.isArray(data.config.events), 'Admin Events API: Returns events array');
     assert(data.config.events.length >= 8, `Admin Events API: Contains at least 8 events (found: ${data.config?.events?.length})`);
+    assert(Array.isArray(data.sheetHealth), 'Admin Events API: Reports configured sheet health');
 
     // Verify key events exist in config
     const eventNames = data.config.events.map(e => e.name);
@@ -304,6 +417,24 @@ async function testAdminEventsApi() {
     assert(eventNames.includes('SAIF 26'), 'Config includes SAIF 26 event');
     assert(eventNames.includes('KoG 26'), 'Config includes KoG 26 event');
     assert(eventNames.includes('Black Hat'), 'Config includes Black Hat event');
+    const kogSheetHealth = data.sheetHealth.find(sheet => sheet.eventId === 'kog-26' && sheet.kind === 'Actuals');
+    assert(kogSheetHealth?.state === 'healthy' && kogSheetHealth.hasCachedData, 'Admin reports KoG actuals are healthy and cached');
+    assert(kogSheetHealth?.eventDataStatus === 'present' && kogSheetHealth.eventRows > 0, 'Admin confirms KoG actual rows are present');
+    assert(Boolean(kogSheetHealth?.firstDataDate && kogSheetHealth?.lastDataDate), 'Admin reports KoG actual data date range');
+    assert(data.sheetHealth.filter(sheet => sheet.kind === 'Actuals').length === data.config.events.length, 'Admin reports each configured event once in actuals health');
+
+    const refreshSheetRes = await fetch(adminEventsUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'refresh-sheet',
+        eventId: 'kog-26',
+        kind: 'Actuals',
+        author: 'Automated Test'
+      })
+    });
+    const refreshSheetData = await refreshSheetRes.json();
+    assert(refreshSheetRes.ok && refreshSheetData.refreshed, 'Admin can manually refresh KoG actuals');
 
     // Verify Version Control & History
     assert(Array.isArray(data.history), 'Admin Events API: History array is present');
@@ -411,9 +542,12 @@ async function runAllTests() {
   console.log('====================================================');
 
   testUnitLogic();
+  testSheetSummaries();
+  testHealthNotifications();
   testEventAndPortfolioLogic();
   testDynamicWeekLogic();
   testDetailedDateFilterLogic();
+  await testLastKnownGoodSheetCache();
 
   // Check if local dev server is running before attempting API integration tests
   try {
