@@ -120,7 +120,7 @@ export default function CreativeView({ data, exRate = 1, exSym = '$', formatShor
 
   // Dimensions & Metrics Selection
   const availableDimensions = ['Event', 'Channel', 'Campaign'];
-  const [selectedDimensions, setSelectedDimensions] = useState(['Event']);
+  const [selectedDimensions, setSelectedDimensions] = useState(['Channel']);
 
   const availableMetrics = userRole === 'non-finance' 
     ? ['Impressions', 'Clicks', 'CTR', 'Views', 'Conversions', 'CVR'] 
@@ -426,6 +426,7 @@ export default function CreativeView({ data, exRate = 1, exSym = '$', formatShor
             </span>
           </div>
           <p className="text-[#14a6d9] text-xs font-medium italic mt-0.5">Asset analysis with in-window arrow navigation &amp; responsive screen-fit layout.</p>
+          <p className="text-[#9bb5b0] text-[11px] font-medium italic mt-0.5">* missing data below is due to the unavailability of creative assets for Google Ads PMax campaigns</p>
         </div>
 
         {/* SCREEN FIT & VIEW TOGGLES */}
