@@ -41,6 +41,7 @@ export async function GET(request) {
       success: true,
       settings: state.settings,
       issues,
+      history: [...(state.history || [])].reverse(),
       emailConfigured: isEmailConfigured(),
       updatedAt: state.updatedAt || null
     });

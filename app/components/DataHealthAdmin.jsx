@@ -14,6 +14,15 @@ const formatTimestamp = (value) => value
   ? new Date(value).toLocaleString()
   : 'Never';
 
+const formatDuration = (from, to) => {
+  const minutes = Math.max(0, Math.round((Date.parse(to) - Date.parse(from)) / 60000));
+  if (minutes < 1) return 'under 1 min';
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ${minutes % 60}m`;
+  return `${Math.floor(hours / 24)}d ${hours % 24}h`;
+};
+
 const getSuggestedFix = (issue = '') => {
   const message = issue.toLowerCase();
   if (message.includes('formula error') || message.includes('#ref!') || message.includes('#value!') || message.includes('#error!')) {
@@ -66,6 +75,7 @@ export default function DataHealthAdmin({
   const [sheetHealth, setSheetHealth] = useState([]);
   const [settings, setSettings] = useState(DEFAULT_HEALTH_NOTIFICATION_SETTINGS);
   const [emailConfigured, setEmailConfigured] = useState(false);
+  const [issueHistory, setIssueHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [settingsLoading, setSettingsLoading] = useState(true);
   const [savingSettings, setSavingSettings] = useState(false);
@@ -101,11 +111,21 @@ export default function DataHealthAdmin({
     }
   }, [onIssueCountChange]);
 
+  const reloadHistory = useCallback(async () => {
+    try {
+      const response = await fetch('/api/admin/health-notifications', { headers: await getAdminHeaders() });
+      const result = await response.json();
+      if (response.ok && result.success) setIssueHistory(result.history || []);
+    } catch (historyError) {
+      console.error(historyError);
+    }
+  }, []);
+
   useEffect(() => {
     reloadHealth();
-    const intervalId = window.setInterval(() => reloadHealth(true), 60_000);
+    const intervalId = window.setInterval(() => { reloadHealth(true); reloadHistory(); }, 60_000);
     return () => window.clearInterval(intervalId);
-  }, [reloadHealth]);
+  }, [reloadHealth, reloadHistory]);
 
   useEffect(() => {
     let cancelled = false;
@@ -122,6 +142,7 @@ export default function DataHealthAdmin({
         if (!cancelled) {
           setSettings(result.settings);
           setEmailConfigured(result.emailConfigured);
+          setIssueHistory(result.history || []);
           onDashboardAlertsEnabledChange(result.settings.dashboardEnabled);
         }
       } catch (settingsError) {
@@ -530,6 +551,35 @@ export default function DataHealthAdmin({
           </p>
         </div>
       </section>
+
+      <div className="card-surface rounded-2xl border border-[#14a6d9]/20 overflow-hidden">
+        <div className="px-4 py-3 border-b border-white/5">
+          <h3 className="text-xs font-bold text-white uppercase tracking-widest">Issue History</h3>
+          <p className="text-[10px] text-gray-400 mt-1">
+            When each issue was detected and when it was resolved. Recorded from now on; the latest 200 are kept.
+          </p>
+        </div>
+        <div className="max-h-80 overflow-y-auto divide-y divide-gray-700/30">
+          {issueHistory.map(item => (
+            <div key={item.id} className="px-4 py-3 flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0 space-y-0.5">
+                <p className="text-xs font-bold text-white">{item.eventName} <span className="font-medium text-gray-400">— {item.kind} — {item.status}</span></p>
+                <p className="text-[11px] text-gray-400">{item.message}</p>
+                <p className="text-[10px] text-gray-500">
+                  Detected {formatTimestamp(item.openedAt)}
+                  {item.resolvedAt && ` · Resolved ${formatTimestamp(item.resolvedAt)} (after ${formatDuration(item.openedAt, item.resolvedAt)})`}
+                </p>
+              </div>
+              <span className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${item.resolvedAt ? 'text-emerald-300 border-emerald-400/30 bg-emerald-500/10' : 'text-rose-300 border-rose-400/30 bg-rose-500/10'}`}>
+                {item.resolvedAt ? 'Resolved' : 'Open'}
+              </span>
+            </div>
+          ))}
+          {issueHistory.length === 0 && (
+            <div className="p-5 text-center text-xs text-gray-400">No issues have been recorded yet.</div>
+          )}
+        </div>
+      </div>
 
       <div className="card-surface rounded-2xl border border-[#14a6d9]/20 overflow-hidden">
         <div className="px-4 py-3 border-b border-white/5">

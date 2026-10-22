@@ -23,7 +23,10 @@ import {
 import {
   DEFAULT_HEALTH_NOTIFICATION_SETTINGS,
   getHealthIssues,
-  normalizeHealthNotificationSettings
+  normalizeHealthNotificationSettings,
+  recordHealthIssueOpened,
+  recordHealthIssueResolved,
+  MAX_HEALTH_HISTORY
 } from '../lib/healthNotificationUtils.mjs';
 import { getSmtpTransportConfig } from '../lib/healthEmailTransport.mjs';
 const { 
@@ -118,6 +121,34 @@ function testSheetSummaries() {
   assert(summary.eventBreakdown['KoG 26']?.rows === 2, 'Sheet health summary counts rows by event tag');
   assert(summary.eventBreakdown['KoG 26']?.firstDate === '2026-02-01', 'Sheet health summary finds the first event date');
   assert(summary.eventBreakdown['KoG 26']?.lastDate === '2026-03-04', 'Sheet health summary finds the last event date');
+}
+
+function testHealthIssueHistory() {
+  console.log('\n--- Testing Health Issue History ---');
+  const state = { activeIssues: {}, history: [] };
+  const issue = { key: 'e1:Actuals', eventName: 'SAIF 26', kind: 'Actuals', status: 'stale', signature: 'stale', message: 'Refresh failed' };
+
+  const id = recordHealthIssueOpened(state, issue, undefined, '2026-10-21T10:00:00.000Z');
+  assert(state.history.length === 1 && state.history[0].resolvedAt === null, 'Opening an issue records an unresolved history entry');
+
+  const sameId = recordHealthIssueOpened(state, issue, { historyId: id, signature: 'stale' }, '2026-10-21T10:05:00.000Z');
+  assert(sameId === id && state.history.length === 1, 'Re-observing the same issue does not duplicate history');
+
+  recordHealthIssueResolved(state, id, '2026-10-21T11:30:00.000Z');
+  assert(state.history[0].resolvedAt === '2026-10-21T11:30:00.000Z' && state.history[0].resolution === 'resolved', 'Resolving closes the history entry with a timestamp');
+
+  recordHealthIssueResolved(state, id, '2026-10-22T00:00:00.000Z');
+  assert(state.history[0].resolvedAt === '2026-10-21T11:30:00.000Z', 'Resolving twice keeps the original resolution time');
+
+  const first = recordHealthIssueOpened(state, issue, undefined, '2026-10-22T01:00:00.000Z');
+  const changed = recordHealthIssueOpened(state, { ...issue, status: 'unavailable', signature: 'unavailable' }, { historyId: first, signature: 'stale' }, '2026-10-22T02:00:00.000Z');
+  const prior = state.history.find(item => item.id === first);
+  assert(changed !== first && prior.resolution === 'status-changed', 'A status change closes the old entry and opens a new one');
+
+  for (let i = 0; i < MAX_HEALTH_HISTORY + 20; i += 1) {
+    recordHealthIssueOpened(state, { ...issue, key: `k${i}` }, undefined, new Date(2026, 9, 23, 0, i).toISOString());
+  }
+  assert(state.history.length === MAX_HEALTH_HISTORY, 'History is capped at the maximum size');
 }
 
 function testHealthNotifications() {
@@ -635,6 +666,7 @@ async function runAllTests() {
   testUnitLogic();
   testSheetSummaries();
   testHealthNotifications();
+  testHealthIssueHistory();
   testEventAndPortfolioLogic();
   testDynamicWeekLogic();
   testDetailedDateFilterLogic();
