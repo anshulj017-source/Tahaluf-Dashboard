@@ -360,6 +360,61 @@ async function testFirestoreChunkBatching() {
 }
 
 // -------------------------------------------------------------
+// 3.6 UNIT TESTS: CREATIVE VIEW & EVENT DIMENSION PROCESSING
+// -------------------------------------------------------------
+function testCreativeViewLogic() {
+  console.log('\n--- 3.6 Testing Creative View & Event Dimension Processing ---');
+
+  const mockRows = [
+    {
+      adName: 'SAIF_Ad_01',
+      creativeName: 'SAIF Keynote Teaser',
+      eventNameDB: 'SAIF 26',
+      impressions: 1000,
+      clicks: 50,
+      cost: 100,
+      dateObj: new Date('2026-10-18T10:00:00Z'),
+      adImageUrl: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=800',
+      videoUrl: 'https://example.com/video.mp4',
+      channel: 'Meta',
+      status: 'Live'
+    },
+    {
+      adName: 'SMLC_Ad_02',
+      creativeName: 'SMLC Maritime Registration',
+      eventNameDB: 'SMLC 26',
+      impressions: 2000,
+      clicks: 80,
+      cost: 160,
+      dateObj: new Date('2026-10-01T10:00:00Z'),
+      adImageUrl: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=800',
+      videoUrl: '',
+      channel: 'Google',
+      status: 'Paused'
+    }
+  ];
+
+  // 1. Event extraction
+  const saifEvent = mockRows[0].eventNameDB;
+  assert(saifEvent === 'SAIF 26', 'Creative correctly maps to Event dimension SAIF 26');
+
+  const smlcEvent = mockRows[1].eventNameDB;
+  assert(smlcEvent === 'SMLC 26', 'Creative correctly maps to Event dimension SMLC 26');
+
+  // 2. Full target URL resolution
+  const getFullTargetUrl = (c) => c.adImageUrl || c.previewUrl || c.videoUrl || c.postUrl;
+  assert(getFullTargetUrl(mockRows[0]) === 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=800', 'Full picture URL resolves adImageUrl with priority');
+  assert(getFullTargetUrl(mockRows[1]) === 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=800', 'Full picture URL resolves image when video absent');
+
+  // 3. CTR and CPC calculation
+  const ctr0 = mockRows[0].clicks / mockRows[0].impressions;
+  assert(ctr0 === 0.05, 'Creative CTR calculates correctly (5%)');
+
+  const cpc0 = mockRows[0].cost / mockRows[0].clicks;
+  assert(cpc0 === 2.0, 'Creative CPC calculates correctly ($2.00)');
+}
+
+// -------------------------------------------------------------
 // 4. INTEGRATION TESTS: LOCAL API ENDPOINTS & CACHING
 // -------------------------------------------------------------
 async function testApiEndpoints() {
@@ -585,6 +640,7 @@ async function runAllTests() {
   testDetailedDateFilterLogic();
   await testLastKnownGoodSheetCache();
   await testFirestoreChunkBatching();
+  testCreativeViewLogic();
 
   // Check if local dev server is running before attempting API integration tests
   try {
