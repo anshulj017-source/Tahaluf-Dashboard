@@ -4,7 +4,8 @@ import * as d3 from 'd3';
 import { 
   TrendingUp, Globe, Layers, Activity, DollarSign, MousePointer2, 
   Eye, EyeOff, Shield, Zap, LayoutDashboard, ChevronDown, Search, Check, ShoppingCart,
-  TableProperties, MonitorPlay, BarChart3, Smartphone, List, Download, RefreshCw, Users, Calendar, LayoutTemplate, PieChart, Grid, Map, LogOut
+  TableProperties, MonitorPlay, BarChart3, Smartphone, List, Download, RefreshCw, Users, Calendar, LayoutTemplate, PieChart, Grid, Map as MapIcon, LogOut,
+  Sparkles
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, AreaChart, Area } from 'recharts';
 import { ComposableMap, Geographies, Geography, ZoomableGroup } from 'react-simple-maps';
@@ -25,6 +26,7 @@ const CustomView = dynamic(() => import('./CustomView'), { ssr: false });
 import CreativeView from './CreativeView';
 import DetailedDateFilter from './components/DetailedDateFilter';
 import HealthAlertBanner from './components/HealthAlertBanner';
+import { getWeekIndex, generateEventWeekTimeline } from '../lib/weekTimeline.mjs';
 
 const GEO_URL = "https://unpkg.com/world-atlas@2.0.2/countries-110m.json";
 
@@ -103,7 +105,7 @@ const MetricCard = ({ label, value, color, icon: Icon, definition, subContent })
 
 const DateRangeFilter = DetailedDateFilter;
 
-const MultiSelect = ({ label, options, selected, onChange, widthClass }) => {
+const MultiSelect = ({ label, options, selected, onChange, widthClass, isHero = false }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const wrapperRef = useRef(null);
@@ -120,15 +122,30 @@ const MultiSelect = ({ label, options, selected, onChange, widthClass }) => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const isAll = selected.includes('All');
+  const hasSpecificChoice = isHero && !isAll && selected.length > 0;
+
   return (
     <div ref={wrapperRef} className={`relative ${widthClass || 'w-[120px] xl:w-[130px]'} shrink-0 z-30`}>
-      <span className="text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest mb-1.5 block">{label}</span>
+      <span className={`text-[10px] font-black uppercase tracking-widest mb-1.5 flex items-center gap-1 ${isHero ? 'text-[#cedc28]' : 'text-[#14a6d9]'}`}>
+        {isHero && <Sparkles className="w-3 h-3 text-[#cedc28]" />}
+        {label}
+        {hasSpecificChoice && <span className="w-1.5 h-1.5 rounded-full bg-[#cedc28] animate-pulse"></span>}
+      </span>
       <div 
         onClick={() => setIsOpen(!isOpen)}
-        className="px-2.5 py-1.5 surface-inset border border-[#cedc28]/30 rounded-lg text-[10px] font-bold text-[#eef7f5] cursor-pointer flex justify-between items-center hover:border-[#cedc28] transition-colors"
+        className={`px-2.5 py-1.5 rounded-xl cursor-pointer flex justify-between items-center transition-all ${
+          isHero
+            ? hasSpecificChoice
+              ? 'bg-[#cedc28]/20 border-2 border-[#cedc28] text-white font-black shadow-[0_0_15px_rgba(206,220,40,0.35)] hover:shadow-[0_0_20px_rgba(206,220,40,0.5)]'
+              : 'bg-gradient-to-r from-[#cedc28]/15 via-[#0a2442] to-[#14a6d9]/15 border-2 border-[#cedc28]/70 text-[#eef7f5] font-bold hover:border-[#cedc28] shadow-[0_0_10px_rgba(206,220,40,0.2)]'
+            : 'surface-inset border border-[#cedc28]/30 rounded-lg text-[10px] font-bold text-[#eef7f5] hover:border-[#cedc28]'
+        }`}
       >
-        <span className="truncate pr-2">{selected.includes('All') ? 'All Selected' : selected.join(', ')}</span>
-        <ChevronDown className={`w-4 h-4 flex-shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <span className="truncate pr-2 text-[10px] xl:text-[11px]">
+          {isAll ? (isHero ? 'All Events' : 'All Selected') : selected.join(', ')}
+        </span>
+        <ChevronDown className={`w-4 h-4 flex-shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''} ${isHero ? 'text-[#cedc28]' : ''}`} />
       </div>
       {isOpen && (
         <div className="absolute top-full left-0 min-w-[200px] w-full h-0 z-50">
@@ -468,6 +485,7 @@ export default function App() {
   const [filterPortfolios, setFilterPortfolios] = useState(['All']);
   const [filterWeeks, setFilterWeeks] = useState(['All']);
   const [localWeeklyViewWeeks, setLocalWeeklyViewWeeks] = useState(['All']);
+  const [eventWeekTimelines, setEventWeekTimelines] = useState({});
   
   // State: Currency
   const [currency, setCurrency] = useState('USD'); // 'USD' or 'SAR'
@@ -799,7 +817,26 @@ export default function App() {
         }
       });
 
-      const MS_PER_DAY = 1000 * 60 * 60 * 24;
+      // Also incorporate configured startDate from activeEvents if set
+      activeEvents.forEach(ev => {
+        if (ev.startDate) {
+          const parts = ev.startDate.split('-').map(Number);
+          if (parts.length === 3) {
+            const sDate = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
+            const evKey = (ev.name || '').toUpperCase();
+            if (!firstImps[evKey] || sDate < firstImps[evKey]) {
+              firstImps[evKey] = sDate;
+            }
+            if (ev.sourceName) {
+              const srcKey = ev.sourceName.toUpperCase();
+              if (!firstImps[srcKey] || sDate < firstImps[srcKey]) {
+                firstImps[srcKey] = sDate;
+              }
+            }
+          }
+        }
+      });
+
       combinedAds.forEach(d => {
         if (!d.dateObj) return;
         const ev = (d.eventNameDB || '').toUpperCase();
@@ -809,16 +846,8 @@ export default function App() {
         
         if (campStart && eventStart) {
            const dUTC = new Date(Date.UTC(d.dateObj.getFullYear(), d.dateObj.getMonth(), d.dateObj.getDate()));
-           const getWeekIndex = (targetDate) => {
-             const daysToSunday = (7 - campStart.getUTCDay()) % 7;
-             const firstWeekEnd = new Date(campStart.getTime() + daysToSunday * MS_PER_DAY);
-             if (targetDate <= firstWeekEnd) return 0;
-             const diffFromNextMonday = Math.floor((targetDate.getTime() - (firstWeekEnd.getTime() + MS_PER_DAY)) / MS_PER_DAY);
-             return 1 + Math.floor(diffFromNextMonday / 7);
-           };
-
-           const rowWeekIdx = getWeekIndex(dUTC);
-           const totalWeeks = getWeekIndex(eventStart);
+           const rowWeekIdx = getWeekIndex(dUTC, campStart);
+           const totalWeeks = getWeekIndex(eventStart, campStart);
            const countdown = Math.max(0, totalWeeks - rowWeekIdx);
            const yearSuffix = (eventStart.getUTCFullYear() % 100);
            d.weekDB = `W${countdown} '${yearSuffix}`;
@@ -827,6 +856,32 @@ export default function App() {
            d.weekDB = `${d.weekDB} '${yr}`;
         }
       });
+
+      // Build complete client week timelines (countdown W{total} to W0) for all known events
+      const timelines = {};
+      const allKnownEventNames = Array.from(new Set([
+        ...Object.keys(eventStartDates),
+        ...Object.keys(firstImps),
+        ...activeEvents.map(e => e.name),
+        ...combinedAds.map(d => d.eventNameDB).filter(Boolean)
+      ]));
+
+      allKnownEventNames.forEach(evName => {
+        const evUpper = evName.toUpperCase();
+        const campStart = firstImps[evUpper] || Object.entries(firstImps).find(([k]) => evUpper.includes(k.toUpperCase()))?.[1];
+        const eventEntry = Object.entries(eventStartDates).find(([k]) => evUpper.includes(k.toUpperCase()));
+        const eventStart = eventEntry?.[1];
+
+        if (campStart && eventStart) {
+          const tl = generateEventWeekTimeline(campStart, eventStart);
+          if (tl && tl.length > 0) {
+            timelines[evName] = tl;
+            timelines[evUpper] = tl;
+          }
+        }
+      });
+
+      setEventWeekTimelines(timelines);
 
       setAdData(combinedAds);
       setGaData([]);
@@ -863,6 +918,7 @@ export default function App() {
     setFilterEventTypes(['All']);
     setFilterPortfolios(['All']);
     setFilterWeeks(['All']);
+    setSelectedEvent(null);
     setDateRange({ start: '', end: '', preset: 'auto' });
   };
 
@@ -881,6 +937,17 @@ export default function App() {
   const eventTypesData = useMemo(() => filterEvents.includes('All') ? eventsData : eventsData.filter(d => filterEvents.includes(d.eventNameDB)), [eventsData, filterEvents]);
   const uniqueEventTypes = useMemo(() => Array.from(new Set(eventTypesData.map(d => d.eventTypeDB))).filter(e => e && e !== 'Unknown').sort(), [eventTypesData]);
 
+  const eventPortfolioMap = useMemo(() => {
+    const map = {};
+    for (let i = 0; i < adData.length; i++) {
+      const ev = adData[i].eventNameDB;
+      if (ev && !map[ev]) {
+        map[ev] = adData[i].portfolio;
+      }
+    }
+    return map;
+  }, [adData]);
+
   useEffect(() => {
     if (filterEvents.includes('All')) return;
     const validEvents = filterEvents.filter(e => uniqueEvents.includes(e));
@@ -897,14 +964,16 @@ export default function App() {
     }
   }, [uniqueEventTypes, filterEventTypes]);
   const uniqueWeeks = useMemo(() => {
-    const weeks = Array.from(new Set(adData.map(d => d.weekDB))).filter(w => w && w !== 'Unknown');
+    const fromAds = adData.map(d => d.weekDB);
+    const fromTimelines = Object.values(eventWeekTimelines).flat().map(t => t.week);
+    const weeks = Array.from(new Set([...fromAds, ...fromTimelines])).filter(w => w && w !== 'Unknown');
     // Sort weeks numerically in countdown order (e.g. W12, W11 ... W0)
     return weeks.sort((a, b) => {
       const numA = parseInt(a.match(/^W(\d+)/i)?.[1] || a.replace(/[^\d-]/g, '') || '0', 10);
       const numB = parseInt(b.match(/^W(\d+)/i)?.[1] || b.replace(/[^\d-]/g, '') || '0', 10);
       return numB - numA;
     });
-  }, [adData]);
+  }, [adData, eventWeekTimelines]);
 
   // Apply filters to Ad Data
   const filteredAdData = useMemo(() => {
@@ -1112,7 +1181,7 @@ export default function App() {
     { id: 'campaign', label: 'Event View', icon: Activity },
     { id: 'weekly', label: 'Weekly View', icon: Calendar },
     { id: 'channel', label: 'Channel View', icon: MonitorPlay },
-    { id: 'market', label: 'Market View', icon: Map },
+    { id: 'market', label: 'Market View', icon: MapIcon },
     { id: 'detailed', label: 'Detailed View', icon: PieChart },
     /* { id: 'webtraffic', label: 'Web Traffic', icon: Users }, */
     { id: 'creative', label: 'Creative View', icon: LayoutTemplate },
@@ -1322,7 +1391,7 @@ export default function App() {
         
         const groupKey = currentTrendView === 'Daily' ? d => d.date : d => d.weekDB;
         const grouped = d3.groups(evData, groupKey).filter(([k]) => k && k !== 'Unknown');
-        return grouped.map(([key, vals]) => {
+        const results = grouped.map(([key, vals]) => {
           const spend = d3.sum(vals, d => d.cost) * exRate;
           const impressions = d3.sum(vals, d => d.impressions);
           const clicks = d3.sum(vals, d => d.clicks);
@@ -1333,7 +1402,41 @@ export default function App() {
           const cpa = purchases > 0 ? (spend / purchases) : 0;
           const cvr = clicks > 0 ? (purchases / clicks) * 100 : 0;
           return { key, spend, impressions, clicks, purchases, ctr, cpm, cpc, cpa, cvr };
-        }).sort((a, b) => {
+        });
+
+        if (currentTrendView === 'Weekly') {
+          const evContext = selectedEvent || (keyField === 'eventNameDB' ? selection : null);
+          const evUpper = (evContext || '').toUpperCase();
+          const tl = (evContext && eventWeekTimelines[evContext])
+            || (evUpper && eventWeekTimelines[evUpper])
+            || Object.entries(eventWeekTimelines).find(([k]) => evUpper && evUpper.includes(k.toUpperCase()))?.[1];
+
+          const targetWeeks = (allowedWeeks && !allowedWeeks.includes('All'))
+            ? allowedWeeks
+            : (tl ? tl.map(t => t.week) : null);
+
+          if (targetWeeks && targetWeeks.length > 0) {
+            const existingKeys = new Set(results.map(r => r.key));
+            targetWeeks.forEach(wKey => {
+              if (!existingKeys.has(wKey)) {
+                results.push({
+                  key: wKey,
+                  spend: 0,
+                  impressions: 0,
+                  clicks: 0,
+                  purchases: 0,
+                  ctr: 0,
+                  cpm: 0,
+                  cpc: 0,
+                  cpa: 0,
+                  cvr: 0
+                });
+              }
+            });
+          }
+        }
+
+        return results.sort((a, b) => {
           if (currentTrendView === 'Daily') return new Date(a.key) - new Date(b.key);
           const numA = parseInt(a.key.replace(/[^\d-]/g, ''), 10) || 0;
           const numB = parseInt(b.key.replace(/[^\d-]/g, ''), 10) || 0;
@@ -1546,23 +1649,76 @@ export default function App() {
 
       if (!activeEventContext) {
          return (
-           <div className="flex flex-col items-center justify-center h-[60vh] text-center w-full">
-             <Calendar className="w-20 h-20 text-[#cedc28]/40 mb-6" />
-             <h2 className="text-3xl font-anton uppercase text-white mb-3">Select an Event</h2>
-             <p className="text-[#eef7f5]/70 max-w-lg text-sm">
-               Please select exactly one event from the master filter at the top right, or click an event in the Overview tab, to unlock its full weekly breakdown and trend analysis.
+           <div className="flex flex-col items-center justify-center min-h-[60vh] py-10 text-center w-full max-w-5xl mx-auto px-4">
+             <div className="p-4 rounded-3xl bg-[#cedc28]/10 border border-[#cedc28]/30 mb-5 shadow-[0_0_30px_rgba(206,220,40,0.15)]">
+               <Calendar className="w-12 h-12 text-[#cedc28]" />
+             </div>
+             <h2 className="text-3xl sm:text-4xl font-anton uppercase text-white tracking-wide mb-2">
+               Select an Event to Unlock Weekly Breakdown &amp; Trends
+             </h2>
+             <p className="text-[#eef7f5]/70 max-w-2xl text-sm mb-8">
+               Select an event from the hero filter in the top bar, or click any event card below to immediately load its full countdown timeline (<span className="text-[#cedc28] font-bold">W20 → W0</span>), weekly delivery metrics, and trend analysis.
              </p>
+
+             <div className="w-full grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+               {uniqueEvents.map(evName => {
+                 const evTimeline = eventWeekTimelines[evName] || eventWeekTimelines[evName.toUpperCase()] || [];
+                 const maxWeek = evTimeline[0]?.week || 'Dynamic';
+                 const portfolio = eventPortfolioMap[evName] || 'P1';
+
+                 return (
+                   <button
+                     key={evName}
+                     type="button"
+                     onClick={() => {
+                       React.startTransition(() => {
+                         setFilterEvents([evName]);
+                         setSelectedEvent(evName);
+                       });
+                     }}
+                     className="group text-left p-5 rounded-2xl bg-[#0a2442]/80 hover:bg-[#0a2442] border border-[#cedc28]/30 hover:border-[#cedc28] shadow-lg hover:shadow-[0_0_25px_rgba(206,220,40,0.25)] transition-all transform hover:-translate-y-1 cursor-pointer flex flex-col justify-between"
+                   >
+                     <div>
+                       <div className="flex items-center justify-between mb-3">
+                         <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#14a6d9]/20 text-[#14a6d9] border border-[#14a6d9]/30">
+                           {portfolio}
+                         </span>
+                         <span className="text-[10px] font-bold text-gray-400 group-hover:text-[#cedc28] transition-colors">
+                           {maxWeek} → W0
+                         </span>
+                       </div>
+                       <h3 className="text-lg font-black text-white group-hover:text-[#cedc28] transition-colors truncate">
+                         {evName}
+                       </h3>
+                     </div>
+                     <div className="mt-4 pt-3 border-t border-[#cedc28]/10 flex items-center justify-between text-xs text-[#14a6d9] font-bold group-hover:text-[#cedc28]">
+                       <span>View Timeline</span>
+                       <span className="transition-transform group-hover:translate-x-1">→</span>
+                     </div>
+                   </button>
+                 );
+               })}
+             </div>
            </div>
          );
       }
 
       let baseWeeklyData = filteredAdData.filter(d => d.eventNameDB === activeEventContext);
       
-      const eventUniqueWeeks = Array.from(new Set(baseWeeklyData.map(d => d.weekDB))).filter(Boolean).sort((a, b) => {
-          const numA = parseInt(a.match(/^W(\d+)/i)?.[1] || a.replace(/[^\d-]/g, '') || '0', 10);
-          const numB = parseInt(b.match(/^W(\d+)/i)?.[1] || b.replace(/[^\d-]/g, '') || '0', 10);
-          return numB - numA;
-      });
+      const fullTimeline = (activeEventContext && eventWeekTimelines[activeEventContext]) 
+        || (activeEventContext && eventWeekTimelines[activeEventContext.toUpperCase()])
+        || Object.entries(eventWeekTimelines).find(([k]) => activeEventContext && activeEventContext.toUpperCase().includes(k.toUpperCase()))?.[1]
+        || [];
+
+      const timelineWeekStrings = fullTimeline.map(t => t.week);
+
+      const eventUniqueWeeks = timelineWeekStrings.length > 0
+        ? timelineWeekStrings
+        : Array.from(new Set(baseWeeklyData.map(d => d.weekDB))).filter(Boolean).sort((a, b) => {
+            const numA = parseInt(a.match(/^W(\d+)/i)?.[1] || a.replace(/[^\d-]/g, '') || '0', 10);
+            const numB = parseInt(b.match(/^W(\d+)/i)?.[1] || b.replace(/[^\d-]/g, '') || '0', 10);
+            return numB - numA;
+        });
 
       let subTableAdData = baseWeeklyData;
       if (!localWeeklyViewWeeks.includes('All')) {
@@ -1570,6 +1726,9 @@ export default function App() {
       }
 
       const getWeekDateRange = (weekStr) => {
+         const tEntry = fullTimeline.find(t => t.week === weekStr);
+         if (tEntry && tEntry.dateRange) return tEntry.dateRange;
+
          const weekData = baseWeeklyData.filter(d => d.weekDB === weekStr);
          if (weekData.length === 0) return '';
          const dates = weekData.map(d => new Date(d.date)).filter(d => !isNaN(d));
@@ -1577,13 +1736,13 @@ export default function App() {
          const minDate = new Date(Math.min(...dates));
          const maxDate = new Date(Math.max(...dates));
          
-         const monthMin = minDate.toLocaleDateString('en-US', { month: 'short' });
-         const dayMin = minDate.getDate();
-         const yearMin = minDate.getFullYear();
+         const monthMin = minDate.toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' });
+         const dayMin = minDate.getUTCDate();
+         const yearMin = minDate.getUTCFullYear();
          
-         const monthMax = maxDate.toLocaleDateString('en-US', { month: 'short' });
-         const dayMax = maxDate.getDate();
-         const yearMax = maxDate.getFullYear();
+         const monthMax = maxDate.toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' });
+         const dayMax = maxDate.getUTCDate();
+         const yearMax = maxDate.getUTCFullYear();
          
          if (yearMin === yearMax) {
              if (monthMin === monthMax) {
@@ -1594,9 +1753,29 @@ export default function App() {
          return `${monthMin} ${dayMin}, ${yearMin} - ${monthMax} ${dayMax}, ${yearMax}`;
       };
 
-      const weeklyMetricsData = getMetricsData(subTableAdData, d => d.weekDB, 'week');
-      weeklyMetricsData.forEach(row => {
-          row.dateRange = getWeekDateRange(row.week);
+      const existingMetrics = getMetricsData(subTableAdData, d => d.weekDB, 'week');
+      const metricsMap = new Map(existingMetrics.map(r => [r.week, r]));
+      const targetWeeks = localWeeklyViewWeeks.includes('All') ? eventUniqueWeeks : localWeeklyViewWeeks;
+
+      const weeklyMetricsData = targetWeeks.map(weekStr => {
+        if (metricsMap.has(weekStr)) {
+          const row = { ...metricsMap.get(weekStr) };
+          row.dateRange = getWeekDateRange(weekStr);
+          return row;
+        }
+        return {
+          week: weekStr,
+          dateRange: getWeekDateRange(weekStr),
+          spend: 0,
+          impressions: 0,
+          clicks: 0,
+          ctr: 0,
+          cpm: 0,
+          cpc: 0,
+          cpa: 0,
+          cvr: 0,
+          purchases: 0
+        };
       });
       
       weeklyMetricsData.sort((a, b) => {
@@ -1614,7 +1793,32 @@ export default function App() {
       return (
         <div className="space-y-8 w-full">
           <div className="flex justify-between items-center card-surface backdrop-blur-2xl p-6 rounded-3xl border border-[#cedc28]/20 shadow-xl mb-4 relative z-30" style={{ overflow: 'visible' }}>
-            <h2 className="text-3xl font-anton uppercase text-white flex items-center gap-3"><Calendar className="text-[#cedc28]" /> Weekly View: {activeEventContext}</h2>
+            <div className="flex items-center gap-3 flex-wrap">
+              <h2 className="text-3xl font-anton uppercase text-white flex items-center gap-2">
+                <Calendar className="text-[#cedc28]" /> Weekly View:
+              </h2>
+              {/* Instant Inline Event Switcher */}
+              <div className="relative inline-block">
+                <select
+                  value={activeEventContext}
+                  onChange={(e) => {
+                    const nextVal = e.target.value;
+                    React.startTransition(() => {
+                      setSelectedEvent(nextVal);
+                      setFilterEvents([nextVal]);
+                    });
+                  }}
+                  className="appearance-none bg-[#0a2442] hover:bg-[#07192f] border-2 border-[#cedc28] text-white text-xs font-black rounded-xl pl-3 pr-8 py-2 cursor-pointer shadow-[0_0_12px_rgba(206,220,40,0.25)] focus:outline-none transition-all active:scale-95"
+                >
+                  {uniqueEvents.map(ev => (
+                    <option key={ev} value={ev} className="bg-[#0a2442] text-white font-bold py-1">
+                      {ev}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="w-3.5 h-3.5 text-[#cedc28] absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
+            </div>
             <div className="w-64">
                <MultiSelect label="Select Weeks" options={eventUniqueWeeks} selected={localWeeklyViewWeeks} onChange={setLocalWeeklyViewWeeks} />
             </div>
@@ -1873,15 +2077,30 @@ export default function App() {
           </div>
 
           {/* RIGHT: Filters + Actions */}
-          <div className="flex gap-1.5 flex-wrap flex-1 justify-start items-end xl:ml-4">
-            <DateRangeFilter label="Date Range" dateRange={dateRange} onChange={setDateRange} />
-            <MultiSelect label="Week" options={uniqueWeeks} selected={filterWeeks} onChange={setFilterWeeks} />
-            <MultiSelect label="Event Portfolio" options={uniquePortfolios} selected={filterPortfolios} onChange={setFilterPortfolios} />
-            <MultiSelect label="Event" options={uniqueEvents} selected={filterEvents} onChange={setFilterEvents} />
-            <MultiSelect label="Event Type" options={uniqueEventTypes} selected={filterEventTypes} onChange={setFilterEventTypes} />
-            <MultiSelect label="Funnel Stage" options={uniquePhases} selected={filterPhases} onChange={setFilterPhases} />
-            <MultiSelect label="Channel" options={uniqueChannels} selected={filterChannels} onChange={setFilterChannels} />
-            <MultiSelect label="Market" options={uniqueMarkets} selected={filterMarkets} onChange={setFilterMarkets} widthClass="w-[160px] xl:w-[185px]" />
+          <div className="flex gap-2 flex-wrap flex-1 justify-start items-end xl:ml-4">
+            <DateRangeFilter label="DATE" dateRange={dateRange} onChange={setDateRange} />
+            <MultiSelect label="Week" options={uniqueWeeks} selected={filterWeeks} onChange={setFilterWeeks} widthClass="w-[110px] xl:w-[120px]" />
+            <MultiSelect label="Event Portfolio" options={uniquePortfolios} selected={filterPortfolios} onChange={setFilterPortfolios} widthClass="w-[110px] xl:w-[125px]" />
+            {/* HERO HIGHLIGHTED EVENT FILTER */}
+            <MultiSelect 
+              label="Event" 
+              options={uniqueEvents} 
+              selected={filterEvents} 
+              onChange={(next) => {
+                setFilterEvents(next);
+                if (next.length === 1 && !next.includes('All')) {
+                  setSelectedEvent(next[0]);
+                } else if (next.includes('All') || next.length === 0) {
+                  setSelectedEvent(null);
+                }
+              }} 
+              isHero={true} 
+              widthClass="w-[155px] xl:w-[185px]" 
+            />
+            <MultiSelect label="Event Type" options={uniqueEventTypes} selected={filterEventTypes} onChange={setFilterEventTypes} widthClass="w-[110px] xl:w-[120px]" />
+            <MultiSelect label="Funnel Stage" options={uniquePhases} selected={filterPhases} onChange={setFilterPhases} widthClass="w-[110px] xl:w-[120px]" />
+            <MultiSelect label="Channel" options={uniqueChannels} selected={filterChannels} onChange={setFilterChannels} widthClass="w-[110px] xl:w-[120px]" />
+            <MultiSelect label="Market" options={uniqueMarkets} selected={filterMarkets} onChange={setFilterMarkets} widthClass="w-[145px] xl:w-[170px]" />
             
             <div className="ml-auto shrink-0 flex items-end">
               <button onClick={resetFilters} title="Reset Filters" className="h-[34px] w-[34px] bg-[#cedc28]/10 border border-[#cedc28]/50 text-[#cedc28] rounded-lg hover:bg-[#cedc28]/20 hover:text-white transition-colors flex items-center justify-center"><RefreshCw className="w-4 h-4"/></button>

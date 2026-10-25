@@ -29,6 +29,12 @@ import {
   MAX_HEALTH_HISTORY
 } from '../lib/healthNotificationUtils.mjs';
 import { getSmtpTransportConfig } from '../lib/healthEmailTransport.mjs';
+import {
+  getWeekIndex,
+  getWeekDates,
+  formatWeekDateRange,
+  generateEventWeekTimeline
+} from '../lib/weekTimeline.mjs';
 const { 
   formatYMD, 
   calculatePresetRange, 
@@ -274,6 +280,42 @@ function testDynamicWeekLogic() {
 
   const eventDayWeek = calculateWeekDB(eventStart, campStart, eventStart);
   assert(eventDayWeek === "W0 '26", `Event launch date resolves to W0 '26 (got: ${eventDayWeek})`);
+
+  // Test contiguous timeline generation
+  const timeline = generateEventWeekTimeline(campStart, eventStart);
+  assert(Array.isArray(timeline) && timeline.length === 21, `Timeline generates all 21 contiguous weeks (got: ${timeline.length})`);
+  assert(timeline[0].week === "W20 '26", `Timeline starts at W20 '26 (got: ${timeline[0]?.week})`);
+  assert(timeline[timeline.length - 1].week === "W0 '26", `Timeline ends at W0 '26 (got: ${timeline[timeline.length - 1]?.week})`);
+  assert(timeline.every(t => typeof t.dateRange === 'string' && t.dateRange.length > 5), 'Every timeline week has a non-empty formatted dateRange');
+
+  // Test zero-filling on missing weeks
+  const mockActuals = [
+    { week: "W20 '26", spend: 500, impressions: 5000, clicks: 100 },
+    { week: "W18 '26", spend: 300, impressions: 3000, clicks: 60 }
+    // W19 '26 was skipped / had 0 campaign activity
+  ];
+  const actualsMap = new Map(mockActuals.map(a => [a.week, a]));
+  const filledWeeks = timeline.slice(0, 3).map(t => {
+    if (actualsMap.has(t.week)) {
+      return { ...actualsMap.get(t.week), dateRange: t.dateRange };
+    }
+    return {
+      week: t.week,
+      dateRange: t.dateRange,
+      spend: 0,
+      impressions: 0,
+      clicks: 0,
+      ctr: 0,
+      cpc: 0
+    };
+  });
+
+  assert(filledWeeks.length === 3, 'Zero-filling preserves full sequence of 3 weeks');
+  assert(filledWeeks[1].week === "W19 '26", 'Gap week W19 is present in filled output');
+  assert(filledWeeks[1].spend === 0 && filledWeeks[1].clicks === 0, 'Gap week W19 has 0 spend and 0 clicks');
+  assert(filledWeeks[1].dateRange.length > 0, 'Gap week W19 retains formatted calendar dateRange');
+  const totalSpend = filledWeeks.reduce((acc, w) => acc + w.spend, 0);
+  assert(totalSpend === 800, 'Zero-filled entries do not alter total spend ($800)');
 }
 
 // -------------------------------------------------------------
