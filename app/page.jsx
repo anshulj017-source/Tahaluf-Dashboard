@@ -105,7 +105,7 @@ const MetricCard = ({ label, value, color, icon: Icon, definition, subContent })
 
 const DateRangeFilter = DetailedDateFilter;
 
-const MultiSelect = ({ label, options, selected, onChange, widthClass, isHero = false }) => {
+const MultiSelect = ({ label, options, selected, onChange, widthClass, isHero = false, singleSelect = false }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const wrapperRef = useRef(null);
@@ -155,20 +155,28 @@ const MultiSelect = ({ label, options, selected, onChange, widthClass, isHero = 
               <input type="text" placeholder="Search..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full bg-black/30 text-[#eef7f5] text-[10px] font-bold pl-9 pr-3 py-2 rounded-lg outline-none border border-transparent focus:border-[#cedc28]/50" />
             </div>
             <div className="overflow-y-auto p-2 flex-1 custom-scrollbar">
-              <div onClick={() => { onChange(['All']); setIsOpen(false); setSearchTerm(''); }} className={`px-3 py-2 rounded-lg text-[11px] font-bold cursor-pointer flex justify-between ${selected.includes('All') ? 'bg-[#cedc28]/20 text-[#cedc28]' : 'text-[#eef7f5] hover:bg-[#0a2442]'}`}>
-                All <Check className={`w-3.5 h-3.5 ${selected.includes('All') ? 'opacity-100' : 'opacity-0'}`} />
-              </div>
+              {!singleSelect && (
+                <div onClick={() => { onChange(['All']); setIsOpen(false); setSearchTerm(''); }} className={`px-3 py-2 rounded-lg text-[11px] font-bold cursor-pointer flex justify-between ${selected.includes('All') ? 'bg-[#cedc28]/20 text-[#cedc28]' : 'text-[#eef7f5] hover:bg-[#0a2442]'}`}>
+                  All <Check className={`w-3.5 h-3.5 ${selected.includes('All') ? 'opacity-100' : 'opacity-0'}`} />
+                </div>
+              )}
               {filtered.map(opt => {
                 const isSel = selected.includes(opt);
                 return (
                   <div key={opt} onClick={() => {
-                    let next = [...selected];
-                    if (next.includes('All')) next = [];
-                    if (isSel) {
-                      next = next.filter(n => n !== opt);
-                      if (next.length === 0) next = ['All'];
-                    } else { next.push(opt); }
-                    onChange(next);
+                    if (singleSelect) {
+                      onChange([opt]);
+                      setIsOpen(false);
+                      setSearchTerm('');
+                    } else {
+                      let next = [...selected];
+                      if (next.includes('All')) next = [];
+                      if (isSel) {
+                        next = next.filter(n => n !== opt);
+                        if (next.length === 0) next = ['All'];
+                      } else { next.push(opt); }
+                      onChange(next);
+                    }
                   }} className={`px-3 py-2 mt-1 rounded-lg text-[11px] font-bold cursor-pointer flex justify-between ${isSel ? 'bg-[#cedc28]/20 text-[#cedc28]' : 'text-[#eef7f5] hover:bg-[#0a2442]'}`}>
                     <span className="truncate pr-2">{opt}</span> <Check className={`w-3.5 h-3.5 flex-shrink-0 ${isSel ? 'opacity-100' : 'opacity-0'}`} />
                   </div>
@@ -817,26 +825,6 @@ export default function App() {
         }
       });
 
-      // Also incorporate configured startDate from activeEvents if set
-      activeEvents.forEach(ev => {
-        if (ev.startDate) {
-          const parts = ev.startDate.split('-').map(Number);
-          if (parts.length === 3) {
-            const sDate = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
-            const evKey = (ev.name || '').toUpperCase();
-            if (!firstImps[evKey] || sDate < firstImps[evKey]) {
-              firstImps[evKey] = sDate;
-            }
-            if (ev.sourceName) {
-              const srcKey = ev.sourceName.toUpperCase();
-              if (!firstImps[srcKey] || sDate < firstImps[srcKey]) {
-                firstImps[srcKey] = sDate;
-              }
-            }
-          }
-        }
-      });
-
       combinedAds.forEach(d => {
         if (!d.dateObj) return;
         const ev = (d.eventNameDB || '').toUpperCase();
@@ -857,7 +845,8 @@ export default function App() {
         }
       });
 
-      // Build complete client week timelines (countdown W{total} to W0) for all known events
+      // Build complete client week timelines (countdown W{total} to current week) for all known events
+      // Starting strictly from the first impression date and stopping at the current week (no upcoming weeks)
       const timelines = {};
       const allKnownEventNames = Array.from(new Set([
         ...Object.keys(eventStartDates),
@@ -866,6 +855,13 @@ export default function App() {
         ...combinedAds.map(d => d.eventNameDB).filter(Boolean)
       ]));
 
+      const allDates = combinedAds
+        .map(d => d.dateObj)
+        .filter(d => d instanceof Date && !isNaN(d));
+      const latestDataDate = allDates.length > 0 ? new Date(Math.max(...allDates)) : new Date();
+      const now = new Date();
+      const currentAnchor = latestDataDate > now ? latestDataDate : now;
+
       allKnownEventNames.forEach(evName => {
         const evUpper = evName.toUpperCase();
         const campStart = firstImps[evUpper] || Object.entries(firstImps).find(([k]) => evUpper.includes(k.toUpperCase()))?.[1];
@@ -873,7 +869,7 @@ export default function App() {
         const eventStart = eventEntry?.[1];
 
         if (campStart && eventStart) {
-          const tl = generateEventWeekTimeline(campStart, eventStart);
+          const tl = generateEventWeekTimeline(campStart, eventStart, currentAnchor);
           if (tl && tl.length > 0) {
             timelines[evName] = tl;
             timelines[evUpper] = tl;
@@ -888,11 +884,8 @@ export default function App() {
       setCreativeData(combinedAds);
       setPlannedData(parsedPlannedData);
       
-      const allDates = combinedAds
-        .map(d => d.dateObj)
-        .filter(d => d instanceof Date && !isNaN(d));
       if (allDates.length > 0) {
-        setLastUpdated(new Date(Math.max(...allDates)));
+        setLastUpdated(latestDataDate);
       } else {
         setLastUpdated(new Date());
       }
@@ -1793,31 +1786,28 @@ export default function App() {
       return (
         <div className="space-y-8 w-full">
           <div className="flex justify-between items-center card-surface backdrop-blur-2xl p-6 rounded-3xl border border-[#cedc28]/20 shadow-xl mb-4 relative z-30" style={{ overflow: 'visible' }}>
-            <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-4 flex-wrap">
               <h2 className="text-3xl font-anton uppercase text-white flex items-center gap-2">
                 <Calendar className="text-[#cedc28]" /> Weekly View:
               </h2>
-              {/* Instant Inline Event Switcher */}
-              <div className="relative inline-block">
-                <select
-                  value={activeEventContext}
-                  onChange={(e) => {
-                    const nextVal = e.target.value;
+              {/* Event Switcher with exact same size & hero styling as main top filter */}
+              <MultiSelect 
+                label="Event" 
+                options={uniqueEvents} 
+                selected={activeEventContext ? [activeEventContext] : []} 
+                onChange={(next) => {
+                  const ev = next[0];
+                  if (ev && ev !== 'All') {
                     React.startTransition(() => {
-                      setSelectedEvent(nextVal);
-                      setFilterEvents([nextVal]);
+                      setSelectedEvent(ev);
+                      setFilterEvents([ev]);
                     });
-                  }}
-                  className="appearance-none bg-[#0a2442] hover:bg-[#07192f] border-2 border-[#cedc28] text-white text-xs font-black rounded-xl pl-3 pr-8 py-2 cursor-pointer shadow-[0_0_12px_rgba(206,220,40,0.25)] focus:outline-none transition-all active:scale-95"
-                >
-                  {uniqueEvents.map(ev => (
-                    <option key={ev} value={ev} className="bg-[#0a2442] text-white font-bold py-1">
-                      {ev}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="w-3.5 h-3.5 text-[#cedc28] absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-              </div>
+                  }
+                }} 
+                isHero={true} 
+                widthClass="w-[155px] xl:w-[185px]" 
+                singleSelect={true} 
+              />
             </div>
             <div className="w-64">
                <MultiSelect label="Select Weeks" options={eventUniqueWeeks} selected={localWeeklyViewWeeks} onChange={setLocalWeeklyViewWeeks} />

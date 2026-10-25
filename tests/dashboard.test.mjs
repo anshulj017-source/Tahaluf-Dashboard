@@ -281,12 +281,20 @@ function testDynamicWeekLogic() {
   const eventDayWeek = calculateWeekDB(eventStart, campStart, eventStart);
   assert(eventDayWeek === "W0 '26", `Event launch date resolves to W0 '26 (got: ${eventDayWeek})`);
 
-  // Test contiguous timeline generation
-  const timeline = generateEventWeekTimeline(campStart, eventStart);
+  // Test contiguous timeline generation for past events (full timeline)
+  const timeline = generateEventWeekTimeline(campStart, eventStart, new Date(Date.UTC(2026, 9, 26)));
   assert(Array.isArray(timeline) && timeline.length === 21, `Timeline generates all 21 contiguous weeks (got: ${timeline.length})`);
   assert(timeline[0].week === "W20 '26", `Timeline starts at W20 '26 (got: ${timeline[0]?.week})`);
   assert(timeline[timeline.length - 1].week === "W0 '26", `Timeline ends at W0 '26 (got: ${timeline[timeline.length - 1]?.week})`);
   assert(timeline.every(t => typeof t.dateRange === 'string' && t.dateRange.length > 5), 'Every timeline week has a non-empty formatted dateRange');
+
+  // Test that active campaigns cut off at current week and DO NOT include future upcoming weeks
+  const midCampaignUntil = new Date(Date.UTC(2026, 7, 10)); // August 10, 2026 (midway through campaign)
+  const activeTimeline = generateEventWeekTimeline(campStart, eventStart, midCampaignUntil);
+  assert(activeTimeline.length === 11, `Active campaign timeline stops at current week (got: ${activeTimeline.length})`);
+  assert(activeTimeline[activeTimeline.length - 1].week === "W10 '26", `Active campaign ends at current week W10 (got: ${activeTimeline[activeTimeline.length - 1]?.week})`);
+  assert(!activeTimeline.some(t => t.week === "W0 '26"), 'Upcoming weeks (W0) are not present in active campaign timeline');
+  assert(!activeTimeline.some(t => t.week === "W9 '26"), 'Next week (W9) is not present before it arrives');
 
   // Test zero-filling on missing weeks
   const mockActuals = [
