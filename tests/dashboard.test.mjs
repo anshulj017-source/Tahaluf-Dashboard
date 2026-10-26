@@ -47,7 +47,10 @@ import {
   getCountryName,
   recordAnalyticsEvent,
   getAnalyticsSummary,
-  resetAnalyticsData
+  resetAnalyticsData,
+  generateAnalyticsInsights,
+  applyAnalyticsAction,
+  SYSTEM_ACTIONS_CATALOG
 } from '../lib/analyticsService.mjs';
 const { 
   formatYMD, 
@@ -918,6 +921,44 @@ async function testAnalyticsLogic() {
   assert(qaUser?.location?.includes('Saudi Arabia'), 'QA user location resolves correctly');
   assert(Array.isArray(summary.recentActivity), 'Summary returns rolling recentActivity feed');
   assert(summary.recentActivity.length > 0, 'Recent activity feed is non-empty');
+
+  // Real-Time Findings & Intelligence Checks
+  assert(Array.isArray(summary.findings), 'Summary includes real-time heuristic findings list');
+  assert(summary.findings.length >= 5, 'Finds at least 5 prioritized heuristic insights');
+  const detailedFinding = summary.findings.find(f => f.actionId === 'enable_compact_grid_mode');
+  assert(detailedFinding !== undefined, 'Identifies Detailed Grid high bounce rate finding');
+  assert(typeof detailedFinding?.impactScore === 'number' && detailedFinding.impactScore > 70, 'Finding carries valid impact score');
+  assert(typeof detailedFinding?.recommendation === 'string', 'Finding contains concrete actionable recommendation');
+
+  // Action Catalog & In-UI Action Execution
+  assert(SYSTEM_ACTIONS_CATALOG['enable_compact_grid_mode'] !== undefined, 'Action catalog includes compact grid density action');
+  const actionRes = await applyAnalyticsAction('enable_compact_grid_mode', 'admin@tahaluf.com', true);
+  assert(actionRes.success === true, 'Applying analytics optimization succeeds');
+  assert(actionRes.status === 'active', 'Action status is updated to active');
+
+  // Rollback / Revert Action & History Verification
+  const revertRes = await applyAnalyticsAction('enable_compact_grid_mode', 'admin@tahaluf.com', false, 'Testing automated rollback');
+  assert(revertRes.success === true, 'Reverting analytics optimization succeeds');
+  assert(revertRes.status === 'reverted', 'Reverted action status is updated to reverted');
+  assert(Array.isArray(revertRes.actionsHistory), 'Revert returns actions history audit trail');
+  assert(revertRes.actionsHistory.some(h => h.actionId === 'enable_compact_grid_mode' && h.operation === 'REVERT'), 'Actions history records REVERT operation with actor');
+
+  // Monitored Fixes & Fix Health Telemetry
+  const updatedSummary = await getAnalyticsSummary();
+  assert(Array.isArray(updatedSummary.monitoredFixes) && updatedSummary.monitoredFixes.length > 0, 'Summary includes monitored fixes list');
+  const monitoredCompact = updatedSummary.monitoredFixes.find(f => f.actionId === 'enable_compact_grid_mode');
+  assert(monitoredCompact !== undefined, 'Monitored fixes contains compact grid density');
+  assert(monitoredCompact.healthStatus === 'reverted', 'Monitored fix reflects reverted health state');
+  assert(typeof monitoredCompact.telemetryEffect === 'string', 'Monitored fix includes empirical telemetry impact');
+  assert(typeof updatedSummary.kpis.totalRollbacksAvailable === 'number', 'Summary KPIs include totalRollbacksAvailable');
+  assert(Array.isArray(updatedSummary.actionsHistory) && updatedSummary.actionsHistory.length > 0, 'Summary includes complete rollback audit history');
+
+  // Dwell Time & Device Telemetry Checks
+  assert(typeof summary.dwellTimes?.summary?.avgSec === 'number', 'Summary contains dwell time for Summary tab');
+  assert(typeof summary.dwellTimes?.detailed?.bouncePercent === 'number', 'Summary contains bounce rate for Detailed Grid');
+  assert(Object.keys(summary.deviceFootprint?.screenResolutions || {}).length > 0, 'Summary contains screen resolution telemetry');
+  assert(typeof summary.featureInteractions?.currencyToggles?.SAR === 'number', 'Summary tracks currency toggles');
+  assert(typeof summary.featureInteractions?.exports?.pptx === 'number', 'Summary tracks PPTX exports');
 }
 
 async function testAnalyticsApi() {
@@ -939,6 +980,7 @@ async function testAnalyticsApi() {
         userEmail: 'exec-vip@tahaluf.com',
         userRole: 'standard',
         tab: 'campaign',
+        dwellTimeSec: 180,
         filters: { business: 'B2B', event: 'SMLC 26' },
       }),
     });
@@ -949,15 +991,52 @@ async function testAnalyticsApi() {
     assert(typeof trackJson.activityId === 'string', 'Tracking endpoint returns generated activityId');
 
     // Test GET Admin Analytics
-    const adminRes = await fetch(adminAnalyticsUrl);
+    const adminRes = await fetch(`${adminAnalyticsUrl}?email=admin@tahaluf.com`);
     const adminJson = await adminRes.json();
     assert(adminRes.status === 200, 'GET /api/admin/analytics returns HTTP 200');
     assert(adminJson.success === true, 'Admin analytics returns success: true');
     assert(adminJson.kpis?.totalViews > 0, 'Admin analytics provides totalViews metric');
+    assert(Array.isArray(adminJson.findings) && adminJson.findings.length > 0, 'Admin analytics provides real-time findings array');
     assert(Array.isArray(adminJson.tabUsage) && adminJson.tabUsage.length > 0, 'Admin analytics tabUsage is populated');
     assert(Array.isArray(adminJson.geoDistribution) && adminJson.geoDistribution.length > 0, 'Admin analytics geoDistribution is populated');
+    assert(Array.isArray(adminJson.monitoredFixes) && adminJson.monitoredFixes.length > 0, 'Admin analytics provides monitoredFixes list');
+    assert(Array.isArray(adminJson.actionsHistory) && adminJson.actionsHistory.length > 0, 'Admin analytics provides actionsHistory audit trail');
     assert(adminJson.geoDistribution.some(g => g.code === 'AE'), 'Vercel header country AE was ingested into geo distribution');
     assert(adminJson.users.some(u => u.email === 'exec-vip@tahaluf.com'), 'New user exec-vip was indexed in user audit table');
+
+    // Test POST Action Execution on Findings
+    const actionPostRes = await fetch(`${adminAnalyticsUrl}?email=admin@tahaluf.com`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        actionId: 'smart_default_b2b',
+        enable: true,
+        email: 'admin@tahaluf.com',
+      }),
+    });
+    const actionPostJson = await actionPostRes.json();
+    assert(actionPostRes.status === 200, 'POST /api/admin/analytics executes action with HTTP 200');
+    assert(actionPostJson.success === true, 'Action execution reports success: true');
+    assert(actionPostJson.actionId === 'smart_default_b2b', 'Action ID matches target');
+    assert(actionPostJson.status === 'active', 'Action status updated to active');
+
+    // Test POST 1-Click Rollback / Revert on Action
+    const revertPostRes = await fetch(`${adminAnalyticsUrl}?email=admin@tahaluf.com`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        actionId: 'smart_default_b2b',
+        operation: 'revert',
+        reason: 'Admin requested rollback via API',
+        email: 'admin@tahaluf.com',
+      }),
+    });
+    const revertPostJson = await revertPostRes.json();
+    assert(revertPostRes.status === 200, 'POST /api/admin/analytics reverts action with HTTP 200');
+    assert(revertPostJson.success === true, 'Revert execution reports success: true');
+    assert(revertPostJson.actionId === 'smart_default_b2b', 'Reverted action ID matches target');
+    assert(revertPostJson.status === 'reverted', 'Reverted action status updated to reverted');
+    assert(revertPostJson.actionsHistory.some(h => h.actionId === 'smart_default_b2b' && h.operation === 'REVERT'), 'Reverted action tracked in audit history');
   } catch (err) {
     assert(false, `Analytics API: Exception (${err.message})`);
   }

@@ -27,7 +27,7 @@ import CreativeView from './CreativeView';
 import DetailedDateFilter from './components/DetailedDateFilter';
 import HealthAlertBanner from './components/HealthAlertBanner';
 import { getWeekIndex, generateEventWeekTimeline } from '../lib/weekTimeline.mjs';
-import { trackActivity } from '../lib/analyticsTracker.js';
+import { trackActivity, trackCurrencyToggle } from '../lib/analyticsTracker.js';
 
 const GEO_URL = "https://unpkg.com/world-atlas@2.0.2/countries-110m.json";
 
@@ -2282,8 +2282,8 @@ export default function App() {
             {userRole !== 'non-finance' && (
               <div className="flex justify-start px-3">
                 <div className="flex bg-[#0a2442] p-0.5 rounded-lg border border-[#cedc28]/20 w-[100px]">
-                  <button onClick={() => setCurrency('USD')} className={`flex-1 px-2 py-1 text-[10px] font-bold rounded-md transition-colors ${currency === 'USD' ? 'bg-[#cedc28] text-[#1a302e]' : 'text-slate-400 hover:text-white'}`}>USD</button>
-                  <button onClick={() => setCurrency('SAR')} className={`flex-1 px-2 py-1 text-[10px] font-bold rounded-md transition-colors ${currency === 'SAR' ? 'bg-[#cedc28] text-[#1a302e]' : 'text-slate-400 hover:text-white'}`}>SAR</button>
+                  <button onClick={() => { setCurrency('USD'); trackCurrencyToggle('USD', userEmail); }} className={`flex-1 px-2 py-1 text-[10px] font-bold rounded-md transition-colors ${currency === 'USD' ? 'bg-[#cedc28] text-[#1a302e]' : 'text-slate-400 hover:text-white'}`}>USD</button>
+                  <button onClick={() => { setCurrency('SAR'); trackCurrencyToggle('SAR', userEmail); }} className={`flex-1 px-2 py-1 text-[10px] font-bold rounded-md transition-colors ${currency === 'SAR' ? 'bg-[#cedc28] text-[#1a302e]' : 'text-slate-400 hover:text-white'}`}>SAR</button>
                 </div>
               </div>
             )}

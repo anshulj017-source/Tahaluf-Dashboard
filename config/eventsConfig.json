@@ -1,6 +1,6 @@
 {
-  "version": "v1.0.154",
-  "lastUpdated": "2026-10-26T13:19:55.476Z",
+  "version": "v1.0.174",
+  "lastUpdated": "2026-10-26T17:48:14.199Z",
   "updatedBy": "recovery-admin@tahaluf.com",
   "events": [
     {
@@ -208,5 +208,5 @@
       }
     }
   ],
-  "revertedFrom": "v1.0.152"
+  "revertedFrom": "v1.0.172"
 }

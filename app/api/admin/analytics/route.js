@@ -51,6 +51,32 @@ export async function GET(req) {
   }
 }
 
+export async function POST(req) {
+  try {
+    const isAdmin = await checkAdmin(req);
+    if (!isAdmin) {
+      return NextResponse.json({ error: 'Unauthorized: Administrator access required' }, { status: 403 });
+    }
+
+    const body = await req.json().catch(() => ({}));
+    const { actionId, operation, reason } = body;
+    const enable = operation === 'revert' ? false : (typeof body.enable === 'boolean' ? body.enable : true);
+    const { searchParams } = new URL(req.url);
+    const email = (searchParams.get('email') || req.headers.get('x-admin-email') || body.email || 'admin@tahaluf.com').toLowerCase().trim();
+
+    if (!actionId) {
+      return NextResponse.json({ error: 'Missing actionId parameter' }, { status: 400 });
+    }
+
+    const { applyAnalyticsAction } = await import('../../../../lib/analyticsService.mjs');
+    const result = await applyAnalyticsAction(actionId, email, enable, reason);
+    return NextResponse.json(result, { status: 200 });
+  } catch (error) {
+    console.error('Admin analytics POST action error:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
 export async function DELETE(req) {
   try {
     const isAdmin = await checkAdmin(req);
