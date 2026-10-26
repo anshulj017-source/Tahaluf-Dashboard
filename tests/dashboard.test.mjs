@@ -990,6 +990,46 @@ async function testAnalyticsApi() {
     assert(trackJson.success === true, 'POST /api/analytics/track returns success: true');
     assert(typeof trackJson.activityId === 'string', 'Tracking endpoint returns generated activityId');
 
+    // Test POST Dashboard Open on Overview tab
+    const openRes = await fetch(trackUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        eventType: 'dashboard_open',
+        userEmail: 'growth.director@tahaluf.com',
+        tab: 'overview',
+        filters: { business: 'All' },
+      }),
+    });
+    assert(openRes.status === 200, 'POST /api/analytics/track (dashboard_open) returns HTTP 200');
+
+    // Test POST Heartbeat Dwell on Overview tab
+    const heartbeatRes = await fetch(trackUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        eventType: 'heartbeat_dwell',
+        userEmail: 'growth.director@tahaluf.com',
+        tab: 'summary',
+        dwellTimeSec: 25,
+        details: { reason: 'heartbeat' },
+      }),
+    });
+    assert(heartbeatRes.status === 200, 'POST /api/analytics/track (heartbeat_dwell) returns HTTP 200');
+
+    // Test POST Metric Card Click on Overview tab
+    const metricClickRes = await fetch(trackUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        eventType: 'metric_card_click',
+        userEmail: 'growth.director@tahaluf.com',
+        tab: 'summary',
+        details: { metric: 'Spend', value: '$45,000' },
+      }),
+    });
+    assert(metricClickRes.status === 200, 'POST /api/analytics/track (metric_card_click) returns HTTP 200');
+
     // Test GET Admin Analytics
     const adminRes = await fetch(`${adminAnalyticsUrl}?email=admin@tahaluf.com`);
     const adminJson = await adminRes.json();

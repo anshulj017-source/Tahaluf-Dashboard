@@ -24,8 +24,8 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
   const [actionLoadingId, setActionLoadingId] = useState(null);
   const [actionFeedback, setActionFeedback] = useState(null);
 
-  const fetchAnalytics = async () => {
-    setIsRefreshing(true);
+  const fetchAnalytics = async (silent = false) => {
+    if (!silent) setIsRefreshing(true);
     setError(null);
     try {
       const email = currentUserEmail || auth.currentUser?.email || 'admin@tahaluf.com';
@@ -47,15 +47,24 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
       setData(json);
     } catch (err) {
       console.error('Error fetching analytics:', err);
-      setError(err.message);
+      if (!silent) setError(err.message);
     } finally {
       setLoading(false);
-      setIsRefreshing(false);
+      if (!silent) setIsRefreshing(false);
     }
   };
 
   useEffect(() => {
     fetchAnalytics();
+
+    // Auto-refresh telemetry stream every 6 seconds when document is visible
+    const timer = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        fetchAnalytics(true);
+      }
+    }, 6000);
+
+    return () => clearInterval(timer);
   }, [timeRange]);
 
   const handleAction = async (actionId, willEnable, reason = '') => {
@@ -1255,36 +1264,77 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
           </div>
           <span className="flex items-center gap-1.5 text-[11px] text-[#cedc28] font-bold">
             <span className="w-2 h-2 rounded-full bg-[#cedc28] animate-ping"></span>
-            Streaming User Actions
+            Live Stream: Active (Auto-sync 6s)
           </span>
         </div>
 
-        <div className="divide-y divide-gray-850">
-          {recentActivity.slice(0, 5).map((act) => (
-            <div key={act.id} className="py-2 flex items-center justify-between text-xs">
-              <div className="flex items-center gap-2.5">
-                <span className="text-sm">{act.geo?.flag || '🌐'}</span>
-                <div>
-                  <span className="font-bold text-white">{act.userEmail}</span>
-                  <span className="text-gray-400 ml-1.5">
-                    {act.eventType === 'tab_view' ? 'switched to tab' : act.eventType === 'optimization_applied' ? 'applied optimization' : 'interacted with'}
-                  </span>
-                  <span className="ml-1.5 font-bold text-[#cedc28]">{act.tab || act.details?.title}</span>
-                  {act.dwellTimeSec > 0 && (
-                    <span className="ml-2 text-[10px] font-mono text-gray-500">
-                      ({act.dwellTimeSec}s dwell)
-                    </span>
-                  )}
-                </div>
-              </div>
+        <div className="divide-y divide-gray-850 max-h-72 overflow-y-auto">
+          {recentActivity.length === 0 ? (
+            <div className="py-4 text-center text-xs text-gray-500">No live telemetry events recorded yet.</div>
+          ) : (
+            recentActivity.slice(0, 10).map((act) => {
+              const rawTab = (act.tab || '').toLowerCase();
+              const tabName = rawTab === 'summary' || rawTab === 'overview' ? 'Overview' : (data?.tabLabels?.[rawTab] || act.tab || 'Dashboard');
 
-              <div className="flex items-center gap-3 text-gray-500 font-mono text-[10px]">
-                <span>{act.geo?.city ? `${act.geo.city}, ` : ''}{act.geo?.country}</span>
-                <span>•</span>
-                <span>{formatRelativeTime(act.timestamp)}</span>
-              </div>
-            </div>
-          ))}
+              let narrative = { action: 'interacted with', target: tabName, color: 'text-gray-300' };
+              if (act.eventType === 'dashboard_open') {
+                narrative = { action: 'opened dashboard on', target: tabName, color: 'text-[#cedc28]' };
+              } else if (act.eventType === 'tab_view') {
+                narrative = { action: 'switched to tab', target: tabName, color: 'text-[#14a6d9]' };
+              } else if (act.eventType === 'heartbeat_dwell') {
+                narrative = { action: 'actively reviewing', target: tabName, color: 'text-amber-400' };
+              } else if (act.eventType === 'tab_dwell') {
+                narrative = { action: 'completed dwell on', target: tabName, color: 'text-emerald-400' };
+              } else if (act.eventType === 'metric_card_click') {
+                narrative = { action: 'inspected KPI', target: `${act.details?.metric || 'Metric'} (${act.details?.value || ''})`, color: 'text-[#cedc28]' };
+              } else if (act.eventType === 'trend_view_change') {
+                narrative = { action: 'switched trend view to', target: act.details?.trendView || 'Trend', color: 'text-[#14a6d9]' };
+              } else if (act.eventType === 'perf_metric_change') {
+                narrative = { action: 'selected chart metric', target: act.details?.metric || 'Metric', color: 'text-indigo-400' };
+              } else if (act.eventType === 'filter_applied') {
+                const parts = [];
+                if (act.filters?.business && act.filters.business !== 'All') parts.push(`Business: ${act.filters.business}`);
+                if (act.filters?.events?.length) parts.push(`Events: ${act.filters.events.join(', ')}`);
+                narrative = { action: 'applied filters', target: parts.join(' | ') || 'Default Filters', color: 'text-blue-400' };
+              } else if (act.eventType === 'export_pptx') {
+                narrative = { action: 'generated executive PPTX deck from', target: tabName, color: 'text-purple-400' };
+              } else if (act.eventType === 'export_csv') {
+                narrative = { action: 'downloaded raw CSV data from', target: tabName, color: 'text-teal-400' };
+              } else if (act.eventType === 'currency_toggle') {
+                narrative = { action: 'toggled currency to', target: act.details?.currency || 'SAR', color: 'text-amber-300' };
+              } else if (act.eventType === 'search_query') {
+                narrative = { action: 'searched for', target: `"${act.details?.query}"`, color: 'text-pink-400' };
+              } else if (act.eventType === 'optimization_applied') {
+                narrative = { action: 'applied optimization', target: act.details?.title || act.actionId, color: 'text-emerald-300' };
+              } else if (act.eventType === 'optimization_reverted') {
+                narrative = { action: 'reverted optimization', target: act.details?.title || act.actionId, color: 'text-rose-400' };
+              }
+
+              return (
+                <div key={act.id} className="py-2 flex items-center justify-between text-xs hover:bg-white/[0.02] px-2 rounded-lg transition-colors">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-sm">{act.geo?.flag || '🌐'}</span>
+                    <div>
+                      <span className="font-bold text-white">{act.userEmail}</span>
+                      <span className="text-gray-400 ml-1.5">{narrative.action}</span>
+                      <span className={`ml-1.5 font-bold ${narrative.color}`}>{narrative.target}</span>
+                      {act.dwellTimeSec > 0 && (
+                        <span className="ml-2 text-[10px] font-mono text-gray-500">
+                          ({act.dwellTimeSec}s dwell)
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 text-gray-500 font-mono text-[10px] shrink-0">
+                    <span>{act.geo?.city ? `${act.geo.city}, ` : ''}{act.geo?.country}</span>
+                    <span>•</span>
+                    <span>{formatRelativeTime(act.timestamp)}</span>
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
     </div>

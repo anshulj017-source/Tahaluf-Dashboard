@@ -27,7 +27,14 @@ import CreativeView from './CreativeView';
 import DetailedDateFilter from './components/DetailedDateFilter';
 import HealthAlertBanner from './components/HealthAlertBanner';
 import { getWeekIndex, generateEventWeekTimeline } from '../lib/weekTimeline.mjs';
-import { trackActivity, trackCurrencyToggle } from '../lib/analyticsTracker.js';
+import { 
+  trackActivity, 
+  trackCurrencyToggle, 
+  trackDashboardOpen, 
+  trackMetricCardClick, 
+  trackTrendView, 
+  trackExport 
+} from '../lib/analyticsTracker.js';
 
 const GEO_URL = "https://unpkg.com/world-atlas@2.0.2/countries-110m.json";
 
@@ -88,8 +95,16 @@ const normalizeMarket = (marketName) => {
 };
 
 // --- COMPONENTS ---
-const MetricCard = ({ label, value, color, icon: Icon, definition, subContent }) => (
-  <div className="card-surface backdrop-blur-2xl p-4 rounded-xl border border-[#cedc28]/20 shadow-md relative overflow-hidden group hover:-translate-y-1 transition-transform">
+const MetricCard = ({ label, value, color, icon: Icon, definition, subContent, onClick }) => (
+  <div 
+    onClick={() => {
+      if (typeof window !== 'undefined' && window.__tahaluf_trackMetricClick) {
+        window.__tahaluf_trackMetricClick(label, value);
+      }
+      if (onClick) onClick();
+    }}
+    className="card-surface backdrop-blur-2xl p-4 rounded-xl border border-[#cedc28]/20 shadow-md relative overflow-hidden group hover:-translate-y-1 transition-transform cursor-pointer"
+  >
     <div className="absolute top-0 right-0 w-16 h-16 bg-[#cedc28]/10 rounded-full blur-xl -mr-4 -mt-4 group-hover:bg-[#cedc28]/20 transition-colors duration-500"></div>
     <div className="flex justify-between items-start relative z-10">
       <div>
@@ -281,6 +296,9 @@ const DataTable = ({ title, data, columns, totals, onRowClick, selectedRowId, ro
     link.click();
     document.body.removeChild(link);
     setTimeout(() => URL.revokeObjectURL(url), 100);
+    if (typeof window !== 'undefined' && window.__tahaluf_trackExportCSV) {
+      window.__tahaluf_trackExportCSV();
+    }
   };
 
   return (
@@ -390,7 +408,7 @@ const MetricTrendChart = ({ data, dataKey, name, format, color }) => (
   </div>
 );
 
-const TrendSection = ({ title, trendData, currentTrendView, setViewFn, userRole, exSym, formatShort }) => {
+const TrendSection = ({ title, trendData, currentTrendView, setViewFn, userRole, exSym, formatShort, userEmail = 'admin@tahaluf.com' }) => {
   const [showInsights, setShowInsights] = useState(false);
 
   if (!trendData || trendData.length === 0) return null;
@@ -450,8 +468,24 @@ const TrendSection = ({ title, trendData, currentTrendView, setViewFn, userRole,
             {showInsights ? 'Hide Insights' : 'View Insights'}
           </button>
           <div className="flex bg-[#0a2442] p-1 rounded-lg border border-[#cedc28]/20">
-            <button onClick={() => setViewFn('Weekly')} className={`px-3 py-1 text-[10px] font-bold rounded transition-colors ${currentTrendView === 'Weekly' ? 'bg-[#cedc28] text-[#1a302e]' : 'text-slate-400 hover:text-white'}`}>Weekly</button>
-            <button onClick={() => setViewFn('Daily')} className={`px-3 py-1 text-[10px] font-bold rounded transition-colors ${currentTrendView === 'Daily' ? 'bg-[#cedc28] text-[#1a302e]' : 'text-slate-400 hover:text-white'}`}>Daily</button>
+            <button 
+              onClick={() => {
+                setViewFn('Weekly');
+                trackTrendView('Weekly', userEmail);
+              }} 
+              className={`px-3 py-1 text-[10px] font-bold rounded transition-colors ${currentTrendView === 'Weekly' ? 'bg-[#cedc28] text-[#1a302e]' : 'text-slate-400 hover:text-white'}`}
+            >
+              Weekly
+            </button>
+            <button 
+              onClick={() => {
+                setViewFn('Daily');
+                trackTrendView('Daily', userEmail);
+              }} 
+              className={`px-3 py-1 text-[10px] font-bold rounded transition-colors ${currentTrendView === 'Daily' ? 'bg-[#cedc28] text-[#1a302e]' : 'text-slate-400 hover:text-white'}`}
+            >
+              Daily
+            </button>
           </div>
         </div>
       </div>
@@ -583,9 +617,32 @@ export default function App() {
     return () => unsubscribe();
   }, [router]);
 
-  // Telemetric user tracking: immediate on tab view, debounced on filter adjustments
+  // Telemetric user tracking: initial landing, immediate on tab view, debounced on filter adjustments
+  const hasTrackedInitialOpenRef = useRef(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.__tahaluf_trackMetricClick = (label, val) => {
+        trackMetricCardClick(label, val, userEmail);
+      };
+      window.__tahaluf_trackExportCSV = () => {
+        trackExport('csv', activeTab, userEmail);
+      };
+    }
+  }, [userEmail, activeTab]);
+
   useEffect(() => {
     if (!isAuthenticated) return;
+    if (!hasTrackedInitialOpenRef.current) {
+      hasTrackedInitialOpenRef.current = true;
+      trackDashboardOpen(userEmail, userRole, activeTab, {
+        business: filterBusinesses[0] || 'All',
+        events: filterEvents,
+        channels: filterChannels,
+        datePreset: dateRange.preset || 'auto',
+      });
+      return;
+    }
     trackActivity({
       eventType: 'tab_view',
       userEmail,
@@ -1420,6 +1477,7 @@ export default function App() {
           if (mainScroll) mainScroll.scrollTo({ top: 0, behavior: 'smooth' });
 
           await pres.writeFile({ fileName: `Tahaluf_Dashboard_Snapshot_${new Date().getTime()}.pptx` });
+          trackExport('pptx', activeTab, userEmail);
       } catch (err) {
           console.error("PPTX Error", err);
           alert("Error generating PPTX: " + (err.message || err.toString()));
@@ -1715,7 +1773,7 @@ export default function App() {
               totals={{ eventName: 'TOTAL', ...commonTotals }}
             />
             
-            {selectedEvent && <TrendSection title={selectedEvent} trendData={getTrendDataForSelection(selectedEvent, 'eventNameDB', trendView)} currentTrendView={trendView} setViewFn={setTrendView} userRole={userRole} exSym={exSym} formatShort={formatShort} />}
+            {selectedEvent && <TrendSection title={selectedEvent} trendData={getTrendDataForSelection(selectedEvent, 'eventNameDB', trendView)} currentTrendView={trendView} setViewFn={setTrendView} userRole={userRole} exSym={exSym} formatShort={formatShort} userEmail={userEmail} />}
           </div>
 
           {/* 3. Phase Metrics Table */}
@@ -1727,7 +1785,7 @@ export default function App() {
               selectedRowId={selectedPhase} rowKey="phase"
               showBars={true} allowColumnSelect={true}
             />
-            {selectedPhase && <TrendSection title={selectedPhase} trendData={getTrendDataForSelection(selectedPhase, 'phase', phaseTrendView)} currentTrendView={phaseTrendView} setViewFn={setPhaseTrendView} userRole={userRole} exSym={exSym} formatShort={formatShort} />}
+            {selectedPhase && <TrendSection title={selectedPhase} trendData={getTrendDataForSelection(selectedPhase, 'phase', phaseTrendView)} currentTrendView={phaseTrendView} setViewFn={setPhaseTrendView} userRole={userRole} exSym={exSym} formatShort={formatShort} userEmail={userEmail} />}
           </div>
 
           {/* 4. Channel Metrics Table */}
@@ -1739,7 +1797,7 @@ export default function App() {
               selectedRowId={selectedChannel} rowKey="channel"
               showBars={true} allowColumnSelect={true}
             />
-            {selectedChannel && <TrendSection title={selectedChannel} trendData={getTrendDataForSelection(selectedChannel, 'channel', channelTrendView)} currentTrendView={channelTrendView} setViewFn={setChannelTrendView} userRole={userRole} exSym={exSym} formatShort={formatShort} />}
+            {selectedChannel && <TrendSection title={selectedChannel} trendData={getTrendDataForSelection(selectedChannel, 'channel', channelTrendView)} currentTrendView={channelTrendView} setViewFn={setChannelTrendView} userRole={userRole} exSym={exSym} formatShort={formatShort} userEmail={userEmail} />}
           </div>
 
           {/* 5. Market Metrics Table */}
@@ -1751,7 +1809,7 @@ export default function App() {
               selectedRowId={selectedMarket} rowKey="market"
               showBars={true} allowColumnSelect={true}
             />
-            {selectedMarket && <TrendSection title={selectedMarket} trendData={getTrendDataForSelection(selectedMarket, 'country', marketTrendView)} currentTrendView={marketTrendView} setViewFn={setMarketTrendView} userRole={userRole} exSym={exSym} formatShort={formatShort} />}
+            {selectedMarket && <TrendSection title={selectedMarket} trendData={getTrendDataForSelection(selectedMarket, 'country', marketTrendView)} currentTrendView={marketTrendView} setViewFn={setMarketTrendView} userRole={userRole} exSym={exSym} formatShort={formatShort} userEmail={userEmail} />}
           </div>
 
         </div>

@@ -31,11 +31,17 @@ export async function POST(req) {
     const city = vercelCity ? decodeURIComponent(vercelCity) : (body.geo?.city || (country === 'SA' ? 'Riyadh' : 'Dubai'));
     const region = vercelRegion || body.geo?.region || '';
 
+    const rawTab = (body.tab || 'summary').toLowerCase().trim();
+    const tab = rawTab === 'overview' ? 'summary' : rawTab;
+
     const payload = {
       eventType: body.eventType || 'page_view',
       userEmail: body.userEmail || 'anonymous',
       userRole: body.userRole || 'standard',
-      tab: body.tab || 'summary',
+      tab,
+      dwellTimeSec: typeof body.dwellTimeSec === 'number' ? body.dwellTimeSec : 0,
+      details: body.details || null,
+      device: body.device || null,
       filters: body.filters || {},
       sessionId: body.sessionId,
       isNewSession: Boolean(body.isNewSession),
