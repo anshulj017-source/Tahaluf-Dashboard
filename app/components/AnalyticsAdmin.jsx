@@ -185,11 +185,31 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
     return `${diffDays}d ago`;
   };
 
-  const formatEventLocalTime = (isoString, timezone) => {
+  const viewerTimeZone = useMemo(() => {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Riyadh';
+    } catch {
+      return 'Asia/Riyadh';
+    }
+  }, []);
+
+  const viewerTzShort = useMemo(() => {
+    try {
+      const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: viewerTimeZone,
+        timeZoneName: 'short',
+      }).formatToParts(new Date());
+      return parts.find(p => p.type === 'timeZoneName')?.value || 'Local';
+    } catch {
+      return 'Local';
+    }
+  }, [viewerTimeZone]);
+
+  const formatEventLocalTime = (isoString, targetTimeZone = viewerTimeZone) => {
     if (!isoString) return { timeStr: '', tzShort: '', tzFull: '' };
     try {
       const d = new Date(isoString);
-      const tz = timezone || 'Asia/Riyadh';
+      const tz = targetTimeZone || viewerTimeZone;
       const timeStr = d.toLocaleTimeString('en-US', {
         timeZone: tz,
         hour: 'numeric',
@@ -202,7 +222,7 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
         timeZone: tz,
         timeZoneName: 'short',
       }).formatToParts(d);
-      const tzShort = parts.find(p => p.type === 'timeZoneName')?.value || 'AST';
+      const tzShort = parts.find(p => p.type === 'timeZoneName')?.value || viewerTzShort;
 
       return {
         timeStr,
@@ -1362,9 +1382,20 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
                           <td className="py-3 px-4">
                             <div className="text-white font-medium">{formatRelativeTime(u.lastActive)}</div>
                             <div className="text-[10px] text-gray-400 font-mono flex items-center gap-1 mt-0.5">
-                              <span>{new Date(u.lastActive).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                              <span>
+                                {new Date(u.lastActive).toLocaleTimeString('en-US', {
+                                  timeZone: viewerTimeZone,
+                                  hour: 'numeric',
+                                  minute: '2-digit',
+                                  hour12: true,
+                                })} {viewerTzShort}
+                              </span>
                               <span>•</span>
-                              <span>{new Date(u.lastActive).toLocaleDateString()}</span>
+                              <span>
+                                {new Date(u.lastActive).toLocaleDateString('en-US', {
+                                  timeZone: viewerTimeZone,
+                                })}
+                              </span>
                             </div>
                           </td>
                           <td className="py-3 px-4">
@@ -1403,6 +1434,9 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
                 : userFilter === 'admin_only'
                 ? 'Filtered Scope: Admins Only'
                 : 'Scope: All Users'}
+            </span>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-300 border border-purple-500/30 font-medium hidden sm:inline">
+              Your Timezone: {viewerTzShort} ({viewerTimeZone})
             </span>
           </div>
 
@@ -1474,7 +1508,7 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
                 narrative = { action: 'reverted optimization', target: act.details?.title || act.actionId, color: 'text-rose-400' };
               }
 
-              const localTime = formatEventLocalTime(act.timestamp, act.geo?.timezone);
+              const localTime = formatEventLocalTime(act.timestamp, viewerTimeZone);
 
               return (
                 <div key={act.id} className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs hover:bg-white/[0.02] px-2.5 rounded-lg transition-colors">
@@ -1499,9 +1533,9 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
                     <span>•</span>
                     <span 
                       className="px-2 py-0.5 rounded-md bg-[#0a2442] border border-[#14a6d9]/30 text-[#14a6d9] font-bold tracking-tight"
-                      title={`Viewed at ${localTime.timeStr} ${localTime.tzShort} (${localTime.tzFull}) at visitor location (${act.geo?.city || ''}, ${act.geo?.country || ''})`}
+                      title={`Viewed at ${localTime.timeStr} in your local timezone (${viewerTimeZone}) • Activity recorded from ${act.geo?.city || 'Unknown'}, ${act.geo?.country || 'SA'}`}
                     >
-                      {localTime.timeStr} {localTime.tzShort}
+                      {localTime.timeStr} {viewerTzShort}
                     </span>
                     <span>•</span>
                     <span className="text-emerald-400 font-bold whitespace-nowrap">
@@ -1520,7 +1554,7 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
             <span>Showing {Math.min(activityLimit, recentActivity.length)} of {recentActivity.length} recent telemetry events</span>
           </div>
-          <span className="text-gray-400">Time displayed is the visitor's local view time & timezone at location of view</span>
+          <span className="text-gray-400">All activities normalized to your local timezone ({viewerTzShort} - {viewerTimeZone})</span>
         </div>
       </div>
     </div>
