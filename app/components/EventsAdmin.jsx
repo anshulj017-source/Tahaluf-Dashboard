@@ -305,15 +305,20 @@ export default function EventsAdmin({ currentUserEmail = 'admin@tahaluf.com', in
     };
 
     if (isNew) {
-      const newId = cleanEventObj.id?.trim() || cleanEventObj.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      const newId = cleanEventObj.id?.trim() || cleanEventObj.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
       const newEventObj = {
         ...cleanEventObj,
-        id: newId
+        id: newId,
+        sourceName: cleanEventObj.sourceName?.trim() || cleanEventObj.name.trim()
       };
       updatedEventsList = [...events, newEventObj];
     } else {
       const targetId = originalEventId || cleanEventObj.id;
-      updatedEventsList = events.map(ev => ev.id === targetId ? cleanEventObj : ev);
+      const updatedEventObj = {
+        ...cleanEventObj,
+        sourceName: cleanEventObj.sourceName?.trim() || cleanEventObj.name.trim()
+      };
+      updatedEventsList = events.map(ev => ev.id === targetId ? updatedEventObj : ev);
     }
 
     try {
@@ -1120,52 +1125,30 @@ export default function EventsAdmin({ currentUserEmail = 'admin@tahaluf.com', in
                       <span>1. Core Event Identification & Portfolio</span>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                      {/* Event Display Name */}
+                      {/* Single Event Name Field */}
                       <div>
                         <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">
-                          Event Display Name *
+                          Event Name *
                         </label>
                         <input
                           type="text"
                           required
                           value={editingEvent.name || ''}
-                          onChange={(e) => setEditingEvent({ ...editingEvent, name: e.target.value })}
+                          onChange={(e) => {
+                            const newName = e.target.value;
+                            const autoSlug = newName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+                            setEditingEvent({
+                              ...editingEvent,
+                              name: newName,
+                              id: isAddingNew ? autoSlug : editingEvent.id,
+                              sourceName: newName
+                            });
+                          }}
                           placeholder="e.g. SMLC 26"
-                          className="w-full bg-[#041628] border border-gray-600/50 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-[#cedc28]/60"
-                        />
-                      </div>
-
-                      {/* Event Unique ID / Slug */}
-                      <div>
-                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">
-                          System ID / Slug *
-                        </label>
-                        <input
-                          type="text"
-                          value={editingEvent.id || ''}
-                          onChange={(e) => setEditingEvent({ ...editingEvent, id: e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, '') })}
-                          placeholder="e.g. smlc-26"
-                          className="w-full bg-[#041628] border border-gray-600/50 rounded-xl px-3.5 py-2 text-sm font-mono text-white focus:outline-none focus:border-[#cedc28]/60"
+                          className="w-full bg-[#041628] border border-gray-600/50 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-[#cedc28]/60 font-semibold"
                         />
                         <span className="text-[9px] text-gray-500 mt-0.5 block">
-                          Unique URL identifier (auto-derived from name if blank).
-                        </span>
-                      </div>
-
-                      {/* Source Name in Sheet */}
-                      <div>
-                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">
-                          Source Name in DB / Sheet
-                        </label>
-                        <input
-                          type="text"
-                          value={editingEvent.sourceName || ''}
-                          onChange={(e) => setEditingEvent({ ...editingEvent, sourceName: e.target.value })}
-                          placeholder="e.g. SMLC"
-                          className="w-full bg-[#041628] border border-gray-600/50 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-[#cedc28]/60"
-                        />
-                        <span className="text-[9px] text-gray-500 mt-0.5 block">
-                          Tag matching rows in the "Event Name DB" column.
+                          Display title used across dashboard filters, charts, and sheet rows.
                         </span>
                       </div>
 
@@ -1177,7 +1160,7 @@ export default function EventsAdmin({ currentUserEmail = 'admin@tahaluf.com', in
                         <select
                           value={editingEvent.portfolio || 'P1'}
                           onChange={(e) => setEditingEvent({ ...editingEvent, portfolio: e.target.value })}
-                          className="w-full bg-[#041628] border border-gray-600/50 rounded-xl px-3.5 py-2 text-sm text-white font-bold focus:outline-none focus:border-[#cedc28]/60"
+                          className="w-full bg-[#041628] border border-gray-600/50 rounded-xl px-3.5 py-2.5 text-sm text-white font-bold focus:outline-none focus:border-[#cedc28]/60"
                         >
                           <option value="P1">Portfolio P1 (GSTS, SAIF, KoG, Black Hat)</option>
                           <option value="P3">Portfolio P3 (SMLC, IDWS, BIO, CPHI)</option>

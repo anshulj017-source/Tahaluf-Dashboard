@@ -161,12 +161,23 @@ export async function POST(req) {
       if (!Array.isArray(events)) {
         return NextResponse.json({ success: false, error: 'Events array is required' }, { status: 400 });
       }
+      const sanitizedEvents = events.map(ev => {
+        const name = (ev.name || '').trim();
+        const id = (ev.id || '').trim() || name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+        const sourceName = (ev.sourceName || '').trim() || name;
+        return {
+          ...ev,
+          name,
+          id,
+          sourceName
+        };
+      });
       const actionType = description.toLowerCase().includes('added') 
         ? 'ADD_EVENT' 
         : description.toLowerCase().includes('removed') 
         ? 'DELETE_EVENT' 
         : 'EDIT_EVENT';
-      const result = await saveEventsConfig(events, description, author, actionType);
+      const result = await saveEventsConfig(sanitizedEvents, description, author, actionType);
       return NextResponse.json({ success: true, ...result });
     }
 
