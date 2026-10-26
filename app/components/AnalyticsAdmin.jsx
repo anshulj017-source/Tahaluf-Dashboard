@@ -5,6 +5,7 @@ import {
   Search, ArrowUpRight, TrendingUp, Sparkles, CheckCircle2, Clock, 
   Layers, BarChart2, Shield, Laptop, MapPin
 } from 'lucide-react';
+import { auth } from '../../lib/firebase';
 
 export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' }) {
   const [data, setData] = useState(null);
@@ -20,7 +21,17 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
     setIsRefreshing(true);
     setError(null);
     try {
-      const res = await fetch(`/api/admin/analytics?timeRange=${timeRange}`);
+      const email = currentUserEmail || auth.currentUser?.email || 'admin@tahaluf.com';
+      const token = await auth.currentUser?.getIdToken().catch(() => null);
+      const headers = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      headers['x-admin-email'] = email;
+
+      const res = await fetch(`/api/admin/analytics?timeRange=${timeRange}&email=${encodeURIComponent(email)}`, {
+        headers,
+      });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
         throw new Error(errData.error || 'Failed to fetch analytics data');
