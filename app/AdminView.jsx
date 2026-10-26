@@ -1,8 +1,9 @@
 "use client";
 import React, { useState, useEffect } from 'react';
-import { Trash2, UserPlus, Shield, User, RefreshCw, CheckCircle2, Key, Layers, Activity, Users as UsersIcon } from 'lucide-react';
+import { Trash2, UserPlus, Shield, User, RefreshCw, CheckCircle2, Key, Layers, Activity, Users as UsersIcon, BarChart3 } from 'lucide-react';
 import EventsAdmin from './components/EventsAdmin';
 import DataHealthAdmin from './components/DataHealthAdmin';
+import AnalyticsAdmin from './components/AnalyticsAdmin';
 
 export default function AdminView({ currentUserEmail = 'admin@tahaluf.com', initialEvents = [] }) {
   const [activeSection, setActiveSection] = useState('events');
@@ -216,6 +217,17 @@ export default function AdminView({ currentUserEmail = 'admin@tahaluf.com', init
             <UsersIcon className="w-4 h-4" />
             User Access Management
           </button>
+          <button
+            onClick={() => setActiveSection('analytics')}
+            className={`pb-3 text-xs font-bold uppercase tracking-wider flex items-center gap-2 border-b-2 transition-all ${
+              activeSection === 'analytics'
+                ? 'border-[#cedc28] text-[#cedc28]'
+                : 'border-transparent text-gray-400 hover:text-white'
+            }`}
+          >
+            <BarChart3 className="w-4 h-4" />
+            Analytics & Activity
+          </button>
         </div>
 
         {/* SECTION 1: EVENTS & DATA CONFIGURATION */}
@@ -424,6 +436,11 @@ export default function AdminView({ currentUserEmail = 'admin@tahaluf.com', init
           </div>
         </div>
       </div>
+      )}
+
+      {/* SECTION 3: ANALYTICS & ACTIVITY */}
+      {activeSection === 'analytics' && (
+        <AnalyticsAdmin currentUserEmail={currentUserEmail} />
       )}
 
       </div>

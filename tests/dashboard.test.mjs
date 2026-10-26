@@ -42,6 +42,13 @@ import {
   formatWeekDateRange,
   generateEventWeekTimeline
 } from '../lib/weekTimeline.mjs';
+import {
+  getCountryFlag,
+  getCountryName,
+  recordAnalyticsEvent,
+  getAnalyticsSummary,
+  resetAnalyticsData
+} from '../lib/analyticsService.mjs';
 const { 
   formatYMD, 
   calculatePresetRange, 
@@ -863,6 +870,100 @@ async function testAdminEventsApi() {
 }
 
 // -------------------------------------------------------------
+// 7. ANALYTICS & ACTIVITY LOGIC AND API TESTS
+// -------------------------------------------------------------
+async function testAnalyticsLogic() {
+  console.log('\n--- 7. Testing User Activity & Analytics Logic ---');
+
+  // Country Flag & Name Lookups
+  assert(getCountryFlag('SA') === '🇸🇦', 'Resolves Saudi Arabia flag emoji (🇸🇦)');
+  assert(getCountryFlag('AE') === '🇦🇪', 'Resolves UAE flag emoji (🇦🇪)');
+  assert(getCountryFlag('US') === '🇺🇸', 'Resolves US flag emoji (🇺🇸)');
+  assert(getCountryFlag('GB') === '🇬🇧', 'Resolves UK flag emoji (🇬🇧)');
+  assert(getCountryName('SA') === 'Saudi Arabia', 'Resolves country name Saudi Arabia');
+  assert(getCountryName('AE') === 'United Arab Emirates', 'Resolves country name UAE');
+
+  // Event Recording & Metric Rollups
+  const recordRes = await recordAnalyticsEvent({
+    eventType: 'tab_view',
+    userEmail: 'qa-tester@tahaluf.com',
+    userRole: 'standard',
+    tab: 'summary',
+    filters: {
+      business: 'B2B',
+      events: ['KoG 26'],
+      channels: ['Google'],
+      datePreset: 'last7',
+    },
+    geo: { country: 'SA', city: 'Riyadh' },
+    isNewSession: true,
+  });
+
+  assert(recordRes.success === true, 'Analytics record event succeeds');
+  assert(typeof recordRes.activityId === 'string', 'Analytics event returns unique activityId');
+
+  const summary = await getAnalyticsSummary('all');
+  assert(typeof summary.kpis?.totalViews === 'number', 'Summary contains totalViews KPI');
+  assert(typeof summary.kpis?.totalSessions === 'number', 'Summary contains totalSessions KPI');
+  assert(summary.kpis?.totalUsers >= 1, 'Summary reflects registered unique users');
+  assert(Array.isArray(summary.tabUsage), 'Summary returns tabUsage list');
+  assert(summary.tabUsage.some(t => t.tab === 'summary' && t.percentage > 0), 'Tab usage includes summary tab with positive percentage');
+  assert(Array.isArray(summary.geoDistribution), 'Summary returns geoDistribution list');
+  assert(summary.geoDistribution.some(g => g.code === 'SA' && g.country === 'Saudi Arabia'), 'Geo distribution includes Saudi Arabia');
+  assert(summary.filterInsights?.business?.B2B?.count > 0, 'Filter insights records B2B filter selections');
+  assert(Array.isArray(summary.users), 'Summary returns users ledger');
+  const qaUser = summary.users.find(u => u.email === 'qa-tester@tahaluf.com');
+  assert(qaUser !== undefined, 'User ledger contains qa-tester@tahaluf.com');
+  assert(qaUser?.role === 'standard', 'QA user has standard role');
+  assert(qaUser?.location?.includes('Saudi Arabia'), 'QA user location resolves correctly');
+  assert(Array.isArray(summary.recentActivity), 'Summary returns rolling recentActivity feed');
+  assert(summary.recentActivity.length > 0, 'Recent activity feed is non-empty');
+}
+
+async function testAnalyticsApi() {
+  console.log('\n--- 8. Testing Analytics Ingestion & Admin API ---');
+  const trackUrl = `http://localhost:${PORT}/api/analytics/track`;
+  const adminAnalyticsUrl = `http://localhost:${PORT}/api/admin/analytics`;
+
+  try {
+    // Test POST tracking beacon
+    const trackRes = await fetch(trackUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-vercel-ip-country': 'AE',
+        'x-vercel-ip-city': 'Dubai',
+      },
+      body: JSON.stringify({
+        eventType: 'tab_view',
+        userEmail: 'exec-vip@tahaluf.com',
+        userRole: 'standard',
+        tab: 'campaign',
+        filters: { business: 'B2B', event: 'SMLC 26' },
+      }),
+    });
+
+    const trackJson = await trackRes.json();
+    assert(trackRes.status === 200, 'POST /api/analytics/track returns HTTP 200');
+    assert(trackJson.success === true, 'POST /api/analytics/track returns success: true');
+    assert(typeof trackJson.activityId === 'string', 'Tracking endpoint returns generated activityId');
+
+    // Test GET Admin Analytics
+    const adminRes = await fetch(adminAnalyticsUrl);
+    const adminJson = await adminRes.json();
+    assert(adminRes.status === 200, 'GET /api/admin/analytics returns HTTP 200');
+    assert(adminJson.success === true, 'Admin analytics returns success: true');
+    assert(adminJson.kpis?.totalViews > 0, 'Admin analytics provides totalViews metric');
+    assert(Array.isArray(adminJson.tabUsage) && adminJson.tabUsage.length > 0, 'Admin analytics tabUsage is populated');
+    assert(Array.isArray(adminJson.geoDistribution) && adminJson.geoDistribution.length > 0, 'Admin analytics geoDistribution is populated');
+    assert(adminJson.geoDistribution.some(g => g.code === 'AE'), 'Vercel header country AE was ingested into geo distribution');
+    assert(adminJson.users.some(u => u.email === 'exec-vip@tahaluf.com'), 'New user exec-vip was indexed in user audit table');
+  } catch (err) {
+    assert(false, `Analytics API: Exception (${err.message})`);
+  }
+}
+
+// -------------------------------------------------------------
 // MAIN TEST RUNNER
 // -------------------------------------------------------------
 async function runAllTests() {
@@ -882,6 +983,7 @@ async function runAllTests() {
   await testFirestoreChunkBatching();
   testCreativeViewLogic();
   test24hMetricIntegrity();
+  await testAnalyticsLogic();
 
   // Check if local dev server is running before attempting API integration tests
   try {
@@ -889,6 +991,7 @@ async function runAllTests() {
     if (health.status === 200) {
       await testApiEndpoints();
       await testAdminEventsApi();
+      await testAnalyticsApi();
     } else {
       console.warn(`Local server responded with status ${health.status}, skipping live API tests.`);
     }

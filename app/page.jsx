@@ -27,6 +27,7 @@ import CreativeView from './CreativeView';
 import DetailedDateFilter from './components/DetailedDateFilter';
 import HealthAlertBanner from './components/HealthAlertBanner';
 import { getWeekIndex, generateEventWeekTimeline } from '../lib/weekTimeline.mjs';
+import { trackActivity } from '../lib/analyticsTracker.js';
 
 const GEO_URL = "https://unpkg.com/world-atlas@2.0.2/countries-110m.json";
 
@@ -581,6 +582,41 @@ export default function App() {
     });
     return () => unsubscribe();
   }, [router]);
+
+  // Telemetric user tracking: immediate on tab view, debounced on filter adjustments
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    trackActivity({
+      eventType: 'tab_view',
+      userEmail,
+      userRole,
+      tab: activeTab,
+      filters: {
+        business: filterBusinesses[0] || 'All',
+        events: filterEvents,
+        channels: filterChannels,
+        datePreset: dateRange.preset || 'auto',
+      },
+      immediate: true,
+    });
+  }, [isAuthenticated, userEmail, userRole, activeTab]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    trackActivity({
+      eventType: 'filter_applied',
+      userEmail,
+      userRole,
+      tab: activeTab,
+      filters: {
+        business: filterBusinesses[0] || 'All',
+        events: filterEvents,
+        channels: filterChannels,
+        datePreset: dateRange.preset || 'auto',
+      },
+      immediate: false,
+    });
+  }, [filterBusinesses, filterEvents, filterChannels, dateRange]);
 
   const handleSignOut = async () => {
     if (process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true') {
