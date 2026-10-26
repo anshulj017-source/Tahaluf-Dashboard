@@ -2025,7 +2025,7 @@ export default function App() {
 
       if (!activeEventContext && !isMultiEventComparison) {
         return (
-          <div className="flex flex-col items-center justify-center min-h-[60vh] py-10 text-center w-full max-w-6xl mx-auto px-4">
+          <div className="flex flex-col items-center justify-center min-h-[60vh] py-10 text-center w-full max-w-5xl mx-auto px-4">
             <div className="p-4 rounded-3xl bg-[#cedc28]/10 border border-[#cedc28]/30 mb-5 shadow-[0_0_30px_rgba(206,220,40,0.15)]">
               <Activity className="w-12 h-12 text-[#cedc28]" />
             </div>
@@ -2036,7 +2036,7 @@ export default function App() {
               Select an event from the hero filter in the top bar, or click any event card below to immediately load its full campaign performance, phase pacing, channels, and delivery metrics.
             </p>
 
-            <div className="flex items-center gap-3 mb-8">
+            <div className="flex items-center justify-center gap-3 mb-8">
               <button
                 type="button"
                 onClick={() => {
@@ -2045,21 +2045,15 @@ export default function App() {
                     setSelectedEvent(null);
                   });
                 }}
-                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#cedc28]/20 via-[#14a6d9]/20 to-[#cedc28]/20 hover:from-[#cedc28] hover:to-[#cedc28] border border-[#cedc28]/40 hover:border-[#cedc28] text-[#cedc28] hover:text-[#1a302e] font-black text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-md hover:shadow-[0_0_20px_rgba(206,220,40,0.35)] cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-[#cedc28]/15 hover:bg-[#cedc28] border border-[#cedc28]/30 hover:border-[#cedc28] text-[#cedc28] hover:text-[#1a302e] font-black text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-sm cursor-pointer"
               >
-                <Activity className="w-4 h-4" />
+                <Activity className="w-3.5 h-3.5" />
                 <span>Compare All Events (Relative Timeline) →</span>
               </button>
             </div>
 
             <div className="w-full grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {uniqueEvents.map(evName => {
-                const evRows = adData.filter(d => d.eventNameDB === evName);
-                const evSpend = d3.sum(evRows, d => d.cost || 0);
-                const evImpressions = d3.sum(evRows, d => d.impressions || 0);
-                const evConversions = d3.sum(evRows, d => d.purchases || 0);
-                const evClicks = d3.sum(evRows, d => d.clicks || 0);
-                const evPhases = Array.from(new Set(evRows.map(d => d.phase).filter(Boolean)));
                 const portfolio = eventPortfolioMap[evName] || 'P1';
 
                 return (
@@ -2080,31 +2074,15 @@ export default function App() {
                           {portfolio}
                         </span>
                         <span className="text-[10px] font-bold text-gray-400 group-hover:text-[#cedc28] transition-colors">
-                          {evPhases.length ? `${evPhases.length} Phases` : 'Active'}
+                          Event View
                         </span>
                       </div>
-                      <h3 className="text-lg font-black text-white group-hover:text-[#cedc28] transition-colors truncate mb-3">
+                      <h3 className="text-lg font-black text-white group-hover:text-[#cedc28] transition-colors truncate">
                         {evName}
                       </h3>
-                      <div className="space-y-1 text-xs">
-                        {userRole !== 'non-finance' && (
-                          <div className="flex justify-between items-center text-slate-300">
-                            <span className="text-gray-400 text-[11px]">Spend:</span>
-                            <span className="font-bold text-[#cedc28]">{exSym}{formatShort(evSpend * exRate)}</span>
-                          </div>
-                        )}
-                        <div className="flex justify-between items-center text-slate-300">
-                          <span className="text-gray-400 text-[11px]">{evConversions > 0 ? 'Conversions:' : 'Clicks:'}</span>
-                          <span className="font-bold text-white">{formatShort(evConversions > 0 ? evConversions : evClicks)}</span>
-                        </div>
-                        <div className="flex justify-between items-center text-slate-300">
-                          <span className="text-gray-400 text-[11px]">Impressions:</span>
-                          <span className="font-medium text-slate-300">{formatShort(evImpressions)}</span>
-                        </div>
-                      </div>
                     </div>
                     <div className="mt-4 pt-3 border-t border-[#cedc28]/10 flex items-center justify-between text-xs text-[#14a6d9] font-bold group-hover:text-[#cedc28]">
-                      <span>View Event Details</span>
+                      <span>View Event</span>
                       <span className="transition-transform group-hover:translate-x-1">→</span>
                     </div>
                   </button>
@@ -2149,20 +2127,6 @@ export default function App() {
                 widthClass="w-[165px] xl:w-[200px]" 
                 singleSelect={false} 
               />
-              <button
-                type="button"
-                onClick={() => {
-                  React.startTransition(() => {
-                    setFilterEvents(['All']);
-                    setSelectedEvent(null);
-                  });
-                }}
-                className="px-3 py-1.5 rounded-xl border border-[#cedc28]/30 hover:border-[#cedc28] bg-[#0a2442]/70 hover:bg-[#cedc28]/15 text-[#cedc28] text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
-                title="Return to Event Selection Hub"
-              >
-                <span>All Events Selection</span>
-                <span className="text-[10px] text-gray-400">✕</span>
-              </button>
             </div>
             {isMultiEventComparison && (
               <div className="text-xs font-bold px-3 py-1.5 rounded-xl bg-[#14a6d9]/15 border border-[#14a6d9]/30 text-[#14a6d9] flex items-center gap-1.5">

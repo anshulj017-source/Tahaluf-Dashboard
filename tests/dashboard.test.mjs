@@ -1130,11 +1130,12 @@ function testEventViewContracts() {
   // Verify Event Selection Hub in Event View
   assert(pageContent.includes("Select an Event to Unlock Event Breakdown &amp; Analysis"), 'Event View defines Event Selection Hub title');
   assert(pageContent.includes("Compare All Events (Relative Timeline) →"), 'Event View includes Compare All Events action');
-  assert(pageContent.includes("View Event Details"), 'Event Selection cards provide View Event Details action');
+  assert(pageContent.includes("<span>View Event</span>"), 'Event Selection cards provide consistent compact View Event action matching Weekly view');
+  assert(pageContent.includes('max-w-5xl mx-auto px-4'), 'Event Selection Hub matches max-w-5xl container layout');
 
   // Verify In-View Event Switcher and Filter
   assert(pageContent.includes('<Activity className="text-[#cedc28]" /> Event View:'), 'Event View includes dedicated header title');
-  assert(pageContent.includes('title="Return to Event Selection Hub"'), 'Event View includes All Events Selection button');
+  assert(!pageContent.includes('title="Return to Event Selection Hub"'), 'All Events Selection button is removed from header when event is selected');
   assert(pageContent.includes('Comparing {filterEvents.length} Events (Relative Timeline)'), 'Event View supports multi-event comparison indicator');
 
   // Verify CampaignView onSelectEvent support
