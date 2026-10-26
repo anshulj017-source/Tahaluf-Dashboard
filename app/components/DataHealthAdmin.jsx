@@ -445,7 +445,7 @@ export default function DataHealthAdmin({
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <label className="flex items-center gap-2 rounded-xl border border-white/5 bg-[#041628]/40 p-3 text-xs text-gray-200">
             <input
               type="checkbox"
@@ -458,7 +458,7 @@ export default function DataHealthAdmin({
               disabled={settingsLoading}
               className="accent-[#cedc28]"
             />
-            Show in-dashboard alerts to admins
+            <span>Show in-dashboard alerts to admins</span>
           </label>
           <label className="flex items-center gap-2 rounded-xl border border-white/5 bg-[#041628]/40 p-3 text-xs text-gray-200">
             <input
@@ -468,12 +468,27 @@ export default function DataHealthAdmin({
               disabled={settingsLoading}
               className="accent-[#cedc28]"
             />
-            Send email notifications
+            <span>Send email notifications</span>
+          </label>
+          <label className="flex flex-col gap-1 rounded-xl border border-white/5 bg-[#041628]/40 p-3 text-xs text-gray-200">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={settings.sendResolutionEmail !== false}
+                onChange={event => setSettings(previous => ({ ...previous, sendResolutionEmail: event.target.checked }))}
+                disabled={settingsLoading || !settings.emailEnabled}
+                className="accent-[#cedc28]"
+              />
+              <span className="font-semibold text-lime-300">Send resolution email</span>
+            </div>
+            <span className="text-[10px] text-gray-400 pl-5 leading-tight">
+              Only sent if an issue alert was previously dispatched. If resolved before the delay threshold, neither email is sent.
+            </span>
           </label>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="space-y-1.5">
             <label htmlFor="health-email-frequency" className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">
               Email frequency
             </label>
@@ -488,8 +503,40 @@ export default function DataHealthAdmin({
               <option value="daily">Daily digest</option>
               <option value="immediate_and_daily">Immediate + daily digest</option>
             </select>
+            <p className="text-[10px] text-gray-500">
+              When to dispatch alert emails.
+            </p>
           </div>
-          <div className="space-y-2">
+
+          <div className="space-y-1.5">
+            <label htmlFor="health-alert-delay" className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+              Alert Delay (Grace Period)
+            </label>
+            <select
+              id="health-alert-delay"
+              value={settings.alertDelayMinutes ?? 5}
+              onChange={event => setSettings(previous => ({ ...previous, alertDelayMinutes: Number(event.target.value) }))}
+              disabled={settingsLoading || !settings.emailEnabled || settings.frequency === 'daily'}
+              className="w-full rounded-xl border border-white/10 bg-[#041628] px-3 py-2 text-xs text-white"
+            >
+              <option value={0}>Immediate (0 min)</option>
+              <option value={1}>After 1 minute</option>
+              <option value={2}>After 2 minutes</option>
+              <option value={3}>After 3 minutes</option>
+              <option value={4}>After 4 minutes</option>
+              <option value={5}>After 5 minutes (Default / Recommended)</option>
+              <option value={10}>After 10 minutes</option>
+              <option value={15}>After 15 minutes</option>
+              <option value={20}>After 20 minutes</option>
+              <option value={25}>After 25 minutes</option>
+              <option value={30}>After 30 minutes</option>
+            </select>
+            <p className="text-[10px] text-gray-500">
+              Wait time before sending alert. If self-healed within this window, no email is sent.
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
             <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Email recipients</label>
             <div className="flex gap-2">
               <input

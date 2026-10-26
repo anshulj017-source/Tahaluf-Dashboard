@@ -230,8 +230,8 @@ export default function DetailedDateFilter({
   ];
 
   return (
-    <div ref={wrapperRef} className={`relative ${widthClass || 'w-[135px] xl:w-[145px]'} shrink-0 z-40`}>
-      <span className="text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest mb-1.5 flex items-center justify-between">
+    <div ref={wrapperRef} className={`relative ${widthClass || 'w-[108px] xl:w-[116px]'} shrink-0 z-40`}>
+      <span className="text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest mb-1 flex items-center justify-between">
         <span>{label}</span>
         {isActiveFilter && (
           <span className="w-1.5 h-1.5 rounded-full bg-[#cedc28] animate-pulse"></span>
@@ -241,7 +241,7 @@ export default function DetailedDateFilter({
       {/* TRIGGER BUTTON: Compact, matching MultiSelect height */}
       <div 
         onClick={() => setIsOpen(!isOpen)}
-        className={`px-2.5 py-1.5 surface-inset border rounded-lg text-[10px] font-bold cursor-pointer flex justify-between items-center transition-all ${
+        className={`px-2 py-1.5 surface-inset border rounded-lg text-[10px] font-bold cursor-pointer flex justify-between items-center transition-all ${
           isOpen 
             ? 'border-[#cedc28] ring-1 ring-[#cedc28]/30 bg-[#0a2442]' 
             : isActiveFilter 
@@ -250,9 +250,9 @@ export default function DetailedDateFilter({
         }`}
         title="Open Date Range Selector"
       >
-        <div className="flex items-center gap-1.5 truncate pr-1">
-          <Calendar className={`w-3.5 h-3.5 flex-shrink-0 ${isActiveFilter ? 'text-[#cedc28]' : 'text-[#14a6d9]'}`} />
-          <span className="truncate">{formatButtonLabel()}</span>
+        <div className="flex items-center gap-1 truncate pr-1">
+          <Calendar className={`w-3 h-3 flex-shrink-0 ${isActiveFilter ? 'text-[#cedc28]' : 'text-[#14a6d9]'}`} />
+          <span className="truncate text-[10px] xl:text-[10.5px]">{formatButtonLabel()}</span>
         </div>
         <ChevronDown className={`w-3.5 h-3.5 flex-shrink-0 text-gray-400 transition-transform ${isOpen ? 'rotate-180 text-[#cedc28]' : ''}`} />
       </div>

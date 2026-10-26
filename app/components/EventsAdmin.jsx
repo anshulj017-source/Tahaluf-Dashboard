@@ -175,6 +175,7 @@ export default function EventsAdmin({ currentUserEmail = 'admin@tahaluf.com', in
       name: event.name || '',
       sourceName: event.sourceName || '',
       portfolio: event.portfolio || 'P1',
+      business: event.business || (event.id === 'kog-26' ? 'derive' : 'B2B'),
       enabled: event.enabled ?? true,
       status: event.status || (event.enabled ? 'active' : 'inactive'),
       visibility: event.visibility || (event.status === 'admin_only' ? 'admin_only' : 'public'),
@@ -214,6 +215,7 @@ export default function EventsAdmin({ currentUserEmail = 'admin@tahaluf.com', in
       name: '',
       sourceName: '',
       portfolio: 'P1',
+      business: 'B2B',
       enabled: true,
       status: 'admin_only',
       visibility: 'admin_only',
@@ -940,15 +942,20 @@ export default function EventsAdmin({ currentUserEmail = 'admin@tahaluf.com', in
                     </div>
                   </td>
 
-                  {/* Portfolio */}
+                  {/* Portfolio & Business */}
                   <td className="py-3.5 px-4 whitespace-nowrap">
-                    <span className={`px-2 py-0.5 rounded-md font-extrabold text-[10px] ${
-                      event.portfolio === 'P3' 
-                        ? 'bg-[#cedc28]/20 text-[#cedc28] border border-[#cedc28]/30' 
-                        : 'bg-[#14a6d9]/20 text-[#14a6d9] border border-[#14a6d9]/30'
-                    }`}>
-                      {event.portfolio || 'P1'}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className={`px-2 py-0.5 rounded-md font-extrabold text-[10px] ${
+                        event.portfolio === 'P3' 
+                          ? 'bg-[#cedc28]/20 text-[#cedc28] border border-[#cedc28]/30' 
+                          : 'bg-[#14a6d9]/20 text-[#14a6d9] border border-[#14a6d9]/30'
+                      }`}>
+                        {event.portfolio || 'P1'}
+                      </span>
+                      <span className="px-1.5 py-0.5 rounded font-mono text-[9px] bg-white/5 border border-white/10 text-gray-300">
+                        {event.business === 'derive' ? 'Auto (Campaign)' : (event.business || 'B2B')}
+                      </span>
+                    </div>
                   </td>
 
                   {/* Sheet GID */}
@@ -1169,19 +1176,38 @@ export default function EventsAdmin({ currentUserEmail = 'admin@tahaluf.com', in
                       </div>
 
                       {/* Event Type */}
-                      <div className="sm:col-span-2">
+                      <div>
                         <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">
                           Event Classification Type
                         </label>
                         <select
                           value={editingEvent.eventType || 'Exhibition'}
                           onChange={(e) => setEditingEvent({ ...editingEvent, eventType: e.target.value })}
-                          className="w-full bg-[#041628] border border-gray-600/50 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-[#cedc28]/60"
+                          className="w-full bg-[#041628] border border-gray-600/50 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-[#cedc28]/60"
                         >
                           <option value="Exhibition">Exhibition</option>
                           <option value="Conference">Conference</option>
                           <option value="Both">Both (Exhibition & Conference)</option>
                         </select>
+                      </div>
+
+                      {/* Business Dimension Setting */}
+                      <div>
+                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">
+                          Default Business Dimension *
+                        </label>
+                        <select
+                          value={editingEvent.business || (editingEvent.id === 'kog-26' ? 'derive' : 'B2B')}
+                          onChange={(e) => setEditingEvent({ ...editingEvent, business: e.target.value })}
+                          className="w-full bg-[#041628] border border-gray-600/50 rounded-xl px-3.5 py-2.5 text-sm text-white font-bold focus:outline-none focus:border-[#cedc28]/60"
+                        >
+                          <option value="B2B">B2B (Default)</option>
+                          <option value="B2C">B2C</option>
+                          <option value="derive">Extract from Campaign Name (Fallback: B2B)</option>
+                        </select>
+                        <span className="text-[9px] text-gray-500 mt-1 block">
+                          Controls whether rows for this event default to B2B/B2C or extract from campaign name.
+                        </span>
                       </div>
                     </div>
                   </div>

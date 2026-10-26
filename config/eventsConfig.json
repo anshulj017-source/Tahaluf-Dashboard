@@ -1,6 +1,6 @@
 {
-  "version": "v1.0.101",
-  "lastUpdated": "2026-10-25T20:36:07.664Z",
+  "version": "v1.0.134",
+  "lastUpdated": "2026-10-26T12:34:03.159Z",
   "updatedBy": "recovery-admin@tahaluf.com",
   "events": [
     {
@@ -8,6 +8,7 @@
       "name": "GSTS 26",
       "sourceName": "GSTS",
       "portfolio": "P1",
+      "business": "B2B",
       "enabled": true,
       "sheetType": "combined",
       "gid": "",
@@ -34,6 +35,7 @@
       "name": "SAIF 26",
       "sourceName": "SAIF 26",
       "portfolio": "P1",
+      "business": "B2B",
       "enabled": true,
       "sheetType": "combined",
       "gid": "1196409184",
@@ -58,6 +60,7 @@
       "name": "KoG 26",
       "sourceName": "KoG 26",
       "portfolio": "P1",
+      "business": "derive",
       "enabled": true,
       "sheetType": "combined",
       "gid": "1486784585",
@@ -82,6 +85,7 @@
       "name": "Black Hat",
       "sourceName": "BLACK HAT",
       "portfolio": "P1",
+      "business": "B2B",
       "enabled": true,
       "sheetType": "combined",
       "gid": "659941332",
@@ -106,6 +110,7 @@
       "name": "SMLC 26",
       "sourceName": "SMLC 26",
       "portfolio": "P3",
+      "business": "B2B",
       "enabled": true,
       "sheetType": "combined",
       "gid": "1526538255",
@@ -132,6 +137,7 @@
       "name": "IDWS 26",
       "sourceName": "IDWS 26",
       "portfolio": "P3",
+      "business": "B2B",
       "enabled": true,
       "sheetType": "combined",
       "gid": "1121987876",
@@ -156,6 +162,7 @@
       "name": "BIO 26 & CPHI 26",
       "sourceName": "BIO / CPHI",
       "portfolio": "P3",
+      "business": "B2B",
       "enabled": true,
       "sheetType": "combined",
       "gid": "1728688512",
@@ -180,6 +187,7 @@
       "name": "CPHI 26 (LinkedIn)",
       "sourceName": "CPHI 26",
       "portfolio": "P3",
+      "business": "B2B",
       "enabled": true,
       "sheetType": "combined",
       "gid": "208497314",
@@ -200,5 +208,5 @@
       }
     }
   ],
-  "revertedFrom": "v1.0.99"
+  "revertedFrom": "v1.0.132"
 }

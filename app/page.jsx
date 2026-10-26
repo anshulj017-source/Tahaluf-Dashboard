@@ -105,11 +105,21 @@ const MetricCard = ({ label, value, color, icon: Icon, definition, subContent })
 
 const DateRangeFilter = DetailedDateFilter;
 
-const MultiSelect = ({ label, options, selected, onChange, widthClass, isHero = false, singleSelect = false }) => {
+const MultiSelect = ({ label, options, selected, onChange, widthClass, isHero = false, singleSelect = false, alignRight = false }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [optimisticSelected, setOptimisticSelected] = useState(null);
   const wrapperRef = useRef(null);
   const filtered = options.filter(o => o.toLowerCase().includes(searchTerm.toLowerCase()));
+
+  // Reset optimistic state when props update
+  useEffect(() => {
+    setOptimisticSelected(null);
+  }, [selected]);
+
+  const activeSelected = optimisticSelected || selected;
+  const isAll = activeSelected.includes('All');
+  const isActive = !isAll && activeSelected.length > 0;
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -122,69 +132,93 @@ const MultiSelect = ({ label, options, selected, onChange, widthClass, isHero = 
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const isAll = selected.includes('All');
-  const hasSpecificChoice = isHero && !isAll && selected.length > 0;
-
   return (
-    <div ref={wrapperRef} className={`relative ${widthClass || 'w-[120px] xl:w-[130px]'} shrink-0 z-30`}>
-      <span className={`text-[10px] font-black uppercase tracking-widest mb-1.5 flex items-center gap-1 ${isHero ? 'text-[#cedc28]' : 'text-[#14a6d9]'}`}>
-        {isHero && <Sparkles className="w-3 h-3 text-[#cedc28]" />}
-        {label}
-        {hasSpecificChoice && <span className="w-1.5 h-1.5 rounded-full bg-[#cedc28] animate-pulse"></span>}
+    <div ref={wrapperRef} className={`relative ${widthClass || 'w-[100px] xl:w-[110px]'} shrink-0 z-30`}>
+      <span className={`text-[10px] font-black uppercase tracking-widest mb-1 flex items-center justify-between ${isHero ? 'text-[#cedc28]' : 'text-[#14a6d9]'}`}>
+        <span className="flex items-center gap-1">
+          {isHero && <Sparkles className="w-3 h-3 text-[#cedc28]" />}
+          {label}
+        </span>
+        {isActive && <span className="w-1.5 h-1.5 rounded-full bg-[#cedc28] animate-pulse"></span>}
       </span>
       <div 
         onClick={() => setIsOpen(!isOpen)}
-        className={`px-2.5 py-1.5 rounded-xl cursor-pointer flex justify-between items-center transition-all ${
+        className={`px-2 py-1.5 rounded-xl cursor-pointer flex justify-between items-center transition-all ${
           isHero
-            ? hasSpecificChoice
+            ? isActive
               ? 'bg-[#cedc28]/20 border-2 border-[#cedc28] text-white font-black shadow-[0_0_15px_rgba(206,220,40,0.35)] hover:shadow-[0_0_20px_rgba(206,220,40,0.5)]'
               : 'bg-gradient-to-r from-[#cedc28]/15 via-[#0a2442] to-[#14a6d9]/15 border-2 border-[#cedc28]/70 text-[#eef7f5] font-bold hover:border-[#cedc28] shadow-[0_0_10px_rgba(206,220,40,0.2)]'
-            : 'surface-inset border border-[#cedc28]/30 rounded-lg text-[10px] font-bold text-[#eef7f5] hover:border-[#cedc28]'
+            : isActive
+              ? 'bg-[#cedc28]/15 border border-[#cedc28] text-white font-black shadow-[0_0_10px_rgba(206,220,40,0.25)]'
+              : 'surface-inset border border-[#cedc28]/30 rounded-lg text-[10px] font-bold text-[#eef7f5] hover:border-[#cedc28]'
         }`}
       >
-        <span className="truncate pr-2 text-[10px] xl:text-[11px]">
-          {isAll ? (isHero ? 'All Events' : 'All Selected') : selected.join(', ')}
+        <span className="truncate pr-1 text-[10px] xl:text-[10.5px]">
+          {isAll ? (isHero ? 'All Events' : 'All') : activeSelected.join(', ')}
         </span>
-        <ChevronDown className={`w-4 h-4 flex-shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''} ${isHero ? 'text-[#cedc28]' : ''}`} />
+        <ChevronDown className={`w-3.5 h-3.5 flex-shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''} ${isHero || isActive ? 'text-[#cedc28]' : ''}`} />
       </div>
       {isOpen && (
-        <div className="absolute top-full left-0 min-w-[200px] w-full h-0 z-50">
-          <div className="w-full mt-2 card-surface backdrop-blur-3xl bg-[#0a2442]/90 border border-[#cedc28]/30 rounded-xl shadow-2xl flex flex-col max-h-64 overflow-hidden">
-            <div className="p-2 border-b border-[#cedc28]/10 relative">
-              <Search className="w-4 h-4 text-[#14a6d9] absolute left-4 top-1/2 -translate-y-1/2" />
-              <input type="text" placeholder="Search..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full bg-black/30 text-[#eef7f5] text-[10px] font-bold pl-9 pr-3 py-2 rounded-lg outline-none border border-transparent focus:border-[#cedc28]/50" />
-            </div>
-            <div className="overflow-y-auto p-2 flex-1 custom-scrollbar">
-              {!singleSelect && (
-                <div onClick={() => { onChange(['All']); setIsOpen(false); setSearchTerm(''); }} className={`px-3 py-2 rounded-lg text-[11px] font-bold cursor-pointer flex justify-between ${selected.includes('All') ? 'bg-[#cedc28]/20 text-[#cedc28]' : 'text-[#eef7f5] hover:bg-[#0a2442]'}`}>
-                  All <Check className={`w-3.5 h-3.5 ${selected.includes('All') ? 'opacity-100' : 'opacity-0'}`} />
+        <>
+          {/* Backdrop to ensure immediate dismissal when clicking outside */}
+          <div className="fixed inset-0 z-40" onClick={() => { setIsOpen(false); setSearchTerm(''); }}></div>
+          <div className={`absolute top-full ${alignRight ? 'right-0' : 'left-0'} min-w-[200px] w-full h-0 z-50`}>
+            <div className="w-full mt-2 card-surface backdrop-blur-3xl bg-[#0a2442]/95 border border-[#cedc28]/40 rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.85)] flex flex-col max-h-64 overflow-hidden animate-in fade-in zoom-in-95 duration-70">
+              <div className="p-2 border-b border-[#cedc28]/10 relative">
+                <Search className="w-4 h-4 text-[#14a6d9] absolute left-4 top-1/2 -translate-y-1/2" />
+                <input type="text" placeholder="Search..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full bg-black/30 text-[#eef7f5] text-[10px] font-bold pl-9 pr-3 py-2 rounded-lg outline-none border border-transparent focus:border-[#cedc28]/50" />
+              </div>
+              <div className="overflow-y-auto p-2 flex-1 custom-scrollbar">
+                <div 
+                  onClick={() => { 
+                    setOptimisticSelected(['All']);
+                    setIsOpen(false); 
+                    setSearchTerm(''); 
+                    React.startTransition(() => {
+                      onChange(['All']); 
+                    });
+                  }} 
+                  className={`px-3 py-2 rounded-lg text-[11px] font-bold cursor-pointer flex justify-between ${activeSelected.includes('All') ? 'bg-[#cedc28]/20 text-[#cedc28]' : 'text-[#eef7f5] hover:bg-[#0a2442]'}`}
+                >
+                  All <Check className={`w-3.5 h-3.5 ${activeSelected.includes('All') ? 'opacity-100' : 'opacity-0'}`} />
                 </div>
-              )}
-              {filtered.map(opt => {
-                const isSel = selected.includes(opt);
-                return (
-                  <div key={opt} onClick={() => {
-                    if (singleSelect) {
-                      onChange([opt]);
-                      setIsOpen(false);
-                      setSearchTerm('');
-                    } else {
-                      let next = [...selected];
-                      if (next.includes('All')) next = [];
-                      if (isSel) {
-                        next = next.filter(n => n !== opt);
-                        if (next.length === 0) next = ['All'];
-                      } else { next.push(opt); }
-                      onChange(next);
-                    }
-                  }} className={`px-3 py-2 mt-1 rounded-lg text-[11px] font-bold cursor-pointer flex justify-between ${isSel ? 'bg-[#cedc28]/20 text-[#cedc28]' : 'text-[#eef7f5] hover:bg-[#0a2442]'}`}>
-                    <span className="truncate pr-2">{opt}</span> <Check className={`w-3.5 h-3.5 flex-shrink-0 ${isSel ? 'opacity-100' : 'opacity-0'}`} />
-                  </div>
-                )
-              })}
+                {filtered.map(opt => {
+                  const isSel = activeSelected.includes(opt);
+                  return (
+                    <div 
+                      key={opt} 
+                      onClick={() => {
+                        if (singleSelect) {
+                          setOptimisticSelected([opt]);
+                          setIsOpen(false);
+                          setSearchTerm('');
+                          React.startTransition(() => {
+                            onChange([opt]);
+                          });
+                        } else {
+                          let next = [...activeSelected];
+                          if (next.includes('All')) next = [];
+                          if (isSel) {
+                            next = next.filter(n => n !== opt);
+                            if (next.length === 0) next = ['All'];
+                          } else { next.push(opt); }
+                          setOptimisticSelected(next);
+                          React.startTransition(() => {
+                            onChange(next);
+                          });
+                        }
+                      }} 
+                      className={`px-3 py-2 mt-1 rounded-lg text-[11px] font-bold cursor-pointer flex justify-between ${isSel ? 'bg-[#cedc28]/20 text-[#cedc28]' : 'text-[#eef7f5] hover:bg-[#0a2442]'}`}
+                    >
+                      <span className="truncate pr-2">{opt}</span> 
+                      <Check className={`w-3.5 h-3.5 flex-shrink-0 ${isSel ? 'opacity-100' : 'opacity-0'}`} />
+                    </div>
+                  )
+                })}
+              </div>
             </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );
@@ -491,6 +525,7 @@ export default function App() {
   const [filterEvents, setFilterEvents] = useState(['All']);
   const [filterEventTypes, setFilterEventTypes] = useState(['All']);
   const [filterPortfolios, setFilterPortfolios] = useState(['All']);
+  const [filterBusinesses, setFilterBusinesses] = useState(['All']);
   const [filterWeeks, setFilterWeeks] = useState(['All']);
   const [localWeeklyViewWeeks, setLocalWeeklyViewWeeks] = useState(['All']);
   const [eventWeekTimelines, setEventWeekTimelines] = useState({});
@@ -556,7 +591,7 @@ export default function App() {
     router.push('/login');
   };
 
-  const parseRow = (row, sourceEventName = '', forcedPortfolio = null, fieldAliases = null) => {
+  const parseRow = (row, sourceEventName = '', forcedPortfolio = null, fieldAliases = null, businessConfig = null) => {
     const rawCost = parseMetric(
       (fieldAliases?.spend && row[fieldAliases.spend] !== undefined)
         ? row[fieldAliases.spend]
@@ -588,6 +623,25 @@ export default function App() {
       if (upper.includes('SMLC') || upper.includes('IDWS') || upper.includes('BIO') || upper.includes('CPHI')) {
         portfolio = 'P3';
       }
+    }
+
+    // Derive Business Dimension (B2B vs B2C)
+    // Rule: Default all events to B2B. For KoG 26 (or any event configured as 'derive'), extract from campaign name with fallback to B2B.
+    const eventBusinessSetting = businessConfig || (eventNameDB?.toUpperCase().includes('KOG') ? 'derive' : 'B2B');
+    let business = 'B2B';
+    const cName = row['Campaign name'] || row['Campaign Name'] || row['Campaign DB'] || row['Campaign'] || '';
+    if (eventBusinessSetting === 'derive') {
+      if (/\bB2C\b/i.test(cName)) {
+        business = 'B2C';
+      } else if (/\bB2B\b/i.test(cName)) {
+        business = 'B2B';
+      } else {
+        business = 'B2B'; // fallback when not available
+      }
+    } else if (eventBusinessSetting === 'B2C') {
+      business = 'B2C';
+    } else {
+      business = 'B2B';
     }
 
     const isGoogle = channel.toLowerCase().includes('google');
@@ -630,7 +684,8 @@ export default function App() {
       eventNameDB: eventNameDB || 'Unknown',
       eventTypeDB: eventTypeDB || 'Unknown',
       weekDB: (row['Week DB'] || '').trim() || 'Unknown',
-      portfolio: portfolio
+      portfolio: portfolio,
+      business: business
     };
   };
 
@@ -711,14 +766,14 @@ export default function App() {
       // Fallback defaults
       if (!configuredEvents || configuredEvents.length === 0) {
         configuredEvents = [
-          { id: 'gsts-26', name: 'GSTS 26', sourceName: 'GSTS', portfolio: 'P1', enabled: true, gid: '', plannedGid: '2019892532', launchDate: '2026-12-18' },
-          { id: 'saif-26', name: 'SAIF 26', sourceName: 'SAIF 26', portfolio: 'P1', enabled: true, gid: '1196409184', plannedGid: '570639072', launchDate: '2026-11-24' },
-          { id: 'kog-26', name: 'KoG 26', sourceName: 'KoG 26', portfolio: 'P1', enabled: true, gid: '1486784585', plannedGid: '1766297835', launchDate: '2026-12-01' },
-          { id: 'black-hat', name: 'Black Hat', sourceName: 'BLACK HAT', portfolio: 'P1', enabled: true, gid: '659941332', plannedGid: '277310277', plannedType: 'blackhat-text', launchDate: '2026-12-01' },
-          { id: 'smlc-26', name: 'SMLC 26', sourceName: 'SMLC 26', portfolio: 'P3', enabled: true, gid: '1526538255', launchDate: '2026-10-21' },
-          { id: 'idws-26', name: 'IDWS 26', sourceName: 'IDWS 26', portfolio: 'P3', enabled: true, gid: '1121987876', startDate: '2026-06-01', launchDate: '2026-12-14' },
-          { id: 'bio-cphi-main', name: 'BIO 26 & CPHI 26', sourceName: 'BIO / CPHI', portfolio: 'P3', enabled: true, gid: '1728688512', dateFilterMode: 'year-2026', launchDate: '2026-12-14' },
-          { id: 'cphi-li', name: 'CPHI 26 (LinkedIn)', sourceName: 'CPHI 26', portfolio: 'P3', enabled: true, gid: '208497314', dateFilterMode: 'year-2026', launchDate: '2026-12-14' }
+          { id: 'gsts-26', name: 'GSTS 26', sourceName: 'GSTS', portfolio: 'P1', business: 'B2B', enabled: true, gid: '', plannedGid: '2019892532', launchDate: '2026-12-18' },
+          { id: 'saif-26', name: 'SAIF 26', sourceName: 'SAIF 26', portfolio: 'P1', business: 'B2B', enabled: true, gid: '1196409184', plannedGid: '570639072', launchDate: '2026-11-24' },
+          { id: 'kog-26', name: 'KoG 26', sourceName: 'KoG 26', portfolio: 'P1', business: 'derive', enabled: true, gid: '1486784585', plannedGid: '1766297835', launchDate: '2026-12-01' },
+          { id: 'black-hat', name: 'Black Hat', sourceName: 'BLACK HAT', portfolio: 'P1', business: 'B2B', enabled: true, gid: '659941332', plannedGid: '277310277', plannedType: 'blackhat-text', launchDate: '2026-12-01' },
+          { id: 'smlc-26', name: 'SMLC 26', sourceName: 'SMLC 26', portfolio: 'P3', business: 'B2B', enabled: true, gid: '1526538255', launchDate: '2026-10-21' },
+          { id: 'idws-26', name: 'IDWS 26', sourceName: 'IDWS 26', portfolio: 'P3', business: 'B2B', enabled: true, gid: '1121987876', startDate: '2026-06-01', launchDate: '2026-12-14' },
+          { id: 'bio-cphi-main', name: 'BIO 26 & CPHI 26', sourceName: 'BIO / CPHI', portfolio: 'P3', business: 'B2B', enabled: true, gid: '1728688512', dateFilterMode: 'year-2026', launchDate: '2026-12-14' },
+          { id: 'cphi-li', name: 'CPHI 26 (LinkedIn)', sourceName: 'CPHI 26', portfolio: 'P3', business: 'B2B', enabled: true, gid: '208497314', dateFilterMode: 'year-2026', launchDate: '2026-12-14' }
         ];
       }
 
@@ -757,7 +812,7 @@ export default function App() {
           if (ev.dateFilterMode === 'year-2026') {
             rows = rows.filter(r => !r.Date || r.Date.startsWith('2026'));
           }
-          return rows.map(r => parseRow(r, ev.sourceName || ev.name, ev.portfolio, ev.fieldAliases));
+          return rows.map(r => parseRow(r, ev.sourceName || ev.name, ev.portfolio, ev.fieldAliases, ev.business));
         });
       });
 
@@ -910,6 +965,7 @@ export default function App() {
     setFilterEvents(['All']);
     setFilterEventTypes(['All']);
     setFilterPortfolios(['All']);
+    setFilterBusinesses(['All']);
     setFilterWeeks(['All']);
     setSelectedEvent(null);
     setDateRange({ start: '', end: '', preset: 'auto' });
@@ -925,6 +981,10 @@ export default function App() {
   const uniquePaidOrganic = useMemo(() => Array.from(new Set(gaData.map(d => d.paidOrganic))).sort(), [gaData]);
   const uniqueGa4Properties = useMemo(() => Array.from(new Set(gaData.map(d => d.ga4Property))).filter(Boolean).sort(), [gaData]);
   const uniquePortfolios = useMemo(() => Array.from(new Set(adData.map(d => d.portfolio))).filter(Boolean).sort(), [adData]);
+  const uniqueBusinesses = useMemo(() => {
+    const vals = Array.from(new Set(adData.map(d => d.business))).filter(Boolean).sort();
+    return vals.length ? vals : ['B2B', 'B2C'];
+  }, [adData]);
   const eventsData = useMemo(() => filterPortfolios.includes('All') ? adData : adData.filter(d => filterPortfolios.includes(d.portfolio)), [adData, filterPortfolios]);
   const uniqueEvents = useMemo(() => Array.from(new Set(eventsData.map(d => d.eventNameDB))).filter(e => e && e !== 'Unknown').sort(), [eventsData]);
   const eventTypesData = useMemo(() => filterEvents.includes('All') ? eventsData : eventsData.filter(d => filterEvents.includes(d.eventNameDB)), [eventsData, filterEvents]);
@@ -968,28 +1028,53 @@ export default function App() {
     });
   }, [adData, eventWeekTimelines]);
 
-  // Apply filters to Ad Data
+  // Apply filters to Ad Data - Optimized with pre-computed Sets for instant O(1) filtering
   const filteredAdData = useMemo(() => {
+    const hasCampaignFilter = !filterCampaigns.includes('All');
+    const campaignSet = hasCampaignFilter ? new Set(filterCampaigns) : null;
+    
+    const hasMarketFilter = !filterMarkets.includes('All');
+    const marketSet = hasMarketFilter ? new Set(filterMarkets) : null;
+    
+    const hasChannelFilter = !filterChannels.includes('All');
+    const channelSet = hasChannelFilter ? new Set(filterChannels) : null;
+    
+    const hasPhaseFilter = !filterPhases.includes('All');
+    const phaseSet = hasPhaseFilter ? new Set(filterPhases) : null;
+    
+    const hasEventFilter = !filterEvents.includes('All');
+    const eventSet = hasEventFilter ? new Set(filterEvents) : null;
+    
+    const hasPortfolioFilter = !filterPortfolios.includes('All');
+    const portfolioSet = hasPortfolioFilter ? new Set(filterPortfolios) : null;
+    
+    const hasBusinessFilter = !filterBusinesses.includes('All');
+    const businessSet = hasBusinessFilter ? new Set(filterBusinesses) : null;
+    
+    const hasEventTypeFilter = !filterEventTypes.includes('All');
+    const eventTypeSet = hasEventTypeFilter ? new Set(filterEventTypes) : null;
+    
+    const hasWeekFilter = !filterWeeks.includes('All');
+    const weekSet = hasWeekFilter ? new Set(filterWeeks) : null;
+    
+    const startBound = dateRange.start ? (isNaN(new Date(dateRange.start + 'T00:00:00').getTime()) ? new Date(dateRange.start) : new Date(dateRange.start + 'T00:00:00')) : null;
+    const endBound = dateRange.end ? (isNaN(new Date(dateRange.end + 'T23:59:59.999').getTime()) ? new Date(dateRange.end) : new Date(dateRange.end + 'T23:59:59.999')) : null;
+
     return adData.filter(d => {
-      if (!filterCampaigns.includes('All') && !filterCampaigns.includes(d.campaignName)) return false;
-      if (!filterMarkets.includes('All') && !filterMarkets.includes(d.country)) return false;
-      if (!filterChannels.includes('All') && !filterChannels.includes(d.channel)) return false;
-      if (!filterPhases.includes('All') && !filterPhases.includes(d.phase)) return false;
-      if (!filterEvents.includes('All') && !filterEvents.includes(d.eventNameDB)) return false;
-      if (!filterPortfolios.includes('All') && !filterPortfolios.includes(d.portfolio)) return false;
-      if (!filterEventTypes.includes('All') && !filterEventTypes.includes(d.eventTypeDB)) return false;
-      if (!filterWeeks.includes('All') && !filterWeeks.includes(d.weekDB)) return false;
-      if (dateRange.start && d.dateObj) {
-        const startBound = new Date(dateRange.start + 'T00:00:00');
-        if (d.dateObj < (isNaN(startBound.getTime()) ? new Date(dateRange.start) : startBound)) return false;
-      }
-      if (dateRange.end && d.dateObj) {
-        const endBound = new Date(dateRange.end + 'T23:59:59.999');
-        if (d.dateObj > (isNaN(endBound.getTime()) ? new Date(dateRange.end) : endBound)) return false;
-      }
+      if (hasCampaignFilter && !campaignSet.has(d.campaignName)) return false;
+      if (hasMarketFilter && !marketSet.has(d.country)) return false;
+      if (hasChannelFilter && !channelSet.has(d.channel)) return false;
+      if (hasPhaseFilter && !phaseSet.has(d.phase)) return false;
+      if (hasEventFilter && !eventSet.has(d.eventNameDB)) return false;
+      if (hasPortfolioFilter && !portfolioSet.has(d.portfolio)) return false;
+      if (hasBusinessFilter && !businessSet.has(d.business)) return false;
+      if (hasEventTypeFilter && !eventTypeSet.has(d.eventTypeDB)) return false;
+      if (hasWeekFilter && !weekSet.has(d.weekDB)) return false;
+      if (startBound && d.dateObj && d.dateObj < startBound) return false;
+      if (endBound && d.dateObj && d.dateObj > endBound) return false;
       return true;
     });
-  }, [adData, filterCampaigns, filterMarkets, filterChannels, filterPhases, filterEvents, filterPortfolios, filterEventTypes, filterWeeks, dateRange]);
+  }, [adData, filterCampaigns, filterMarkets, filterChannels, filterPhases, filterEvents, filterPortfolios, filterBusinesses, filterEventTypes, filterWeeks, dateRange]);
 
   const coreAdData = useMemo(() => filteredAdData.filter(d => !d.isAuxiliaryData), [filteredAdData]);
 
@@ -2054,23 +2139,22 @@ export default function App() {
   return (
     <div className="h-screen overflow-hidden app-bg font-sans selection:bg-[#cedc28]/30 text-white flex flex-col">
       {/* HEADER */}
-      <header className="sticky top-0 z-50 bg-[#0a2442]/95 backdrop-blur-xl border-b border-[#cedc28]/20 px-6 py-3 shadow-2xl relative">
+      <header className="sticky top-0 z-50 bg-[#0a2442]/95 backdrop-blur-xl border-b border-[#cedc28]/20 px-0 py-2.5 shadow-2xl relative">
         <div className="pattern-overlay absolute inset-0 z-0 pointer-events-none"></div>
-        <div className="flex items-start gap-4 relative z-10 w-full justify-between">
-          {/* LEFT: Logo */}
-          <div className="flex items-center gap-4 shrink-0 mt-1">
-            <div className="flex flex-col items-start gap-0.5 mr-2">
-              <img src="/tahaluf-logo.svg" alt="Tahaluf Logo" className="h-8 object-contain" onError={(e) => e.target.style.display = 'none'} />
-              <p className="text-[9px] font-bold text-[#cedc28] uppercase tracking-[0.1em]">Performance Dashboard</p>
+        <div className="flex items-center relative z-10 w-full">
+          {/* LEFT: Logo - Exactly matches sidebar width w-52 (208px) with border-r continuing the sidebar border line */}
+          <div className="w-52 pl-6 pr-4 flex items-center justify-between shrink-0 border-r border-[#cedc28]/15">
+            <div className="flex flex-col items-start gap-0.5">
+              <img src="/tahaluf-logo.svg" alt="Tahaluf Logo" className="h-7 object-contain" onError={(e) => e.target.style.display = 'none'} />
+              <p className="text-[8.5px] font-bold text-[#cedc28] uppercase tracking-[0.08em] whitespace-nowrap">Performance Dashboard</p>
             </div>
-            <div className="h-10 w-px bg-[#cedc28]/20 hidden xl:block"></div>
           </div>
 
-          {/* RIGHT: Filters + Actions */}
-          <div className="flex gap-2 flex-wrap flex-1 justify-start items-end xl:ml-4">
-            <DateRangeFilter label="DATE" dateRange={dateRange} onChange={setDateRange} />
-            <MultiSelect label="Week" options={uniqueWeeks} selected={filterWeeks} onChange={setFilterWeeks} widthClass="w-[110px] xl:w-[120px]" />
-            <MultiSelect label="Event Portfolio" options={uniquePortfolios} selected={filterPortfolios} onChange={setFilterPortfolios} widthClass="w-[110px] xl:w-[125px]" />
+          {/* FILTERS + ACTIONS: pl-8 (32px) perfectly aligns the first filter (DATE) with the table & cards in <main> below */}
+          <div className="pl-8 pr-6 flex gap-1.5 xl:gap-2 flex-nowrap items-end flex-1 overflow-x-auto xl:overflow-visible">
+            <DateRangeFilter label="DATE" dateRange={dateRange} onChange={setDateRange} widthClass="w-[125px] xl:w-[135px]" />
+            <MultiSelect label="Week" options={uniqueWeeks} selected={filterWeeks} onChange={setFilterWeeks} widthClass="w-[82px] xl:w-[90px]" />
+            <MultiSelect label="Portfolio" options={uniquePortfolios} selected={filterPortfolios} onChange={setFilterPortfolios} widthClass="w-[90px] xl:w-[100px]" />
             {/* HERO HIGHLIGHTED EVENT FILTER */}
             <MultiSelect 
               label="Event" 
@@ -2085,15 +2169,25 @@ export default function App() {
                 }
               }} 
               isHero={true} 
-              widthClass="w-[155px] xl:w-[185px]" 
+              widthClass="w-[145px] xl:w-[170px]" 
             />
-            <MultiSelect label="Event Type" options={uniqueEventTypes} selected={filterEventTypes} onChange={setFilterEventTypes} widthClass="w-[110px] xl:w-[120px]" />
-            <MultiSelect label="Funnel Stage" options={uniquePhases} selected={filterPhases} onChange={setFilterPhases} widthClass="w-[110px] xl:w-[120px]" />
-            <MultiSelect label="Channel" options={uniqueChannels} selected={filterChannels} onChange={setFilterChannels} widthClass="w-[110px] xl:w-[120px]" />
-            <MultiSelect label="Market" options={uniqueMarkets} selected={filterMarkets} onChange={setFilterMarkets} widthClass="w-[145px] xl:w-[170px]" />
+            <MultiSelect label="Event Type" options={uniqueEventTypes} selected={filterEventTypes} onChange={setFilterEventTypes} widthClass="w-[94px] xl:w-[104px]" />
+            <MultiSelect label="Funnel Stage" options={uniquePhases} selected={filterPhases} onChange={setFilterPhases} widthClass="w-[96px] xl:w-[106px]" />
+            <MultiSelect label="Channel" options={uniqueChannels} selected={filterChannels} onChange={setFilterChannels} widthClass="w-[90px] xl:w-[98px]" />
+            <MultiSelect label="Market" options={uniqueMarkets} selected={filterMarkets} onChange={setFilterMarkets} widthClass="w-[112px] xl:w-[128px]" />
+            {/* BUSINESS DIMENSION FILTER - PUSHED TO THE VERY LAST */}
+            <MultiSelect 
+              label="Business" 
+              options={uniqueBusinesses} 
+              selected={filterBusinesses} 
+              onChange={setFilterBusinesses} 
+              widthClass="w-[86px] xl:w-[94px]" 
+              singleSelect={true}
+              alignRight={true}
+            />
             
             <div className="ml-auto shrink-0 flex items-end">
-              <button onClick={resetFilters} title="Reset Filters" className="h-[34px] w-[34px] bg-[#cedc28]/10 border border-[#cedc28]/50 text-[#cedc28] rounded-lg hover:bg-[#cedc28]/20 hover:text-white transition-colors flex items-center justify-center"><RefreshCw className="w-4 h-4"/></button>
+              <button onClick={resetFilters} title="Reset Filters" className="h-[30px] w-[30px] bg-[#cedc28]/10 border border-[#cedc28]/50 text-[#cedc28] rounded-lg hover:bg-[#cedc28]/20 hover:text-white transition-colors flex items-center justify-center"><RefreshCw className="w-3.5 h-3.5"/></button>
             </div>
           </div>
         </div>

@@ -31,6 +31,12 @@ import {
 import { getSmtpTransportConfig } from '../lib/healthEmailTransport.mjs';
 import { extractChannelMetrics24h, checkMetricDiscrepancies } from '../lib/metricIntegrity.mjs';
 import {
+  formatHealthAlertEmail,
+  formatHealthResolvedEmail,
+  formatDailyDigestEmail,
+  formatTestEmail
+} from '../lib/healthEmailTemplates.mjs';
+import {
   getWeekIndex,
   getWeekDates,
   formatWeekDateRange,
@@ -168,6 +174,55 @@ function testHealthNotifications() {
   assert(settings.emailRecipients.length === 2, 'Notification settings normalize and deduplicate email recipients');
   assert(settings.emailRecipients[0] === 'admin@example.com', 'Notification recipient addresses are normalized');
   assert(settings.frequency === 'immediate_and_daily', 'Notification settings accept immediate and daily delivery');
+  assert(DEFAULT_HEALTH_NOTIFICATION_SETTINGS.alertDelayMinutes === 5, 'Default alert delay is set to 5 minutes');
+  assert(DEFAULT_HEALTH_NOTIFICATION_SETTINGS.sendResolutionEmail === true, 'Default send resolution email is enabled');
+
+  const customSettings = normalizeHealthNotificationSettings({
+    alertDelayMinutes: 15,
+    sendResolutionEmail: false
+  });
+  assert(customSettings.alertDelayMinutes === 15, 'Accepts custom 15 minute delay');
+  assert(customSettings.sendResolutionEmail === false, 'Accepts disabled resolution email');
+
+  const fallbackSettings = normalizeHealthNotificationSettings({
+    alertDelayMinutes: 999
+  });
+  assert(fallbackSettings.alertDelayMinutes === 5, 'Falls back to default 5 min for invalid delay');
+
+  // Test Rich Email Templates
+  const alertEmail = formatHealthAlertEmail({
+    eventName: 'SMLC 26',
+    kind: 'Actuals',
+    status: 'metric-discrepancy',
+    message: 'Cost dropped',
+    discrepancies: [
+      { channel: 'Google Ads', metric: 'cost', previousValue: 200, currentValue: 150, dropPercent: 25 }
+    ]
+  }, 'https://tahaluf-dashboard.vercel.app');
+  assert(alertEmail.subject.includes('[ALERT]'), 'Alert email subject contains [ALERT]');
+  assert(alertEmail.html.includes('SMLC 26'), 'Alert HTML contains event name');
+  assert(alertEmail.html.includes('Google Ads'), 'Alert HTML contains channel name');
+  assert(alertEmail.html.includes('-25%'), 'Alert HTML contains regression drop');
+  assert(alertEmail.html.includes('Open Health Monitor'), 'Alert HTML contains CTA button');
+
+  const resolutionEmail = formatHealthResolvedEmail({
+    eventName: 'SMLC 26',
+    kind: 'Actuals',
+    status: 'metric-discrepancy'
+  }, '2026-10-26T12:00:00.000Z', 'https://tahaluf-dashboard.vercel.app');
+  assert(resolutionEmail.subject.includes('[RESOLVED]'), 'Resolution email subject contains [RESOLVED]');
+  assert(resolutionEmail.html.includes('Issue Resolved'), 'Resolution HTML contains Issue Resolved');
+  assert(resolutionEmail.html.includes('Healthy &amp; Operational'), 'Resolution HTML confirms healthy status');
+
+  const digestEmail = formatDailyDigestEmail([
+    { eventName: 'GSTS 26', kind: 'Actuals', status: 'missing-data', message: 'No rows' }
+  ], 'https://tahaluf-dashboard.vercel.app');
+  assert(digestEmail.subject.includes('Daily Health Digest'), 'Digest email subject contains Daily Health Digest');
+  assert(digestEmail.html.includes('GSTS 26'), 'Digest HTML contains GSTS 26');
+
+  const testEmail = formatTestEmail('https://tahaluf-dashboard.vercel.app');
+  assert(testEmail.subject.includes('Health Notification Test'), 'Test email subject contains test label');
+  assert(testEmail.html.includes('SMTP Transport verified'), 'Test email confirms SMTP');
 
   let invalidEmailRejected = false;
   try {
@@ -304,6 +359,41 @@ function testEventAndPortfolioLogic() {
   assert(derivePortfolio('SAIF 26') === 'P1', 'SAIF 26 is assigned to Portfolio P1');
   assert(derivePortfolio('KoG 26') === 'P1', 'KoG 26 is assigned to Portfolio P1');
   assert(derivePortfolio('BLACK HAT') === 'P1', 'BLACK HAT is assigned to Portfolio P1');
+}
+
+// -------------------------------------------------------------
+// Testing Business Dimension Derivation & Fallback Logic
+// -------------------------------------------------------------
+function testBusinessDimensionLogic() {
+  console.log('\n--- Testing Business Dimension Derivation & Fallback Logic ---');
+
+  const deriveBusiness = (eventName, campaignName, businessConfig = null) => {
+    const eventBusinessSetting = businessConfig || (eventName?.toUpperCase().includes('KOG') ? 'derive' : 'B2B');
+    if (eventBusinessSetting === 'derive') {
+      if (/\bB2C\b/i.test(campaignName)) return 'B2C';
+      if (/\bB2B\b/i.test(campaignName)) return 'B2B';
+      return 'B2B'; // fallback when not available
+    }
+    if (eventBusinessSetting === 'B2C') return 'B2C';
+    return 'B2B';
+  };
+
+  // Rule 1: All events default to B2B
+  assert(deriveBusiness('SMLC 26', 'Tahaluf | SMLC | Exprom') === 'B2B', 'SMLC defaults to B2B even without campaign tag');
+  assert(deriveBusiness('SMLC 26', 'Tahaluf | B2C | SMLC') === 'B2B', 'SMLC defaults to B2B when configured as B2B');
+  assert(deriveBusiness('SAIF 26', 'Random Campaign') === 'B2B', 'SAIF 26 defaults to B2B');
+  assert(deriveBusiness('GSTS 26', 'Generic') === 'B2B', 'GSTS 26 defaults to B2B');
+
+  // Rule 2: KoG 26 derives from campaign name, falls back to B2B
+  assert(deriveBusiness('KoG 26', 'Tahaluf | B2B | KoG 2026 | Visprom') === 'B2B', 'KoG 26 extracts B2B from campaign name');
+  assert(deriveBusiness('KoG 26', 'Tahaluf | B2C | KoG 2026 | Visprom') === 'B2C', 'KoG 26 extracts B2C from campaign name');
+  assert(deriveBusiness('KoG 26', 'Untagged Campaign Name') === 'B2B', 'KoG 26 falls back to B2B when not specified');
+
+  // Rule 3: Event with custom configured business dimension
+  assert(deriveBusiness('Custom Event', 'Generic', 'B2C') === 'B2C', 'Custom event with B2C config returns B2C');
+  assert(deriveBusiness('Custom Event', 'Tahaluf | B2C | Exp', 'derive') === 'B2C', 'Custom event with derive config extracts B2C');
+  assert(deriveBusiness('Custom Event', 'Tahaluf | B2B | Exp', 'derive') === 'B2B', 'Custom event with derive config extracts B2B');
+  assert(deriveBusiness('Custom Event', 'Untagged', 'derive') === 'B2B', 'Custom event with derive config falls back to B2B');
 }
 
 // -------------------------------------------------------------
@@ -785,6 +875,7 @@ async function runAllTests() {
   testHealthNotifications();
   testHealthIssueHistory();
   testEventAndPortfolioLogic();
+  testBusinessDimensionLogic();
   testDynamicWeekLogic();
   testDetailedDateFilterLogic();
   await testLastKnownGoodSheetCache();
