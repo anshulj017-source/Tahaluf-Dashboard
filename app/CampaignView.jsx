@@ -648,7 +648,7 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
           <h3 className="text-2xl font-anton uppercase text-[#eef7f5] flex items-center gap-3 mb-2">
             <Activity className="text-[#cedc28]" /> Event Comparison (Relative Timeline)
           </h3>
-          <p className="text-xs text-[#14a6d9] mb-8 font-bold tracking-wider">COMPARING DAILY TRAJECTORIES FROM DAY 1 OF EACH EVENT'S LAUNCH</p>
+          <p className="text-xs text-[#14a6d9] mb-8 font-bold tracking-wider">COMPARING DAILY TRAJECTORIES FROM DAY 1 OF EACH EVENT&apos;S LAUNCH</p>
           
           <div className="flex justify-between items-center mb-6">
             <div className="flex bg-[#0a2442] rounded-lg p-1 border border-[#cedc28]/20 overflow-x-auto custom-scrollbar">

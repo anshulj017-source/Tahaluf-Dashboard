@@ -1976,7 +1976,7 @@ export default function EventsAdmin({ currentUserEmail = 'admin@tahaluf.com', in
             </div>
             <h3 className="text-base font-bold text-white mb-1">Remove Event?</h3>
             <p className="text-xs text-gray-400 mb-5">
-              Are you sure you want to remove <strong className="text-white">"{confirmDeleteEvent.name}"</strong>? 
+              Are you sure you want to remove <strong className="text-white">&ldquo;{confirmDeleteEvent.name}&rdquo;</strong>? 
               A version snapshot will be created and this can be undone at any time.
             </p>
             <div className="flex gap-2">
@@ -2037,7 +2037,7 @@ export default function EventsAdmin({ currentUserEmail = 'admin@tahaluf.com', in
             </div>
             <h3 className="text-base font-bold text-white mb-1">Promote to Public Active?</h3>
             <p className="text-xs text-gray-300 mb-5 leading-relaxed">
-              Are you sure you want to promote <strong className="text-white">"{confirmPromoteEvent.name}"</strong>? 
+              Are you sure you want to promote <strong className="text-white">&ldquo;{confirmPromoteEvent.name}&rdquo;</strong>? 
               It will immediately become visible to all standard users in Portfolio <strong className="text-[#cedc28]">{confirmPromoteEvent.portfolio || 'P1'}</strong>. A version snapshot will be created automatically.
             </p>
             <div className="flex gap-2">

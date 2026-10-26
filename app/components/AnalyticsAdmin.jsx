@@ -460,7 +460,7 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
           <div className="absolute top-0 right-0 w-20 h-20 bg-purple-400/10 rounded-full blur-xl -mr-6 -mt-6"></div>
           <div className="flex justify-between items-start relative z-10">
             <div>
-              <p className="text-[10px] font-bold text-purple-300 uppercase tracking-wider mb-1">13" Screen Baseline</p>
+              <p className="text-[10px] font-bold text-purple-300 uppercase tracking-wider mb-1">13&quot; Screen Baseline</p>
               <h3 className="text-2xl font-black text-white">58% Share</h3>
               <p className="text-[10px] text-gray-400 mt-1 flex items-center gap-1">
                 <Laptop className="w-3 h-3 text-purple-300" /> 1440x900 viewport
@@ -1058,7 +1058,7 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
                   <Monitor className="w-5 h-5 text-purple-400" />
                   <h4 className="text-sm font-bold text-white uppercase tracking-wider">Screen Resolution Distribution</h4>
                 </div>
-                <span className="text-xs text-purple-400 font-mono">13" Laptop = Baseline</span>
+                <span className="text-xs text-purple-400 font-mono">13&quot; Laptop = Baseline</span>
               </div>
 
               <div className="space-y-3">

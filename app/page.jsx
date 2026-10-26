@@ -130,7 +130,7 @@ const MultiSelect = ({ label, options, selected, onChange, widthClass, isHero = 
 
   // Reset optimistic state when props update
   useEffect(() => {
-    setOptimisticSelected(null);
+    setOptimisticSelected(prev => (prev !== null ? null : prev));
   }, [selected]);
 
   const activeSelected = optimisticSelected || selected;
@@ -245,7 +245,7 @@ const DataTable = ({ title, data, columns, totals, onRowClick, selectedRowId, ro
 
   useEffect(() => {
     // If the columns change (e.g., dynamic KoG columns injected), default back to showing all
-    setSelectedLabels(['All']);
+    setSelectedLabels(prev => (prev.length === 1 && prev[0] === 'All' ? prev : ['All']));
   }, [columns.length]);
   
   const activeColumns = allowColumnSelect 
@@ -2403,7 +2403,7 @@ export default function App() {
               <div className="flex items-center gap-2.5">
                 <Shield className="w-4 h-4 text-purple-400 animate-pulse flex-shrink-0" />
                 <span>
-                  <strong>Admin Staging Mode:</strong> You are viewing live numbers for <em>"{selectedEvent}"</em>. This event is strictly hidden from regular dashboard users until promoted to Public Active.
+                  <strong>Admin Staging Mode:</strong> You are viewing live numbers for <em>&ldquo;{selectedEvent}&rdquo;</em>. This event is strictly hidden from regular dashboard users until promoted to Public Active.
                 </span>
               </div>
               <span className="px-2 py-0.5 rounded text-[9px] font-extrabold uppercase bg-purple-500/25 text-purple-300 border border-purple-500/40 flex-shrink-0">

@@ -364,11 +364,9 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
   };
 
 
-  if (!channelStats || channelStats.length === 0) return <div className="text-white p-8">No channel data available.</div>;
-
-  // AI Insights data
+  // AI Insights data (Hook must be declared before any conditional return)
   const aiInsights = useMemo(() => {
-    if (activeChannels.length === 0 || channelStats.length === 0) return null;
+    if (!channelStats || activeChannels.length === 0 || channelStats.length === 0) return null;
     const selectedData = channelStats.filter(c => activeChannels.includes(c.channel));
     if (selectedData.length === 0) return null;
     
@@ -388,6 +386,8 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
 
     return { totalSpend, totalImpressions, totalClicks, totalPurchases, totalCTR, totalCPC, topBySpend, topByImp, topByConv, lowestCPM, highestCTR };
   }, [activeChannels, channelStats, exRate]);
+
+  if (!channelStats || channelStats.length === 0) return <div className="text-white p-8">No channel data available.</div>;
 
   return (
     <div className="space-y-8 animate-[fadeIn_0.5s_ease-out]">

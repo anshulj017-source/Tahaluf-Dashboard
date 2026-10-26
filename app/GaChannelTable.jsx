@@ -175,7 +175,7 @@ export const GaChannelTable = ({ rawData, formatShort }) => {
       });
       return obj;
     });
-  }, [modalOpen, rawData, modalChannels, trendTimeframe, trendMetric]);
+  }, [modalOpen, rawData, modalChannels, trendTimeframe, trendMetric, viewBy]);
 
   const COLORS = ['#cedc28', '#eef7f5', '#14a6d9', '#00937b', '#EF4444', '#10B981', '#cedc28', '#14a6d9'];
 

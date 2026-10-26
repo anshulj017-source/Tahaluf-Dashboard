@@ -63,18 +63,22 @@ export default function DetailedDateFilter({
 
   // Sync draft when external dateRange prop changes
   useEffect(() => {
-    setDraftStart(dateRange.start || '');
-    setDraftEnd(dateRange.end || '');
-    setDraftPreset(dateRange.preset || (dateRange.start ? 'custom' : 'auto'));
+    const nextStart = dateRange?.start || '';
+    const nextEnd = dateRange?.end || '';
+    const nextPreset = dateRange?.preset || (nextStart ? 'custom' : 'auto');
 
-    if (dateRange.start) {
-      const d = new Date(dateRange.start);
+    setDraftStart(prev => (prev !== nextStart ? nextStart : prev));
+    setDraftEnd(prev => (prev !== nextEnd ? nextEnd : prev));
+    setDraftPreset(prev => (prev !== nextPreset ? nextPreset : prev));
+
+    if (nextStart) {
+      const d = new Date(nextStart);
       if (!isNaN(d.getTime())) {
         setCalYear(d.getFullYear());
         setCalMonth(d.getMonth());
       }
     }
-  }, [dateRange]);
+  }, [dateRange?.start, dateRange?.end, dateRange?.preset]);
 
   // Handle Preset Selection
   const handleSelectPreset = (presetId) => {

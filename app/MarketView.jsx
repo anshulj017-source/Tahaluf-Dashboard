@@ -384,11 +384,9 @@ export default function MarketView({ adData, gaData, exRate = 1, exSym = '$', fo
     return null;
   };
 
-  if (!marketStats || marketStats.length === 0) return <div className="text-white p-8">No market data available.</div>;
-
-  // AI Insights data
+  // AI Insights data (Hook must be declared before any conditional return)
   const aiInsights = useMemo(() => {
-    if (selectedMarkets.length === 0 || marketStats.length === 0) return null;
+    if (!marketStats || selectedMarkets.length === 0 || marketStats.length === 0) return null;
     const selectedData = marketStats.filter(m => selectedMarkets.includes(m.country));
     if (selectedData.length === 0) return null;
     
@@ -408,6 +406,8 @@ export default function MarketView({ adData, gaData, exRate = 1, exSym = '$', fo
 
     return { totalSpend, totalImpressions, totalClicks, totalPurchases, totalCTR, totalCPC, topBySpend, topByImp, topByConv, lowestCPM, highestCTR };
   }, [selectedMarkets, marketStats, exRate]);
+
+  if (!marketStats || marketStats.length === 0) return <div className="text-white p-8">No market data available.</div>;
 
   return (
     <div className="space-y-8 animate-[fadeIn_0.5s_ease-out]">
