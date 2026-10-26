@@ -25,11 +25,13 @@ export async function POST(req) {
     const vercelCountry = req.headers.get('x-vercel-ip-country');
     const vercelCity = req.headers.get('x-vercel-ip-city');
     const vercelRegion = req.headers.get('x-vercel-ip-country-region');
+    const vercelTimezone = req.headers.get('x-vercel-ip-timezone');
 
     // Prefer edge headers, fallback to client-supplied or defaults
     const country = vercelCountry || body.geo?.country || 'SA';
     const city = vercelCity ? decodeURIComponent(vercelCity) : (body.geo?.city || (country === 'SA' ? 'Riyadh' : 'Dubai'));
     const region = vercelRegion || body.geo?.region || '';
+    const timezone = vercelTimezone || body.geo?.timezone || (country === 'AE' ? 'Asia/Dubai' : country === 'GB' ? 'Europe/London' : country === 'US' ? 'America/New_York' : 'Asia/Riyadh');
 
     const rawTab = (body.tab || 'summary').toLowerCase().trim();
     const tab = rawTab === 'overview' ? 'summary' : rawTab;
@@ -49,6 +51,7 @@ export async function POST(req) {
         country,
         city,
         region,
+        timezone,
       },
       userAgent: req.headers.get('user-agent') || '',
       timestamp: body.timestamp || new Date().toISOString(),

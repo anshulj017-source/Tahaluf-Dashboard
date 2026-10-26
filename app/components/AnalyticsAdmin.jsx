@@ -25,6 +25,7 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
   const [actionFeedback, setActionFeedback] = useState(null);
   const [userFilter, setUserFilter] = useState('non_admin'); // 'non_admin' (default) | 'all' | 'admin_only'
   const [selectedUserEmail, setSelectedUserEmail] = useState('');
+  const [activityLimit, setActivityLimit] = useState(25); // 10 | 25 | 50 | 100
 
   const fetchAnalytics = async (silent = false) => {
     if (!silent) setIsRefreshing(true);
@@ -182,6 +183,39 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
     if (diffMin < 60) return `${diffMin}m ago`;
     if (diffHr < 24) return `${diffHr}h ago`;
     return `${diffDays}d ago`;
+  };
+
+  const formatEventLocalTime = (isoString, timezone) => {
+    if (!isoString) return { timeStr: '', tzShort: '', tzFull: '' };
+    try {
+      const d = new Date(isoString);
+      const tz = timezone || 'Asia/Riyadh';
+      const timeStr = d.toLocaleTimeString('en-US', {
+        timeZone: tz,
+        hour: 'numeric',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true,
+      });
+
+      const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: tz,
+        timeZoneName: 'short',
+      }).formatToParts(d);
+      const tzShort = parts.find(p => p.type === 'timeZoneName')?.value || 'AST';
+
+      return {
+        timeStr,
+        tzShort,
+        tzFull: tz,
+      };
+    } catch {
+      return {
+        timeStr: new Date(isoString).toLocaleTimeString(),
+        tzShort: 'Local',
+        tzFull: 'Local',
+      };
+    }
   };
 
   const formatDurationSec = (sec = 0) => {
@@ -1326,9 +1360,11 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
                             {formatDurationSec(u.avgDwellSec || 120)}
                           </td>
                           <td className="py-3 px-4">
-                            <div className="text-gray-300 font-medium">{formatRelativeTime(u.lastActive)}</div>
-                            <div className="text-[10px] text-gray-500 font-mono">
-                              {new Date(u.lastActive).toLocaleDateString()}
+                            <div className="text-white font-medium">{formatRelativeTime(u.lastActive)}</div>
+                            <div className="text-[10px] text-gray-400 font-mono flex items-center gap-1 mt-0.5">
+                              <span>{new Date(u.lastActive).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                              <span>•</span>
+                              <span>{new Date(u.lastActive).toLocaleDateString()}</span>
                             </div>
                           </td>
                           <td className="py-3 px-4">
@@ -1355,8 +1391,8 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
 
       {/* PERSISTENT REAL-TIME TELEMETRY STREAM TICKER */}
       <div className="card-surface p-5 rounded-2xl border border-gray-800 shadow-lg">
-        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-          <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-3 pb-3 border-b border-gray-800/80">
+          <div className="flex flex-wrap items-center gap-2.5">
             <Activity className="w-4 h-4 text-[#cedc28]" />
             <h4 className="text-xs font-bold text-white tracking-wide uppercase">Real-Time Telemetry Stream</h4>
             <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#14a6d9]/10 text-[#14a6d9] border border-[#14a6d9]/30 font-medium">
@@ -1369,17 +1405,38 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
                 : 'Scope: All Users'}
             </span>
           </div>
-          <span className="flex items-center gap-1.5 text-[11px] text-[#cedc28] font-bold">
-            <span className="w-2 h-2 rounded-full bg-[#cedc28] animate-ping"></span>
-            Live Stream: Active (Auto-sync 6s)
-          </span>
+
+          <div className="flex items-center gap-3">
+            {/* Limit Selector */}
+            <div className="flex items-center gap-1.5 bg-[#071322] px-2.5 py-1 rounded-xl border border-gray-800">
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Show:</span>
+              {[10, 25, 50, 100].map((cnt) => (
+                <button
+                  key={cnt}
+                  onClick={() => setActivityLimit(cnt)}
+                  className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${
+                    activityLimit === cnt
+                      ? 'bg-[#cedc28] text-[#0a2442] shadow-[0_0_8px_rgba(206,220,40,0.3)]'
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  {cnt === 100 ? 'All' : cnt}
+                </button>
+              ))}
+            </div>
+
+            <span className="flex items-center gap-1.5 text-[11px] text-[#cedc28] font-bold">
+              <span className="w-2 h-2 rounded-full bg-[#cedc28] animate-ping"></span>
+              Live Sync (6s)
+            </span>
+          </div>
         </div>
 
-        <div className="divide-y divide-gray-850 max-h-72 overflow-y-auto">
+        <div className="divide-y divide-gray-850 max-h-96 overflow-y-auto pr-1">
           {recentActivity.length === 0 ? (
-            <div className="py-4 text-center text-xs text-gray-500">No live telemetry events recorded yet.</div>
+            <div className="py-8 text-center text-xs text-gray-500">No live telemetry events recorded yet.</div>
           ) : (
-            recentActivity.slice(0, 10).map((act) => {
+            recentActivity.slice(0, activityLimit).map((act) => {
               const rawTab = (act.tab || '').toLowerCase();
               const tabName = rawTab === 'summary' || rawTab === 'overview' ? 'Overview' : (data?.tabLabels?.[rawTab] || act.tab || 'Dashboard');
 
@@ -1417,11 +1474,13 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
                 narrative = { action: 'reverted optimization', target: act.details?.title || act.actionId, color: 'text-rose-400' };
               }
 
+              const localTime = formatEventLocalTime(act.timestamp, act.geo?.timezone);
+
               return (
-                <div key={act.id} className="py-2 flex items-center justify-between text-xs hover:bg-white/[0.02] px-2 rounded-lg transition-colors">
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-sm">{act.geo?.flag || '🌐'}</span>
-                    <div>
+                <div key={act.id} className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs hover:bg-white/[0.02] px-2.5 rounded-lg transition-colors">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="text-sm shrink-0">{act.geo?.flag || '🌐'}</span>
+                    <div className="truncate">
                       <span className="font-bold text-white">{act.userEmail}</span>
                       <span className="text-gray-400 ml-1.5">{narrative.action}</span>
                       <span className={`ml-1.5 font-bold ${narrative.color}`}>{narrative.target}</span>
@@ -1433,15 +1492,35 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3 text-gray-500 font-mono text-[10px] shrink-0">
-                    <span>{act.geo?.city ? `${act.geo.city}, ` : ''}{act.geo?.country}</span>
+                  <div className="flex items-center gap-2.5 text-gray-400 font-mono text-[10px] shrink-0 sm:self-center self-end">
+                    <span className="text-gray-300 font-medium">
+                      {act.geo?.city ? `${act.geo.city}, ` : ''}{act.geo?.country || 'SA'}
+                    </span>
                     <span>•</span>
-                    <span>{formatRelativeTime(act.timestamp)}</span>
+                    <span 
+                      className="px-2 py-0.5 rounded-md bg-[#0a2442] border border-[#14a6d9]/30 text-[#14a6d9] font-bold tracking-tight"
+                      title={`Viewed at ${localTime.timeStr} ${localTime.tzShort} (${localTime.tzFull}) at visitor location (${act.geo?.city || ''}, ${act.geo?.country || ''})`}
+                    >
+                      {localTime.timeStr} {localTime.tzShort}
+                    </span>
+                    <span>•</span>
+                    <span className="text-emerald-400 font-bold whitespace-nowrap">
+                      {formatRelativeTime(act.timestamp)}
+                    </span>
                   </div>
                 </div>
               );
             })
           )}
+        </div>
+
+        {/* Stream footer indicator */}
+        <div className="mt-3 pt-2.5 border-t border-gray-800/80 flex flex-wrap items-center justify-between gap-2 text-[10px] text-gray-500 font-mono">
+          <div className="flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+            <span>Showing {Math.min(activityLimit, recentActivity.length)} of {recentActivity.length} recent telemetry events</span>
+          </div>
+          <span className="text-gray-400">Time displayed is the visitor's local view time & timezone at location of view</span>
         </div>
       </div>
     </div>

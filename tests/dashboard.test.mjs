@@ -1046,6 +1046,7 @@ async function testAnalyticsApi() {
     assert(adminJson.userCounts?.activeFilter === 'non_admin', 'Default userRoleFilter is non_admin');
     assert(adminJson.users.every(u => u.role !== 'admin' && !u.email.includes('admin@')), 'Default analytics response filters out admins from user table');
     assert(adminJson.recentActivity.every(a => a.userRole !== 'admin' && !a.userEmail.includes('admin@')), 'Default analytics response filters out admins from recent activity stream');
+    assert(adminJson.recentActivity.some(a => Boolean(a.geo?.timezone)), 'Recent activity entries contain geo timezone information');
 
     // Test GET Admin Analytics with userRoleFilter=all
     const allUsersRes = await fetch(`${adminAnalyticsUrl}?userRoleFilter=all&email=admin@tahaluf.com`);
