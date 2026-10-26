@@ -29,6 +29,24 @@ function getEventDataStats(source, health) {
   const eventRows = eventMatches.reduce((sum, [, stats]) => sum + stats.rows, 0);
   const dates = eventMatches.flatMap(([, stats]) => [stats.firstDate, stats.lastDate]).filter(Boolean).sort();
 
+  const candidatesList = [source.eventName, source.sourceName]
+    .filter(Boolean)
+    .flatMap(name => name.split(/[\/&]+/))
+    .map(name => name.toLowerCase().replace(/[^a-z0-9]/g, ''))
+    .filter(name => name.length > 2);
+
+  const eventChannelMetrics = (health.channelMetrics24h || []).filter(item => {
+    if (!item.eventName || item.eventName === 'Unknown') return true;
+    const itemNorm = item.eventName.toLowerCase().replace(/[^a-z0-9]/g, '');
+    return candidatesList.some(c => itemNorm.includes(c) || c.includes(itemNorm));
+  });
+
+  const eventDiscrepancies = (health.metricDiscrepancies || []).filter(item => {
+    if (!item.eventName || item.eventName === 'Unknown') return true;
+    const itemNorm = item.eventName.toLowerCase().replace(/[^a-z0-9]/g, '');
+    return candidatesList.some(c => itemNorm.includes(c) || c.includes(itemNorm));
+  });
+
   return {
     eventDataStatus: source.kind !== 'Actuals'
       ? (health.rowCount > 0 ? 'unverified' : 'missing')
@@ -43,7 +61,10 @@ function getEventDataStats(source, health) {
     lastDataDate: source.kind !== 'Actuals'
       ? health.lastDate || null
       : dates.at(-1) || (eventMatches.length === 0 && !health.eventColumn ? health.lastDate || null : null),
-    eventNames: eventMatches.map(([name]) => name)
+    eventNames: eventMatches.map(([name]) => name),
+    channelMetrics24h: eventChannelMetrics,
+    metricDiscrepancies: eventDiscrepancies,
+    latest24hDate: health.latest24hDate || null
   };
 }
 

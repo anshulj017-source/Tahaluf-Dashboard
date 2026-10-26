@@ -29,6 +29,7 @@ import {
   MAX_HEALTH_HISTORY
 } from '../lib/healthNotificationUtils.mjs';
 import { getSmtpTransportConfig } from '../lib/healthEmailTransport.mjs';
+import { extractChannelMetrics24h, checkMetricDiscrepancies } from '../lib/metricIntegrity.mjs';
 import {
   getWeekIndex,
   getWeekDates,
@@ -203,6 +204,72 @@ function testHealthNotifications() {
     missingSmtpSettingsRejected = true;
   }
   assert(missingSmtpSettingsRejected, 'SMTP transport rejects missing credentials');
+}
+
+// -------------------------------------------------------------
+// Testing 24h Channel Metric Integrity & Monotonicity
+// -------------------------------------------------------------
+function test24hMetricIntegrity() {
+  console.log('\n--- Testing 24h Metric Integrity & Monotonicity ---');
+
+  const csvData = [
+    'Event Name DB,Channel,Date,Cost,Impressions,Clicks,Conversions',
+    'SMLC 26,Google Ads,2026-10-24,150,4000,100,10',
+    'SMLC 26,Google Ads,2026-10-25,200,5000,120,15',
+    'SMLC 26,Meta,2026-10-25,350,12000,300,25'
+  ].join('\n');
+
+  const { latestDate, channelMetrics } = extractChannelMetrics24h(csvData);
+  assert(latestDate === '2026-10-25', 'Latest 24h date is correctly identified as 2026-10-25');
+  assert(channelMetrics.length === 2, 'Extracts metrics for both channels on latest date');
+
+  const googleMetrics = channelMetrics.find(c => c.channel === 'Google Ads');
+  assert(googleMetrics?.cost === 200, 'Google Ads cost is 200');
+  assert(googleMetrics?.impressions === 5000, 'Google Ads impressions is 5000');
+  assert(googleMetrics?.clicks === 120, 'Google Ads clicks is 120');
+  assert(googleMetrics?.conversions === 15, 'Google Ads conversions is 15');
+
+  // Test 1: Monotonic growth (cost increases to 250) -> No discrepancy
+  const baseline1 = {
+    'SMLC 26:::Google Ads:::2026-10-25': { cost: 200, impressions: 5000, clicks: 120, conversions: 15 }
+  };
+  const current1 = [
+    { eventName: 'SMLC 26', channel: 'Google Ads', date: '2026-10-25', cost: 250, impressions: 5500, clicks: 130, conversions: 16 }
+  ];
+  const check1 = checkMetricDiscrepancies(current1, baseline1);
+  assert(check1.discrepancies.length === 0, 'No discrepancy when metrics grow or stay flat');
+  assert(check1.updatedBaselines['SMLC 26:::Google Ads:::2026-10-25'].cost === 250, 'Baseline advances to higher value');
+
+  // Test 2: Regression drop (cost drops from 200 to 150) -> Discrepancy flagged!
+  const current2 = [
+    { eventName: 'SMLC 26', channel: 'Google Ads', date: '2026-10-25', cost: 150, impressions: 5000, clicks: 120, conversions: 15 }
+  ];
+  const check2 = checkMetricDiscrepancies(current2, baseline1);
+  assert(check2.discrepancies.length === 1, 'Regression drop flags discrepancy');
+  assert(check2.discrepancies[0].metric === 'cost', 'Discrepancy correctly identifies cost');
+  assert(check2.discrepancies[0].dropAmount === 50, 'Discrepancy drop amount is $50');
+  assert(check2.discrepancies[0].dropPercent === 25, 'Discrepancy drop percent is 25%');
+
+  // Test 3: Micro-drop within tolerance (cost drops by $0.01) -> Ignored
+  const current3 = [
+    { eventName: 'SMLC 26', channel: 'Google Ads', date: '2026-10-25', cost: 199.99, impressions: 5000, clicks: 120, conversions: 15 }
+  ];
+  const check3 = checkMetricDiscrepancies(current3, baseline1);
+  assert(check3.discrepancies.length === 0, 'Micro-drop within tolerance is safely ignored');
+
+  // Test 4: Health issue detection for metric discrepancy
+  const healthIssues = getHealthIssues([
+    {
+      eventId: 'smlc-26',
+      eventName: 'SMLC 26',
+      kind: 'Actuals',
+      state: 'healthy',
+      eventDataStatus: 'present',
+      metricDiscrepancies: check2.discrepancies
+    }
+  ]);
+  assert(healthIssues.length === 1, 'Health issues include metric discrepancy alert');
+  assert(healthIssues[0].status === 'metric-discrepancy', 'Status is metric-discrepancy');
 }
 
 // -------------------------------------------------------------
@@ -723,6 +790,7 @@ async function runAllTests() {
   await testLastKnownGoodSheetCache();
   await testFirestoreChunkBatching();
   testCreativeViewLogic();
+  test24hMetricIntegrity();
 
   // Check if local dev server is running before attempting API integration tests
   try {
