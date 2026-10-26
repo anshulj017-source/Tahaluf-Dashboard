@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "test": "node tests/dashboard.test.mjs",
-    "prepublish-check": "node tests/dashboard.test.mjs && next build"
+    "prepublish-check": "node tests/dashboard.test.mjs && next build",
+    "backup": "bash scripts/backup-to-mirror.sh",
+    "setup-hooks": "cp scripts/pre-push.sh .git/hooks/pre-push && chmod +x .git/hooks/pre-push"
   },
   "dependencies": {
     "@clerk/themes": "^2.0.0",

@@ -7,6 +7,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 ## Project Quick Links
 - **Live Dashboard**: https://tahaluf-dashboard.vercel.app
 - **GitHub Repository**: https://github.com/anshulj017-source/Tahaluf-Dashboard
+- **Backup Repository**: https://github.com/itsjohn9-cell/backupdashboard
 - **Local Development URL**: http://localhost:3000
 
 ## Mandatory Testing & Publishing Protocol
@@ -20,3 +21,11 @@ This version has breaking changes — APIs, conventions, and file structure may 
    npm run prepublish-check
    ```
 4. **Resilient Sheet Caching**: The sheet proxy in `app/api/sheets/route.js` maintains an in-memory 5-minute TTL cache with stale-while-revalidate fallback to ensure massive sheets (SMLC, BIO/CPHI) remain available with sub-50ms response times and zero data loss.
+5. **Automatic Dual-Repository Mirror Backup**:
+   - Every `git push origin main` automatically executes `.git/hooks/pre-push` which invokes `scripts/backup-to-mirror.sh`.
+   - This mirrors the exact commit and environment configuration to the private backup repository:
+     `https://github.com/itsjohn9-cell/backupdashboard`
+   - Manual backup trigger:
+     ```bash
+     npm run backup
+     ```
