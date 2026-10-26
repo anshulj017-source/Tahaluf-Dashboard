@@ -1,11 +1,11 @@
 "use client";
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  Calendar, Clock, Plus, Edit2, Trash2, History, RotateCcw, 
+  Calendar, Clock, Plus, Edit2, Edit3, Trash2, History, RotateCcw, 
   Check, CheckCircle2, XCircle, AlertCircle, Filter, 
-  Download, Upload, Search, Layers, Settings2, RefreshCw, 
+  Download, Upload, Search, Layers, Settings, Settings2, RefreshCw, 
   Copy, Save, FileText, ChevronRight, ChevronDown, X, ArrowUpDown,
-  Shield, Lock, Eye, EyeOff, User
+  Shield, Lock, Eye, EyeOff, User, Code, Sliders
 } from 'lucide-react';
 
 export default function EventsAdmin({ currentUserEmail = 'admin@tahaluf.com', initialEvents = [] }) {
@@ -26,6 +26,10 @@ export default function EventsAdmin({ currentUserEmail = 'admin@tahaluf.com', in
 
   // Modals state
   const [editingEvent, setEditingEvent] = useState(null);
+  const [originalEventId, setOriginalEventId] = useState(null);
+  const [modalTab, setModalTab] = useState('form'); // 'form' | 'json'
+  const [jsonConfigText, setJsonConfigText] = useState('');
+  const [jsonConfigError, setJsonConfigError] = useState(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [expandedVersionId, setExpandedVersionId] = useState(null);
@@ -164,12 +168,123 @@ export default function EventsAdmin({ currentUserEmail = 'admin@tahaluf.com', in
     }
   };
 
+  // Open Full Configuration Editor for an Existing Event
+  const openEditModal = (event) => {
+    const fullEvent = {
+      id: event.id || '',
+      name: event.name || '',
+      sourceName: event.sourceName || '',
+      portfolio: event.portfolio || 'P1',
+      enabled: event.enabled ?? true,
+      status: event.status || (event.enabled ? 'active' : 'inactive'),
+      visibility: event.visibility || (event.status === 'admin_only' ? 'admin_only' : 'public'),
+      sheetType: event.sheetType || 'combined',
+      gid: event.gid || '',
+      plannedGid: event.plannedGid || '',
+      plannedType: event.plannedType || 'standard',
+      launchDate: event.launchDate || '2026-12-01',
+      startDate: event.startDate || '',
+      endDate: event.endDate || '',
+      dateFilterMode: event.dateFilterMode || 'none',
+      eventType: event.eventType || 'Exhibition',
+      description: event.description || '',
+      channelFilters: {
+        meta: event.channelFilters?.meta ?? true,
+        google: event.channelFilters?.google ?? true,
+        linkedin: event.channelFilters?.linkedin ?? true,
+        tiktok: event.channelFilters?.tiktok ?? true,
+        x: event.channelFilters?.x ?? true,
+      },
+      fieldAliases: event.fieldAliases || {},
+      autoPublishDate: event.autoPublishDate || ''
+    };
+    setEditingEvent(fullEvent);
+    setOriginalEventId(event.id);
+    setIsAddingNew(false);
+    setModalTab('form');
+    setJsonConfigText(JSON.stringify(fullEvent, null, 2));
+    setJsonConfigError(null);
+    setSheetValidationResult(null);
+  };
+
+  // Open Full Configuration Editor for a New Event
+  const openAddModal = () => {
+    const newEvent = {
+      id: '',
+      name: '',
+      sourceName: '',
+      portfolio: 'P1',
+      enabled: true,
+      status: 'admin_only',
+      visibility: 'admin_only',
+      sheetType: 'combined',
+      gid: '',
+      plannedGid: '',
+      plannedType: 'standard',
+      launchDate: '2026-12-01',
+      startDate: '',
+      endDate: '',
+      dateFilterMode: 'none',
+      eventType: 'Exhibition',
+      description: '',
+      channelFilters: { meta: true, google: true, linkedin: true, tiktok: true, x: true },
+      fieldAliases: {},
+      autoPublishDate: ''
+    };
+    setEditingEvent(newEvent);
+    setOriginalEventId(null);
+    setIsAddingNew(true);
+    setModalTab('form');
+    setJsonConfigText(JSON.stringify(newEvent, null, 2));
+    setJsonConfigError(null);
+    setSheetValidationResult(null);
+  };
+
+  // Switch between Visual Form tab and Raw JSON Config tab
+  const handleSwitchTab = (tab) => {
+    if (tab === 'json') {
+      setJsonConfigText(JSON.stringify(editingEvent, null, 2));
+      setJsonConfigError(null);
+    } else if (tab === 'form') {
+      if (jsonConfigText) {
+        try {
+          const parsed = JSON.parse(jsonConfigText);
+          if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+            throw new Error('Configuration must be a valid JSON object');
+          }
+          setEditingEvent(parsed);
+          setJsonConfigError(null);
+        } catch (err) {
+          setJsonConfigError(`Invalid JSON: ${err.message}`);
+          return;
+        }
+      }
+    }
+    setModalTab(tab);
+  };
+
   // 3. Save Add / Edit Event
   const handleSaveEvent = async (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     if (!editingEvent) return;
 
-    if (!editingEvent.name || !editingEvent.name.trim()) {
+    let targetEventObj = { ...editingEvent };
+
+    // If currently on JSON tab, validate & parse latest JSON text
+    if (modalTab === 'json') {
+      try {
+        const parsed = JSON.parse(jsonConfigText);
+        if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+          throw new Error('Configuration must be a JSON object');
+        }
+        targetEventObj = parsed;
+      } catch (err) {
+        setJsonConfigError(`Cannot save: Invalid JSON (${err.message})`);
+        return;
+      }
+    }
+
+    if (!targetEventObj.name || !targetEventObj.name.trim()) {
       alert('Event name is required');
       return;
     }
@@ -178,26 +293,27 @@ export default function EventsAdmin({ currentUserEmail = 'admin@tahaluf.com', in
     const isNew = isAddingNew;
     let updatedEventsList;
 
-    const finalStatus = editingEvent.status || (editingEvent.enabled ? 'active' : 'inactive');
+    const finalStatus = targetEventObj.status || (targetEventObj.enabled ? 'active' : 'inactive');
     const finalVisibility = finalStatus === 'admin_only' ? 'admin_only' : 'public';
     const finalEnabled = finalStatus !== 'inactive';
 
     const cleanEventObj = {
-      ...editingEvent,
+      ...targetEventObj,
       status: finalStatus,
       visibility: finalVisibility,
       enabled: finalEnabled
     };
 
     if (isNew) {
-      const newId = editingEvent.id || editingEvent.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      const newId = cleanEventObj.id?.trim() || cleanEventObj.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
       const newEventObj = {
         ...cleanEventObj,
         id: newId
       };
       updatedEventsList = [...events, newEventObj];
     } else {
-      updatedEventsList = events.map(ev => ev.id === editingEvent.id ? cleanEventObj : ev);
+      const targetId = originalEventId || cleanEventObj.id;
+      updatedEventsList = events.map(ev => ev.id === targetId ? cleanEventObj : ev);
     }
 
     try {
@@ -207,7 +323,7 @@ export default function EventsAdmin({ currentUserEmail = 'admin@tahaluf.com', in
         body: JSON.stringify({
           action: 'save',
           events: updatedEventsList,
-          description: isNew ? `Added new event "${editingEvent.name}"` : `Modified settings for "${editingEvent.name}"`,
+          description: isNew ? `Added new event "${cleanEventObj.name}"` : `Modified complete settings for "${cleanEventObj.name}"`,
           author: currentAuthor
         })
       });
@@ -217,8 +333,9 @@ export default function EventsAdmin({ currentUserEmail = 'admin@tahaluf.com', in
       setEvents(data.config.events);
       setHistory(data.history);
       setEditingEvent(null);
+      setOriginalEventId(null);
       setIsAddingNew(false);
-      showNotification(`${editingEvent.name} successfully ${isNew ? 'added' : 'updated'}`);
+      showNotification(`${cleanEventObj.name} successfully ${isNew ? 'added' : 'updated'}`);
     } catch (err) {
       console.error(err);
       setError(`Error saving event: ${err.message}`);
@@ -414,16 +531,28 @@ export default function EventsAdmin({ currentUserEmail = 'admin@tahaluf.com', in
 
   // Duplicate Event Template
   const handleDuplicateEvent = (event) => {
-    setEditingEvent({
+    const dupe = {
       ...event,
       id: `${event.id}-copy`,
       name: `${event.name} (Copy)`,
       description: `Copy of ${event.name}`,
       status: 'admin_only',
       visibility: 'admin_only',
-      enabled: true
-    });
+      enabled: true,
+      channelFilters: {
+        meta: event.channelFilters?.meta ?? true,
+        google: event.channelFilters?.google ?? true,
+        linkedin: event.channelFilters?.linkedin ?? true,
+        tiktok: event.channelFilters?.tiktok ?? true,
+        x: event.channelFilters?.x ?? true,
+      }
+    };
+    setEditingEvent(dupe);
+    setOriginalEventId(null);
     setIsAddingNew(true);
+    setModalTab('form');
+    setJsonConfigText(JSON.stringify(dupe, null, 2));
+    setJsonConfigError(null);
   };
 
   // Filtered Events
@@ -585,29 +714,7 @@ export default function EventsAdmin({ currentUserEmail = 'admin@tahaluf.com', in
 
           {/* Add New Event Button */}
           <button
-            onClick={() => {
-              setEditingEvent({
-                id: '',
-                name: '',
-                sourceName: '',
-                portfolio: 'P1',
-                enabled: true,
-                status: 'admin_only',
-                visibility: 'admin_only',
-                sheetType: 'combined',
-                gid: '',
-                plannedGid: '',
-                plannedType: 'standard',
-                launchDate: '2026-12-01',
-                startDate: '',
-                endDate: '',
-                dateFilterMode: 'none',
-                eventType: 'Exhibition',
-                description: '',
-                channelFilters: { meta: true, google: true, linkedin: true, tiktok: true, x: true }
-              });
-              setIsAddingNew(true);
-            }}
+            onClick={openAddModal}
             className="px-4 py-2 bg-[#cedc28] hover:bg-[#cedc28]/90 text-[#1a302e] rounded-xl text-xs font-extrabold uppercase tracking-wider flex items-center gap-1.5 shadow-[0_0_15px_rgba(206,220,40,0.3)] transition-all"
           >
             <Plus className="w-4 h-4" />
@@ -796,9 +903,16 @@ export default function EventsAdmin({ currentUserEmail = 'admin@tahaluf.com', in
                   </td>
 
                   {/* Event Name & Type */}
-                  <td className="py-3.5 px-4">
+                  <td 
+                    className="py-3.5 px-4 cursor-pointer group"
+                    onClick={() => openEditModal(event)}
+                    title="Click to edit complete configuration for this event"
+                  >
                     <div className="flex items-center gap-2">
-                      <span className="font-bold text-white text-sm">{event.name}</span>
+                      <span className="font-bold text-white text-sm group-hover:text-[#cedc28] group-hover:underline transition-colors flex items-center gap-1.5">
+                        {event.name}
+                        <Edit3 className="w-3.5 h-3.5 text-gray-400 group-hover:text-[#cedc28] transition-colors" />
+                      </span>
                       {isAdminOnly && (
                         <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-purple-500/25 text-purple-300 border border-purple-500/40 inline-flex items-center gap-1">
                           <Lock className="w-2.5 h-2.5 text-purple-400" />
@@ -810,6 +924,14 @@ export default function EventsAdmin({ currentUserEmail = 'admin@tahaluf.com', in
                       <span>Source: <code className="text-[#14a6d9]">{event.sourceName || event.name}</code></span>
                       <span>•</span>
                       <span>{event.eventType || 'Exhibition'}</span>
+                      {event.channelFilters && (
+                        <>
+                          <span>•</span>
+                          <span className="text-gray-500">
+                            {Object.entries(event.channelFilters).filter(([, v]) => v).map(([k]) => k.toUpperCase()).join(' | ')}
+                          </span>
+                        </>
+                      )}
                     </div>
                   </td>
 
@@ -898,14 +1020,12 @@ export default function EventsAdmin({ currentUserEmail = 'admin@tahaluf.com', in
                         <Copy className="w-3.5 h-3.5" />
                       </button>
                       <button
-                        onClick={() => {
-                          setEditingEvent({ ...event });
-                          setIsAddingNew(false);
-                        }}
-                        title="Edit event settings"
-                        className="p-1.5 hover:bg-[#14a6d9]/20 text-[#14a6d9] rounded-lg transition-colors"
+                        onClick={() => openEditModal(event)}
+                        title="Edit complete event configuration"
+                        className="px-2.5 py-1 bg-[#14a6d9]/15 hover:bg-[#14a6d9] text-[#14a6d9] hover:text-white border border-[#14a6d9]/40 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
                       >
                         <Edit2 className="w-3.5 h-3.5" />
+                        <span>Edit</span>
                       </button>
                       <button
                         onClick={() => setConfirmDeleteEvent(event)}
@@ -931,396 +1051,655 @@ export default function EventsAdmin({ currentUserEmail = 'admin@tahaluf.com', in
         </div>
       </div>
 
-      {/* MODAL 1: ADD / EDIT EVENT */}
+      {/* MODAL 1: ADD / EDIT COMPLETE EVENT CONFIGURATION */}
       {editingEvent && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="card-surface max-w-2xl w-full rounded-3xl border border-[#cedc28]/30 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
-            <div className="p-5 border-b border-gray-700/50 flex items-center justify-between">
+          <div className="card-surface max-w-3xl w-full rounded-3xl border border-[#cedc28]/30 shadow-2xl overflow-hidden max-h-[92vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="p-5 border-b border-gray-700/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h3 className="text-lg font-bold text-white uppercase tracking-wider">
-                  {isAddingNew ? 'Add New Event' : `Edit ${editingEvent.name}`}
-                </h3>
-                <p className="text-xs text-[#14a6d9]">Configure sheet parameters, date filters, and portfolio rules</p>
-              </div>
-              <button 
-                onClick={() => setEditingEvent(null)}
-                className="p-2 hover:bg-white/10 rounded-xl text-gray-400 hover:text-white"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveEvent} className="p-6 space-y-4 overflow-y-auto custom-scrollbar flex-1">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Event Display Name */}
-                <div>
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">
-                    Event Display Name *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={editingEvent.name}
-                    onChange={(e) => setEditingEvent({ ...editingEvent, name: e.target.value })}
-                    placeholder="e.g. SMLC 26"
-                    className="w-full bg-[#041628] border border-gray-600/50 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-[#cedc28]/60"
-                  />
-                </div>
-
-                {/* Source Name in Sheet */}
-                <div>
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">
-                    Source Name in DB / Sheet
-                  </label>
-                  <input
-                    type="text"
-                    value={editingEvent.sourceName}
-                    onChange={(e) => setEditingEvent({ ...editingEvent, sourceName: e.target.value })}
-                    placeholder="e.g. SMLC"
-                    className="w-full bg-[#041628] border border-gray-600/50 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-[#cedc28]/60"
-                  />
-                </div>
-
-                {/* Portfolio */}
-                <div>
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">
-                    Portfolio Assignment *
-                  </label>
-                  <select
-                    value={editingEvent.portfolio || 'P1'}
-                    onChange={(e) => setEditingEvent({ ...editingEvent, portfolio: e.target.value })}
-                    className="w-full bg-[#041628] border border-gray-600/50 rounded-xl px-3.5 py-2 text-sm text-white font-bold focus:outline-none focus:border-[#cedc28]/60"
-                  >
-                    <option value="P1">Portfolio P1 (GSTS, SAIF, KoG, Black Hat)</option>
-                    <option value="P3">Portfolio P3 (SMLC, IDWS, BIO, CPHI)</option>
-                    <option value="P2">Portfolio P2</option>
-                  </select>
-                </div>
-
-                {/* Event Type */}
-                <div>
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">
-                    Event Type
-                  </label>
-                  <select
-                    value={editingEvent.eventType || 'Exhibition'}
-                    onChange={(e) => setEditingEvent({ ...editingEvent, eventType: e.target.value })}
-                    className="w-full bg-[#041628] border border-gray-600/50 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-[#cedc28]/60"
-                  >
-                    <option value="Exhibition">Exhibition</option>
-                    <option value="Conference">Conference</option>
-                    <option value="Both">Both (Exhibition & Conference)</option>
-                  </select>
-                </div>
-
-                {/* Actuals Sheet GID */}
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block">
-                      Actuals Sheet GID
-                    </label>
-                    <button
-                      type="button"
-                      onClick={handleValidateSheet}
-                      disabled={validatingSheet}
-                      className="text-[10px] font-bold text-[#14a6d9] hover:text-[#cedc28] flex items-center gap-1 transition-colors"
-                      title="Test connection to Google Sheets and inspect column headers"
-                    >
-                      <RefreshCw className={`w-3 h-3 ${validatingSheet ? 'animate-spin text-[#cedc28]' : ''}`} />
-                      <span>{validatingSheet ? 'Testing Sheet...' : 'Test Connection'}</span>
-                    </button>
-                  </div>
-                  <input
-                    type="text"
-                    value={editingEvent.gid}
-                    onChange={(e) => {
-                      setEditingEvent({ ...editingEvent, gid: e.target.value });
-                      setSheetValidationResult(null);
-                    }}
-                    placeholder="Leave empty for root sheet, or enter GID"
-                    className="w-full bg-[#041628] border border-gray-600/50 rounded-xl px-3.5 py-2 text-sm font-mono text-white focus:outline-none focus:border-[#cedc28]/60"
-                  />
-                  {sheetValidationResult && (
-                    <div className={`mt-2 p-2.5 rounded-xl text-xs border ${
-                      sheetValidationResult.valid 
-                        ? 'bg-[#cedc28]/10 border-[#cedc28]/40 text-gray-200' 
-                        : 'bg-red-500/10 border-red-500/40 text-red-300'
-                    }`}>
-                      {sheetValidationResult.valid ? (
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-1.5 font-bold text-[#cedc28]">
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            <span>Connected: {sheetValidationResult.rowCount.toLocaleString()} rows detected</span>
-                          </div>
-                          <div className="text-[10px] text-gray-300 flex flex-wrap gap-x-3 gap-y-0.5">
-                            <span>Spend: <strong className={sheetValidationResult.hasSpend ? 'text-lime-400' : 'text-amber-400'}>{sheetValidationResult.hasSpend ? '✓ Found' : '⚠ Missing'}</strong></span>
-                            <span>Date: <strong className={sheetValidationResult.hasDate ? 'text-lime-400' : 'text-amber-400'}>{sheetValidationResult.hasDate ? '✓ Found' : '⚠ Missing'}</strong></span>
-                            <span>Clicks: <strong className={sheetValidationResult.hasClicks ? 'text-lime-400' : 'text-amber-400'}>{sheetValidationResult.hasClicks ? '✓ Found' : '⚠ Missing'}</strong></span>
-                          </div>
-                          {sheetValidationResult.sampleEvents?.length > 0 && (
-                            <div className="text-[10px] text-gray-400 mt-1">
-                              Detected event tags: <span className="text-white font-mono">{sheetValidationResult.sampleEvents.join(', ')}</span>
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1.5">
-                          <AlertCircle className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
-                          <span>{sheetValidationResult.error || 'Connection failed'}</span>
-                        </div>
-                      )}
-                    </div>
+                <div className="flex items-center gap-3">
+                  <h3 className="text-lg font-bold text-white uppercase tracking-wider">
+                    {isAddingNew ? 'Add New Event' : `Edit Configuration: ${editingEvent.name || 'Event'}`}
+                  </h3>
+                  {editingEvent.id && (
+                    <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-[#041628] text-gray-400 border border-gray-700">
+                      id: {editingEvent.id}
+                    </span>
                   )}
                 </div>
-
-                {/* Planned Sheet GID */}
-                <div>
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">
-                    Planned Spends Sheet GID (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    value={editingEvent.plannedGid}
-                    onChange={(e) => setEditingEvent({ ...editingEvent, plannedGid: e.target.value })}
-                    placeholder="e.g. 2019892532"
-                    className="w-full bg-[#041628] border border-gray-600/50 rounded-xl px-3.5 py-2 text-sm font-mono text-white focus:outline-none focus:border-[#cedc28]/60"
-                  />
-                </div>
-
-                {/* Date Filter: Start Date */}
-                <div>
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">
-                    Date Filter: Start Date (YYYY-MM-DD)
-                  </label>
-                  <input
-                    type="date"
-                    value={editingEvent.startDate || ''}
-                    onChange={(e) => setEditingEvent({ ...editingEvent, startDate: e.target.value })}
-                    className="w-full bg-[#041628] border border-gray-600/50 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-[#cedc28]/60"
-                  />
-                </div>
-
-                {/* Date Filter: End Date */}
-                <div>
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">
-                    Date Filter: End Date (YYYY-MM-DD)
-                  </label>
-                  <input
-                    type="date"
-                    value={editingEvent.endDate || ''}
-                    onChange={(e) => setEditingEvent({ ...editingEvent, endDate: e.target.value })}
-                    className="w-full bg-[#041628] border border-gray-600/50 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-[#cedc28]/60"
-                  />
-                </div>
-
-                {/* Launch Date for Dynamic Week Countdown */}
-                <div>
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">
-                    Event Launch Date (For W0 Countdown) *
-                  </label>
-                  <input
-                    type="date"
-                    required
-                    value={editingEvent.launchDate || '2026-12-01'}
-                    onChange={(e) => setEditingEvent({ ...editingEvent, launchDate: e.target.value })}
-                    className="w-full bg-[#041628] border border-gray-600/50 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-[#cedc28]/60"
-                  />
-                </div>
-
-                {/* Auto-Publish Go-Live Date */}
-                <div>
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">
-                    Auto-Publish Date (Optional)
-                  </label>
-                  <input
-                    type="date"
-                    value={editingEvent.autoPublishDate || ''}
-                    onChange={(e) => setEditingEvent({ ...editingEvent, autoPublishDate: e.target.value })}
-                    className="w-full bg-[#041628] border border-gray-600/50 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-[#cedc28]/60"
-                  />
-                  <span className="text-[9px] text-gray-400 mt-0.5 block">
-                    Automatically promotes from Staging to Public Active on this date
-                  </span>
-                </div>
-
-                {/* Description */}
-                <div className="sm:col-span-2">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">
-                    Notes / Description
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={editingEvent.description || ''}
-                    onChange={(e) => setEditingEvent({ ...editingEvent, description: e.target.value })}
-                    placeholder="Optional details about this event or specific campaign nuances"
-                    className="w-full bg-[#041628] border border-gray-600/50 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-[#cedc28]/60"
-                  />
-                </div>
-
-                {/* Advanced Column / Alias Mappings */}
-                <div className="sm:col-span-2 p-3.5 bg-[#041628]/80 rounded-xl border border-gray-700/60">
-                  <div className="text-[11px] font-bold text-gray-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                    <Settings2 className="w-3.5 h-3.5 text-[#14a6d9]" />
-                    <span>Custom Column Mappings (Self-Service Aliases)</span>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                    <div>
-                      <label className="text-[9px] font-bold text-gray-400 block mb-1">Spend Column Override</label>
-                      <input
-                        type="text"
-                        value={editingEvent.fieldAliases?.spend || ''}
-                        onChange={(e) => setEditingEvent({
-                          ...editingEvent,
-                          fieldAliases: { ...(editingEvent.fieldAliases || {}), spend: e.target.value }
-                        })}
-                        placeholder="Default (Spend / Cost)"
-                        className="w-full bg-[#0a2442] border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[9px] font-bold text-gray-400 block mb-1">Date Column Override</label>
-                      <input
-                        type="text"
-                        value={editingEvent.fieldAliases?.date || ''}
-                        onChange={(e) => setEditingEvent({
-                          ...editingEvent,
-                          fieldAliases: { ...(editingEvent.fieldAliases || {}), date: e.target.value }
-                        })}
-                        placeholder="Default (Date / Day)"
-                        className="w-full bg-[#0a2442] border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[9px] font-bold text-gray-400 block mb-1">Event Column Override</label>
-                      <input
-                        type="text"
-                        value={editingEvent.fieldAliases?.event || ''}
-                        onChange={(e) => setEditingEvent({
-                          ...editingEvent,
-                          fieldAliases: { ...(editingEvent.fieldAliases || {}), event: e.target.value }
-                        })}
-                        placeholder="Default (Event Name DB)"
-                        className="w-full bg-[#0a2442] border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Event Visibility & Testing Tier */}
-                <div className="sm:col-span-2 space-y-2">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block">
-                    Visibility & Access Tier *
-                  </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                    {/* Option 1: Admin Only (Testing) */}
-                    <button
-                      type="button"
-                      onClick={() => setEditingEvent({ 
-                        ...editingEvent, 
-                        status: 'admin_only', 
-                        visibility: 'admin_only', 
-                        enabled: true 
-                      })}
-                      className={`p-3 rounded-2xl border text-left transition-all relative ${
-                        (editingEvent.status === 'admin_only' || editingEvent.visibility === 'admin_only')
-                          ? 'bg-purple-950/40 border-purple-500 text-white shadow-[0_0_15px_rgba(168,85,247,0.25)]'
-                          : 'bg-[#041628] border-gray-700/60 text-gray-400 hover:border-gray-500'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <div className="flex items-center gap-1.5 font-bold text-xs text-purple-300">
-                          <Shield className="w-3.5 h-3.5 text-purple-400" />
-                          <span>Admin Only</span>
-                        </div>
-                        {(editingEvent.status === 'admin_only' || editingEvent.visibility === 'admin_only') && (
-                          <Check className="w-3.5 h-3.5 text-purple-400" />
-                        )}
-                      </div>
-                      <div className="text-[10px] leading-relaxed text-gray-300">
-                        Isolated staging. Only admins can see & test this event in the live dashboard.
-                      </div>
-                      <div className="mt-2 inline-block text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
-                        Recommended for new
-                      </div>
-                    </button>
-
-                    {/* Option 2: Public Active */}
-                    <button
-                      type="button"
-                      onClick={() => setEditingEvent({ 
-                        ...editingEvent, 
-                        status: 'active', 
-                        visibility: 'public', 
-                        enabled: true 
-                      })}
-                      className={`p-3 rounded-2xl border text-left transition-all relative ${
-                        (editingEvent.status === 'active' || (!editingEvent.status && editingEvent.enabled && editingEvent.visibility !== 'admin_only'))
-                          ? 'bg-[#cedc28]/10 border-[#cedc28] text-white shadow-[0_0_15px_rgba(206,220,40,0.2)]'
-                          : 'bg-[#041628] border-gray-700/60 text-gray-400 hover:border-gray-500'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <div className="flex items-center gap-1.5 font-bold text-xs text-[#cedc28]">
-                          <Eye className="w-3.5 h-3.5 text-[#cedc28]" />
-                          <span>Public Active</span>
-                        </div>
-                        {(editingEvent.status === 'active' || (!editingEvent.status && editingEvent.enabled && editingEvent.visibility !== 'admin_only')) && (
-                          <Check className="w-3.5 h-3.5 text-[#cedc28]" />
-                        )}
-                      </div>
-                      <div className="text-[10px] leading-relaxed text-gray-300">
-                        Live production. Ingested and visible to all authorized dashboard users.
-                      </div>
-                    </button>
-
-                    {/* Option 3: Inactive (Off) */}
-                    <button
-                      type="button"
-                      onClick={() => setEditingEvent({ 
-                        ...editingEvent, 
-                        status: 'inactive', 
-                        visibility: 'public', 
-                        enabled: false 
-                      })}
-                      className={`p-3 rounded-2xl border text-left transition-all relative ${
-                        editingEvent.status === 'inactive' || editingEvent.enabled === false
-                          ? 'bg-gray-800/80 border-gray-500 text-white'
-                          : 'bg-[#041628] border-gray-700/60 text-gray-400 hover:border-gray-500'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <div className="flex items-center gap-1.5 font-bold text-xs text-gray-300">
-                          <EyeOff className="w-3.5 h-3.5 text-gray-400" />
-                          <span>Inactive (Off)</span>
-                        </div>
-                        {(editingEvent.status === 'inactive' || editingEvent.enabled === false) && (
-                          <Check className="w-3.5 h-3.5 text-gray-300" />
-                        )}
-                      </div>
-                      <div className="text-[10px] leading-relaxed text-gray-400">
-                        Completely disabled. Data is not ingested for any user.
-                      </div>
-                    </button>
-                  </div>
-                </div>
+                <p className="text-xs text-[#14a6d9] mt-0.5">
+                  {isAddingNew 
+                    ? 'Define complete parameters for a new event' 
+                    : 'Modify complete parameters, sheet GIDs, dates, channels, and rules'}
+                </p>
               </div>
 
-              <div className="pt-4 border-t border-gray-700/50 flex justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setEditingEvent(null)}
-                  className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl text-xs font-bold uppercase tracking-wider"
+              <div className="flex items-center gap-2 self-end sm:self-auto">
+                {/* View Switcher: Visual Form vs Raw JSON */}
+                <div className="flex bg-[#041628] rounded-xl border border-gray-700 p-0.5 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => handleSwitchTab('form')}
+                    className={`px-3 py-1 rounded-lg font-bold text-[11px] transition-all flex items-center gap-1.5 ${
+                      modalTab === 'form' ? 'bg-[#cedc28] text-[#1a302e]' : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    <Sliders className="w-3.5 h-3.5" />
+                    <span>Form View</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSwitchTab('json')}
+                    className={`px-3 py-1 rounded-lg font-bold text-[11px] transition-all flex items-center gap-1.5 ${
+                      modalTab === 'json' ? 'bg-[#14a6d9] text-white' : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    <Code className="w-3.5 h-3.5" />
+                    <span>Raw JSON</span>
+                  </button>
+                </div>
+
+                <button 
+                  onClick={() => { setEditingEvent(null); setOriginalEventId(null); }}
+                  className="p-2 hover:bg-white/10 rounded-xl text-gray-400 hover:text-white transition-colors"
                 >
-                  Cancel
+                  <X className="w-5 h-5" />
                 </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="px-5 py-2 bg-[#cedc28] hover:bg-[#cedc28]/90 text-[#1a302e] rounded-xl text-xs font-extrabold uppercase tracking-wider shadow-lg disabled:opacity-50 flex items-center gap-2"
-                >
-                  <Save className="w-4 h-4" />
-                  {saving ? 'Saving...' : 'Save Configuration'}
-                </button>
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveEvent} className="flex-1 flex flex-col overflow-hidden">
+              {/* TAB 1: VISUAL FORM VIEW */}
+              {modalTab === 'form' && (
+                <div className="p-6 space-y-6 overflow-y-auto custom-scrollbar flex-1">
+                  {/* SECTION 1: CORE IDENTIFICATION */}
+                  <div>
+                    <div className="text-[11px] font-bold text-gray-300 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-[#cedc28]"></span>
+                      <span>1. Core Event Identification & Portfolio</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                      {/* Event Display Name */}
+                      <div>
+                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">
+                          Event Display Name *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={editingEvent.name || ''}
+                          onChange={(e) => setEditingEvent({ ...editingEvent, name: e.target.value })}
+                          placeholder="e.g. SMLC 26"
+                          className="w-full bg-[#041628] border border-gray-600/50 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-[#cedc28]/60"
+                        />
+                      </div>
+
+                      {/* Event Unique ID / Slug */}
+                      <div>
+                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">
+                          System ID / Slug *
+                        </label>
+                        <input
+                          type="text"
+                          value={editingEvent.id || ''}
+                          onChange={(e) => setEditingEvent({ ...editingEvent, id: e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, '') })}
+                          placeholder="e.g. smlc-26"
+                          className="w-full bg-[#041628] border border-gray-600/50 rounded-xl px-3.5 py-2 text-sm font-mono text-white focus:outline-none focus:border-[#cedc28]/60"
+                        />
+                        <span className="text-[9px] text-gray-500 mt-0.5 block">
+                          Unique URL identifier (auto-derived from name if blank).
+                        </span>
+                      </div>
+
+                      {/* Source Name in Sheet */}
+                      <div>
+                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">
+                          Source Name in DB / Sheet
+                        </label>
+                        <input
+                          type="text"
+                          value={editingEvent.sourceName || ''}
+                          onChange={(e) => setEditingEvent({ ...editingEvent, sourceName: e.target.value })}
+                          placeholder="e.g. SMLC"
+                          className="w-full bg-[#041628] border border-gray-600/50 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-[#cedc28]/60"
+                        />
+                        <span className="text-[9px] text-gray-500 mt-0.5 block">
+                          Tag matching rows in the "Event Name DB" column.
+                        </span>
+                      </div>
+
+                      {/* Portfolio */}
+                      <div>
+                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">
+                          Portfolio Assignment *
+                        </label>
+                        <select
+                          value={editingEvent.portfolio || 'P1'}
+                          onChange={(e) => setEditingEvent({ ...editingEvent, portfolio: e.target.value })}
+                          className="w-full bg-[#041628] border border-gray-600/50 rounded-xl px-3.5 py-2 text-sm text-white font-bold focus:outline-none focus:border-[#cedc28]/60"
+                        >
+                          <option value="P1">Portfolio P1 (GSTS, SAIF, KoG, Black Hat)</option>
+                          <option value="P3">Portfolio P3 (SMLC, IDWS, BIO, CPHI)</option>
+                          <option value="P2">Portfolio P2</option>
+                        </select>
+                      </div>
+
+                      {/* Event Type */}
+                      <div className="sm:col-span-2">
+                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">
+                          Event Classification Type
+                        </label>
+                        <select
+                          value={editingEvent.eventType || 'Exhibition'}
+                          onChange={(e) => setEditingEvent({ ...editingEvent, eventType: e.target.value })}
+                          className="w-full bg-[#041628] border border-gray-600/50 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-[#cedc28]/60"
+                        >
+                          <option value="Exhibition">Exhibition</option>
+                          <option value="Conference">Conference</option>
+                          <option value="Both">Both (Exhibition & Conference)</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* SECTION 2: GOOGLE SHEETS & DATA INGESTION */}
+                  <div className="pt-2 border-t border-gray-700/40">
+                    <div className="text-[11px] font-bold text-gray-300 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-[#14a6d9]"></span>
+                      <span>2. Google Sheets & Data Connection</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                      {/* Actuals Sheet GID */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block">
+                            Actuals Sheet GID
+                          </label>
+                          <button
+                            type="button"
+                            onClick={handleValidateSheet}
+                            disabled={validatingSheet}
+                            className="text-[10px] font-bold text-[#14a6d9] hover:text-[#cedc28] flex items-center gap-1 transition-colors"
+                            title="Test connection to Google Sheets and inspect column headers"
+                          >
+                            <RefreshCw className={`w-3 h-3 ${validatingSheet ? 'animate-spin text-[#cedc28]' : ''}`} />
+                            <span>{validatingSheet ? 'Testing...' : 'Test Connection'}</span>
+                          </button>
+                        </div>
+                        <input
+                          type="text"
+                          value={editingEvent.gid || ''}
+                          onChange={(e) => {
+                            setEditingEvent({ ...editingEvent, gid: e.target.value });
+                            setSheetValidationResult(null);
+                          }}
+                          placeholder="Leave empty for root sheet, or enter GID"
+                          className="w-full bg-[#041628] border border-gray-600/50 rounded-xl px-3.5 py-2 text-sm font-mono text-white focus:outline-none focus:border-[#cedc28]/60"
+                        />
+                        {sheetValidationResult && (
+                          <div className={`mt-2 p-2.5 rounded-xl text-xs border ${
+                            sheetValidationResult.valid 
+                              ? 'bg-[#cedc28]/10 border-[#cedc28]/40 text-gray-200' 
+                              : 'bg-red-500/10 border-red-500/40 text-red-300'
+                          }`}>
+                            {sheetValidationResult.valid ? (
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-1.5 font-bold text-[#cedc28]">
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                  <span>Connected: {sheetValidationResult.rowCount?.toLocaleString()} rows detected</span>
+                                </div>
+                                <div className="text-[10px] text-gray-300 flex flex-wrap gap-x-3 gap-y-0.5">
+                                  <span>Spend: <strong className={sheetValidationResult.hasSpend ? 'text-lime-400' : 'text-amber-400'}>{sheetValidationResult.hasSpend ? '✓ Found' : '⚠ Missing'}</strong></span>
+                                  <span>Date: <strong className={sheetValidationResult.hasDate ? 'text-lime-400' : 'text-amber-400'}>{sheetValidationResult.hasDate ? '✓ Found' : '⚠ Missing'}</strong></span>
+                                  <span>Clicks: <strong className={sheetValidationResult.hasClicks ? 'text-lime-400' : 'text-amber-400'}>{sheetValidationResult.hasClicks ? '✓ Found' : '⚠ Missing'}</strong></span>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1.5">
+                                <AlertCircle className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
+                                <span>{sheetValidationResult.error || 'Connection failed'}</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Sheet Type */}
+                      <div>
+                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">
+                          Sheet Architecture Type
+                        </label>
+                        <select
+                          value={editingEvent.sheetType || 'combined'}
+                          onChange={(e) => setEditingEvent({ ...editingEvent, sheetType: e.target.value })}
+                          className="w-full bg-[#041628] border border-gray-600/50 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-[#cedc28]/60"
+                        >
+                          <option value="combined">Combined Country CSV (Default Central Warehouse)</option>
+                          <option value="standalone">Standalone Dedicated Sheet</option>
+                        </select>
+                      </div>
+
+                      {/* Planned Sheet GID */}
+                      <div>
+                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">
+                          Planned Spends Sheet GID (Optional)
+                        </label>
+                        <input
+                          type="text"
+                          value={editingEvent.plannedGid || ''}
+                          onChange={(e) => setEditingEvent({ ...editingEvent, plannedGid: e.target.value })}
+                          placeholder="e.g. 2019892532"
+                          className="w-full bg-[#041628] border border-gray-600/50 rounded-xl px-3.5 py-2 text-sm font-mono text-white focus:outline-none focus:border-[#cedc28]/60"
+                        />
+                      </div>
+
+                      {/* Planned Sheet Type */}
+                      <div>
+                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">
+                          Planned Sheet Parser Format
+                        </label>
+                        <select
+                          value={editingEvent.plannedType || 'standard'}
+                          onChange={(e) => setEditingEvent({ ...editingEvent, plannedType: e.target.value })}
+                          className="w-full bg-[#041628] border border-gray-600/50 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-[#cedc28]/60"
+                        >
+                          <option value="standard">Standard (Standard Planned Spends Table)</option>
+                          <option value="blackhat-text">Black Hat Text (Special Custom Header)</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* SECTION 3: DATES & CAMPAIGN TIMELINE */}
+                  <div className="pt-2 border-t border-gray-700/40">
+                    <div className="text-[11px] font-bold text-gray-300 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-purple-400"></span>
+                      <span>3. Dates & Campaign Timeline</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                      {/* Launch Date for Dynamic Week Countdown */}
+                      <div>
+                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">
+                          Event Launch Date (For W0 Countdown) *
+                        </label>
+                        <input
+                          type="date"
+                          required
+                          value={editingEvent.launchDate || '2026-12-01'}
+                          onChange={(e) => setEditingEvent({ ...editingEvent, launchDate: e.target.value })}
+                          className="w-full bg-[#041628] border border-gray-600/50 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-[#cedc28]/60"
+                        />
+                        <span className="text-[9px] text-gray-500 mt-0.5 block">
+                          Determines W0 and relative week calculations (e.g. W-12).
+                        </span>
+                      </div>
+
+                      {/* Date Filter Mode */}
+                      <div>
+                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">
+                          Date Filter Ingestion Mode
+                        </label>
+                        <select
+                          value={editingEvent.dateFilterMode || 'none'}
+                          onChange={(e) => setEditingEvent({ ...editingEvent, dateFilterMode: e.target.value })}
+                          className="w-full bg-[#041628] border border-gray-600/50 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-[#cedc28]/60"
+                        >
+                          <option value="none">None (All Available Data in Sheet)</option>
+                          <option value="min-date">Min-Date (From Start Date Onwards)</option>
+                          <option value="year-2026">Full Year 2026 Calendar</option>
+                          <option value="strict">Strict (Between Start Date & End Date)</option>
+                        </select>
+                      </div>
+
+                      {/* Date Filter: Start Date */}
+                      <div>
+                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">
+                          Date Filter: Start Date (Inclusive)
+                        </label>
+                        <input
+                          type="date"
+                          value={editingEvent.startDate || ''}
+                          onChange={(e) => setEditingEvent({ ...editingEvent, startDate: e.target.value })}
+                          className="w-full bg-[#041628] border border-gray-600/50 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-[#cedc28]/60"
+                        />
+                      </div>
+
+                      {/* Date Filter: End Date */}
+                      <div>
+                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">
+                          Date Filter: End Date (Inclusive)
+                        </label>
+                        <input
+                          type="date"
+                          value={editingEvent.endDate || ''}
+                          onChange={(e) => setEditingEvent({ ...editingEvent, endDate: e.target.value })}
+                          className="w-full bg-[#041628] border border-gray-600/50 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-[#cedc28]/60"
+                        />
+                      </div>
+
+                      {/* Auto-Publish Go-Live Date */}
+                      <div className="sm:col-span-2">
+                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">
+                          Auto-Publish Date (Optional)
+                        </label>
+                        <input
+                          type="date"
+                          value={editingEvent.autoPublishDate || ''}
+                          onChange={(e) => setEditingEvent({ ...editingEvent, autoPublishDate: e.target.value })}
+                          className="w-full bg-[#041628] border border-gray-600/50 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-[#cedc28]/60"
+                        />
+                        <span className="text-[9px] text-gray-400 mt-0.5 block">
+                          Automatically promotes from Admin Testing to Public Active on this date.
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* SECTION 4: MARKETING CHANNELS (INGESTION FILTERS) */}
+                  <div className="pt-2 border-t border-gray-700/40">
+                    <div className="text-[11px] font-bold text-gray-300 uppercase tracking-wider mb-2 flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                        <span>4. Marketing Channels Ingestion</span>
+                      </div>
+                      <span className="text-[10px] text-gray-400 font-normal">
+                        Toggle to include or exclude specific channels for this event
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+                      {[
+                        { key: 'meta', label: 'Meta Ads', desc: 'FB & IG' },
+                        { key: 'google', label: 'Google Ads', desc: 'Search & PMax' },
+                        { key: 'linkedin', label: 'LinkedIn', desc: 'InMail & Feed' },
+                        { key: 'tiktok', label: 'TikTok', desc: 'Video Ads' },
+                        { key: 'x', label: 'X (Twitter)', desc: 'Promoted' }
+                      ].map(ch => {
+                        const isEnabled = editingEvent.channelFilters ? editingEvent.channelFilters[ch.key] !== false : true;
+                        return (
+                          <button
+                            key={ch.key}
+                            type="button"
+                            onClick={() => {
+                              const currentChannels = editingEvent.channelFilters || {
+                                meta: true, google: true, linkedin: true, tiktok: true, x: true
+                              };
+                              setEditingEvent({
+                                ...editingEvent,
+                                channelFilters: {
+                                  ...currentChannels,
+                                  [ch.key]: !isEnabled
+                                }
+                              });
+                            }}
+                            className={`p-3 rounded-xl border text-left transition-all ${
+                              isEnabled
+                                ? 'bg-emerald-950/20 border-emerald-500/50 text-white shadow-sm'
+                                : 'bg-[#041628]/60 border-gray-700/50 text-gray-500'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <span className={`text-xs font-bold ${isEnabled ? 'text-emerald-400' : 'text-gray-400'}`}>
+                                {ch.label}
+                              </span>
+                              <div className={`w-4 h-4 rounded flex items-center justify-center text-[10px] font-bold ${
+                                isEnabled ? 'bg-emerald-500 text-black' : 'bg-gray-800 text-gray-500 border border-gray-700'
+                              }`}>
+                                {isEnabled ? '✓' : '✕'}
+                              </div>
+                            </div>
+                            <span className="text-[10px] text-gray-400 block">{ch.desc}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* SECTION 5: ADVANCED COLUMN / ALIAS MAPPINGS */}
+                  <div className="pt-2 border-t border-gray-700/40">
+                    <div className="p-3.5 bg-[#041628]/80 rounded-xl border border-gray-700/60">
+                      <div className="text-[11px] font-bold text-gray-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                        <Settings2 className="w-3.5 h-3.5 text-[#14a6d9]" />
+                        <span>5. Custom Column Mappings (Self-Service Aliases)</span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                        <div>
+                          <label className="text-[9px] font-bold text-gray-400 block mb-1">Spend Column Override</label>
+                          <input
+                            type="text"
+                            value={editingEvent.fieldAliases?.spend || ''}
+                            onChange={(e) => setEditingEvent({
+                              ...editingEvent,
+                              fieldAliases: { ...(editingEvent.fieldAliases || {}), spend: e.target.value }
+                            })}
+                            placeholder="Default (Spend / Cost)"
+                            className="w-full bg-[#0a2442] border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-bold text-gray-400 block mb-1">Date Column Override</label>
+                          <input
+                            type="text"
+                            value={editingEvent.fieldAliases?.date || ''}
+                            onChange={(e) => setEditingEvent({
+                              ...editingEvent,
+                              fieldAliases: { ...(editingEvent.fieldAliases || {}), date: e.target.value }
+                            })}
+                            placeholder="Default (Date / Day)"
+                            className="w-full bg-[#0a2442] border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-bold text-gray-400 block mb-1">Event Column Override</label>
+                          <input
+                            type="text"
+                            value={editingEvent.fieldAliases?.event || ''}
+                            onChange={(e) => setEditingEvent({
+                              ...editingEvent,
+                              fieldAliases: { ...(editingEvent.fieldAliases || {}), event: e.target.value }
+                            })}
+                            placeholder="Default (Event Name DB)"
+                            className="w-full bg-[#0a2442] border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* SECTION 6: EVENT VISIBILITY & TESTING TIER */}
+                  <div className="pt-2 border-t border-gray-700/40">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-2">
+                      6. Visibility & Access Tier *
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                      {/* Option 1: Admin Only (Testing) */}
+                      <button
+                        type="button"
+                        onClick={() => setEditingEvent({ 
+                          ...editingEvent, 
+                          status: 'admin_only', 
+                          visibility: 'admin_only', 
+                          enabled: true 
+                        })}
+                        className={`p-3 rounded-2xl border text-left transition-all relative ${
+                          (editingEvent.status === 'admin_only' || editingEvent.visibility === 'admin_only')
+                            ? 'bg-purple-950/40 border-purple-500 text-white shadow-[0_0_15px_rgba(168,85,247,0.25)]'
+                            : 'bg-[#041628] border-gray-700/60 text-gray-400 hover:border-gray-500'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center gap-1.5 font-bold text-xs text-purple-300">
+                            <Shield className="w-3.5 h-3.5 text-purple-400" />
+                            <span>Admin Only</span>
+                          </div>
+                          {(editingEvent.status === 'admin_only' || editingEvent.visibility === 'admin_only') && (
+                            <Check className="w-3.5 h-3.5 text-purple-400" />
+                          )}
+                        </div>
+                        <div className="text-[10px] leading-relaxed text-gray-300">
+                          Isolated staging. Only admins can see & test this event in the live dashboard.
+                        </div>
+                        <div className="mt-2 inline-block text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                          Recommended for new
+                        </div>
+                      </button>
+
+                      {/* Option 2: Public Active */}
+                      <button
+                        type="button"
+                        onClick={() => setEditingEvent({ 
+                          ...editingEvent, 
+                          status: 'active', 
+                          visibility: 'public', 
+                          enabled: true 
+                        })}
+                        className={`p-3 rounded-2xl border text-left transition-all relative ${
+                          (editingEvent.status === 'active' || (!editingEvent.status && editingEvent.enabled && editingEvent.visibility !== 'admin_only'))
+                            ? 'bg-[#cedc28]/10 border-[#cedc28] text-white shadow-[0_0_15px_rgba(206,220,40,0.2)]'
+                            : 'bg-[#041628] border-gray-700/60 text-gray-400 hover:border-gray-500'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center gap-1.5 font-bold text-xs text-[#cedc28]">
+                            <Eye className="w-3.5 h-3.5 text-[#cedc28]" />
+                            <span>Public Active</span>
+                          </div>
+                          {(editingEvent.status === 'active' || (!editingEvent.status && editingEvent.enabled && editingEvent.visibility !== 'admin_only')) && (
+                            <Check className="w-3.5 h-3.5 text-[#cedc28]" />
+                          )}
+                        </div>
+                        <div className="text-[10px] leading-relaxed text-gray-300">
+                          Live production. Ingested and visible to all authorized dashboard users.
+                        </div>
+                      </button>
+
+                      {/* Option 3: Inactive (Off) */}
+                      <button
+                        type="button"
+                        onClick={() => setEditingEvent({ 
+                          ...editingEvent, 
+                          status: 'inactive', 
+                          visibility: 'public', 
+                          enabled: false 
+                        })}
+                        className={`p-3 rounded-2xl border text-left transition-all relative ${
+                          editingEvent.status === 'inactive' || editingEvent.enabled === false
+                            ? 'bg-gray-800/80 border-gray-500 text-white'
+                            : 'bg-[#041628] border-gray-700/60 text-gray-400 hover:border-gray-500'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center gap-1.5 font-bold text-xs text-gray-300">
+                            <EyeOff className="w-3.5 h-3.5 text-gray-400" />
+                            <span>Inactive (Off)</span>
+                          </div>
+                          {(editingEvent.status === 'inactive' || editingEvent.enabled === false) && (
+                            <Check className="w-3.5 h-3.5 text-gray-300" />
+                          )}
+                        </div>
+                        <div className="text-[10px] leading-relaxed text-gray-400">
+                          Completely disabled. Data is not ingested for any user.
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* SECTION 7: NOTES & DESCRIPTION */}
+                  <div className="pt-2 border-t border-gray-700/40">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">
+                      7. Notes & Operational Nuances
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={editingEvent.description || ''}
+                      onChange={(e) => setEditingEvent({ ...editingEvent, description: e.target.value })}
+                      placeholder="Optional details about this event or specific campaign nuances"
+                      className="w-full bg-[#041628] border border-gray-600/50 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-[#cedc28]/60"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 2: RAW JSON CONFIG VIEW */}
+              {modalTab === 'json' && (
+                <div className="p-6 space-y-4 overflow-y-auto custom-scrollbar flex-1">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                        <Code className="w-4 h-4 text-[#14a6d9]" />
+                        Direct JSON Event Configuration Editor
+                      </span>
+                      <p className="text-[11px] text-gray-400 mt-0.5">
+                        Inspect or modify every configuration key directly. Saving persists this exact object.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        try {
+                          const parsed = JSON.parse(jsonConfigText);
+                          setJsonConfigText(JSON.stringify(parsed, null, 2));
+                          setJsonConfigError(null);
+                          showNotification('JSON formatted successfully');
+                        } catch (err) {
+                          setJsonConfigError(`Format error: ${err.message}`);
+                        }
+                      }}
+                      className="px-3 py-1 bg-white/5 hover:bg-white/10 text-gray-300 rounded-lg text-[10px] font-bold border border-gray-700 transition-colors"
+                    >
+                      Format JSON
+                    </button>
+                  </div>
+
+                  {jsonConfigError && (
+                    <div className="p-3 bg-red-500/10 border border-red-500/40 text-red-300 rounded-xl text-xs flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
+                      <span>{jsonConfigError}</span>
+                    </div>
+                  )}
+
+                  <textarea
+                    rows={18}
+                    value={jsonConfigText}
+                    onChange={(e) => {
+                      setJsonConfigText(e.target.value);
+                      try {
+                        const parsed = JSON.parse(e.target.value);
+                        setEditingEvent(parsed);
+                        setJsonConfigError(null);
+                      } catch (err) {
+                        setJsonConfigError(err.message);
+                      }
+                    }}
+                    className="w-full bg-[#020b14] border border-gray-700 rounded-2xl p-4 font-mono text-xs text-lime-400 focus:outline-none focus:border-[#14a6d9] leading-relaxed"
+                    spellCheck={false}
+                  />
+                </div>
+              )}
+
+              {/* Modal Footer */}
+              <div className="p-4 border-t border-gray-700/50 flex items-center justify-between bg-[#041628]/40">
+                <span className="text-[10px] text-gray-400 font-mono">
+                  {modalTab === 'form' ? 'Visual Form Mode' : 'Raw JSON Mode'}
+                </span>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => { setEditingEvent(null); setOriginalEventId(null); }}
+                    className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    className="px-5 py-2 bg-[#cedc28] hover:bg-[#cedc28]/90 text-[#1a302e] rounded-xl text-xs font-extrabold uppercase tracking-wider shadow-lg disabled:opacity-50 flex items-center gap-2 transition-all"
+                  >
+                    <Save className="w-4 h-4" />
+                    {saving ? 'Saving...' : 'Save Configuration'}
+                  </button>
+                </div>
               </div>
             </form>
           </div>
@@ -1394,21 +1773,36 @@ export default function EventsAdmin({ currentUserEmail = 'admin@tahaluf.com', in
               </div>
             </div>
 
-            <div className="mt-6 flex justify-end gap-2.5">
+            <div className="mt-5 pt-3 border-t border-gray-700/50 flex flex-col sm:flex-row items-center justify-between gap-3">
               <button
-                onClick={() => setDateModalEvent(null)}
-                className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl text-xs font-bold uppercase"
+                type="button"
+                onClick={() => {
+                  const ev = dateModalEvent;
+                  setDateModalEvent(null);
+                  openEditModal(ev);
+                }}
+                className="text-xs font-bold text-[#cedc28] hover:underline flex items-center gap-1.5 transition-all"
               >
-                Cancel
+                <Settings className="w-3.5 h-3.5" />
+                <span>Edit Full Event Config (All Fields) →</span>
               </button>
-              <button
-                onClick={handleSaveQuickDate}
-                disabled={saving}
-                className="px-4 py-2 bg-[#14a6d9] hover:bg-[#14a6d9]/90 text-white rounded-xl text-xs font-bold uppercase shadow-lg flex items-center gap-1.5"
-              >
-                <Save className="w-3.5 h-3.5" />
-                {saving ? 'Updating...' : 'Apply Date Range'}
-              </button>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                <button
+                  onClick={() => setDateModalEvent(null)}
+                  className="px-3.5 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl text-xs font-bold uppercase"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveQuickDate}
+                  disabled={saving}
+                  className="px-4 py-1.5 bg-[#14a6d9] hover:bg-[#14a6d9]/90 text-white rounded-xl text-xs font-bold uppercase shadow-lg flex items-center gap-1.5"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  {saving ? 'Updating...' : 'Apply Date Range'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
