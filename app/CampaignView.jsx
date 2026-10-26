@@ -58,7 +58,7 @@ const MetricMultiSelectDropdown = ({ options, selected, onChange }) => {
   );
 };
 
-export default function CampaignView({ adData, plannedData = [], exRate = 1, exSym = '$', formatShort = (v) => v, userRole, filterMarkets, filterEvents = ['All'] }) {
+export default function CampaignView({ adData, plannedData = [], exRate = 1, exSym = '$', formatShort = (v) => v, userRole, filterMarkets, filterEvents = ['All'], onSelectEvent }) {
   const [selectedPhases, setSelectedPhases] = useState([]);
   const [selectedChannels, setSelectedChannels] = useState({}); // { phaseName: [channelNames] }
   const [viewMode, setViewMode] = useState('overall'); // 'overall' or 'planned'
@@ -633,10 +633,28 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
 
   if (filterEvents.includes('All')) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] w-full max-w-7xl mx-auto card-surface backdrop-blur-2xl p-8 rounded-3xl border border-[#cedc28]/20 shadow-xl gap-4">
-        <Activity size={48} className="text-[#14a6d9] opacity-50" />
-        <h2 className="text-xl font-bold text-[#eef7f5]">Select an event to see details</h2>
-        <p className="text-sm text-[#14a6d9]">Or select more than one event to compare them.</p>
+      <div className="flex flex-col items-center justify-center min-h-[400px] w-full max-w-7xl mx-auto card-surface backdrop-blur-2xl p-8 rounded-3xl border border-[#cedc28]/20 shadow-xl gap-6">
+        <div className="p-4 rounded-3xl bg-[#cedc28]/10 border border-[#cedc28]/30 shadow-[0_0_30px_rgba(206,220,40,0.15)]">
+          <Activity size={40} className="text-[#cedc28]" />
+        </div>
+        <div className="text-center">
+          <h2 className="text-2xl font-anton uppercase text-[#eef7f5] tracking-wide mb-1">Select an Event to View Performance Details</h2>
+          <p className="text-sm text-[#14a6d9] max-w-xl">Choose an event from the filter above or click an event below to load its full campaign phases, channels, and delivery metrics.</p>
+        </div>
+        {uniqueEvents.length > 0 && onSelectEvent && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 w-full max-w-4xl mt-2">
+            {uniqueEvents.map(ev => (
+              <button
+                key={ev}
+                onClick={() => onSelectEvent(ev)}
+                className="p-3.5 rounded-xl bg-[#0a2442]/80 hover:bg-[#0a2442] border border-[#cedc28]/30 hover:border-[#cedc28] text-white hover:text-[#cedc28] font-bold text-xs transition-all shadow-md hover:shadow-[0_0_15px_rgba(206,220,40,0.25)] flex items-center justify-between group cursor-pointer"
+              >
+                <span className="truncate">{ev}</span>
+                <span className="text-[#14a6d9] group-hover:translate-x-0.5 transition-transform">→</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     );
   }

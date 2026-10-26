@@ -2020,9 +2020,174 @@ export default function App() {
     }
     
     if (activeTab === 'campaign') {
+      const activeEventContext = selectedEvent || (filterEvents.length === 1 && !filterEvents.includes('All') ? filterEvents[0] : null);
+      const isMultiEventComparison = filterEvents.length > 1 && !filterEvents.includes('All');
+
+      if (!activeEventContext && !isMultiEventComparison) {
+        return (
+          <div className="flex flex-col items-center justify-center min-h-[60vh] py-10 text-center w-full max-w-6xl mx-auto px-4">
+            <div className="p-4 rounded-3xl bg-[#cedc28]/10 border border-[#cedc28]/30 mb-5 shadow-[0_0_30px_rgba(206,220,40,0.15)]">
+              <Activity className="w-12 h-12 text-[#cedc28]" />
+            </div>
+            <h2 className="text-3xl sm:text-4xl font-anton uppercase text-white tracking-wide mb-2">
+              Select an Event to Unlock Event Breakdown &amp; Analysis
+            </h2>
+            <p className="text-[#eef7f5]/70 max-w-2xl text-sm mb-6">
+              Select an event from the hero filter in the top bar, or click any event card below to immediately load its full campaign performance, phase pacing, channels, and delivery metrics.
+            </p>
+
+            <div className="flex items-center gap-3 mb-8">
+              <button
+                type="button"
+                onClick={() => {
+                  React.startTransition(() => {
+                    setFilterEvents(uniqueEvents);
+                    setSelectedEvent(null);
+                  });
+                }}
+                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#cedc28]/20 via-[#14a6d9]/20 to-[#cedc28]/20 hover:from-[#cedc28] hover:to-[#cedc28] border border-[#cedc28]/40 hover:border-[#cedc28] text-[#cedc28] hover:text-[#1a302e] font-black text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-md hover:shadow-[0_0_20px_rgba(206,220,40,0.35)] cursor-pointer"
+              >
+                <Activity className="w-4 h-4" />
+                <span>Compare All Events (Relative Timeline) →</span>
+              </button>
+            </div>
+
+            <div className="w-full grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {uniqueEvents.map(evName => {
+                const evRows = adData.filter(d => d.eventNameDB === evName);
+                const evSpend = d3.sum(evRows, d => d.cost || 0);
+                const evImpressions = d3.sum(evRows, d => d.impressions || 0);
+                const evConversions = d3.sum(evRows, d => d.purchases || 0);
+                const evClicks = d3.sum(evRows, d => d.clicks || 0);
+                const evPhases = Array.from(new Set(evRows.map(d => d.phase).filter(Boolean)));
+                const portfolio = eventPortfolioMap[evName] || 'P1';
+
+                return (
+                  <button
+                    key={evName}
+                    type="button"
+                    onClick={() => {
+                      React.startTransition(() => {
+                        setFilterEvents([evName]);
+                        setSelectedEvent(evName);
+                      });
+                    }}
+                    className="group text-left p-5 rounded-2xl bg-[#0a2442]/80 hover:bg-[#0a2442] border border-[#cedc28]/30 hover:border-[#cedc28] shadow-lg hover:shadow-[0_0_25px_rgba(206,220,40,0.25)] transition-all transform hover:-translate-y-1 cursor-pointer flex flex-col justify-between"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#14a6d9]/20 text-[#14a6d9] border border-[#14a6d9]/30">
+                          {portfolio}
+                        </span>
+                        <span className="text-[10px] font-bold text-gray-400 group-hover:text-[#cedc28] transition-colors">
+                          {evPhases.length ? `${evPhases.length} Phases` : 'Active'}
+                        </span>
+                      </div>
+                      <h3 className="text-lg font-black text-white group-hover:text-[#cedc28] transition-colors truncate mb-3">
+                        {evName}
+                      </h3>
+                      <div className="space-y-1 text-xs">
+                        {userRole !== 'non-finance' && (
+                          <div className="flex justify-between items-center text-slate-300">
+                            <span className="text-gray-400 text-[11px]">Spend:</span>
+                            <span className="font-bold text-[#cedc28]">{exSym}{formatShort(evSpend * exRate)}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between items-center text-slate-300">
+                          <span className="text-gray-400 text-[11px]">{evConversions > 0 ? 'Conversions:' : 'Clicks:'}</span>
+                          <span className="font-bold text-white">{formatShort(evConversions > 0 ? evConversions : evClicks)}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-slate-300">
+                          <span className="text-gray-400 text-[11px]">Impressions:</span>
+                          <span className="font-medium text-slate-300">{formatShort(evImpressions)}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-4 pt-3 border-t border-[#cedc28]/10 flex items-center justify-between text-xs text-[#14a6d9] font-bold group-hover:text-[#cedc28]">
+                      <span>View Event Details</span>
+                      <span className="transition-transform group-hover:translate-x-1">→</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+      }
+
+      const activeAdData = activeEventContext ? filteredAdData.filter(d => d.eventNameDB === activeEventContext) : filteredAdData;
+      const effectiveFilterEvents = activeEventContext ? [activeEventContext] : filterEvents;
+
       return (
-        <div className="w-full h-full">
-           <CampaignView adData={filteredAdData} plannedData={[]} exRate={exRate} exSym={exSym} formatShort={formatShort} userRole={userRole} filterMarkets={filterMarkets} filterEvents={filterEvents} />
+        <div className="space-y-6 w-full">
+          {/* Event Header with In-View Event Switcher & Filter */}
+          <div className="flex justify-between items-center card-surface backdrop-blur-2xl p-6 rounded-3xl border border-[#cedc28]/20 shadow-xl mb-4 relative z-30" style={{ overflow: 'visible' }}>
+            <div className="flex items-center gap-4 flex-wrap">
+              <h2 className="text-3xl font-anton uppercase text-white flex items-center gap-2">
+                <Activity className="text-[#cedc28]" /> Event View:
+              </h2>
+              {/* Event Switcher with exact same size & hero styling as main top filter */}
+              <MultiSelect 
+                label="Event" 
+                options={uniqueEvents} 
+                selected={activeEventContext ? [activeEventContext] : (filterEvents.includes('All') ? ['All'] : filterEvents)} 
+                onChange={(next) => {
+                  React.startTransition(() => {
+                    if (next.includes('All') || next.length === 0) {
+                      setFilterEvents(['All']);
+                      setSelectedEvent(null);
+                    } else if (next.length === 1) {
+                      setFilterEvents(next);
+                      setSelectedEvent(next[0]);
+                    } else {
+                      setFilterEvents(next);
+                      setSelectedEvent(null);
+                    }
+                  });
+                }} 
+                isHero={true} 
+                widthClass="w-[165px] xl:w-[200px]" 
+                singleSelect={false} 
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  React.startTransition(() => {
+                    setFilterEvents(['All']);
+                    setSelectedEvent(null);
+                  });
+                }}
+                className="px-3 py-1.5 rounded-xl border border-[#cedc28]/30 hover:border-[#cedc28] bg-[#0a2442]/70 hover:bg-[#cedc28]/15 text-[#cedc28] text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+                title="Return to Event Selection Hub"
+              >
+                <span>All Events Selection</span>
+                <span className="text-[10px] text-gray-400">✕</span>
+              </button>
+            </div>
+            {isMultiEventComparison && (
+              <div className="text-xs font-bold px-3 py-1.5 rounded-xl bg-[#14a6d9]/15 border border-[#14a6d9]/30 text-[#14a6d9] flex items-center gap-1.5">
+                <Activity className="w-3.5 h-3.5" />
+                <span>Comparing {filterEvents.length} Events (Relative Timeline)</span>
+              </div>
+            )}
+          </div>
+
+          <CampaignView 
+            adData={activeAdData} 
+            plannedData={[]} 
+            exRate={exRate} 
+            exSym={exSym} 
+            formatShort={formatShort} 
+            userRole={userRole} 
+            filterMarkets={filterMarkets} 
+            filterEvents={effectiveFilterEvents} 
+            onSelectEvent={(evName) => {
+              React.startTransition(() => {
+                setFilterEvents([evName]);
+                setSelectedEvent(evName);
+              });
+            }}
+          />
         </div>
       );
     }

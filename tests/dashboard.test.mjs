@@ -9,6 +9,7 @@
  * 6. Metric Formulas & Zero-Division Safety
  */
 
+import fs from 'fs';
 import * as d3 from 'd3-dsv';
 import * as d3Array from 'd3';
 import datePresets from '../app/utils/datePresets.js';
@@ -1119,6 +1120,29 @@ async function testAnalyticsApi() {
 }
 
 // -------------------------------------------------------------
+// 9. EVENT VIEW SELECTION & IN-VIEW FILTERING CONTRACTS
+// -------------------------------------------------------------
+function testEventViewContracts() {
+  console.log('\n--- 9. Testing Event View Selection & In-View Filtering Contracts ---');
+  const pageContent = fs.readFileSync('app/page.jsx', 'utf8');
+  const campaignContent = fs.readFileSync('app/CampaignView.jsx', 'utf8');
+
+  // Verify Event Selection Hub in Event View
+  assert(pageContent.includes("Select an Event to Unlock Event Breakdown &amp; Analysis"), 'Event View defines Event Selection Hub title');
+  assert(pageContent.includes("Compare All Events (Relative Timeline) →"), 'Event View includes Compare All Events action');
+  assert(pageContent.includes("View Event Details"), 'Event Selection cards provide View Event Details action');
+
+  // Verify In-View Event Switcher and Filter
+  assert(pageContent.includes('<Activity className="text-[#cedc28]" /> Event View:'), 'Event View includes dedicated header title');
+  assert(pageContent.includes('title="Return to Event Selection Hub"'), 'Event View includes All Events Selection button');
+  assert(pageContent.includes('Comparing {filterEvents.length} Events (Relative Timeline)'), 'Event View supports multi-event comparison indicator');
+
+  // Verify CampaignView onSelectEvent support
+  assert(campaignContent.includes('onSelectEvent'), 'CampaignView signature supports onSelectEvent callback');
+  assert(campaignContent.includes("Select an Event to View Performance Details"), 'CampaignView includes upgraded All Events selection layout');
+}
+
+// -------------------------------------------------------------
 // MAIN TEST RUNNER
 // -------------------------------------------------------------
 async function runAllTests() {
@@ -1138,6 +1162,7 @@ async function runAllTests() {
   await testFirestoreChunkBatching();
   testCreativeViewLogic();
   test24hMetricIntegrity();
+  testEventViewContracts();
   await testAnalyticsLogic();
 
   // Check if local dev server is running before attempting API integration tests
