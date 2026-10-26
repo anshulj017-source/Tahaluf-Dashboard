@@ -44,8 +44,9 @@ export async function GET(req) {
     const timeRange = searchParams.get('timeRange') || 'all';
     const userRoleFilter = searchParams.get('userRoleFilter') || 'non_admin';
     const userEmailFilter = searchParams.get('userEmail') || '';
+    const timeZone = searchParams.get('timeZone') || 'UTC';
 
-    const summary = await getAnalyticsSummary(timeRange, { userRoleFilter, userEmailFilter });
+    const summary = await getAnalyticsSummary(timeRange, { userRoleFilter, userEmailFilter, timeZone });
     return NextResponse.json({ success: true, ...summary }, { status: 200 });
   } catch (error) {
     console.error('Admin analytics GET error:', error);

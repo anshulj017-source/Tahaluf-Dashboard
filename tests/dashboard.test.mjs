@@ -1047,6 +1047,20 @@ async function testAnalyticsApi() {
     assert(adminJson.users.every(u => u.role !== 'admin' && !u.email.includes('admin@')), 'Default analytics response filters out admins from user table');
     assert(adminJson.recentActivity.every(a => a.userRole !== 'admin' && !a.userEmail.includes('admin@')), 'Default analytics response filters out admins from recent activity stream');
     assert(adminJson.recentActivity.some(a => Boolean(a.geo?.timezone)), 'Recent activity entries contain geo timezone information');
+    assert(adminJson.findings.every(f => Boolean(f.plainProblem && f.plainSolution && f.howToVerify)), 'Findings contain plain problem, plain solution, and how to verify');
+    assert(adminJson.monitoredFixes.every(f => Boolean(f.plainProblem && f.plainSolution && f.howToVerify)), 'Monitored fixes contain plain problem, plain solution, and how to verify');
+
+    // Test GET Admin Analytics with timeRange=today & timeZone=Asia/Dubai
+    const todayRes = await fetch(`${adminAnalyticsUrl}?timeRange=today&timeZone=Asia/Dubai&email=admin@tahaluf.com`);
+    const todayJson = await todayRes.json();
+    assert(todayRes.status === 200, 'GET /api/admin/analytics?timeRange=today returns HTTP 200');
+    assert(todayJson.timeFilterInfo?.timeRange === 'today', 'timeFilterInfo reports timeRange=today');
+    assert(todayJson.timeFilterInfo?.timeZone === 'Asia/Dubai', 'timeFilterInfo reports user timezone');
+    assert(Boolean(todayJson.timeFilterInfo?.start), 'timeFilterInfo provides start timestamp for 12:00 AM midnight');
+    if (todayJson.recentActivity.length > 0) {
+      const midnightMs = new Date(todayJson.timeFilterInfo.start).getTime();
+      assert(todayJson.recentActivity.every(a => new Date(a.timestamp).getTime() >= midnightMs), 'All activities in timeRange=today are strictly after 12:00 AM midnight in user timezone');
+    }
 
     // Test GET Admin Analytics with userRoleFilter=all
     const allUsersRes = await fetch(`${adminAnalyticsUrl}?userRoleFilter=all&email=admin@tahaluf.com`);
