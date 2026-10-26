@@ -42,8 +42,10 @@ export async function GET(req) {
 
     const { searchParams } = new URL(req.url);
     const timeRange = searchParams.get('timeRange') || 'all';
+    const userRoleFilter = searchParams.get('userRoleFilter') || 'non_admin';
+    const userEmailFilter = searchParams.get('userEmail') || '';
 
-    const summary = await getAnalyticsSummary(timeRange);
+    const summary = await getAnalyticsSummary(timeRange, { userRoleFilter, userEmailFilter });
     return NextResponse.json({ success: true, ...summary }, { status: 200 });
   } catch (error) {
     console.error('Admin analytics GET error:', error);

@@ -1043,6 +1043,27 @@ async function testAnalyticsApi() {
     assert(Array.isArray(adminJson.actionsHistory) && adminJson.actionsHistory.length > 0, 'Admin analytics provides actionsHistory audit trail');
     assert(adminJson.geoDistribution.some(g => g.code === 'AE'), 'Vercel header country AE was ingested into geo distribution');
     assert(adminJson.users.some(u => u.email === 'exec-vip@tahaluf.com'), 'New user exec-vip was indexed in user audit table');
+    assert(adminJson.userCounts?.activeFilter === 'non_admin', 'Default userRoleFilter is non_admin');
+    assert(adminJson.users.every(u => u.role !== 'admin' && !u.email.includes('admin@')), 'Default analytics response filters out admins from user table');
+    assert(adminJson.recentActivity.every(a => a.userRole !== 'admin' && !a.userEmail.includes('admin@')), 'Default analytics response filters out admins from recent activity stream');
+
+    // Test GET Admin Analytics with userRoleFilter=all
+    const allUsersRes = await fetch(`${adminAnalyticsUrl}?userRoleFilter=all&email=admin@tahaluf.com`);
+    const allUsersJson = await allUsersRes.json();
+    assert(allUsersRes.status === 200, 'GET /api/admin/analytics?userRoleFilter=all returns HTTP 200');
+    assert(allUsersJson.users.some(u => u.email === 'admin@tahaluf.com'), 'userRoleFilter=all includes admin user');
+
+    // Test GET Admin Analytics with userRoleFilter=admin_only
+    const adminOnlyRes = await fetch(`${adminAnalyticsUrl}?userRoleFilter=admin_only&email=admin@tahaluf.com`);
+    const adminOnlyJson = await adminOnlyRes.json();
+    assert(adminOnlyRes.status === 200, 'GET /api/admin/analytics?userRoleFilter=admin_only returns HTTP 200');
+    assert(adminOnlyJson.users.every(u => u.role === 'admin' || u.email.includes('admin@')), 'userRoleFilter=admin_only returns only admin users');
+
+    // Test GET Admin Analytics with specific userEmail filter
+    const singleUserRes = await fetch(`${adminAnalyticsUrl}?userEmail=exec-vip@tahaluf.com&email=admin@tahaluf.com`);
+    const singleUserJson = await singleUserRes.json();
+    assert(singleUserRes.status === 200, 'GET /api/admin/analytics?userEmail=exec-vip returns HTTP 200');
+    assert(singleUserJson.users.length === 1 && singleUserJson.users[0].email === 'exec-vip@tahaluf.com', 'userEmail parameter isolates individual user journey');
 
     // Test POST Action Execution on Findings
     const actionPostRes = await fetch(`${adminAnalyticsUrl}?email=admin@tahaluf.com`, {

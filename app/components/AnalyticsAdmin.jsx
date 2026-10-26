@@ -23,6 +23,8 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState(null);
   const [actionFeedback, setActionFeedback] = useState(null);
+  const [userFilter, setUserFilter] = useState('non_admin'); // 'non_admin' (default) | 'all' | 'admin_only'
+  const [selectedUserEmail, setSelectedUserEmail] = useState('');
 
   const fetchAnalytics = async (silent = false) => {
     if (!silent) setIsRefreshing(true);
@@ -36,9 +38,8 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
       }
       headers['x-admin-email'] = email;
 
-      const res = await fetch(`/api/admin/analytics?timeRange=${timeRange}&email=${encodeURIComponent(email)}`, {
-        headers,
-      });
+      const url = `/api/admin/analytics?timeRange=${timeRange}&userRoleFilter=${userFilter}&userEmail=${encodeURIComponent(selectedUserEmail)}&email=${encodeURIComponent(email)}`;
+      const res = await fetch(url, { headers });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
         throw new Error(errData.error || 'Failed to fetch analytics data');
@@ -65,7 +66,7 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
     }, 6000);
 
     return () => clearInterval(timer);
-  }, [timeRange]);
+  }, [timeRange, userFilter, selectedUserEmail]);
 
   const handleAction = async (actionId, willEnable, reason = '') => {
     setActionLoadingId(actionId);
@@ -130,6 +131,16 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
   const filteredUsers = useMemo(() => {
     if (!data?.users) return [];
     let list = [...data.users];
+    
+    // Apply user scope filter
+    if (selectedUserEmail) {
+      list = list.filter(u => u.email?.toLowerCase() === selectedUserEmail.toLowerCase());
+    } else if (userFilter === 'non_admin') {
+      list = list.filter(u => u.role !== 'admin' && !u.email?.toLowerCase().includes('admin@'));
+    } else if (userFilter === 'admin_only') {
+      list = list.filter(u => u.role === 'admin' || u.email?.toLowerCase().includes('admin@'));
+    }
+
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       list = list.filter(u => 
@@ -151,7 +162,7 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
       return 0;
     });
     return list;
-  }, [data?.users, searchQuery, sortField, sortDirection]);
+  }, [data?.users, userFilter, selectedUserEmail, searchQuery, sortField, sortDirection]);
 
   const filteredFindings = useMemo(() => {
     if (!data?.findings) return [];
@@ -242,7 +253,34 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Audience Scope Filter */}
+          <div className="flex items-center gap-2 bg-[#071322] px-3 py-1.5 rounded-xl border border-gray-800 shadow-sm">
+            <Users className="w-3.5 h-3.5 text-[#cedc28]" />
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider hidden sm:inline">Audience:</span>
+            <select
+              value={userFilter}
+              onChange={(e) => {
+                setUserFilter(e.target.value);
+                setSelectedUserEmail('');
+              }}
+              className="bg-transparent text-xs font-bold text-white outline-none cursor-pointer pr-1"
+            >
+              <option value="non_admin" className="bg-[#0a2442] text-white">All Users (Excl. Admins) [Default]</option>
+              <option value="all" className="bg-[#0a2442] text-white">All Users (Incl. Admins)</option>
+              <option value="admin_only" className="bg-[#0a2442] text-white">Admins Only</option>
+            </select>
+            {data?.userCounts && (
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#cedc28]/15 text-[#cedc28] border border-[#cedc28]/30 font-bold whitespace-nowrap">
+                {userFilter === 'non_admin' 
+                  ? `${data.userCounts.nonAdmin} Users (${data.userCounts.admin} Admins Filtered)`
+                  : userFilter === 'admin_only'
+                  ? `${data.userCounts.admin} Admins`
+                  : `${data.userCounts.total} Total Users`}
+              </span>
+            )}
+          </div>
+
           {/* Time range selector */}
           <div className="flex items-center bg-[#071322] p-1 rounded-xl border border-gray-800">
             {[
@@ -276,21 +314,38 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
         </div>
       </div>
 
-      {/* TOP 5 EXECUTIVE KPI CARDS */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      {/* TOP 6 EXECUTIVE KPI CARDS */}
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
         {/* Total Views */}
         <div className="card-surface p-4 rounded-xl border border-[#cedc28]/25 shadow-md relative overflow-hidden group">
           <div className="absolute top-0 right-0 w-20 h-20 bg-[#cedc28]/10 rounded-full blur-xl -mr-6 -mt-6"></div>
           <div className="flex justify-between items-start relative z-10">
             <div>
-              <p className="text-[10px] font-bold text-[#cedc28] uppercase tracking-wider mb-1">Total Dashboard Views</p>
+              <p className="text-[10px] font-bold text-[#cedc28] uppercase tracking-wider mb-1">Total Views</p>
               <h3 className="text-2xl font-black text-white">{kpis.totalViews?.toLocaleString() || 0}</h3>
               <p className="text-[10px] text-gray-400 mt-1 flex items-center gap-1">
-                <TrendingUp className="w-3 h-3 text-[#cedc28]" /> Page loads & tab visits
+                <TrendingUp className="w-3 h-3 text-[#cedc28]" /> Page loads & tabs
               </p>
             </div>
             <div className="p-2 rounded-lg bg-[#cedc28]/10 text-[#cedc28]">
               <Eye className="w-4 h-4" />
+            </div>
+          </div>
+        </div>
+
+        {/* Active Users */}
+        <div className="card-surface p-4 rounded-xl border border-[#14a6d9]/25 shadow-md relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-20 h-20 bg-[#14a6d9]/10 rounded-full blur-xl -mr-6 -mt-6"></div>
+          <div className="flex justify-between items-start relative z-10">
+            <div>
+              <p className="text-[10px] font-bold text-[#14a6d9] uppercase tracking-wider mb-1">Active Users</p>
+              <h3 className="text-2xl font-black text-white">{kpis.totalUsers ?? (filteredUsers?.length || 0)}</h3>
+              <p className="text-[10px] text-gray-400 mt-1 flex items-center gap-1 truncate">
+                <Users className="w-3 h-3 text-[#14a6d9]" /> {kpis.userScopeLabel || 'Excl. Admins'}
+              </p>
+            </div>
+            <div className="p-2 rounded-lg bg-[#14a6d9]/10 text-[#14a6d9]">
+              <Users className="w-4 h-4" />
             </div>
           </div>
         </div>
@@ -1162,15 +1217,58 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
                 </p>
               </div>
 
-              <div className="relative w-full md:w-72">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search user, role, or city..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-[#071322] border border-gray-800 rounded-xl pl-9 pr-4 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-[#cedc28]"
-                />
+              <div className="flex flex-wrap items-center gap-3">
+                {/* Audience quick filter buttons */}
+                <div className="flex items-center bg-[#071322] p-1 rounded-xl border border-gray-800">
+                  {[
+                    { id: 'non_admin', label: 'Excl. Admins (Default)' },
+                    { id: 'all', label: 'All Users' },
+                    { id: 'admin_only', label: 'Admins Only' },
+                  ].map((f) => (
+                    <button
+                      key={f.id}
+                      onClick={() => {
+                        setUserFilter(f.id);
+                        setSelectedUserEmail('');
+                      }}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                        userFilter === f.id && !selectedUserEmail
+                          ? 'bg-[#cedc28] text-[#0a2442] shadow-[0_0_10px_rgba(206,220,40,0.3)]'
+                          : 'text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Specific user email dropdown */}
+                {data?.allKnownUsers && data.allKnownUsers.length > 0 && (
+                  <select
+                    value={selectedUserEmail}
+                    onChange={(e) => setSelectedUserEmail(e.target.value)}
+                    className="bg-[#071322] border border-gray-800 text-xs font-medium text-white rounded-xl px-3 py-1.5 focus:outline-none focus:border-[#cedc28]"
+                  >
+                    <option value="">All Users in Scope ({filteredUsers.length})</option>
+                    {data.allKnownUsers.map((u) => (
+                      <option key={u.email} value={u.email} className="bg-[#0a2442] text-white">
+                        {u.email} {u.role === 'admin' ? '[Admin]' : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
+
+                {/* Search input */}
+                <div className="relative w-full md:w-60">
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search user, role, city..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full bg-[#071322] border border-gray-800 rounded-xl pl-9 pr-4 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-[#cedc28]"
+                  />
+                </div>
               </div>
             </div>
 
@@ -1257,10 +1355,19 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
 
       {/* PERSISTENT REAL-TIME TELEMETRY STREAM TICKER */}
       <div className="card-surface p-5 rounded-2xl border border-gray-800 shadow-lg">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+          <div className="flex items-center gap-2.5">
             <Activity className="w-4 h-4 text-[#cedc28]" />
             <h4 className="text-xs font-bold text-white tracking-wide uppercase">Real-Time Telemetry Stream</h4>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#14a6d9]/10 text-[#14a6d9] border border-[#14a6d9]/30 font-medium">
+              {selectedUserEmail 
+                ? `Isolating: ${selectedUserEmail}`
+                : userFilter === 'non_admin' 
+                ? 'Filtered Scope: Business Users (Admins Hidden)' 
+                : userFilter === 'admin_only'
+                ? 'Filtered Scope: Admins Only'
+                : 'Scope: All Users'}
+            </span>
           </div>
           <span className="flex items-center gap-1.5 text-[11px] text-[#cedc28] font-bold">
             <span className="w-2 h-2 rounded-full bg-[#cedc28] animate-ping"></span>

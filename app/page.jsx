@@ -622,6 +622,8 @@ export default function App() {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      if (userEmail) window.__tahaluf_user_email = userEmail;
+      if (userRole) window.__tahaluf_user_role = userRole;
       window.__tahaluf_trackMetricClick = (label, val) => {
         trackMetricCardClick(label, val, userEmail);
       };
@@ -629,7 +631,7 @@ export default function App() {
         trackExport('csv', activeTab, userEmail);
       };
     }
-  }, [userEmail, activeTab]);
+  }, [userEmail, userRole, activeTab]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
