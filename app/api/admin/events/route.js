@@ -87,7 +87,12 @@ export async function GET() {
         : null
     }));
     const cacheKeys = dataSources.map(source => source.cacheKey).filter(Boolean);
-    const healthByKey = await getSheetCacheHealth(cacheKeys);
+    let healthByKey = {};
+    try {
+      healthByKey = await getSheetCacheHealth(cacheKeys);
+    } catch (err) {
+      console.warn('Could not read sheet cache health (using memory/fallback):', err?.message || err);
+    }
     const sheetHealth = dataSources.map(source => ({
       ...source,
       ...(source.cacheKey

@@ -544,22 +544,10 @@ const TrendSection = ({ title, trendData, currentTrendView, setViewFn, userRole,
 };
 
 // --- INITIAL LOADING SCREEN (Engaging Animation & Fast Feedback) ---
-const InitialLoadingScreen = ({ isAuthLoading }) => {
-  const [progress, setProgress] = useState(18);
-  const [stageIndex, setStageIndex] = useState(0);
+// --- INITIAL LOADING SCREEN (Engaging Animation & Gradual Feedback) ---
+const InitialLoadingScreen = ({ isAuthLoading, progress = 18, statusMessage = '' }) => {
   const [factIndex, setFactIndex] = useState(0);
   const [showRetry, setShowRetry] = useState(false);
-
-  const STAGES = useMemo(() => isAuthLoading ? [
-    { label: "Verifying credentials & session...", icon: Shield },
-    { label: "Establishing encrypted gateway...", icon: Zap },
-    { label: "Authorizing role permissions...", icon: Sparkles }
-  ] : [
-    { label: "Connecting to resilient sheet engine...", icon: Zap },
-    { label: "Synchronizing 2026 event countdowns...", icon: Calendar },
-    { label: "Streaming 15,000+ campaign metrics...", icon: Sparkles },
-    { label: "Synthesizing executive visualizations...", icon: Grid }
-  ], [isAuthLoading]);
 
   const FACTS = useMemo(() => [
     "Tracking 8 major 2026 events across Saudi Arabia and regional markets",
@@ -570,34 +558,21 @@ const InitialLoadingScreen = ({ isAuthLoading }) => {
   ], []);
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setProgress(p => {
-        if (p < 82) return p + Math.floor(Math.random() * 8) + 4;
-        return p < 95 ? p + 1 : p;
-      });
-    }, 320);
-
-    const stageTimer = setInterval(() => {
-      setStageIndex(i => (i + 1) % STAGES.length);
-    }, 1800);
-
     const factTimer = setInterval(() => {
       setFactIndex(i => (i + 1) % FACTS.length);
-    }, 3200);
+    }, 2800);
 
     const retryTimer = setTimeout(() => {
       setShowRetry(true);
-    }, 5500);
+    }, 7000);
 
     return () => {
-      clearInterval(timer);
-      clearInterval(stageTimer);
       clearInterval(factTimer);
       clearTimeout(retryTimer);
     };
-  }, [STAGES.length, FACTS.length]);
+  }, [FACTS.length]);
 
-  const CurrentStageIcon = STAGES[stageIndex]?.icon || Sparkles;
+  const displayProgress = Math.min(100, Math.max(12, Math.round(progress)));
 
   return (
     <div className="min-h-screen app-bg flex flex-col items-center justify-center text-white px-4 relative overflow-hidden select-none">
@@ -635,18 +610,18 @@ const InitialLoadingScreen = ({ isAuthLoading }) => {
         </h2>
         
         {/* Stage Status Ticker with Icon */}
-        <div className="h-7 flex items-center justify-center gap-2 mb-4">
-          <CurrentStageIcon className="w-3.5 h-3.5 text-[#cedc28] animate-pulse" />
-          <span className="text-xs font-bold text-[#14a6d9] tracking-wider transition-all duration-300">
-            {STAGES[stageIndex]?.label || (isAuthLoading ? "Verifying credentials..." : "Loading performance data...")}
+        <div className="h-7 flex items-center justify-center gap-2 mb-4 px-2">
+          <Sparkles className="w-3.5 h-3.5 text-[#cedc28] animate-pulse flex-shrink-0" />
+          <span className="text-xs font-bold text-[#14a6d9] tracking-wider transition-all duration-300 truncate">
+            {statusMessage || (isAuthLoading ? "Verifying executive credentials..." : "Synchronizing event data...")}
           </span>
         </div>
 
         {/* High-Tech Progress Track */}
-        <div className="w-full max-w-xs bg-[#0a2442] h-2 rounded-full overflow-hidden border border-[#cedc28]/25 p-0.5 mb-3 relative shadow-inner">
+        <div className="w-full max-w-xs bg-[#0a2442] h-2.5 rounded-full overflow-hidden border border-[#cedc28]/25 p-0.5 mb-3 relative shadow-inner">
           <div 
-            className="h-full bg-gradient-to-r from-[#14a6d9] via-[#cedc28] to-[#14a6d9] rounded-full transition-all duration-300 relative overflow-hidden"
-            style={{ width: `${progress}%` }}
+            className="h-full bg-gradient-to-r from-[#14a6d9] via-[#cedc28] to-[#14a6d9] rounded-full transition-all duration-300 ease-out relative overflow-hidden"
+            style={{ width: `${displayProgress}%` }}
           >
             <div className="absolute inset-0 bg-white/40 w-1/2 animate-shimmer-flow rounded-full"></div>
           </div>
@@ -656,9 +631,9 @@ const InitialLoadingScreen = ({ isAuthLoading }) => {
         <div className="flex items-center justify-between w-full max-w-xs text-[10px] font-bold text-slate-400 mb-5 px-1">
           <span className="flex items-center gap-1.5 text-emerald-400">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
-            <span>Secured Gateway</span>
+            <span>Live Data Sync</span>
           </span>
-          <span className="font-mono text-[#cedc28] font-black">{progress}%</span>
+          <span className="font-mono text-[#cedc28] font-black">{displayProgress}%</span>
         </div>
 
         {/* Rotating Executive Micro-Facts Card */}
@@ -698,8 +673,9 @@ export default function App() {
   const [adData, setAdData] = useState([]);
   const [gaData, setGaData] = useState([]);
   const [creativeData, setCreativeData] = useState([]);
-  const [plannedData, setPlannedData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingProgress, setLoadingProgress] = useState(15);
+  const [loadingStatus, setLoadingStatus] = useState('Verifying session...');
   const [lastUpdated, setLastUpdated] = useState(null);
   const [activeTab, setActiveTab] = useState('summary');
   const [selectedEvent, setSelectedEvent] = useState(null);
@@ -1064,10 +1040,24 @@ export default function App() {
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    const fetchCsvSafe = (url) => d3.csv(url).catch(err => {
-      console.warn("Could not load sheet:", url, err);
-      return [];
-    });
+    const fetchCsvSafe = async (url, retries = 1) => {
+      try {
+        const rows = await d3.csv(url);
+        if (rows && rows.length > 0) return rows;
+        if (retries > 0) {
+          await new Promise(r => setTimeout(r, 600));
+          return fetchCsvSafe(url + '&refresh=true', retries - 1);
+        }
+        return rows || [];
+      } catch (err) {
+        if (retries > 0) {
+          await new Promise(r => setTimeout(r, 600));
+          return fetchCsvSafe(url + '&refresh=true', retries - 1);
+        }
+        console.warn("Could not load sheet:", url, err);
+        return [];
+      }
+    };
 
     const parsePlannedRows = (rawData, eventName) => {
       return rawData.filter(r => r.Channel && r.Channel.trim() !== '').map(r => {
@@ -1121,13 +1111,16 @@ export default function App() {
     };
 
     const loadDashboardData = async () => {
+      setLoadingProgress(20);
+      setLoadingStatus('Connecting to performance gateway...');
+
       // 1. Fetch dynamic event configurations from Admin API
       let configuredEvents = [];
       try {
         const eventsRes = await fetch('/api/admin/events');
         if (eventsRes.ok) {
           const eventsData = await eventsRes.json();
-          if (eventsData.config && Array.isArray(eventsData.config.events)) {
+          if (eventsData.config && Array.isArray(eventsData.config.events) && eventsData.config.events.length > 0) {
             configuredEvents = eventsData.config.events;
           }
         }
@@ -1135,17 +1128,17 @@ export default function App() {
         console.warn('Could not load dynamic events config from API, using fallback:', e);
       }
 
-      // Fallback defaults
+      // Fallback defaults with guaranteed active public status
       if (!configuredEvents || configuredEvents.length === 0) {
         configuredEvents = [
-          { id: 'gsts-26', name: 'GSTS 26', sourceName: 'GSTS', portfolio: 'P1', business: 'B2B', enabled: true, gid: '', plannedGid: '2019892532', launchDate: '2026-12-18' },
-          { id: 'saif-26', name: 'SAIF 26', sourceName: 'SAIF 26', portfolio: 'P1', business: 'B2B', enabled: true, gid: '1196409184', plannedGid: '570639072', launchDate: '2026-11-24' },
-          { id: 'kog-26', name: 'KoG 26', sourceName: 'KoG 26', portfolio: 'P1', business: 'derive', enabled: true, gid: '1486784585', plannedGid: '1766297835', launchDate: '2026-12-01' },
-          { id: 'black-hat', name: 'Black Hat', sourceName: 'BLACK HAT', portfolio: 'P1', business: 'B2B', enabled: true, gid: '659941332', plannedGid: '277310277', plannedType: 'blackhat-text', launchDate: '2026-12-01' },
-          { id: 'smlc-26', name: 'SMLC 26', sourceName: 'SMLC 26', portfolio: 'P3', business: 'B2B', enabled: true, gid: '1526538255', launchDate: '2026-10-21' },
-          { id: 'idws-26', name: 'IDWS 26', sourceName: 'IDWS 26', portfolio: 'P3', business: 'B2B', enabled: true, gid: '1121987876', startDate: '2026-06-01', launchDate: '2026-12-14' },
-          { id: 'bio-cphi-main', name: 'BIO 26 & CPHI 26', sourceName: 'BIO / CPHI', portfolio: 'P3', business: 'B2B', enabled: true, gid: '1728688512', dateFilterMode: 'year-2026', launchDate: '2026-12-14' },
-          { id: 'cphi-li', name: 'CPHI 26 (LinkedIn)', sourceName: 'CPHI 26', portfolio: 'P3', business: 'B2B', enabled: true, gid: '208497314', dateFilterMode: 'year-2026', launchDate: '2026-12-14' }
+          { id: 'gsts-26', name: 'GSTS 26', sourceName: 'GSTS', portfolio: 'P1', business: 'B2B', enabled: true, status: 'active', visibility: 'public', sheetType: 'combined', gid: '', plannedGid: '2019892532', launchDate: '2026-12-18' },
+          { id: 'saif-26', name: 'SAIF 26', sourceName: 'SAIF 26', portfolio: 'P1', business: 'B2B', enabled: true, status: 'active', visibility: 'public', sheetType: 'combined', gid: '1196409184', plannedGid: '570639072', launchDate: '2026-11-24' },
+          { id: 'kog-26', name: 'KoG 26', sourceName: 'KoG 26', portfolio: 'P1', business: 'derive', enabled: true, status: 'active', visibility: 'public', sheetType: 'combined', gid: '1486784585', plannedGid: '1766297835', launchDate: '2026-12-01' },
+          { id: 'black-hat', name: 'Black Hat', sourceName: 'BLACK HAT', portfolio: 'P1', business: 'B2B', enabled: true, status: 'active', visibility: 'public', sheetType: 'combined', gid: '659941332', plannedGid: '277310277', plannedType: 'blackhat-text', launchDate: '2026-12-01' },
+          { id: 'smlc-26', name: 'SMLC 26', sourceName: 'SMLC 26', portfolio: 'P3', business: 'B2B', enabled: true, status: 'active', visibility: 'public', sheetType: 'combined', gid: '1526538255', launchDate: '2026-10-21' },
+          { id: 'idws-26', name: 'IDWS 26', sourceName: 'IDWS 26', portfolio: 'P3', business: 'B2B', enabled: true, status: 'active', visibility: 'public', sheetType: 'combined', gid: '1121987876', startDate: '2026-06-01', launchDate: '2026-12-14' },
+          { id: 'bio-cphi-main', name: 'BIO 26 & CPHI 26', sourceName: 'BIO / CPHI', portfolio: 'P3', business: 'B2B', enabled: true, status: 'active', visibility: 'public', sheetType: 'combined', gid: '1728688512', dateFilterMode: 'year-2026', launchDate: '2026-12-14' },
+          { id: 'cphi-li', name: 'CPHI 26 (LinkedIn)', sourceName: 'CPHI 26', portfolio: 'P3', business: 'B2B', enabled: true, status: 'active', visibility: 'public', sheetType: 'combined', gid: '208497314', dateFilterMode: 'year-2026', launchDate: '2026-12-14' }
         ];
       }
 
@@ -1153,16 +1146,13 @@ export default function App() {
 
       const effectiveRole = (userRole === 'admin' && !simulatingStandardUser) ? 'admin' : 'standard';
 
-      // Filter for active events based on effectiveRole & auto-publish:
-      // - 'active' (public): visible to all users
-      // - 'admin_only' (testing): visible ONLY if effectiveRole === 'admin'
-      // - 'autoPublishDate': if reached, promotes event to public active automatically
+      // Filter for active events based on effectiveRole & auto-publish
       const activeEvents = configuredEvents.filter(ev => {
         if (ev.enabled === false || ev.status === 'inactive') return false;
 
         const isAutoPublished = ev.autoPublishDate && new Date(ev.autoPublishDate) <= new Date();
-        const effectiveStatus = isAutoPublished ? 'active' : ev.status;
-        const effectiveVisibility = isAutoPublished ? 'public' : ev.visibility;
+        const effectiveStatus = isAutoPublished ? 'active' : (ev.status || 'active');
+        const effectiveVisibility = isAutoPublished ? 'public' : (ev.visibility || 'public');
 
         if (effectiveVisibility === 'admin_only' || effectiveStatus === 'admin_only') {
           return effectiveRole === 'admin';
@@ -1170,10 +1160,25 @@ export default function App() {
         return true;
       });
 
+      const totalPlannedCount = activeEvents.filter(ev => ev.plannedGid).length;
+      const totalStreams = Math.max(1, activeEvents.length + totalPlannedCount);
+      let completedStreams = 0;
+
+      const trackStreamProgress = (name, kind) => {
+        completedStreams++;
+        const pct = Math.min(90, Math.round(25 + (completedStreams / totalStreams) * 65));
+        setLoadingProgress(pct);
+        setLoadingStatus(`Streaming ${name} ${kind}...`);
+      };
+
+      setLoadingProgress(28);
+      setLoadingStatus(`Connecting to ${activeEvents.length} live event streams...`);
+
       // Fetch actuals for active events
       const actualsPromises = activeEvents.map(ev => {
         const url = BASE_URL + (ev.gid ? `&gid=${ev.gid}` : '');
         return fetchCsvSafe(url).then(rawRows => {
+          trackStreamProgress(ev.name, 'actuals');
           let rows = rawRows;
           if (ev.startDate) {
             rows = rows.filter(r => r.Date && r.Date >= ev.startDate);
@@ -1195,6 +1200,7 @@ export default function App() {
           const url = BASE_URL + `&gid=${ev.plannedGid}`;
           if (ev.plannedType === 'blackhat-text' || ev.id === 'black-hat') {
             return d3.text(url).catch(() => '').then(text => {
+              trackStreamProgress('Black Hat', 'targets');
               const bhRows = parseBlackHatPlanned(text);
               return parsePlannedRows(bhRows, 'Black Hat').map((p, i) => ({
                 ...p,
@@ -1202,7 +1208,10 @@ export default function App() {
               }));
             });
           } else {
-            return fetchCsvSafe(url).then(rows => parsePlannedRows(rows, ev.name));
+            return fetchCsvSafe(url).then(rows => {
+              trackStreamProgress(ev.name, 'targets');
+              return parsePlannedRows(rows, ev.name);
+            });
           }
         });
 
@@ -1210,6 +1219,9 @@ export default function App() {
         Promise.all(actualsPromises),
         Promise.all(plannedPromises)
       ]);
+
+      setLoadingProgress(92);
+      setLoadingStatus('Synthesizing week countdown timelines...');
 
       const combinedAds = allActualsArrays.flat();
       const parsedPlannedData = allPlannedArrays.flat();
@@ -1273,7 +1285,6 @@ export default function App() {
       });
 
       // Build complete client week timelines (countdown W{total} to current week) for all known events
-      // Starting strictly from the first impression date and stopping at the current week (no upcoming weeks)
       const timelines = {};
       const allKnownEventNames = Array.from(new Set([
         ...Object.keys(eventStartDates),
@@ -1316,11 +1327,14 @@ export default function App() {
       } else {
         setLastUpdated(new Date());
       }
+      setLoadingProgress(100);
+      setLoadingStatus('Ready! Rendering visualizations...');
       setLoading(false);
     };
 
     loadDashboardData().catch(err => {
       console.error(err);
+      setLoadingProgress(100);
       setLoading(false);
     });
   }, [isAuthenticated, userRole, simulatingStandardUser]);
@@ -1640,7 +1654,13 @@ export default function App() {
   // Admin button is rendered separately at the bottom left
 
   if (isAuthLoading || loading) {
-    return <InitialLoadingScreen isAuthLoading={isAuthLoading} />;
+    return (
+      <InitialLoadingScreen 
+        isAuthLoading={isAuthLoading} 
+        progress={loadingProgress}
+        statusMessage={loadingStatus}
+      />
+    );
   }
 
   // Removed unused getTotals

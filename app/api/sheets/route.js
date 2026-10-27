@@ -230,26 +230,21 @@ export async function GET(request) {
       health = await storeSheetSnapshot(cacheKey, text, dataSummary);
       sheetCache.set(url, { data: text, timestamp: Date.now() });
     } catch (error) {
-      console.error('[SHEET CACHE] Could not persist successfully fetched sheet:', error);
+      console.warn('[SHEET CACHE] Could not persist sheet to Firestore (using in-memory cache):', error?.message || error);
+      sheetCache.set(url, { data: text, timestamp: Date.now() });
       try {
         health = await recordSheetFailure(cacheKey, `Cache storage failed: ${error.message || error}`, 'storage-error');
         await reportHealthForSheet(cacheKey, health);
       } catch (statusError) {
         console.error('[SHEET CACHE] Could not record cache storage failure:', statusError);
       }
-      if (cached?.data) {
-        return new NextResponse(cached.data, {
-          status: 200,
-          headers: {
-            'Content-Type': 'text/csv',
-            'Cache-Control': 'public, max-age=60, stale-while-revalidate=300',
-            'X-Cache': 'STALE-FALLBACK'
-          }
-        });
-      }
-      return new NextResponse('', {
+      return new NextResponse(text, {
         status: 200,
-        headers: { 'Content-Type': 'text/csv', 'X-Cache': 'MISS-EMPTY' }
+        headers: {
+          'Content-Type': 'text/csv',
+          'Cache-Control': 'public, max-age=300, stale-while-revalidate=600',
+          'X-Cache': 'MISS-PERSISTENCE-ERROR'
+        }
       });
     }
 
