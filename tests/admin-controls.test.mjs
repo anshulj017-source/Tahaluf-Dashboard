@@ -207,6 +207,9 @@ test('Analytics panel polls 120 times/hour, skips hidden documents and clears it
   const document = { visibilityState: 'visible' };
   const cleanup = vm.runInNewContext(`(${effect})()`, {
     document,
+    active: true,
+    requestId: { current: 0 },
+    setIsRefreshing() {},
     lowQuotaMode: false,
     fetchAnalytics: () => { fetches++; },
     setInterval: (fn, delay) => { callback = fn; cadence = delay; return 123; },
@@ -224,12 +227,17 @@ test('Analytics panel polls 120 times/hour, skips hidden documents and clears it
   assert.equal(cleared, 123);
   fetches = 0;
   const lowModeCleanup = vm.runInNewContext(`(${effect})()`, {
+    active: true,
+    requestId: { current: 0 },
+    setIsRefreshing() {},
+    clearInterval() {},
     lowQuotaMode: true,
     fetchAnalytics: () => { fetches++; },
     setInterval: () => { assert.fail('low-quota mode must not schedule polling'); }
   });
   assert.equal(fetches, 1, 'low-quota mode preserves initial/filter loads');
-  assert.equal(lowModeCleanup, undefined);
+  assert.equal(typeof lowModeCleanup, 'function', 'low-quota mode still invalidates outstanding requests on cleanup');
+  lowModeCleanup();
 });
 
 test('visible tabs share one dwell owner and hand over after hiding', async () => {
@@ -1126,7 +1134,11 @@ test('dimension alert templates escape raw values and identify the category with
 });
 
 test('Health Monitor renders all selected dimensions and independent enabled category email checkboxes', async () => {
+  const adminUI = await loadInstrumentedModule('../app/components/AdminUI.jsx');
+  adminUI.useAdminView = () => ['settings', () => {}];
+  adminUI.useAdminDirtyGuard = () => {};
   const component = await loadInstrumentedModule('../app/components/DataHealthAdmin.jsx', {
+    './AdminUI': adminUI,
     '../../lib/firebase': { auth: {} },
     '../../lib/healthNotificationUtils.mjs': healthUtils,
     './DashboardFeatureContext': { useLowQuotaMode: () => false },
@@ -1134,7 +1146,7 @@ test('Health Monitor renders all selected dimensions and independent enabled cat
     './DimensionFindings': (await loadInstrumentedModule('../app/components/DimensionFindings.jsx')).default
   });
   const html = renderToStaticMarkup(React.createElement(component.default));
-  assert.ok(html.includes('Dimension Standards'));
+  assert.ok(html.includes('Dimension standards'));
   assert.ok(html.includes('Email metric issues'));
   assert.ok(html.includes('Email dimension issues'));
   assert.ok(html.includes('Save dimension checks'));

@@ -7,6 +7,7 @@ import {
   Copy, Save, FileText, ChevronRight, ChevronDown, X, ArrowUpDown,
   Shield, Lock, Eye, EyeOff, User, Code, Sliders
 } from 'lucide-react';
+import { AdminDialog, useAdminDirtyGuard } from './AdminUI';
 
 export default function EventsAdmin({ currentUserEmail = 'admin@tahaluf.com', initialEvents = [] }) {
   const currentAuthor = currentUserEmail || 'admin@tahaluf.com';
@@ -39,10 +40,13 @@ export default function EventsAdmin({ currentUserEmail = 'admin@tahaluf.com', in
   const [confirmPromoteEvent, setConfirmPromoteEvent] = useState(null);
   const [validatingSheet, setValidatingSheet] = useState(false);
   const [sheetValidationResult, setSheetValidationResult] = useState(null);
+  const [pendingRevert, setPendingRevert] = useState(null);
+  const [pendingImport, setPendingImport] = useState(null);
 
   // Quick date edit state
   const [quickStartDate, setQuickStartDate] = useState('');
   const [quickEndDate, setQuickEndDate] = useState('');
+  useAdminDirtyGuard('events', Boolean(editingEvent || dateModalEvent));
 
   // Fetch events config and version history
   const fetchConfig = async (isBackground = false) => {
@@ -433,8 +437,7 @@ export default function EventsAdmin({ currentUserEmail = 'admin@tahaluf.com', in
   };
 
   // 5. Version Control Rollback / Revert
-  const handleRevertVersion = async (versionId, description) => {
-    if (!window.confirm(`Are you sure you want to revert to ${versionId}? Current settings will be replaced with that snapshot.`)) return;
+  const handleRevertVersion = async (versionId) => {
     setSaving(true);
     try {
       const res = await fetch('/api/admin/events', {
@@ -452,6 +455,7 @@ export default function EventsAdmin({ currentUserEmail = 'admin@tahaluf.com', in
       setEvents(data.config.events);
       setHistory(data.history);
       setShowHistoryModal(false);
+      setPendingRevert(null);
       showNotification(`Dashboard configuration successfully rolled back to ${versionId}`);
     } catch (err) {
       console.error(err);
@@ -503,37 +507,49 @@ export default function EventsAdmin({ currentUserEmail = 'admin@tahaluf.com', in
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = async (event) => {
+    reader.onload = (event) => {
       try {
         const parsed = JSON.parse(event.target.result);
         if (!parsed || !Array.isArray(parsed.events)) {
           throw new Error('Invalid JSON format. Expected { events: [...] }');
         }
-        setSaving(true);
-        const res = await fetch('/api/admin/events', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'import',
-            importedConfig: parsed,
-            author: currentAuthor
-          })
-        });
-        const data = await res.json();
-        if (!res.ok || !data.success) throw new Error(data.error || 'Failed to import JSON');
-        setConfig(data.config);
-        setEvents(data.config.events);
-        setHistory(data.history);
-        showNotification(`Imported ${parsed.events.length} events successfully!`);
+        setError(null);
+        setPendingImport(parsed);
       } catch (err) {
         console.error(err);
-        alert(`Failed to import configuration: ${err.message}`);
-      } finally {
-        setSaving(false);
+        setError(`Failed to read configuration: ${err.message}`);
       }
+    };
+    reader.onerror = () => {
+      console.error('Configuration backup could not be read', reader.error);
+      setError('Configuration backup could not be read. Select the file again.');
     };
     reader.readAsText(file);
     e.target.value = ''; // Reset input
+  };
+
+  const importBackup = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/admin/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'import', importedConfig: pendingImport, author: currentAuthor })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Failed to import JSON');
+      setConfig(data.config);
+      setEvents(data.config.events);
+      setHistory(data.history);
+      showNotification(`Imported ${pendingImport.events.length} events successfully!`);
+      setPendingImport(null);
+    } catch (err) {
+      console.error(err);
+      setError(`Failed to import configuration: ${err.message}`);
+    } finally {
+      setSaving(false);
+    }
   };
 
   // Duplicate Event Template
@@ -671,7 +687,7 @@ export default function EventsAdmin({ currentUserEmail = 'admin@tahaluf.com', in
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-3">
-            <h2 className="text-2xl font-bold text-white tracking-wide uppercase">Events & Data Configuration</h2>
+            <h2 className="text-2xl font-bold text-white">Events &amp; Data</h2>
             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#cedc28]/20 text-[#cedc28] border border-[#cedc28]/40">
               {config?.version || 'v1.0.0'}
             </span>
@@ -682,6 +698,15 @@ export default function EventsAdmin({ currentUserEmail = 'admin@tahaluf.com', in
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={openAddModal}
+            className="px-4 py-2 bg-[#cedc28] text-[#1a302e] rounded-lg text-sm font-bold"
+          >
+            Add Event
+          </button>
+          <details className="relative">
+            <summary className="cursor-pointer rounded-lg border border-slate-600 px-3 py-2 text-sm">Backups &amp; recovery</summary>
+            <div className="absolute right-0 z-30 mt-2 flex w-64 flex-wrap gap-2 rounded-xl border border-slate-600 bg-[#071b2e] p-4 shadow-xl">
           {/* Version History Button */}
           <button
             onClick={() => setShowHistoryModal(true)}
@@ -698,6 +723,7 @@ export default function EventsAdmin({ currentUserEmail = 'admin@tahaluf.com', in
             className="p-2 bg-[#0a2442] hover:bg-white/10 border border-gray-600/40 text-gray-300 rounded-xl transition-all"
           >
             <Download className="w-4 h-4" />
+            <span className="text-sm">Export backup</span>
           </button>
 
           {/* Import JSON */}
@@ -706,7 +732,8 @@ export default function EventsAdmin({ currentUserEmail = 'admin@tahaluf.com', in
             className="p-2 bg-[#0a2442] hover:bg-white/10 border border-gray-600/40 text-gray-300 rounded-xl transition-all cursor-pointer"
           >
             <Upload className="w-4 h-4" />
-            <input type="file" accept=".json" onChange={handleImportJson} className="hidden" />
+            <span className="text-sm">Import backup</span>
+            <input aria-label="Import configuration backup" type="file" accept=".json" onChange={handleImportJson} className="w-full text-xs" />
           </label>
 
           {/* Reset Defaults */}
@@ -719,14 +746,8 @@ export default function EventsAdmin({ currentUserEmail = 'admin@tahaluf.com', in
             Reset
           </button>
 
-          {/* Add New Event Button */}
-          <button
-            onClick={openAddModal}
-            className="px-4 py-2 bg-[#cedc28] hover:bg-[#cedc28]/90 text-[#1a302e] rounded-xl text-xs font-extrabold uppercase tracking-wider flex items-center gap-1.5 shadow-[0_0_15px_rgba(206,220,40,0.3)] transition-all"
-          >
-            <Plus className="w-4 h-4" />
-            Add Event
-          </button>
+            </div>
+          </details>
         </div>
       </div>
 
@@ -1911,7 +1932,7 @@ export default function EventsAdmin({ currentUserEmail = 'admin@tahaluf.com', in
 
                     {idx !== 0 && (
                       <button
-                        onClick={() => handleRevertVersion(ver.versionId, ver.description)}
+                        onClick={() => setPendingRevert(ver)}
                         disabled={saving}
                         className="px-4 py-1.5 bg-[#14a6d9] hover:bg-[#14a6d9]/80 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-md hover:shadow-[#14a6d9]/30 active:scale-95 cursor-pointer disabled:opacity-50"
                         title="1-Click restore all events and settings back to this snapshot"
@@ -1920,6 +1941,22 @@ export default function EventsAdmin({ currentUserEmail = 'admin@tahaluf.com', in
                         1-Click Restore
                       </button>
                     )}
+                    {pendingRevert && <AdminDialog title="Restore configuration backup?" onClose={() => { if (!saving) setPendingRevert(null); }}>
+                      <p className="text-sm text-slate-300">Restore {pendingRevert.versionId}? Current event settings will be replaced by this snapshot.</p>
+                      {error && <p role="alert" className="mt-3 text-red-300">{error}</p>}
+                      <div className="mt-4 flex gap-3">
+                        <button disabled={saving} onClick={() => setPendingRevert(null)} className="rounded border border-slate-600 px-4 py-2">Cancel</button>
+                        <button disabled={saving} onClick={() => handleRevertVersion(pendingRevert.versionId)} className="rounded bg-[#cedc28] px-4 py-2 text-[#041628]">{saving ? 'Restoring...' : 'Restore snapshot'}</button>
+                      </div>
+                    </AdminDialog>}
+                    {pendingImport && <AdminDialog title="Import configuration backup?" onClose={() => { if (!saving) setPendingImport(null); }}>
+                      <p className="text-sm text-slate-300">Replace current event configuration with {pendingImport.events.length} events from this backup? Review the file and export your current configuration before proceeding.</p>
+                      {error && <p role="alert" className="mt-3 text-red-300">{error}</p>}
+                      <div className="mt-4 flex gap-3">
+                        <button disabled={saving} onClick={() => setPendingImport(null)} className="rounded border border-slate-600 px-4 py-2">Cancel</button>
+                        <button disabled={saving} onClick={importBackup} className="rounded bg-[#cedc28] px-4 py-2 text-[#041628]">{saving ? 'Importing...' : 'Import backup'}</button>
+                      </div>
+                    </AdminDialog>}
                   </div>
 
                   {/* Collapsible Snapshot Details */}

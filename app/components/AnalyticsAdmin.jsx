@@ -1,23 +1,33 @@
 "use client";
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Users, Eye, Compass, Globe, Filter, Activity, RefreshCw, 
-  Search, ArrowUpRight, TrendingUp, Sparkles, CheckCircle2, Clock, 
-  Layers, BarChart2, Shield, Laptop, MapPin, Zap, AlertTriangle,
-  Check, ArrowRight, Settings, Download, Monitor, Database, Sliders,
-  Gauge, PieChart as PieIcon, Cpu, AlertCircle, PlayCircle,
+  Search, TrendingUp, Sparkles, CheckCircle2, Clock,
+  Shield, Laptop, MapPin, Zap, AlertTriangle,
+  ArrowRight, Settings, Download, Monitor, Sliders,
+  Gauge, Cpu, AlertCircle, PlayCircle,
   RotateCcw, ShieldCheck, History
 } from 'lucide-react';
 import { auth } from '../../lib/firebase';
 import { useLowQuotaMode } from './DashboardFeatureContext';
+import { AdminTabs, useAdminView, useAdminDirtyGuard } from './AdminUI';
 
-export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' }) {
+const ANALYTICS_VIEWS = ['overview', 'users', 'activity', 'performance', 'recommendations', 'optimizations'];
+const ANALYTICS_TABS = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'users', label: 'Users' },
+  { id: 'activity', label: 'Activity' },
+  { id: 'performance', label: 'Performance' },
+  { id: 'recommendations', label: 'Recommendations' },
+];
+
+export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com', active = true }) {
   const lowQuotaMode = useLowQuotaMode();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [timeRange, setTimeRange] = useState('all');
-  const [subView, setSubView] = useState('intelligence'); // 'intelligence' | 'fixes_monitoring' | 'behavior' | 'hardware' | 'audience'
+  const [subView, setSubView] = useAdminView('analyticsView', 'overview', ANALYTICS_VIEWS);
   const [findingCategory, setFindingCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [historySearchQuery, setHistorySearchQuery] = useState('');
@@ -30,6 +40,33 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
   const [selectedUserEmail, setSelectedUserEmail] = useState('');
   const [activityLimit, setActivityLimit] = useState(25); // 10 | 25 | 50 | 100
   const [diagnosticProbeResults, setDiagnosticProbeResults] = useState({});
+  const [activitySearch, setActivitySearch] = useState('');
+  const [activityPage, setActivityPage] = useState(1);
+  const [lastSuccessfulRefresh, setLastSuccessfulRefresh] = useState(null);
+  const [loadedScope, setLoadedScope] = useState('');
+  const [pageVisible, setPageVisible] = useState(true);
+  const [pendingAction, setPendingAction] = useState(null);
+  const [actionReason, setActionReason] = useState('');
+  const actionDialog = useRef(null);
+  const requestId = useRef(0);
+  const refreshRef = useRef(null);
+  const activeRef = useRef(active);
+  activeRef.current = active;
+  const scopeKey = JSON.stringify([timeRange, userFilter, selectedUserEmail]);
+  useAdminDirtyGuard('analytics', Boolean(pendingAction && actionReason !== pendingAction.reason));
+
+  useEffect(() => {
+    const updateVisibility = () => setPageVisible(document.visibilityState === 'visible');
+    updateVisibility();
+    document.addEventListener('visibilitychange', updateVisibility);
+    return () => document.removeEventListener('visibilitychange', updateVisibility);
+  }, []);
+
+  useEffect(() => {
+    const dialog = actionDialog.current;
+    if (pendingAction && active && dialog && !dialog.open) dialog.showModal();
+    return () => { if (dialog?.open) dialog.close(); };
+  }, [pendingAction, active]);
 
   const viewerTimeZone = useMemo(() => {
     try {
@@ -51,9 +88,10 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
     }
   }, [viewerTimeZone]);
 
-  const fetchAnalytics = async (silent = false) => {
-    if (!silent) setIsRefreshing(true);
-    setError(null);
+  const fetchAnalytics = async () => {
+    if (!activeRef.current) return;
+    const id = ++requestId.current;
+    setIsRefreshing(true);
     try {
       const email = currentUserEmail || auth.currentUser?.email || 'admin@tahaluf.com';
       const token = await auth.currentUser?.getIdToken().catch(() => null);
@@ -64,37 +102,55 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
       headers['x-admin-email'] = email;
 
       const url = `/api/admin/analytics?timeRange=${timeRange}&timeZone=${encodeURIComponent(viewerTimeZone)}&userRoleFilter=${userFilter}&userEmail=${encodeURIComponent(selectedUserEmail)}&email=${encodeURIComponent(email)}`;
+      if (!activeRef.current || id !== requestId.current) return;
       const res = await fetch(url, { headers });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
         throw new Error(errData.error || 'Failed to fetch analytics data');
       }
       const json = await res.json();
+      if (id !== requestId.current) return;
       setData(json);
+      setLoadedScope(scopeKey);
+      setLastSuccessfulRefresh(new Date().toISOString());
+      setError(null);
     } catch (err) {
       console.error('Error fetching analytics:', err);
-      if (!silent) setError(err.message);
+      if (id === requestId.current) setError(err.message);
     } finally {
-      setLoading(false);
-      if (!silent) setIsRefreshing(false);
+      if (id === requestId.current) {
+        setLoading(false);
+        setIsRefreshing(false);
+      }
     }
   };
+  refreshRef.current = fetchAnalytics;
 
   useEffect(() => {
+    if (!active) return;
     fetchAnalytics();
-    if (lowQuotaMode) return;
+    let timer;
 
     // Keep live telemetry available without polling on every few seconds of dwell.
-    const timer = setInterval(() => {
+    if (!lowQuotaMode) timer = setInterval(() => {
       if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
         fetchAnalytics(true);
       }
     }, 30000);
 
-    return () => clearInterval(timer);
-  }, [timeRange, userFilter, selectedUserEmail, lowQuotaMode]);
+    return () => {
+      clearInterval(timer);
+      requestId.current++;
+      setIsRefreshing(false);
+    };
+  }, [timeRange, userFilter, selectedUserEmail, lowQuotaMode, active, currentUserEmail, viewerTimeZone]);
 
-  const handleAction = async (actionId, willEnable, reason = '') => {
+  const handleAction = (actionId, willEnable, reason = '') => {
+    setActionReason(reason);
+    setPendingAction({ actionId, willEnable, reason });
+  };
+
+  const executeAction = async (actionId, willEnable, reason = '') => {
     setActionLoadingId(actionId);
     setActionFeedback(null);
     try {
@@ -126,17 +182,16 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
       setActionFeedback({
         actionId,
         message: willEnable 
-          ? 'Optimization applied successfully! Telemetry monitoring active.' 
+          ? 'Optimization configuration applied. Runtime behavior has not been verified.'
           : 'Optimization reverted back to baseline.',
       });
 
       // Refresh data
-      await fetchAnalytics();
+      await refreshRef.current(false);
     } catch (err) {
-      alert(`Action execution failed: ${err.message}`);
+      setActionFeedback({ actionId, error: true, message: `Action execution failed: ${err.message}` });
     } finally {
       setActionLoadingId(null);
-      setTimeout(() => setActionFeedback(null), 4000);
     }
   };
 
@@ -209,8 +264,23 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
     );
   }, [data?.actionsHistory, historySearchQuery]);
 
+  const filteredActivity = useMemo(() => {
+    const query = activitySearch.trim().toLowerCase();
+    return (data?.recentActivity || []).filter(event => {
+      if (!query) return true;
+      return [event.userEmail, event.eventType, event.tab, data?.tabLabels?.[(event.tab || '').toLowerCase()], event.geo?.city, event.geo?.country,
+        JSON.stringify(event.details || {}), JSON.stringify(event.filters || {})]
+        .some(value => String(value || '').toLowerCase().includes(query));
+    });
+  }, [data?.recentActivity, data?.tabLabels, activitySearch]);
+  const activityPages = Math.max(1, Math.ceil(filteredActivity.length / activityLimit));
+  const currentActivityPage = Math.min(activityPage, activityPages);
+  const visibleActivity = filteredActivity.slice((currentActivityPage - 1) * activityLimit, currentActivityPage * activityLimit);
+
+  useEffect(() => { setActivityPage(1); }, [activitySearch, activityLimit, timeRange, userFilter, selectedUserEmail]);
+
   const formatRelativeTime = (isoString) => {
-    if (!isoString) return 'Just now';
+    if (!isoString || !Number.isFinite(new Date(isoString).getTime())) return 'Time unavailable';
     const diffMs = Date.now() - new Date(isoString).getTime();
     const diffSec = Math.floor(diffMs / 1000);
     const diffMin = Math.floor(diffSec / 60);
@@ -223,8 +293,6 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
     return `${diffDays}d ago`;
   };
   const handleVerifyAction = (actionId) => {
-    const catalogItem = data?.catalog?.[actionId] || {};
-    const probe = catalogItem.verificationProbe || { rule: actionId, status: 'verified', latencyMs: 2 };
     const nowTimeStr = new Date().toLocaleTimeString('en-US', {
       timeZone: viewerTimeZone,
       hour: 'numeric',
@@ -235,11 +303,9 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
     setDiagnosticProbeResults(prev => ({
       ...prev,
       [actionId]: {
-        verified: true,
+        verified: false,
         time: nowTimeStr,
-        latencyMs: probe.latencyMs || Math.floor(Math.random() * 5) + 6,
-        ruleName: probe.rule || actionId,
-        message: 'Runtime Probe Passed: Rule verified active in memory & proxy.',
+        message: 'Runtime verification unavailable. Catalog metadata is not execution evidence. Follow the verification guide and observe the dashboard before marking this rule as verified.',
       },
     }));
   };
@@ -332,7 +398,7 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
         </h3>
         <p className="text-sm">{error}</p>
         <button
-          onClick={fetchAnalytics}
+          onClick={() => fetchAnalytics(false)}
           className="mt-4 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 border border-red-400 rounded-lg text-xs font-bold uppercase tracking-wider"
         >
           Retry
@@ -344,7 +410,6 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
   const kpis = data?.kpis || {};
   const findings = data?.findings || [];
   const monitoredFixes = data?.monitoredFixes || [];
-  const actionsHistory = data?.actionsHistory || [];
   const tabUsage = data?.tabUsage || [];
   const dwellTimes = data?.dwellTimes || {};
   const featureInteractions = data?.featureInteractions || {};
@@ -354,27 +419,18 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
   const geoDistribution = data?.geoDistribution || [];
   const filterInsights = data?.filterInsights || {};
   const appliedActions = data?.appliedActions || {};
-  const recentActivity = data?.recentActivity || [];
 
   return (
-    <div className="space-y-8 animate-fadeIn pb-12">
+    <div className="space-y-5 animate-fadeIn pb-8">
       {data?.persistence?.lastError && <p role="alert" className="p-3 border border-amber-500/40 rounded-xl text-sm text-amber-200">Analytics persistence is incomplete on this instance: {data.persistence.failedEvents || 0} events failed. {data.persistence.lastError}</p>}
       {data?.persistence?.mode === 'memory-only' && <p role="status" className="p-3 border border-amber-500/40 rounded-xl text-sm text-amber-200">Analytics is running in memory-only mode. These observations are not durably backed up.</p>}
       {/* HEADER & CONTROLS */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-4 border-b border-gray-800">
         <div>
-          <div className="flex items-center gap-2.5 mb-1">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#cedc28] animate-pulse"></span>
-            <span className="text-[10px] font-black uppercase tracking-widest text-[#cedc28]">
-              Automated Analysis & In-UI Action Engine
-            </span>
-          </div>
-          <h2 className="text-3xl font-black text-white tracking-wider uppercase">
-            Dashboard Intelligence & Analytics
+          <h2 className="text-xl font-bold text-white">
+            Analytics
           </h2>
-          <p className="text-xs text-gray-400 font-medium mt-0.5">
-            Deep telemetry tracking, automated UX findings, display ergonomics, and 1-click dashboard optimizations
-          </p>
+          <p className="text-xs text-gray-400 mt-1">Usage, activity and observed performance</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
@@ -383,6 +439,7 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
             <Users className="w-3.5 h-3.5 text-[#cedc28]" />
             <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider hidden sm:inline">Audience:</span>
             <select
+              aria-label="Analytics audience"
               value={userFilter}
               onChange={(e) => {
                 setUserFilter(e.target.value);
@@ -441,7 +498,7 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
           </div>
 
           <button
-            onClick={fetchAnalytics}
+            onClick={() => fetchAnalytics(false)}
             disabled={isRefreshing}
             className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#0a2442] hover:bg-[#0d2f56] border border-[#14a6d9]/30 text-xs font-bold text-[#14a6d9] hover:text-white transition-all shadow-sm"
           >
@@ -451,7 +508,41 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
         </div>
       </div>
 
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-gray-300">
+        <p>
+          Active scope: <strong>{selectedUserEmail || (userFilter === 'non_admin' ? 'Users excluding admins' : userFilter === 'admin_only' ? 'Admins only' : 'All users')}</strong>
+          {' · '}{timeRange === 'all' ? 'All time' : timeRange === 'today' ? 'Today' : timeRange === 'yesterday' ? 'Yesterday' : timeRange === '7d' ? 'Last 7 days' : 'Last 30 days'}
+          {' · '}{viewerTimeZone}
+        </p>
+        <button type="button" onClick={() => {
+          setTimeRange('all'); setUserFilter('non_admin'); setSelectedUserEmail('');
+          setSearchQuery(''); setActivitySearch(''); setHistorySearchQuery(''); setFindingCategory('all');
+        }} className="rounded-lg border border-white/20 px-3 py-1.5 hover:bg-white/10">
+          Reset filters
+        </button>
+      </div>
+      <p role="note" className="rounded-xl border border-sky-400/20 bg-sky-400/5 p-3 text-xs text-slate-300">
+        Scope coverage: audience and specific-user filters apply to Users and Activity. Aggregate performance and tab metrics remain retained all-user rollups; all-time view totals are not audience-filtered. Dated KPIs are calculated from bounded recent activity, not the full historical dataset.
+      </p>
+      <div role="status" className="text-xs text-gray-400 flex flex-wrap gap-x-4 gap-y-1">
+        <span>Last successful refresh: {lastSuccessfulRefresh ? new Date(lastSuccessfulRefresh).toLocaleString('en-US', { timeZone: viewerTimeZone }) : 'Not yet refreshed'}</span>
+        <span>{!active ? 'Polling paused: page inactive' : lowQuotaMode ? 'Polling paused: low quota mode' : !pageVisible ? 'Polling paused: browser tab hidden' : 'Polling every 30 seconds'}</span>
+        {isRefreshing && <span>Refreshing…</span>}
+      </div>
+      {error && data && <p role="alert" className="rounded-xl border border-amber-500/40 p-3 text-sm text-amber-200">Refresh failed: {error}. Showing stale data from the last successful refresh.</p>}
+      {data && loadedScope !== scopeKey && <p role="status" className="text-sm text-amber-200">The displayed snapshot belongs to the previous scope. Waiting for the selected filters to load.</p>}
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <AdminTabs tabs={ANALYTICS_TABS} value={subView} onChange={setSubView} label="Analytics sections" />
+        <button type="button" aria-current={subView === 'optimizations' ? 'page' : undefined}
+          onClick={() => setSubView('optimizations')}
+          className={`rounded-lg border px-3 py-2 text-sm font-semibold ${subView === 'optimizations' ? 'border-amber-300 text-amber-200 bg-amber-400/10' : 'border-gray-700 text-gray-300'}`}>
+          Optimizations & rollback
+        </button>
+      </div>
+
       {/* TOP 6 EXECUTIVE KPI CARDS */}
+      {subView === 'overview' && (
       <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
         {/* Total Views */}
         <div className="card-surface p-4 rounded-xl border border-[#cedc28]/25 shadow-md relative overflow-hidden group">
@@ -493,7 +584,7 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
           <div className="flex justify-between items-start relative z-10">
             <div>
               <p className="text-[10px] font-bold text-[#14a6d9] uppercase tracking-wider mb-1">Avg Session Duration</p>
-              <h3 className="text-2xl font-black text-white">{formatDurationSec(kpis.avgSessionDurationSec || 420)}</h3>
+              <h3 className="text-2xl font-black text-white">{kpis.totalSessions > 0 && Number.isFinite(kpis.avgSessionDurationSec) ? formatDurationSec(kpis.avgSessionDurationSec) : 'Not measured'}</h3>
               <p className="text-[10px] text-gray-400 mt-1 flex items-center gap-1">
                 <Clock className="w-3 h-3 text-[#14a6d9]" /> {kpis.totalSessions || 0} total sessions
               </p>
@@ -543,10 +634,10 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
           <div className="absolute top-0 right-0 w-20 h-20 bg-purple-400/10 rounded-full blur-xl -mr-6 -mt-6"></div>
           <div className="flex justify-between items-start relative z-10">
             <div>
-              <p className="text-[10px] font-bold text-purple-300 uppercase tracking-wider mb-1">13&quot; Screen Baseline</p>
-              <h3 className="text-2xl font-black text-white">58% Share</h3>
+              <p className="text-[10px] font-bold text-purple-300 uppercase tracking-wider mb-1">Display Samples</p>
+              <h3 className="text-2xl font-black text-white">{Object.values(deviceFootprint.screenResolutions || {}).reduce((sum, count) => sum + count, 0)}</h3>
               <p className="text-[10px] text-gray-400 mt-1 flex items-center gap-1">
-                <Laptop className="w-3 h-3 text-purple-300" /> 1440x900 viewport
+                <Laptop className="w-3 h-3 text-purple-300" /> Recorded viewport observations
               </p>
             </div>
             <div className="p-2 rounded-lg bg-purple-400/10 text-purple-300">
@@ -555,53 +646,20 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
           </div>
         </div>
       </div>
-
-      {/* SUB-VIEW NAVIGATION TABS */}
-      <div className="flex border-b border-gray-800 gap-6 overflow-x-auto">
-        {[
-          { id: 'intelligence', label: 'Actionable Findings & Intelligence', icon: Sparkles, count: findings.length },
-          { id: 'fixes_monitoring', label: 'Fix Monitoring & Rollback History', icon: ShieldCheck, count: kpis.appliedOptimizationsCount },
-          { id: 'behavior', label: 'Dwell Time & Behavioral Telemetry', icon: Clock },
-          { id: 'hardware', label: 'Display & Performance Benchmarks', icon: Monitor },
-          { id: 'audience', label: 'Audience, Geo & User Audit', icon: Users },
-        ].map(tab => {
-          const Icon = tab.icon;
-          const active = subView === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setSubView(tab.id)}
-              className={`pb-3 text-xs font-bold uppercase tracking-wider flex items-center gap-2 border-b-2 transition-all ${
-                active
-                  ? 'border-[#cedc28] text-[#cedc28]'
-                  : 'border-transparent text-gray-400 hover:text-white'
-              }`}
-            >
-              <Icon className="w-4 h-4" />
-              {tab.label}
-              {tab.count !== undefined && (
-                <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
-                  active ? 'bg-[#cedc28] text-[#0a2442]' : 'bg-gray-800 text-gray-300'
-                }`}>
-                  {tab.count}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
+      )}
 
       {/* FEEDBACK TOAST */}
       {actionFeedback && (
-        <div className="p-3 rounded-xl bg-[#cedc28]/15 border border-[#cedc28]/40 text-[#cedc28] flex items-center gap-2.5 text-xs font-bold animate-fadeIn">
-          <CheckCircle2 className="w-4 h-4 text-[#cedc28]" />
+        <div role={actionFeedback.error ? 'alert' : 'status'} className={`p-3 rounded-xl border flex items-center gap-2.5 text-xs font-bold ${actionFeedback.error ? 'bg-red-500/10 border-red-400/40 text-red-200' : 'bg-[#cedc28]/15 border-[#cedc28]/40 text-[#cedc28]'}`}>
           <span>{actionFeedback.message}</span>
+          <button type="button" className="ml-auto underline" onClick={() => setActionFeedback(null)}>Dismiss</button>
         </div>
       )}
 
       {/* SUB-VIEW 1: ACTIONABLE FINDINGS & INTELLIGENCE ENGINE */}
-      {subView === 'intelligence' && (
+      {subView === 'recommendations' && (
         <div className="space-y-6">
+          <p role="note" className="rounded-xl border border-amber-500/30 p-3 text-xs text-amber-200">Recommendation descriptions and before/after scenarios are catalog assumptions, not measured outcomes. Numerical benefits have not been independently verified.</p>
           {/* Category filter pills */}
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-2">
@@ -639,11 +697,10 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
             <div className="flex items-center gap-2.5 text-gray-300">
               <History className="w-4 h-4 text-[#14a6d9] flex-shrink-0" />
               <span>
-                <strong>Applied Fixes & Version History:</strong> All optimizations have live telemetry monitoring, author audit trails, and 1-click rollback snapshots in the <strong>Fix Monitoring & Rollback History</strong> tab.
+                <strong>Optimizations & rollback:</strong> Review configured rules, verification guidance, author audit trails and rollback history separately. Configuration status does not prove runtime behavior.
               </span>
             </div>
-            <button 
-              onClick={() => setSubView('fixes_monitoring')} 
+            <button type="button" onClick={() => setSubView('optimizations')}
               className="px-3 py-1.5 rounded-lg bg-[#14a6d9]/20 hover:bg-[#14a6d9]/30 text-[#14a6d9] hover:text-white font-bold whitespace-nowrap text-xs border border-[#14a6d9]/40 flex items-center gap-1.5 transition-all self-start sm:self-auto"
             >
               <span>View Version History</span>
@@ -652,6 +709,7 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
           </div>
 
           {/* Findings Cards Grid */}
+          {filteredFindings.length === 0 && <p className="text-sm text-gray-400">No recommendations match this category and snapshot.</p>}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {filteredFindings.map(finding => {
               const isApplied = finding.status === 'applied';
@@ -689,7 +747,7 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
                           </span>
                           {isApplied && (
                             <span className="text-[10px] font-mono text-emerald-400 font-bold px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 flex items-center gap-1">
-                              <CheckCircle2 className="w-3 h-3" /> Live & Active
+                              <CheckCircle2 className="w-3 h-3" /> Configured
                             </span>
                           )}
                         </div>
@@ -754,8 +812,8 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
 
                       {/* Live Probe Result (if checked) */}
                       {probe && (
-                        <div className="p-2 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-[10px] font-mono flex items-center justify-between">
-                          <span>✓ {probe.message} ({probe.latencyMs}ms)</span>
+                        <div role="status" className="p-2 rounded bg-amber-500/10 border border-amber-500/30 text-amber-200 text-[10px] font-mono flex items-center justify-between gap-2">
+                          <span>{probe.message}</span>
                           <span className="text-gray-400">{probe.time}</span>
                         </div>
                       )}
@@ -766,7 +824,7 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
                   <div className="pt-3 border-t border-gray-800 flex items-center justify-between gap-3 mt-4">
                     <div className="text-[11px] font-bold text-[#cedc28] flex items-center gap-1">
                       <TrendingUp className="w-3.5 h-3.5" />
-                      {finding.impactMetric}
+                      Expected benefit · unverified
                     </div>
 
                     <div className="flex items-center gap-2">
@@ -774,9 +832,9 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
                         <button
                           onClick={() => handleVerifyAction(finding.actionId)}
                           className="px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-[#14a6d9]/15 hover:bg-[#14a6d9]/25 border border-[#14a6d9]/40 text-[#14a6d9] hover:text-white transition-all flex items-center gap-1 shadow-sm"
-                          title="Run instant verification probe test on this active rule"
+                          title="Review runtime verification availability"
                         >
-                          <PlayCircle className="w-3 h-3" /> Test & Verify
+                          <PlayCircle className="w-3 h-3" /> Verification status
                         </button>
                       )}
 
@@ -792,7 +850,7 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
                           ) : (
                             <RotateCcw className="w-3 h-3" />
                           )}
-                          1-Click Revert
+                          Revert
                         </button>
                       ) : (
                         <button
@@ -820,6 +878,11 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
             })}
           </div>
 
+        </div>
+      )}
+
+      {subView === 'optimizations' && (
+        <div className="space-y-4">
           {/* Audit Trail of Active Optimizations */}
           <div className="card-surface p-6 rounded-2xl border border-gray-800 shadow-lg">
             <div className="flex items-center justify-between mb-4">
@@ -837,7 +900,7 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
             <div className="divide-y divide-gray-850">
               {Object.values(appliedActions).length === 0 ? (
                 <div className="py-6 text-center text-xs text-gray-500">
-                  No automated optimizations applied yet. Review the findings above and click to apply.
+                  No optimizations applied yet. Review Recommendations to choose a configuration change.
                 </div>
               ) : (
                 Object.values(appliedActions).map(act => (
@@ -856,7 +919,7 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
                     </div>
 
                     <div className="flex items-center gap-3">
-                      <span className="text-[11px] font-bold text-emerald-400">{act.impact}</span>
+                      <span className="text-[11px] text-gray-400">Runtime impact not measured</span>
                       <button
                         onClick={() => handleToggleAction(act.actionId, act.status)}
                         className="px-2.5 py-1 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 text-[10px] font-bold uppercase tracking-wider"
@@ -873,7 +936,7 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
       )}
 
       {/* SUB-VIEW: FIX MONITORING & ROLLBACK HISTORY */}
-      {subView === 'fixes_monitoring' && (
+      {subView === 'optimizations' && (
         <div className="space-y-8">
           {/* Section 1: Live Fix Health & Telemetry Impact Monitor */}
           <div className="space-y-4">
@@ -881,10 +944,10 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
               <div>
                 <h3 className="text-lg font-black text-white uppercase tracking-wider flex items-center gap-2">
                   <ShieldCheck className="w-5 h-5 text-emerald-400" />
-                  Live Fix Health & Telemetry Impact Monitor
+                  Optimization Configuration & Verification
                 </h3>
                 <p className="text-xs text-gray-400">
-                  Real-time status of applied fixes, observed telemetry delta, active duration, and 1-click rollback
+                  Configured rules, reported impact, verification guidance and audited rollback. Runtime verification is unavailable.
                 </p>
               </div>
               <div className="flex items-center gap-2 text-xs font-mono text-gray-400">
@@ -921,7 +984,7 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
                                 ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
                                 : 'bg-gray-800 border-gray-700 text-gray-400'
                           }`}>
-                            {isActive ? 'Active & Monitored' : isReverted ? 'Reverted' : 'Standby'}
+                            {isActive ? 'Configured active' : isReverted ? 'Reverted' : 'Standby'}
                           </span>
                           <span className="text-[10px] font-mono text-gray-400 uppercase tracking-widest px-1.5 py-0.5 rounded bg-gray-900 border border-gray-800">
                             {fix.category.replace('_', ' ')}
@@ -965,8 +1028,8 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
                         {fix.howToVerify}
                       </p>
                       {probe && (
-                        <div className="p-2 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-[10px] font-mono flex items-center justify-between">
-                          <span>✓ {probe.message} ({probe.latencyMs}ms)</span>
+                        <div role="status" className="p-2 rounded bg-amber-500/10 border border-amber-500/30 text-amber-200 text-[10px] font-mono flex items-center justify-between gap-2">
+                          <span>{probe.message}</span>
                           <span className="text-gray-400">{probe.time}</span>
                         </div>
                       )}
@@ -976,18 +1039,11 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
                     <div className="p-3 rounded-xl bg-[#030b14]/70 border border-gray-850 mb-3 space-y-1.5 text-xs text-gray-300">
                       <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#14a6d9] uppercase tracking-wider">
                         <TrendingUp className="w-3.5 h-3.5" />
-                        Observed Telemetry Impact:
+                        Runtime Impact:
                       </div>
                       <p className="text-xs text-gray-200 leading-relaxed font-medium">
-                        {fix.telemetryEffect}
+                        Not measured. Catalog benefits and targets are not evidence of an observed change.
                       </p>
-                      {fix.baselineMetric && (
-                        <div className="flex items-center gap-2 text-[10px] text-gray-400 pt-1 border-t border-gray-800/80 font-mono">
-                          <span className="text-amber-400">Baseline: {fix.baselineMetric}</span>
-                          <span>→</span>
-                          <span className="text-emerald-400">Target: {fix.targetMetric}</span>
-                        </div>
-                      )}
                     </div>
 
                     {/* Card Footer with Details and 1-Click Revert / Apply */}
@@ -1006,9 +1062,9 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
                           <button
                             onClick={() => handleVerifyAction(fix.actionId)}
                             className="px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-[#14a6d9]/15 hover:bg-[#14a6d9]/25 border border-[#14a6d9]/40 text-[#14a6d9] hover:text-white transition-all flex items-center gap-1 shadow-sm"
-                            title="Run live diagnostic health check"
+                            title="Review runtime verification availability"
                           >
-                            <PlayCircle className="w-3 h-3" /> Test Health
+                            <PlayCircle className="w-3 h-3" /> Verification status
                           </button>
                         )}
 
@@ -1168,7 +1224,7 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
       )}
 
       {/* SUB-VIEW 2: DWELL TIME & BEHAVIORAL TELEMETRY */}
-      {subView === 'behavior' && (
+      {subView === 'overview' && (
         <div className="space-y-6">
           {/* Tab Dwell Time & Bounce Rates Grid */}
           <div className="card-surface p-6 rounded-2xl border border-gray-800 shadow-lg">
@@ -1186,7 +1242,7 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {tabUsage.map(t => {
-                const dt = dwellTimes[t.tab] || { avgSec: 60, bouncePercent: 10 };
+                const dt = dwellTimes[t.tab] || {};
                 const isHighBounce = dt.bouncePercent >= 30;
                 return (
                   <div key={t.tab} className="p-4 rounded-xl bg-[#071322] border border-gray-800">
@@ -1195,19 +1251,19 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
                       <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold ${
                         isHighBounce ? 'bg-red-500/15 text-red-400 border border-red-500/30' : 'bg-[#cedc28]/10 text-[#cedc28]'
                       }`}>
-                        {dt.bouncePercent}% bounce
+                        {Number.isFinite(dt.bouncePercent) ? `${dt.bouncePercent}% bounce` : 'Bounce not measured'}
                       </span>
                     </div>
 
                     <div className="text-2xl font-black text-white font-mono mb-1">
-                      {formatDurationSec(dt.avgSec)}
+                      {Number.isFinite(dt.avgSec) ? formatDurationSec(dt.avgSec) : 'Not measured'}
                     </div>
                     <p className="text-[10px] text-gray-400 mb-2">Average time spent per session</p>
 
                     <div className="w-full h-1.5 rounded-full bg-gray-800 overflow-hidden">
                       <div 
                         className="h-full rounded-full bg-gradient-to-r from-[#14a6d9] to-[#cedc28]"
-                        style={{ width: `${Math.min(100, (dt.avgSec / 200) * 100)}%` }}
+                        style={{ width: `${Number.isFinite(dt.avgSec) ? Math.min(100, (dt.avgSec / 200) * 100) : 0}%` }}
                       ></div>
                     </div>
                   </div>
@@ -1274,7 +1330,7 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
       )}
 
       {/* SUB-VIEW 3: DISPLAY, HARDWARE & PERFORMANCE BENCHMARKS */}
-      {subView === 'hardware' && (
+      {subView === 'performance' && (
         <div className="space-y-6">
           {/* Display & Screen Resolution Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -1356,14 +1412,15 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
               <div className="flex items-center gap-2">
                 <Gauge className="w-5 h-5 text-emerald-400" />
                 <h4 className="text-sm font-bold text-white uppercase tracking-wider">
-                  Live Sheet Data Ingestion & Caching Latencies
+                  Reported Sheet Ingestion & Caching Latencies
                 </h4>
               </div>
               <span className="text-xs text-emerald-400 font-mono font-bold">
-                Avg Response: {performanceTelemetry.avgApiLatencyMs}ms
+                Avg Response: {Object.keys(performanceTelemetry.sheetBreakdown || {}).length > 0 && Number.isFinite(performanceTelemetry.avgApiLatencyMs) ? `${performanceTelemetry.avgApiLatencyMs}ms` : 'Not measured'}
               </span>
             </div>
 
+            {Object.keys(performanceTelemetry.sheetBreakdown || {}).length === 0 && <p className="text-sm text-gray-400">No sheet latency samples are available in this snapshot.</p>}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {Object.entries(performanceTelemetry.sheetBreakdown || {}).map(([sheetName, bench]) => (
                 <div key={sheetName} className="p-4 rounded-xl bg-[#071322] border border-gray-800">
@@ -1391,7 +1448,7 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
       )}
 
       {/* SUB-VIEW 4: AUDIENCE, GEO & USER AUDIT */}
-      {subView === 'audience' && (
+      {subView === 'users' && (
         <div className="space-y-6">
           {/* Countries & Business Filter Split */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -1464,7 +1521,7 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
                       <div className="w-full h-1.5 rounded-full bg-gray-800 overflow-hidden">
                         <div 
                           className={`h-full rounded-full bg-gradient-to-r ${barGradient}`}
-                          style={{ width: `${Math.max(bData.percentage, 5)}%` }}
+                          style={{ width: `${Math.max(0, Math.min(100, bData.percentage))}%` }}
                         ></div>
                       </div>
                     </div>
@@ -1474,7 +1531,7 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
 
               <h5 className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2">Top Filtered Events</h5>
               <div className="grid grid-cols-2 gap-2">
-                {(filterInsights.topEvents || []).slice(0, 4).map((ev, i) => (
+                {(filterInsights.topEvents || []).slice(0, 4).map(ev => (
                   <div key={ev.event} className="py-1.5 px-2 rounded bg-[#071322] text-xs flex justify-between items-center">
                     <span className="text-gray-300 truncate">{ev.event}</span>
                     <span className="font-mono font-bold text-[#14a6d9]">{ev.count}</span>
@@ -1525,6 +1582,7 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
                 {/* Specific user email dropdown */}
                 {data?.allKnownUsers && data.allKnownUsers.length > 0 && (
                   <select
+                    aria-label="Specific analytics user"
                     value={selectedUserEmail}
                     onChange={(e) => setSelectedUserEmail(e.target.value)}
                     className="bg-[#071322] border border-gray-800 text-xs font-medium text-white rounded-xl px-3 py-1.5 focus:outline-none focus:border-[#cedc28]"
@@ -1543,6 +1601,7 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
                   <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input
                     type="text"
+                    aria-label="Search users"
                     placeholder="Search user, role, city..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -1587,7 +1646,7 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
                         <tr key={u.email} className="hover:bg-[#0d2238]/40 transition-colors">
                           <td className="py-3 px-4">
                             <div className="font-bold text-white">{u.email}</div>
-                            <div className="text-[10px] text-gray-500 font-mono">Sessions: {u.sessionCount || 1}</div>
+                            <div className="text-[10px] text-gray-500 font-mono">Sessions: {u.sessionCount ?? 'Not measured'}</div>
                           </td>
                           <td className="py-3 px-4">
                             <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
@@ -1603,7 +1662,7 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
                             {u.totalEvents?.toLocaleString() || 0}
                           </td>
                           <td className="py-3 px-4 font-mono text-gray-300">
-                            {formatDurationSec(u.avgDwellSec || 120)}
+                            {Number.isFinite(u.avgDwellSec) ? formatDurationSec(u.avgDwellSec) : 'Not measured'}
                           </td>
                           <td className="py-3 px-4">
                             <div className="text-white font-medium">{formatRelativeTime(u.lastActive)}</div>
@@ -1646,12 +1705,13 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
         </div>
       )}
 
-      {/* PERSISTENT REAL-TIME TELEMETRY STREAM TICKER */}
+      {/* Activity is scoped to the same API snapshot as the other sections. */}
+      {subView === 'activity' && (
       <div className="card-surface p-5 rounded-2xl border border-gray-800 shadow-lg">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-3 pb-3 border-b border-gray-800/80">
           <div className="flex flex-wrap items-center gap-2.5">
             <Activity className="w-4 h-4 text-[#cedc28]" />
-            <h4 className="text-xs font-bold text-white tracking-wide uppercase">Real-Time Telemetry Stream</h4>
+            <h4 className="text-xs font-bold text-white tracking-wide uppercase">Activity</h4>
             <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#14a6d9]/10 text-[#14a6d9] border border-[#14a6d9]/30 font-medium">
               {selectedUserEmail 
                 ? `Isolating: ${selectedUserEmail}`
@@ -1667,6 +1727,9 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
           </div>
 
           <div className="flex items-center gap-3">
+            <input type="search" aria-label="Search activity" value={activitySearch}
+              onChange={event => setActivitySearch(event.target.value)} placeholder="Search users, actions, tabs…"
+              className="min-w-0 rounded-lg border border-gray-700 bg-[#071322] px-3 py-2 text-xs text-white" />
             {/* Limit Selector */}
             <div className="flex items-center gap-1.5 bg-[#071322] px-2.5 py-1 rounded-xl border border-gray-800">
               <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Show:</span>
@@ -1680,23 +1743,19 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
                       : 'text-gray-400 hover:text-white'
                   }`}
                 >
-                  {cnt === 100 ? 'All' : cnt}
+                  {cnt}
                 </button>
               ))}
             </div>
 
-            <span className="flex items-center gap-1.5 text-[11px] text-[#cedc28] font-bold">
-              <span className="w-2 h-2 rounded-full bg-[#cedc28] animate-ping"></span>
-              Live Sync (6s)
-            </span>
           </div>
         </div>
 
         <div className="divide-y divide-gray-850 max-h-96 overflow-y-auto pr-1">
-          {recentActivity.length === 0 ? (
-            <div className="py-8 text-center text-xs text-gray-500">No live telemetry events recorded yet.</div>
+          {filteredActivity.length === 0 ? (
+            <div className="py-8 text-center text-xs text-gray-500">{activitySearch ? 'No activity matches your search.' : 'No activity recorded for this scope.'}</div>
           ) : (
-            recentActivity.slice(0, activityLimit).map((act) => {
+            visibleActivity.map((act) => {
               const rawTab = (act.tab || '').toLowerCase();
               const tabName = rawTab === 'summary' || rawTab === 'overview' ? 'Overview' : (data?.tabLabels?.[rawTab] || act.tab || 'Dashboard');
 
@@ -1725,7 +1784,7 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
               } else if (act.eventType === 'export_csv') {
                 narrative = { action: 'downloaded raw CSV data from', target: tabName, color: 'text-teal-400' };
               } else if (act.eventType === 'currency_toggle') {
-                narrative = { action: 'toggled currency to', target: act.details?.currency || 'SAR', color: 'text-amber-300' };
+                narrative = { action: 'toggled currency to', target: act.details?.currency || 'Unknown currency', color: 'text-amber-300' };
               } else if (act.eventType === 'search_query') {
                 narrative = { action: 'searched for', target: `"${act.details?.query}"`, color: 'text-pink-400' };
               } else if (act.eventType === 'optimization_applied') {
@@ -1754,12 +1813,12 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
 
                   <div className="flex items-center gap-2.5 text-gray-400 font-mono text-[10px] shrink-0 sm:self-center self-end">
                     <span className="text-gray-300 font-medium">
-                      {act.geo?.city ? `${act.geo.city}, ` : ''}{act.geo?.country || 'SA'}
+                      {act.geo?.city ? `${act.geo.city}, ` : ''}{act.geo?.country || 'Unknown country'}
                     </span>
                     <span>•</span>
                     <span 
                       className="px-2 py-0.5 rounded-md bg-[#0a2442] border border-[#14a6d9]/30 text-[#14a6d9] font-bold tracking-tight"
-                      title={`Viewed at ${localTime.timeStr} in your local timezone (${viewerTimeZone}) • Activity recorded from ${act.geo?.city || 'Unknown'}, ${act.geo?.country || 'SA'}`}
+                      title={`Viewed at ${localTime.timeStr} in your local timezone (${viewerTimeZone}) • Activity recorded from ${act.geo?.city || 'Unknown'}, ${act.geo?.country || 'Unknown country'}`}
                     >
                       {localTime.timeStr} {viewerTzShort}
                     </span>
@@ -1778,11 +1837,40 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
         <div className="mt-3 pt-2.5 border-t border-gray-800/80 flex flex-wrap items-center justify-between gap-2 text-[10px] text-gray-500 font-mono">
           <div className="flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-            <span>Showing {Math.min(activityLimit, recentActivity.length)} of {recentActivity.length} recent telemetry events</span>
+            <span>{filteredActivity.length} matching events · Page {currentActivityPage} of {activityPages}</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <button type="button" disabled={currentActivityPage <= 1} onClick={() => setActivityPage(currentActivityPage - 1)}
+              className="rounded border border-gray-700 px-3 py-1.5 text-white disabled:opacity-40">Previous</button>
+            <button type="button" disabled={currentActivityPage >= activityPages} onClick={() => setActivityPage(currentActivityPage + 1)}
+              className="rounded border border-gray-700 px-3 py-1.5 text-white disabled:opacity-40">Next</button>
           </div>
           <span className="text-gray-400">All activities normalized to your local timezone ({viewerTzShort} - {viewerTimeZone})</span>
         </div>
       </div>
+      )}
+      <dialog ref={actionDialog} aria-labelledby="analytics-action-title"
+          onCancel={() => setPendingAction(null)}
+          className="w-full max-w-lg rounded-2xl border border-gray-700 bg-[#071322] p-6 text-white backdrop:bg-black/70">
+          {pendingAction && <form onSubmit={event => {
+            event.preventDefault();
+            const action = pendingAction;
+            setPendingAction(null);
+            executeAction(action.actionId, action.willEnable, actionReason);
+          }} className="space-y-4">
+            <h3 id="analytics-action-title" className="text-lg font-bold">{pendingAction.willEnable ? 'Apply optimization?' : 'Revert optimization?'}</h3>
+            <p className="text-sm text-gray-300">Rule: {pendingAction.actionId}. This changes dashboard configuration and records an audit event. It does not verify runtime behavior.</p>
+            <label className="block text-sm" htmlFor="analytics-action-reason">Audit reason</label>
+            <textarea id="analytics-action-reason" value={actionReason} onChange={event => setActionReason(event.target.value)}
+              className="w-full rounded-lg border border-gray-600 bg-[#030b14] p-3 text-sm" rows={3} />
+            <div className="flex justify-end gap-3">
+              <button type="button" onClick={() => setPendingAction(null)} className="rounded-lg border border-gray-600 px-4 py-2">Cancel</button>
+              <button type="submit" disabled={Boolean(actionLoadingId)} className="rounded-lg bg-[#cedc28] px-4 py-2 font-semibold text-[#041628] disabled:opacity-50">
+                {pendingAction.willEnable ? 'Apply' : 'Revert'}
+              </button>
+            </div>
+          </form>}
+      </dialog>
     </div>
   );
 }

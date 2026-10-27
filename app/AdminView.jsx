@@ -6,9 +6,28 @@ import DataHealthAdmin from './components/DataHealthAdmin';
 import AnalyticsAdmin from './components/AnalyticsAdmin';
 import ApiQuotasAdmin from './components/ApiQuotasAdmin';
 import FeatureControlsAdmin from './components/FeatureControlsAdmin';
+import { AdminDialog, useAdminView, useAdminDirtyGuard } from './components/AdminUI';
 
-export default function AdminView({ currentUserEmail = 'admin@tahaluf.com', initialEvents = [], onFeaturesSaved }) {
-  const [activeSection, setActiveSection] = useState('events');
+const sections = [
+  { id: 'events', label: 'Events & Data', icon: Layers },
+  { id: 'health', label: 'Health Monitor', icon: Activity },
+  { id: 'quotas', label: 'API & Quotas', icon: Gauge },
+  { id: 'analytics', label: 'Analytics & Activity', icon: BarChart3 },
+  { id: 'features', label: 'Feature Controls', icon: Shield },
+  { id: 'users', label: 'User Access', icon: UsersIcon },
+];
+
+export default function AdminView({ active = true, currentUserEmail = 'admin@tahaluf.com', initialEvents = [], onFeaturesSaved }) {
+  const [activeSection, setActiveSection] = useAdminView('admin', 'users', sections.map(section => section.id));
+  const [visited, setVisited] = useState({ events: true });
+  const [dirtyScopes, setDirtyScopes] = useState({});
+  const [pendingSection, setPendingSection] = useState(null);
+  const [userAction, setUserAction] = useState(null);
+  const [actionPassword, setActionPassword] = useState('');
+  const [actionBusy, setActionBusy] = useState(false);
+  const [notice, setNotice] = useState('');
+  const [userSearch, setUserSearch] = useState('');
+  const [userPage, setUserPage] = useState(1);
   const [users, setUsers] = useState([]);
   const [healthIssueCount, setHealthIssueCount] = useState(0);
   const [dashboardAlertsEnabled, setDashboardAlertsEnabled] = useState(true);
@@ -22,6 +41,17 @@ export default function AdminView({ currentUserEmail = 'admin@tahaluf.com', init
   const [newRole, setNewRole] = useState('standard');
   const [addingUser, setAddingUser] = useState(false);
   const [addSuccess, setAddSuccess] = useState(false);
+  useAdminDirtyGuard('new-user', showAddForm && Boolean(newEmail || newPassword || newRole !== 'standard'));
+  useEffect(() => {
+    const updateDirty = event => setDirtyScopes(current => ({ ...current, [event.detail.scope]: event.detail.dirty }));
+    window.addEventListener('admin-dirty', updateDirty);
+    return () => window.removeEventListener('admin-dirty', updateDirty);
+  }, []);
+  useEffect(() => { setVisited(current => ({ ...current, [activeSection]: true })); }, [activeSection]);
+  const navigate = section => {
+    if (section !== activeSection && Object.values(dirtyScopes).some(Boolean)) setPendingSection(section);
+    else setActiveSection(section);
+  };
 
   const [sortConfig, setSortConfig] = useState({ key: 'lastactive', direction: 'desc' });
 
@@ -89,9 +119,7 @@ export default function AdminView({ currentUserEmail = 'admin@tahaluf.com', init
     }
   };
 
-  const handleDeleteUser = async (uid, email) => {
-    if (!window.confirm(`Are you sure you want to permanently delete the user ${email}?`)) return;
-    
+  const handleDeleteUser = async (uid) => {
     try {
       const res = await fetch('/api/admin/users', {
         method: 'DELETE',
@@ -107,7 +135,7 @@ export default function AdminView({ currentUserEmail = 'admin@tahaluf.com', init
       fetchUsers(); // Refresh the list
     } catch (err) {
       console.error(err);
-      alert('Error deleting user: ' + err.message);
+      throw new Error('Error deleting user: ' + err.message);
     }
   };
 
@@ -125,26 +153,20 @@ export default function AdminView({ currentUserEmail = 'admin@tahaluf.com', init
       }
       
       // Optimistically update the UI
-      setUsers(users.map(u => u.uid === uid ? { ...u, role: newRole } : u));
+      setUsers(current => current.map(u => u.uid === uid ? { ...u, role: newRole } : u));
+      setNotice('User role updated.');
     } catch (err) {
       console.error(err);
-      alert('Error updating user role: ' + err.message);
+      throw new Error('Error updating user role: ' + err.message);
     }
   };
 
-  const handleChangePassword = async (uid, email) => {
-    const newPassword = window.prompt(`Enter new password for ${email} (minimum 6 characters):`);
-    if (!newPassword) return;
-    if (newPassword.length < 6) {
-      alert('Password must be at least 6 characters long.');
-      return;
-    }
-    
+  const handleChangePassword = async (uid, email, password) => {
     try {
       const res = await fetch('/api/admin/users', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ uid, password: newPassword })
+        body: JSON.stringify({ uid, password })
       });
       
       if (!res.ok) {
@@ -152,10 +174,10 @@ export default function AdminView({ currentUserEmail = 'admin@tahaluf.com', init
         throw new Error(data.error || 'Failed to update password');
       }
       
-      alert(`Password successfully updated for ${email}.`);
+      setNotice(`Password successfully updated for ${email}.`);
     } catch (err) {
       console.error(err);
-      alert('Error updating user password: ' + err.message);
+      throw new Error('Error updating user password: ' + err.message);
     }
   };
 
@@ -167,13 +189,32 @@ export default function AdminView({ currentUserEmail = 'admin@tahaluf.com', init
       hour: 'numeric', minute: '2-digit', hour12: true
     }).format(date);
   };
+  const filteredUsers = users.filter(user => `${user.email} ${user.role}`.toLowerCase().includes(userSearch.toLowerCase()));
+  const visibleUserPage = Math.min(userPage, Math.max(1, Math.ceil(filteredUsers.length / 20)));
 
   return (
-    <div className="flex-1 p-8 overflow-auto pb-32">
-      <div className="max-w-6xl mx-auto">
-        {dashboardAlertsEnabled && healthIssueCount > 0 && (
+    <div className="admin-workspace flex-1 p-4 md:p-6 overflow-auto pb-32">
+      <div className="max-w-[1500px] mx-auto lg:grid lg:grid-cols-[190px_minmax(0,1fr)] lg:gap-6">
+        <aside className="mb-5 lg:mb-0">
+          <label className="block lg:hidden text-sm font-semibold text-slate-300">
+            Admin section
+            <select aria-label="Admin section" value={activeSection} onChange={event => navigate(event.target.value)} className="mt-2 w-full rounded-lg border border-slate-600 bg-[#071b2e] p-3 text-white">
+              {sections.map(section => <option key={section.id} value={section.id}>{section.label}</option>)}
+            </select>
+          </label>
+          <nav aria-label="Admin sections" className="hidden lg:flex sticky top-0 flex-col gap-2">
+            <p className="mb-2 text-sm font-semibold text-slate-400">Administration</p>
+            {sections.map(({ id, label, icon: Icon }) => <button key={id} type="button" onClick={() => navigate(id)} aria-current={activeSection === id ? 'page' : undefined}
+              className={`flex items-center gap-2 rounded-lg px-3 py-3 text-left text-sm font-semibold ${activeSection === id ? 'bg-[#cedc28] text-[#041628]' : 'text-slate-300 hover:bg-white/10'}`}>
+              <Icon className="h-4 w-4 shrink-0" />{label}
+              {id === 'health' && dashboardAlertsEnabled && healthIssueCount > 0 && <span className="ml-auto rounded-full bg-red-600 px-2 text-xs text-white">{healthIssueCount}</span>}
+            </button>)}
+          </nav>
+        </aside>
+        <main className="min-w-0" aria-label="Admin content">
+        {activeSection !== 'health' && dashboardAlertsEnabled && healthIssueCount > 0 && (
           <button
-            onClick={() => setActiveSection('health')}
+            onClick={() => navigate('health')}
             className="w-full mb-5 rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-left text-xs text-amber-200 hover:bg-amber-500/15"
           >
             <span className="font-bold">{healthIssueCount} active data health issue{healthIssueCount === 1 ? '' : 's'}.</span>
@@ -181,98 +222,34 @@ export default function AdminView({ currentUserEmail = 'admin@tahaluf.com', init
           </button>
         )}
 
-        {/* ADMIN SUB-TABS */}
-        <div className="flex flex-wrap border-b border-gray-700/60 mb-8 gap-6">
-          <button onClick={() => setActiveSection('features')} className={`pb-3 text-xs font-bold uppercase tracking-wider border-b-2 ${activeSection === 'features' ? 'border-[#cedc28] text-[#cedc28]' : 'border-transparent text-gray-400 hover:text-white'}`}>
-            Feature Controls
-          </button>
-          <button
-            onClick={() => setActiveSection('events')}
-            className={`pb-3 text-xs font-bold uppercase tracking-wider flex items-center gap-2 border-b-2 transition-all ${
-              activeSection === 'events'
-                ? 'border-[#cedc28] text-[#cedc28]'
-                : 'border-transparent text-gray-400 hover:text-white'
-            }`}
-          >
-            <Layers className="w-4 h-4" />
-            Events & Data Configuration
-          </button>
-          <button
-            onClick={() => setActiveSection('health')}
-            className={`pb-3 text-xs font-bold uppercase tracking-wider flex items-center gap-2 border-b-2 transition-all ${
-              activeSection === 'health'
-                ? 'border-[#cedc28] text-[#cedc28]'
-                : 'border-transparent text-gray-400 hover:text-white'
-            }`}
-          >
-            <Activity className="w-4 h-4" />
-            Health Monitor
-            {dashboardAlertsEnabled && healthIssueCount > 0 && (
-              <span className="rounded-full bg-red-500 px-1.5 py-0.5 text-[9px] leading-none text-white">{healthIssueCount}</span>
-            )}
-          </button>
-          <button
-            onClick={() => setActiveSection('quotas')}
-            className={`pb-3 text-xs font-bold uppercase tracking-wider flex items-center gap-2 border-b-2 transition-all ${
-              activeSection === 'quotas'
-                ? 'border-[#cedc28] text-[#cedc28]'
-                : 'border-transparent text-gray-400 hover:text-white'
-            }`}
-          >
-            <Gauge className="w-4 h-4" />
-            API &amp; Quotas Hub
-          </button>
-          <button
-            onClick={() => setActiveSection('users')}
-            className={`pb-3 text-xs font-bold uppercase tracking-wider flex items-center gap-2 border-b-2 transition-all ${
-              activeSection === 'users'
-                ? 'border-[#cedc28] text-[#cedc28]'
-                : 'border-transparent text-gray-400 hover:text-white'
-            }`}
-          >
-            <UsersIcon className="w-4 h-4" />
-            User Access Management
-          </button>
-          <button
-            onClick={() => setActiveSection('analytics')}
-            className={`pb-3 text-xs font-bold uppercase tracking-wider flex items-center gap-2 border-b-2 transition-all ${
-              activeSection === 'analytics'
-                ? 'border-[#cedc28] text-[#cedc28]'
-                : 'border-transparent text-gray-400 hover:text-white'
-            }`}
-          >
-            <BarChart3 className="w-4 h-4" />
-            Analytics &amp; Activity
-          </button>
+        {/* SECTION 1: EVENTS & DATA CONFIGURATION */}
+        <div hidden={activeSection !== 'events'}>
+          <EventsAdmin currentUserEmail={currentUserEmail} initialEvents={initialEvents} />
         </div>
 
-        {/* SECTION 1: EVENTS & DATA CONFIGURATION */}
-        {activeSection === 'events' && (
-          <EventsAdmin currentUserEmail={currentUserEmail} initialEvents={initialEvents} />
-        )}
-
         <DataHealthAdmin
-          active={activeSection === 'health'}
+          active={active && activeSection === 'health'}
           onIssueCountChange={setHealthIssueCount}
           onDashboardAlertsEnabledChange={setDashboardAlertsEnabled}
         />
 
         {/* SECTION: API INFRASTRUCTURE & QUOTA HUB */}
-        <ApiQuotasAdmin active={activeSection === 'quotas'} />
-        {activeSection === 'features' && <FeatureControlsAdmin onSaved={onFeaturesSaved} />}
+        <ApiQuotasAdmin active={active && activeSection === 'quotas'} />
+        {visited.features && <div hidden={activeSection !== 'features'}><FeatureControlsAdmin onSaved={onFeaturesSaved} /></div>}
 
         {/* SECTION 2: USER ACCESS MANAGEMENT */}
         {activeSection === 'users' && (
           <div>
-            <div className="flex justify-between items-end mb-8">
+            <div className="flex flex-wrap gap-3 justify-between items-end mb-5">
               <div>
-                <h2 className="text-3xl font-bold text-white tracking-widest uppercase mb-1">User Management</h2>
+                <h2 className="text-2xl font-bold text-white mb-1">User Access</h2>
                 <p className="text-[#14a6d9] text-sm font-medium">Control dashboard access and administrator privileges</p>
               </div>
               
               <div className="flex gap-3">
                 <button 
                   onClick={fetchUsers}
+                  disabled={loading}
                   className="px-4 py-2 bg-[#0a2442] border border-[#cedc28]/30 text-[#cedc28] hover:bg-[#cedc28]/10 hover:text-white rounded-xl transition-all text-xs font-bold uppercase tracking-widest flex items-center gap-2"
                 >
                   <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
@@ -288,8 +265,9 @@ export default function AdminView({ currentUserEmail = 'admin@tahaluf.com', init
               </div>
             </div>
 
+        {notice && <p role="status" className="mb-4 text-sm text-lime-300">{notice}</p>}
         {error && (
-          <div className="bg-red-500/10 border border-red-500/30 text-red-400 p-4 rounded-2xl text-sm font-medium mb-6 flex items-center gap-3 shadow-lg">
+          <div role="alert" className="bg-red-500/10 border border-red-500/30 text-red-300 p-4 rounded-2xl text-sm font-medium mb-6 flex items-center gap-3 shadow-lg">
             <Shield className="w-5 h-5 text-red-500" />
             {error}
           </div>
@@ -310,8 +288,9 @@ export default function AdminView({ currentUserEmail = 'admin@tahaluf.com', init
             
             <form onSubmit={handleAddUser} className="relative z-10 flex flex-wrap items-end gap-4">
               <div className="flex-1 min-w-[200px]">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 block">Email Address</label>
+                <label htmlFor="new-user-email" className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 block">Email Address</label>
                 <input 
+                  id="new-user-email"
                   type="email" 
                   value={newEmail}
                   onChange={(e) => setNewEmail(e.target.value)}
@@ -321,8 +300,9 @@ export default function AdminView({ currentUserEmail = 'admin@tahaluf.com', init
                 />
               </div>
               <div className="flex-1 min-w-[200px]">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 block">Temporary Password</label>
+                <label htmlFor="new-user-password" className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 block">Temporary Password</label>
                 <input 
+                  id="new-user-password"
                   type="password" 
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
@@ -333,8 +313,9 @@ export default function AdminView({ currentUserEmail = 'admin@tahaluf.com', init
                 />
               </div>
               <div className="flex-1 min-w-[150px]">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 block">User Role</label>
+                <label htmlFor="new-user-role" className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 block">User Role</label>
                 <select 
+                  id="new-user-role"
                   value={newRole}
                   onChange={(e) => setNewRole(e.target.value)}
                   className="w-full bg-[#0a2442] border border-gray-600/50 rounded-xl px-4 py-2.5 text-sm text-[#eef7f5] font-bold focus:outline-none focus:border-[#cedc28]/50 transition-all cursor-pointer appearance-none"
@@ -356,15 +337,16 @@ export default function AdminView({ currentUserEmail = 'admin@tahaluf.com', init
           </div>
         )}
 
+        <label className="mb-4 block text-sm text-slate-300">Search users
+          <input type="search" value={userSearch} onChange={event => { setUserSearch(event.target.value); setUserPage(1); }} className="ml-3 rounded-lg border border-slate-600 bg-[#071b2e] p-2" />
+        </label>
         <div className="card-surface border border-[#cedc28]/10 rounded-3xl overflow-hidden shadow-2xl relative">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-[#0a2442]/50 border-b border-[#cedc28]/10">
-                  <th onClick={() => handleSort('userdetails')} className="cursor-pointer py-4 px-6 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest">User Details {sortConfig?.key === 'userdetails' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>
-                  <th onClick={() => handleSort('role')} className="cursor-pointer py-4 px-6 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest text-center">Role {sortConfig?.key === 'role' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>
-                  <th onClick={() => handleSort('lastactive')} className="cursor-pointer py-4 px-6 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest text-center">Last Active {sortConfig?.key === 'lastactive' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>
-                  <th onClick={() => handleSort('actions')} className="cursor-pointer py-4 px-6 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest text-center">Actions {sortConfig?.key === 'actions' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</th>
+                  {[['userdetails', 'User Details'], ['role', 'Role'], ['lastactive', 'Last Active']].map(([key, label]) => <th key={key} aria-sort={sortConfig.key === key ? sortConfig.direction === 'asc' ? 'ascending' : 'descending' : 'none'} className="py-4 px-6 text-sm text-[#14a6d9]"><button onClick={() => { handleSort(key); setUserPage(1); }}>{label}{sortConfig.key === key ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</button></th>)}
+                  <th className="py-4 px-6 text-sm text-[#14a6d9]">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
@@ -374,14 +356,14 @@ export default function AdminView({ currentUserEmail = 'admin@tahaluf.com', init
                       Loading users...
                     </td>
                   </tr>
-                ) : users.length === 0 ? (
+                ) : filteredUsers.length === 0 ? (
                   <tr>
                     <td colSpan="4" className="py-12 text-center text-gray-500 font-medium">
                       No users found.
                     </td>
                   </tr>
                 ) : (
-                  [...users].sort((a, b) => {
+                  [...filteredUsers].sort((a, b) => {
                     if (!sortConfig) return 0;
                     let valA = a.email;
                     let valB = b.email;
@@ -395,7 +377,7 @@ export default function AdminView({ currentUserEmail = 'admin@tahaluf.com', init
                     if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
                     if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
                     return 0;
-                  }).map(user => (
+                  }).slice((visibleUserPage - 1) * 20, visibleUserPage * 20).map(user => (
                     <tr key={user.uid} className="hover:bg-[#0a2442]/30 transition-colors group">
                       <td className="py-4 px-6">
                         <div className="flex items-center gap-3">
@@ -411,8 +393,9 @@ export default function AdminView({ currentUserEmail = 'admin@tahaluf.com', init
                       <td className="py-4 px-6">
                         <div className="flex justify-center">
                            <select 
+                            aria-label={`Role for ${user.email}`}
                             value={user.role || 'standard'}
-                            onChange={(e) => updateUserRole(user.uid, e.target.value)}
+                            onChange={(e) => { setUserAction({ type: 'role', ...user, nextRole: e.target.value }); setError(null); }}
                             className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all outline-none cursor-pointer appearance-none text-center ${
                               user.role === 'admin' ? 'bg-[#cedc28]/10 border border-[#cedc28]/30 text-[#cedc28]' : 
                               user.role === 'non-finance' ? 'bg-purple-900/20 border border-purple-500/30 text-purple-400' : 
@@ -433,14 +416,16 @@ export default function AdminView({ currentUserEmail = 'admin@tahaluf.com', init
                       <td className="py-4 px-6">
                         <div className="flex justify-center gap-2">
                           <button 
-                            onClick={() => handleChangePassword(user.uid, user.email)}
+                            onClick={() => { setUserAction({ type: 'password', ...user }); setActionPassword(''); setError(null); }}
+                            aria-label={`Change password for ${user.email}`}
                             className="p-2 bg-blue-500/0 hover:bg-blue-500/10 text-gray-500 hover:text-blue-400 rounded-lg transition-colors"
                             title="Change Password"
                           >
                             <Key className="w-4 h-4" />
                           </button>
                           <button 
-                            onClick={() => handleDeleteUser(user.uid, user.email)}
+                            onClick={() => { setUserAction({ type: 'delete', ...user }); setError(null); }}
+                            aria-label={`Delete ${user.email}`}
                             className="p-2 bg-red-500/0 hover:bg-red-500/10 text-gray-500 hover:text-red-400 rounded-lg transition-colors"
                             title="Delete User"
                           >
@@ -455,15 +440,55 @@ export default function AdminView({ currentUserEmail = 'admin@tahaluf.com', init
             </table>
           </div>
         </div>
+        {filteredUsers.length > 20 && <nav aria-label="User list pagination" className="mt-4 flex flex-wrap items-center gap-3 text-sm">
+          <button disabled={visibleUserPage <= 1} onClick={() => setUserPage(visibleUserPage - 1)} className="rounded border border-slate-600 p-2 disabled:opacity-40">Previous</button>
+          <span aria-live="polite">Page {visibleUserPage} of {Math.ceil(filteredUsers.length / 20)} · {filteredUsers.length} users</span>
+          <button disabled={visibleUserPage * 20 >= filteredUsers.length} onClick={() => setUserPage(visibleUserPage + 1)} className="rounded border border-slate-600 p-2 disabled:opacity-40">Next</button>
+        </nav>}
       </div>
       )}
 
       {/* SECTION 3: ANALYTICS & ACTIVITY */}
-      {activeSection === 'analytics' && (
-        <AnalyticsAdmin currentUserEmail={currentUserEmail} />
+      {visited.analytics && (
+        <div hidden={activeSection !== 'analytics'}><AnalyticsAdmin active={active && activeSection === 'analytics'} currentUserEmail={currentUserEmail} /></div>
       )}
-
+        </main>
       </div>
+      {pendingSection && <AdminDialog title="Unsaved changes" onClose={() => setPendingSection(null)}>
+        <p className="text-sm text-slate-300">You have unsaved changes. Your drafts will remain here while you visit another admin section. Save before reloading or leaving the dashboard.</p>
+        <div className="mt-5 flex gap-3">
+          <button onClick={() => setPendingSection(null)} className="rounded border border-slate-500 px-4 py-2">Stay here</button>
+          <button onClick={() => { setActiveSection(pendingSection); setPendingSection(null); }} className="rounded bg-[#cedc28] px-4 py-2 text-[#041628]">Keep drafts & continue</button>
+        </div>
+      </AdminDialog>}
+      {userAction && <AdminDialog title={userAction.type === 'delete' ? 'Delete user?' : userAction.type === 'role' ? 'Change access role?' : 'Change password'} onClose={() => { if (!actionBusy) setUserAction(null); }}>
+        <form onSubmit={async event => {
+          event.preventDefault();
+          setActionBusy(true);
+          setError(null);
+          try {
+            if (userAction.type === 'delete') {
+              await handleDeleteUser(userAction.uid);
+              setNotice(`Deleted ${userAction.email}.`);
+            } else if (userAction.type === 'role') await updateUserRole(userAction.uid, userAction.nextRole);
+            else await handleChangePassword(userAction.uid, userAction.email, actionPassword);
+            setUserAction(null);
+            setActionPassword('');
+          } catch (err) { setError(err.message); }
+          finally { setActionBusy(false); }
+        }}>
+          <p className="break-all text-sm text-slate-300">{userAction.email}{userAction.type === 'delete' ? ' will permanently lose access. This cannot be undone.' : ''}</p>
+          {userAction.type === 'role' && <p className="mt-3 text-sm text-slate-300">Change from {userAction.role || 'standard'} to <strong>{userAction.nextRole}</strong>. This changes dashboard permissions immediately.</p>}
+          {userAction.type === 'password' && <label className="mt-4 block text-sm">New password
+            <input autoComplete="new-password" type="password" minLength={6} required value={actionPassword} onChange={event => setActionPassword(event.target.value)} className="mt-2 w-full rounded border border-slate-500 bg-[#041628] p-2" />
+          </label>}
+          {error && <p role="alert" className="mt-3 text-red-300">{error}</p>}
+          <div className="mt-5 flex gap-3">
+            <button type="button" disabled={actionBusy} onClick={() => setUserAction(null)} className="rounded border border-slate-500 px-4 py-2">Cancel</button>
+            <button disabled={actionBusy} className="rounded bg-[#cedc28] px-4 py-2 text-[#041628]">{actionBusy ? 'Saving...' : userAction.type === 'delete' ? 'Delete user' : userAction.type === 'role' ? 'Change role' : 'Save password'}</button>
+          </div>
+        </form>
+      </AdminDialog>}
     </div>
   );
 }

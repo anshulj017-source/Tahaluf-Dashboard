@@ -258,7 +258,10 @@ test('below-threshold work does not read settings or persist notification state'
 });
 
 test('all APIs render default-checked 70% and 90% alert selections with clear delivery limitations', async () => {
-  const component = await load('../app/components/ApiUsageAnalytics.jsx', { '../../lib/firebase': { auth: {} } });
+  const component = await load('../app/components/ApiUsageAnalytics.jsx', {
+    '../../lib/firebase': { auth: {} },
+    './AdminUI': await load('../app/components/AdminUI.jsx')
+  });
   const report = summarizeApiUsage(empty());
   report.availableServices = report.services;
   report.monitoredServices = report.services.map(service => service.id);
@@ -837,6 +840,6 @@ test('low-quota mode preserves initial quota loads and access to policy controls
   assert.match(body, /if \(active\)/);
   assert.doesNotMatch(body, /lowQuotaMode/);
   assert.doesNotMatch(loadEffect.arguments[1].getText(file), /lowQuotaMode/);
-  assert.match(source, /<ApiUsageAnalytics report=\{data\?\.usage\}/);
+  assert.match(source, /<ApiUsageAnalytics view=\{view\} report=\{data\?\.usage\}/);
   assert.doesNotMatch(source, /All endpoints within quota|All Optimal/);
 });

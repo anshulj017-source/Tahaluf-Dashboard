@@ -682,6 +682,13 @@ export default function App() {
   const [loadingStatus, setLoadingStatus] = useState('Verifying session...');
   const [lastUpdated, setLastUpdated] = useState(null);
   const [activeTab, setActiveTab] = useState('summary');
+  const [adminVisited, setAdminVisited] = useState(false);
+  useEffect(() => {
+    if (userRole === 'admin' && new URLSearchParams(window.location.search).has('admin')) setActiveTab('admin');
+  }, [userRole]);
+  useEffect(() => {
+    if (activeTab === 'admin') setAdminVisited(true);
+  }, [activeTab]);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [trendView, setTrendView] = useState('Weekly');
   const [selectedPhase, setSelectedPhase] = useState(null);
@@ -2779,6 +2786,14 @@ export default function App() {
             </button>
           </div>
         </header>
+      ) : activeTab === 'admin' && userRole === 'admin' ? (
+        <header className="flex items-center justify-between gap-3 border-b border-[#cedc28]/20 bg-[#0a2442] px-4 py-3 text-white">
+          <div className="flex items-center gap-3">
+            <img src="/tahaluf-logo.svg" alt="Tahaluf Logo" className="h-7" />
+            <span className="text-sm font-semibold">Admin workspace</span>
+          </div>
+          <button onClick={() => setActiveTab('summary')} className="rounded-lg border border-slate-500 px-3 py-2 text-sm font-semibold">Back to dashboard</button>
+        </header>
       ) : (
         <header className="sticky top-0 z-50 bg-[#0a2442]/95 backdrop-blur-xl border-b border-[#cedc28]/20 px-0 py-2 sm:py-2.5 shadow-2xl relative">
           <div className="pattern-overlay absolute inset-0 z-0 pointer-events-none"></div>
@@ -3098,7 +3113,7 @@ export default function App() {
       {/* MAIN LAYOUT BODY */}
       <div className="flex flex-1 overflow-hidden relative">
         {/* DESKTOP SIDEBAR (Screens >= lg) */}
-        {!tvMode && (
+        {!tvMode && activeTab !== 'admin' && (
           <div className="hidden lg:flex w-52 border-r border-[#cedc28]/10 bg-[#0a2442] flex-col gap-2 overflow-y-auto z-20 relative shrink-0">
             <div className="pattern-overlay absolute inset-0 z-0 pointer-events-none" style={{ opacity: 0.20 }}></div>
             <div className="p-6 pb-2 relative z-10">
@@ -3176,18 +3191,29 @@ export default function App() {
         )}
         
         {/* TABS CONTENT */}
-        {activeTab === 'admin' && userRole === 'admin' ? (
+        {(adminVisited || activeTab === 'admin') && userRole === 'admin' && (
+          <div className="min-w-0 flex-1 flex overflow-hidden" style={{ display: activeTab === 'admin' ? undefined : 'none' }}>
           <AdminView 
+            active={activeTab === 'admin'}
             currentUserEmail={userEmail || (auth?.currentUser?.email) || 'admin@tahaluf.com'} 
             initialEvents={eventsConfiguration}
             onFeaturesSaved={setFeatureConfig}
           />
-        ) : (
+          </div>
+        )}
+        {!(activeTab === 'admin' && userRole === 'admin') && (
         <main className="flex-1 overflow-y-auto p-3 sm:p-5 md:p-6 lg:p-8 pb-24 lg:pb-8 custom-scrollbar touch-scroll relative z-10">
           <ReactTooltip id="market-tooltip" className="z-50" style={{ backgroundColor: '#0a2442', color: '#eef7f5', border: '1px solid #cedc2830', borderRadius: '8px', zIndex: 1000 }} />
           <div className="absolute top-0 right-0 w-full h-[500px] bg-gradient-to-br from-[#062f2e]/20 via-transparent to-transparent pointer-events-none -z-10"></div>
           {featureAllowed('healthBanner') && !tvMode && (
-            <HealthAlertBanner onOpenHealthMonitor={() => setActiveTab('admin')} />
+            <HealthAlertBanner onOpenHealthMonitor={() => {
+              const url = new URL(window.location.href);
+              url.searchParams.set('admin', 'health');
+              url.searchParams.set('healthView', 'overview');
+              window.history.replaceState(null, '', url);
+              window.dispatchEvent(new Event('admin-locationchange'));
+              setActiveTab('admin');
+            }} />
           )}
           
           {/* 1. Standard User Preview Simulation Banner */}
@@ -3231,7 +3257,7 @@ export default function App() {
       </div>
 
       {/* MOBILE BOTTOM NAVIGATION BAR (Screens < lg / 1024px) */}
-      {!tvMode && (
+      {!tvMode && activeTab !== 'admin' && (
         <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0a2442]/95 backdrop-blur-2xl border-t border-[#cedc28]/20 px-2 py-1.5 flex items-center justify-around pb-safe shadow-[0_-4px_20px_rgba(0,0,0,0.5)]">
           {NAV_ITEMS.filter(item => ['summary', 'campaign', 'weekly', 'channel'].includes(item.id)).map(item => (
             <button key={item.id} onClick={() => setActiveTab(item.id)} className={`flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-all ${activeTab === item.id ? 'text-[#cedc28]' : 'text-slate-400 hover:text-white'}`}>

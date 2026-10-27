@@ -2,13 +2,14 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  Activity, AlertCircle, AlertTriangle, CheckCircle2, ChevronRight,
-  Clock, Database, Globe, HardDrive, HelpCircle, Layers, Mail,
+  Activity, AlertCircle, AlertTriangle, CheckCircle2,
+  Clock, Database, Globe, HelpCircle, Layers, Mail,
   RefreshCw, Shield, ShieldAlert, ShieldCheck, Sparkles, Zap, ArrowUpRight
 } from 'lucide-react';
 import { auth } from '../../lib/firebase';
 import ApiUsageAnalytics from './ApiUsageAnalytics';
 import { useLowQuotaMode } from './DashboardFeatureContext';
+import { AdminTabs, AdminDialog, useAdminView } from './AdminUI';
 
 const getAdminHeaders = async () => {
   const token = await auth.currentUser?.getIdToken();
@@ -84,9 +85,11 @@ export default function ApiQuotasAdmin({ active = true, onPolicySaved }) {
   const [lastAuditAt, setLastAuditAt] = useState(null);
   const [pingResults, setPingResults] = useState({});
   const [pinging, setPinging] = useState(null);
+  const [view, setView] = useAdminView('apiView', 'overview', ['overview', 'usage', 'alerts', 'diagnostics']);
+  const [confirmMemory, setConfirmMemory] = useState(false);
   const measuredServices = data?.services?.filter(service => Number.isFinite(service.latencyMs)) || [];
 
-  const fetchQuotas = useCallback(async (isRefresh = false) => {
+  const fetchQuotas = useCallback(async (isRefresh = false, propagateError = false) => {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
     setError(null);
@@ -103,6 +106,7 @@ export default function ApiQuotasAdmin({ active = true, onPolicySaved }) {
     } catch (err) {
       console.error(err);
       setError(err.message || 'Error fetching API infrastructure status');
+      if (propagateError) throw err;
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -137,7 +141,7 @@ export default function ApiQuotasAdmin({ active = true, onPolicySaved }) {
       }));
     } catch (err) {
       console.error(err);
-      alert(err.message || 'Error updating guardrail state');
+      setError(err.message || 'Error updating guardrail state');
     } finally {
       setToggling(null);
     }
@@ -168,16 +172,14 @@ export default function ApiQuotasAdmin({ active = true, onPolicySaved }) {
     }
   };
 
-  if (!active) return null;
-
   return (
-    <div className="space-y-6">
+    <div hidden={!active} className="space-y-5">
       {/* HEADER SECTION */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 text-2xl font-black text-white tracking-wide uppercase">
+          <div className="flex items-center gap-2 text-2xl font-bold text-white">
             <ShieldCheck className="w-6 h-6 text-[#cedc28]" />
-            <span>API Infrastructure &amp; Quota Safeguard Hub</span>
+            <h2>API &amp; Quotas</h2>
           </div>
           <p className="text-[#14a6d9] text-xs font-medium mt-1">
             Partial application usage observations and on-demand connectivity checks. Provider quotas are not verified; collection runs with traffic, not an autonomous daily scheduler.
@@ -185,7 +187,7 @@ export default function ApiQuotasAdmin({ active = true, onPolicySaved }) {
           {lastAuditAt && (
             <div className="text-[10px] text-gray-500 mt-1 flex items-center gap-1.5">
               <Clock className="w-3 h-3 text-gray-400" />
-              <span>Audited at {lastAuditAt}</span>
+              <span>Last successful update: {lastAuditAt}. Refreshes on entry or request; no background polling.</span>
             </div>
           )}
         </div>
@@ -196,19 +198,23 @@ export default function ApiQuotasAdmin({ active = true, onPolicySaved }) {
           className="px-4 py-2 rounded-xl border border-[#14a6d9]/40 bg-[#14a6d9]/10 text-[#14a6d9] hover:text-white hover:bg-[#14a6d9]/20 disabled:opacity-50 text-xs font-bold uppercase tracking-wider flex items-center gap-2 self-start sm:self-auto transition-all"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
-          {refreshing ? 'Auditing APIs...' : 'Run End-to-End Audit'}
+          {refreshing ? 'Refreshing...' : 'Refresh report'}
         </button>
       </div>
 
       {error && (
-        <div className="p-4 rounded-xl border border-red-500/40 bg-red-500/10 text-red-300 text-xs flex items-center gap-2">
+        <div role="alert" className="p-4 rounded-xl border border-red-500/40 bg-red-500/10 text-red-300 text-sm flex items-center gap-2">
           <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
-          <span>{error}</span>
+          <span>{error}{data ? ' Previously loaded data may be stale.' : ''}</span>
         </div>
       )}
 
-      {/* TOP KPI CARDS */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <AdminTabs value={view} onChange={setView} label="API sections" tabs={[
+        { id: 'overview', label: 'Overview' }, { id: 'usage', label: 'Usage & Forecast' },
+        { id: 'alerts', label: 'Alerts & Limits' }, { id: 'diagnostics', label: 'Diagnostics' }
+      ]} />
+      {loading && !data && <p role="status" className="text-sm text-slate-300">Loading API report...</p>}
+      <div hidden={view !== 'overview'} className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="card-surface p-4 rounded-2xl border border-white/5 space-y-1">
           <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Services Monitored</div>
           <div className="text-2xl font-black text-white flex items-baseline gap-2">
@@ -232,12 +238,11 @@ export default function ApiQuotasAdmin({ active = true, onPolicySaved }) {
         </div>
 
         <div className="card-surface p-4 rounded-2xl border border-white/5 space-y-1">
-          <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Active Guardrails</div>
+          <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Snapshot Persistence</div>
           <div className="text-2xl font-black text-[#cedc28] flex items-baseline gap-2">
-            <span>{data?.summary?.activeGuardrailsCount ?? '—'}</span>
-            <span className="text-xs text-gray-400 font-normal">in place</span>
+            <span>{!data ? 'Not loaded' : data.circuitBreakers?.forceMemoryCache ? 'Memory only' : 'Standard'}</span>
           </div>
-          <p className="text-[10px] text-gray-500">Zero downtime fallbacks active</p>
+          <p className="text-[10px] text-gray-500">Configuration indicators, not verified protection</p>
         </div>
 
         <div className="card-surface p-4 rounded-2xl border border-white/5 space-y-1">
@@ -250,17 +255,20 @@ export default function ApiQuotasAdmin({ active = true, onPolicySaved }) {
               ms
             </span>
           </div>
-          <p className="text-[10px] text-gray-500">Serving from Edge &amp; Memory</p>
+          <p className="text-[10px] text-gray-500">Measured endpoints only; not all dashboard requests</p>
         </div>
       </div>
 
-      {lowQuotaMode && <p className="text-xs text-amber-200">Low-quota mode: background quota refresh paused. Initial loads and manual audits remain available, including policy controls.</p>}
-      <ApiUsageAnalytics report={data?.usage} onSaved={() => fetchQuotas(true)} onPolicySaved={async policy => {
+      {lowQuotaMode && <p className="text-sm text-amber-200">Low-quota mode enabled. API reports still load on entry or manual request; no background quota polling is configured.</p>}
+      <div hidden={view === 'diagnostics'}>
+      <ApiUsageAnalytics view={view} report={data?.usage} onSaved={() => fetchQuotas(true, true)} onPolicySaved={async policy => {
         setData(previous => ({ ...previous, policy, usage: { ...previous.usage, policy } }));
         await onPolicySaved?.(policy);
       }} />
+      </div>
 
       {/* ACTIVE SAFEGUARDS & CIRCUIT BREAKER CONTROL PANEL */}
+      <div hidden={view !== 'diagnostics'} className="space-y-5">
       <div className="card-surface rounded-2xl border border-[#cedc28]/30 p-5 bg-[#031120]/70 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/5 pb-3">
           <div className="flex items-center gap-3">
@@ -269,15 +277,15 @@ export default function ApiQuotasAdmin({ active = true, onPolicySaved }) {
             </div>
             <div>
               <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                <span>Active Quota Circuit Breakers &amp; Emergency Shields</span>
+                <span>Advanced cache controls</span>
               </h3>
               <p className="text-[11px] text-[#cedc28]/90 mt-0.5">
-                Toggle automated guardrails to defend against third-party API spikes and quota exhaustion.
+                Instance-local overrides. These do not enforce provider-wide quotas.
               </p>
             </div>
           </div>
           <span className="px-2.5 py-1 rounded-full border border-lime-400/40 bg-lime-500/10 text-lime-300 text-[10px] font-bold uppercase tracking-wider self-start sm:self-auto shrink-0">
-            Automated Protection Online
+            Manual configuration
           </span>
         </div>
 
@@ -296,12 +304,12 @@ export default function ApiQuotasAdmin({ active = true, onPolicySaved }) {
                 </span>
               </div>
               <p className="text-[11px] text-gray-300 mt-1 leading-relaxed">
-                Bypasses all Firestore snapshot writes, serving data strictly from server RAM &amp; Edge CDN. Keeps dashboard live if Firestore free tier hits 100%.
+                Skips persistent sheet snapshot writes on this server instance. Existing in-memory caching and upstream fetching continue. Does not disable all Firestore writes or guarantee availability. Restarting or switching instances may reset this override.
               </p>
             </div>
             <button
-              onClick={() => toggleCircuitBreaker('forceMemoryCache', data?.circuitBreakers?.forceMemoryCache)}
-              disabled={Boolean(toggling)}
+              onClick={() => setConfirmMemory(true)}
+              disabled={!data || Boolean(toggling)}
               className="mt-2 w-full py-1.5 px-3 rounded-lg text-[10px] font-bold uppercase tracking-wider border border-[#14a6d9]/40 text-[#14a6d9] hover:bg-[#14a6d9]/10 transition-all text-center"
             >
               {toggling === 'forceMemoryCache' ? 'Updating...' : data?.circuitBreakers?.forceMemoryCache ? 'Disable Forced Mode' : 'Enable Memory-Only Shield'}
@@ -314,19 +322,18 @@ export default function ApiQuotasAdmin({ active = true, onPolicySaved }) {
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-white">Vercel Edge Shield</span>
                 <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase border bg-lime-500/10 text-lime-300 border-lime-400/30">
-                  Active
+                  Not configurable here
                 </span>
               </div>
               <p className="text-[11px] text-gray-300 mt-1 leading-relaxed">
-                Applies <code className="text-[#14a6d9]">s-maxage=600</code> Edge caching. Offloads ~90% of requests at the edge before hitting serverless functions.
+                Cache headers are managed by individual endpoints. The former Edge Shield switch did not change runtime caching and has been disabled.
               </p>
             </div>
             <button
-              onClick={() => toggleCircuitBreaker('highEfficiencyMode', data?.circuitBreakers?.highEfficiencyMode)}
-              disabled={Boolean(toggling)}
+              disabled
               className="mt-2 w-full py-1.5 px-3 rounded-lg text-[10px] font-bold uppercase tracking-wider border border-white/20 text-gray-300 hover:bg-white/5 transition-all text-center"
             >
-              {toggling === 'highEfficiencyMode' ? 'Updating...' : data?.circuitBreakers?.highEfficiencyMode ? 'Edge Shield Online' : 'Enable Edge Shield'}
+              Managed by endpoint configuration
             </button>
           </div>
 
@@ -336,19 +343,18 @@ export default function ApiQuotasAdmin({ active = true, onPolicySaved }) {
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-white">Alert Rate Limiter</span>
                 <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase border bg-lime-500/10 text-lime-300 border-lime-400/30">
-                  5m Grace Period
+                  Managed in Health Monitor
                 </span>
               </div>
               <p className="text-[11px] text-gray-300 mt-1 leading-relaxed">
-                Throttles health alert emails with 5-minute deduplication cooldowns so Gmail SMTP limit (500/day) is never breached.
+                Email frequency, grace periods and category preferences are configured in Health Monitor Settings. Deduplication is not a provider quota guarantee. The former switch did not control delivery and has been disabled.
               </p>
             </div>
             <button
-              onClick={() => toggleCircuitBreaker('throttleAlertEmails', data?.circuitBreakers?.throttleAlertEmails)}
-              disabled={Boolean(toggling)}
+              disabled
               className="mt-2 w-full py-1.5 px-3 rounded-lg text-[10px] font-bold uppercase tracking-wider border border-white/20 text-gray-300 hover:bg-white/5 transition-all text-center"
             >
-              {toggling === 'throttleAlertEmails' ? 'Updating...' : data?.circuitBreakers?.throttleAlertEmails ? 'Daily Digest Only' : 'Immediate Throttled'}
+              Configure in Health Monitor
             </button>
           </div>
         </div>
@@ -358,7 +364,7 @@ export default function ApiQuotasAdmin({ active = true, onPolicySaved }) {
       <div className="space-y-4">
         <h3 className="text-xs font-bold text-white uppercase tracking-widest flex items-center gap-2">
           <Database className="w-4 h-4 text-[#14a6d9]" />
-          <span>Connected APIs &amp; Live Quota Status</span>
+          <span>Provider diagnostics &amp; connectivity</span>
         </h3>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -458,7 +464,7 @@ export default function ApiQuotasAdmin({ active = true, onPolicySaved }) {
               <span>Architectural Suggestions, Fixes &amp; Impact Analysis</span>
             </h3>
             <p className="text-[11px] text-[#14a6d9] mt-0.5">
-              Concrete steps to permanently scale infrastructure, eliminate quotas, and accelerate dashboard load times.
+              Suggestions for review. These are not measurements or guarantees of provider capacity.
             </p>
           </div>
           <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 border border-white/10 px-2.5 py-1 rounded-full self-start sm:self-auto">
@@ -496,6 +502,14 @@ export default function ApiQuotasAdmin({ active = true, onPolicySaved }) {
           ))}
         </div>
       </div>
+      </div>
+      {confirmMemory && <AdminDialog title="Change snapshot persistence?" onClose={() => setConfirmMemory(false)}>
+        <p className="text-sm text-slate-300">This changes persistent sheet snapshot writes on this instance only. Memory-only data may be lost on restart. Other Firestore writes continue.</p>
+        <div className="mt-4 flex gap-3">
+          <button onClick={() => setConfirmMemory(false)} className="rounded border border-slate-600 px-4 py-2">Cancel</button>
+          <button onClick={() => { setConfirmMemory(false); toggleCircuitBreaker('forceMemoryCache', data?.circuitBreakers?.forceMemoryCache); }} className="rounded bg-[#cedc28] px-4 py-2 text-[#041628]">Confirm change</button>
+        </div>
+      </AdminDialog>}
     </div>
   );
 }

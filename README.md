@@ -38,7 +38,7 @@ The repository includes an automated test suite (`tests/dashboard.test.mjs`) tha
 
 On Vercel, successfully fetched sheet snapshots are stored in Firestore in size-limited chunks and sub-8 MiB write batches. A new snapshot becomes active only after all chunks have been stored; the current and previous snapshots are retained, and failed refreshes continue serving the last successful snapshot. The existing Firebase Admin service account therefore needs Firestore read/write access. The Admin panel's **Health Monitor** tab groups source checks under one event, verifies event-tagged actual rows, reports available date ranges, suggests fixes, and supports manual sheet refreshes.
 
-Health notifications can be configured in **Admin → Health Monitor → Health Notifications**. Admins can enable in-dashboard alerts, enable email, choose immediate, daily, or both, and manage recipients. Immediate email is sent once per newly detected issue (with retry throttling); issues are detected as sheet data is requested. A scheduled full sheet check and daily digest run at 08:00 UTC (approximately noon Gulf Standard Time). Vercel Hobby schedules are once daily and may run up to about 59 minutes later; higher-frequency scheduled monitoring requires a plan that supports more frequent Cron Jobs.
+Health notifications can be configured in **Admin → Health Monitor → Settings → Health Notifications**. Admins can enable in-dashboard alerts, enable email, choose immediate, daily, or both, and manage recipients. Immediate email is sent once per newly detected issue (with retry throttling); issues are detected as sheet data is requested. A scheduled full sheet check and daily digest run at 08:00 UTC (approximately noon Gulf Standard Time). Vercel Hobby schedules are once daily and may run up to about 59 minutes later; higher-frequency scheduled monitoring requires a plan that supports more frequent Cron Jobs.
 
 Resolution emails are durably queued before removing an active issue, provided
 an immediate alert was previously accepted by SMTP. Status changes preserve
@@ -52,7 +52,7 @@ Previously removed recoveries cannot be reconstructed or resent automatically.
 
 #### Dimension standards and category emails
 
-**Health Monitor → Dimension Standards** checks the 11 documented dimensions
+**Health Monitor → Settings → Dimension Standards** checks the 11 documented dimensions
 (EVENT, EVENT TYPE, FUNNEL STAGE, Channel, Strategy, Campaign Type,
 Campaign Objective, MARKET, Targeting, Ad Format and Language) against the
 [standards tab](https://docs.google.com/spreadsheets/d/1D1BzodAQS45oJ27xwhk9FJkxFFzJk-r9x0lQzWG6u4w/edit?gid=593739615).
@@ -175,7 +175,7 @@ quota cap and does not reduce isolated observations to zero writes.
 
 Health Monitor fetches and polls only while its admin section is active; periodic
 requests also stop when the browser document is hidden. Reopening the section
-reloads its health and notification settings. Notification transactions skip
+reloads its health without replacing unsaved notification or check settings. Notification transactions skip
 writes when an issue is unchanged or there is nothing to resolve; alert retry,
 opening, status changes, and resolution history remain enabled.
 Analytics heartbeats run every two minutes while visible (previously every 25
@@ -209,13 +209,55 @@ per-tab tracking. This measures foreground dashboard dwell rather than summing
 simultaneously visible windows.
 
 API monitoring includes an optional persistent low-quota mode. It pauses
-automatic Analytics, Health Monitor, and API Hub refreshes and periodic dwell
+automatic Analytics and Health Monitor refreshes and periodic dwell
 heartbeats; initial loads, manual refreshes, filter changes, tab/exit dwell
 flushes, real interactions, and essential dashboard/authentication/settings
 operations remain enabled. Policy propagation uses the visible client's
 60-second settings refresh and the server's 60-second cache, so other tabs and
 instances may take up to about two minutes to reflect a change. It is not a
 Firestore hard spending limit.
+
+### Admin workspace navigation
+
+The admin workspace uses a desktop sidebar and a compact mobile section selector.
+User Access is the default section unless a valid `admin` URL selection is supplied.
+User-list pagination appears once below the table only when more than 20 users
+match the current search.
+The `admin`, `healthView`, `apiView`, and `analyticsView` query parameters preserve
+page selections in shareable URLs; authentication and admin authorization are
+still required. Admin pages retain their drafts and filters when switching
+sections or visiting a dashboard view. Unsaved settings are marked, protected
+against report refreshes, and trigger a warning before reload or closing the tab.
+Leaving an admin section offers a keep-draft confirmation rather than silently
+discarding edits.
+
+- **Health Monitor:** Overview for active issues, Events for searchable expanded
+  source details and per-event checks, Issue History for filtered/paginated
+  outcomes and email status, Settings for global checks, standards and emails.
+  Refreshing affected sources does not guarantee that data issues are fixed.
+- **API & Quotas:** Overview for partial usage and daily/monthly references,
+  Usage & Forecast for detailed estimates, Alerts & Limits for monitoring
+  selection, thresholds and budgets (including unmonitored services), Diagnostics
+  for explicit service probes and advanced controls. Reports refresh on entry
+  or manually; there is no background quota polling. Provider billing is not
+  connected. Edge-cache and email-throttle switches that did not enforce runtime
+  behavior are disabled; email controls live in Health Monitor Settings.
+- **Analytics & Activity:** Overview, Users, Activity, Performance and
+  Recommendations, with optimization/rollback controls separated from usage
+  reporting. Missing measurements are not replaced with invented durations or
+  runtime verification results. New in-memory stores and missing schema sections
+  start with empty measured data, not demonstration traffic. Existing persisted
+  history is retained, not reset or retroactively corrected. Audience filters
+  affect Users and Activity; aggregate tab/performance rollups and all-time view
+  counts remain all-user observations. Dated KPIs use the bounded recent-activity
+  window, not complete historical totals.
+- **Events & Data:** normal editing is separate from Backups & recovery.
+  **Feature Controls** distinguishes role preview and unsaved visibility changes.
+  **User Access** includes search, pagination and confirmation dialogs for
+  deletion, password and role changes.
+
+These are presentation/workflow changes; sheet caching, monitoring identities,
+standards matching, role checks and email delivery semantics remain unchanged.
 
 Usage history is collected when instrumented traffic occurs, not by an
 autonomous scheduled job. Review the daily trends over several complete days

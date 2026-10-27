@@ -3,12 +3,31 @@ import assert from 'node:assert/strict';
 import {
   createAnalyticsRecorder,
   getStore,
+  getAnalyticsSummary,
   hydrateAnalyticsStore,
   persistAnalyticsAction,
   persistAnalyticsBatch,
   resetPersistedAnalytics,
   resetAnalyticsData,
 } from '../lib/analyticsService.mjs';
+
+test('new in-memory analytics and missing sections never start with demonstration measurements', async () => {
+  delete globalThis[Symbol.for('tahaluf.analyticsStore')];
+  const store = getStore();
+  assert.equal(store.overview.totalViews, 0);
+  assert.equal(store.overview.totalSessions, 0);
+  assert.equal(store.overview.avgSessionDurationSec, 0);
+  assert.deepEqual(store.users, {});
+  assert.deepEqual(store.recentActivity, []);
+  delete store.deviceFootprint;
+  delete store.dwellTimes;
+  assert.deepEqual(getStore().deviceFootprint.screenResolutions, {});
+  assert.deepEqual(getStore().dwellTimes, {});
+  const summary = await getAnalyticsSummary('today', { userRoleFilter: 'all', timeZone: 'UTC' });
+  assert.equal(summary.kpis.totalViews, 0);
+  assert.equal(summary.kpis.totalSessions, 0);
+  assert.equal(summary.kpis.topCountry, null);
+});
 
 function createMemoryFirestore() {
   const documents = new Map();

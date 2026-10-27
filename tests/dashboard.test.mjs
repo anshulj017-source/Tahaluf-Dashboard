@@ -918,6 +918,12 @@ async function testAnalyticsLogic() {
   assert(recordRes.success === true, 'Analytics record event succeeds');
   assert(typeof recordRes.activityId === 'string', 'Analytics event returns unique activityId');
 
+  for (const payload of [
+    { eventType: 'tab_view', tab: 'detailed', dwellTimeSec: 5, device: { screen: '1440x900', browser: 'Chrome' } },
+    { eventType: 'currency_toggle', details: { currency: 'SAR' } },
+    { eventType: 'export_pptx' }
+  ]) await recordAnalyticsEvent({ userEmail: 'qa-tester@tahaluf.com', userRole: 'standard', geo: { country: 'SA', city: 'Riyadh' }, ...payload });
+
   const summary = await getAnalyticsSummary('all');
   assert(typeof summary.kpis?.totalViews === 'number', 'Summary contains totalViews KPI');
   assert(typeof summary.kpis?.totalSessions === 'number', 'Summary contains totalSessions KPI');

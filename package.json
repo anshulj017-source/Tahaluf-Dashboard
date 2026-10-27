@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --test tests/admin-controls.test.mjs tests/analytics-persistence.test.mjs tests/quota-monitoring.test.mjs && node tests/dashboard.test.mjs",
+    "test": "node --test tests/admin-controls.test.mjs tests/analytics-persistence.test.mjs tests/quota-monitoring.test.mjs tests/admin-layout.test.mjs tests/health-admin-layout.test.mjs tests/analytics-admin-layout.test.mjs && node tests/dashboard.test.mjs",
     "prepublish-check": "npm test && next build",
     "backup": "bash scripts/backup-to-mirror.sh",
     "setup-hooks": "cp scripts/pre-push.sh .git/hooks/pre-push && chmod +x .git/hooks/pre-push"

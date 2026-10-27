@@ -21,6 +21,30 @@ body {
   font-family: var(--font-sans);
 }
 
+.admin-workspace [hidden] {
+  display: none !important;
+}
+
+.admin-workspace :is(button, input, select, summary):focus-visible {
+  outline: 2px solid #67e8f9;
+  outline-offset: 3px;
+}
+
+.admin-workspace :is(.text-\[9px\], .text-\[10px\], .text-\[11px\]) {
+  font-size: 0.75rem;
+  line-height: 1.5;
+  letter-spacing: normal;
+}
+
+.admin-workspace .text-gray-500 {
+  color: #a6b3c4;
+}
+
+.admin-workspace button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 /* --- Tahaluf brand: Corporate Theme --- */
 
 .app-bg {
@@ -161,5 +185,4 @@ body {
 .animate-spin-reverse-slow {
   animation: spin-reverse-slow 20s linear infinite;
 }
-
 

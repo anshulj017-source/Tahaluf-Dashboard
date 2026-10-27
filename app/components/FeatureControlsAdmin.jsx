@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { auth } from '../../lib/firebase';
 import { DASHBOARD_FEATURES, DEFAULT_FEATURE_CONFIG, isFeatureEnabled } from '../../lib/dashboardFeatures.mjs';
+import { useAdminDirtyGuard } from './AdminUI';
 
 const labels = { public: 'Everyone', admin_only: 'Admin only', disabled: 'Disabled' };
 
@@ -58,6 +59,8 @@ export default function FeatureControlsAdmin({ onSaved }) {
   };
 
   const dirty = config && JSON.stringify(modes) !== JSON.stringify({ ...DEFAULT_FEATURE_CONFIG.modes, ...config.modes });
+  useAdminDirtyGuard('features', Boolean(dirty));
+  const changedFeatures = config ? DASHBOARD_FEATURES.filter(feature => modes[feature.id] !== ({ ...DEFAULT_FEATURE_CONFIG.modes, ...config.modes })[feature.id]) : [];
 
   return (
     <section className="space-y-5">
@@ -66,6 +69,7 @@ export default function FeatureControlsAdmin({ onSaved }) {
         <p className="text-sm text-gray-400 mt-2">Control dashboard views and optional tools. These visibility settings never grant permissions or bypass non-finance restrictions.</p>
         <p className="text-xs text-[#14a6d9] mt-2">Admin Center, user management, monitoring and configuration backups remain admin-only and cannot be disabled here.</p>
       </div>
+      {dirty && <p role="status" className="rounded-lg border border-amber-400/40 p-3 text-sm text-amber-200">Unsaved visibility changes: {changedFeatures.map(feature => feature.name).join(', ')}. Preview shows your draft, not the saved dashboard.</p>}
       <div className="flex flex-wrap gap-3 items-center">
         <label className="text-sm text-gray-300">Preview draft as
           <select aria-label="Feature preview role" value={previewRole} onChange={event => setPreviewRole(event.target.value)} className="ml-3 bg-[#041628] border border-gray-600 rounded-lg p-2">
