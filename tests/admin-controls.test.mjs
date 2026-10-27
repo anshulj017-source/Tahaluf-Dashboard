@@ -14,6 +14,7 @@ import {
   API_SERVICES, EMPTY_BUDGETS, addUsage, summarizeApiUsage, validateBudgets, observeApiUsage, createUsageRecorder
 } from '../lib/apiUsage.mjs';
 import { readAdminSetting, updateAdminSetting } from '../lib/adminSettingsStore.mjs';
+import * as healthUtils from '../lib/healthNotificationUtils.mjs';
 
 const require = createRequire(import.meta.url);
 
@@ -720,4 +721,161 @@ test('health observations skip unchanged writes while preserving issue opening a
     else process.env.VERCEL = vercel;
     await fs.rm(directory, { recursive: true });
   }
+});
+
+async function resolutionHarness(persistent = true) {
+  const clock = fakeClock();
+  let state = {
+    settings: { ...healthUtils.DEFAULT_HEALTH_NOTIFICATION_SETTINGS, alertDelayMinutes: 0, emailRecipients: ['admin@example.test'] },
+    activeIssues: {}, history: [], lastDigestDate: null
+  };
+  let writes = 0;
+  let failure = false;
+  let rejected = false;
+  let beforeSend = null;
+  const sent = [];
+  const errors = [];
+  const ref = {
+    get: async () => ({ exists: true, data: () => structuredClone(state) }),
+    set: async patch => { state = { ...state, ...structuredClone(patch) }; writes++; }
+  };
+  let transaction = Promise.resolve();
+  const db = {
+    collection: () => ({ doc: () => ref }),
+    runTransaction: update => {
+      const result = transaction.then(() => update({
+        get: ref.get,
+        set: (_, next) => { state = structuredClone(next); writes++; }
+      }));
+      transaction = result;
+      return result;
+    }
+  };
+  const overrides = {
+    'node:fs': {
+      existsSync: () => true,
+      readFileSync: () => JSON.stringify(state),
+      writeFileSync: (_, json) => { state = JSON.parse(json); writes++; }
+    },
+    'node:util': { isDeepStrictEqual: (left, right) => JSON.stringify(left) === JSON.stringify(right) },
+    './healthNotificationUtils.mjs': healthUtils,
+    './healthEmailTransport.mjs': { getSmtpTransportConfig: () => ({ host: 'smtp.example.test' }) },
+    './healthEmailTemplates.mjs': {
+      formatHealthAlertEmail: () => ({ subject: 'Issue', text: 'Issue' }),
+      formatHealthResolvedEmail: () => ({ subject: 'Resolved', text: 'Resolved' })
+    },
+    './firebaseAdmin.js': { getFirebaseAdmin: () => ({ adminDb: db }) },
+    './apiUsage.mjs': { observeApiUsage: () => {} },
+    nodemailer: { createTransport: () => ({
+      close() {},
+      sendMail: async mail => {
+        sent.push(mail);
+        if (beforeSend) await beforeSend(mail);
+        if (failure) throw new Error('SMTP temporarily unavailable');
+        return { accepted: rejected ? [] : ['admin@example.test'], rejected: rejected ? ['admin@example.test'] : [] };
+      }
+    }) }
+  };
+  const reload = () => loadInstrumentedModule('../lib/healthNotifications.mjs', overrides, {
+    Date: clock.Date,
+    process: { env: { VERCEL: persistent ? '1' : '0', HEALTH_ALERT_FROM: 'sender@example.test' }, cwd: () => '/test' },
+    console: { error: (...args) => errors.push(args) }
+  });
+  return {
+    health: await reload(), reload, clock, sent, errors, state: () => state, writes: () => writes,
+    fail: value => { failure = value; }, reject: value => { rejected = value; },
+    beforeSend: hook => { beforeSend = hook; }
+  };
+}
+
+const recoveryIssue = { key: 'gsts:Actuals', eventName: 'GSTS 26', kind: 'Actuals', status: 'unavailable', message: 'Unavailable' };
+
+test('resolution failure persists after recovery and retries after five minutes across instances', async () => {
+  for (const persistent of [false, true]) {
+    const harness = await resolutionHarness(persistent);
+    await harness.health.observeHealthSource(recoveryIssue.key, recoveryIssue);
+    harness.fail(true);
+    await harness.health.observeHealthSource(recoveryIssue.key, null);
+    assert.equal(harness.sent.length, 2);
+    assert.equal(harness.state().activeIssues[recoveryIssue.key], undefined);
+    assert.equal(Object.keys(harness.state().pendingResolutions).length, 1);
+    assert.equal(harness.state().history[0].resolutionEmailStatus, 'failed');
+    assert.match(harness.state().history[0].resolutionEmailError, /SMTP temporarily unavailable/);
+    assert.equal(harness.errors.length, 1);
+    const writes = harness.writes();
+    const reloaded = await harness.reload();
+    await reloaded.observeHealthSource(recoveryIssue.key, null);
+    assert.equal(harness.sent.length, 2);
+    assert.equal(harness.writes(), writes, 'cooldown checks do not rewrite state');
+    harness.fail(false);
+    harness.clock.advance(5 * 60_000);
+    await Promise.all([harness.health.observeHealthIssues([]), reloaded.observeHealthIssues([])]);
+    assert.equal(harness.sent.length, 3, 'one retry across concurrent instances');
+    assert.equal(Object.keys(harness.state().pendingResolutions).length, 0);
+    assert.equal(harness.state().history[0].resolutionEmailStatus, 'accepted');
+    assert.equal(harness.state().history[0].resolutionEmailError, null);
+    assert.ok(harness.state().history[0].resolutionEmailSentAt);
+    await reloaded.observeHealthSource(recoveryIssue.key, null);
+    assert.equal(harness.sent.length, 3, 'successful recovery is not sent again');
+  }
+});
+
+test('status changes retain eligibility when the replacement alert fails before recovery', async () => {
+  const harness = await resolutionHarness();
+  await harness.health.observeHealthSource(recoveryIssue.key, recoveryIssue);
+  harness.clock.advance(1000);
+  harness.fail(true);
+  await assert.rejects(harness.health.observeHealthSource(recoveryIssue.key, { ...recoveryIssue, status: 'missing-data' }), /SMTP temporarily unavailable/);
+  assert.equal(harness.state().activeIssues[recoveryIssue.key].lastSentAt, null);
+  assert.ok(harness.state().activeIssues[recoveryIssue.key].notifiedAt);
+  harness.fail(false);
+  await harness.health.observeHealthSource(recoveryIssue.key, null);
+  assert.equal(harness.sent.at(-1).subject, 'Resolved');
+  assert.equal(harness.state().history.at(-1).resolutionEmailStatus, 'accepted');
+});
+
+test('recovery during an in-flight issue alert queues its resolution after SMTP accepts', async () => {
+  const harness = await resolutionHarness();
+  harness.beforeSend(async mail => {
+    if (mail.subject === 'Issue') await harness.health.observeHealthSource(recoveryIssue.key, null);
+  });
+  await harness.health.observeHealthSource(recoveryIssue.key, recoveryIssue);
+  assert.equal(harness.sent.length, 2);
+  assert.equal(harness.sent[1].subject, 'Resolved');
+  assert.equal(harness.state().history[0].resolutionEmailStatus, 'accepted');
+});
+
+test('SMTP rejection does not count as a sent health alert or completed resolution', async () => {
+  const harness = await resolutionHarness();
+  harness.reject(true);
+  await assert.rejects(harness.health.observeHealthSource(recoveryIssue.key, recoveryIssue), /SMTP did not accept/);
+  assert.equal(harness.state().activeIssues[recoveryIssue.key].lastSentAt, null);
+  await harness.health.observeHealthSource(recoveryIssue.key, null);
+  assert.equal(harness.sent.length, 1, 'no resolution for an alert that was not accepted');
+  const retry = await resolutionHarness();
+  await retry.health.observeHealthSource(recoveryIssue.key, recoveryIssue);
+  retry.reject(true);
+  await retry.health.observeHealthSource(recoveryIssue.key, null);
+  assert.equal(retry.state().history[0].resolutionEmailStatus, 'failed');
+  assert.equal(Object.keys(retry.state().pendingResolutions).length, 1);
+});
+
+test('resolution settings and alert grace period prevent unwanted recovery emails', async () => {
+  for (const setting of ['emailEnabled', 'sendResolutionEmail']) {
+    const harness = await resolutionHarness();
+    await harness.health.observeHealthSource(recoveryIssue.key, recoveryIssue);
+    await harness.health.saveHealthNotificationSettings({ ...harness.state().settings, [setting]: false });
+    await harness.health.observeHealthSource(recoveryIssue.key, null);
+    assert.equal(harness.sent.length, 1);
+    assert.equal(Object.keys(harness.state().pendingResolutions).length, 1);
+    await harness.health.saveHealthNotificationSettings({ ...harness.state().settings, [setting]: true });
+    await harness.health.observeHealthSource(recoveryIssue.key, null);
+    assert.equal(harness.sent.length, 2);
+  }
+  const harness = await resolutionHarness();
+  await harness.health.saveHealthNotificationSettings({ ...harness.state().settings, alertDelayMinutes: 5 });
+  await harness.health.observeHealthSource(recoveryIssue.key, recoveryIssue);
+  await harness.health.observeHealthSource(recoveryIssue.key, null);
+  assert.equal(harness.sent.length, 0);
+  assert.equal(Object.keys(harness.state().pendingResolutions).length, 0);
 });

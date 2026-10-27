@@ -17,6 +17,65 @@ import {
 const require = createRequire(import.meta.url);
 const empty = () => ({ startedAt: null, days: {} });
 
+test('free-tier defaults fill missing references without guessing limits for other APIs', () => {
+  const report = summarizeApiUsage(empty());
+  assert.equal(report.services.find(service => service.id === 'vercel').settings.monthlyAllowance, 1000000);
+  assert.deepEqual(report.firestoreDaily.metrics.map(metric => metric.referenceDailyLimit), [50000, 20000, 20000]);
+  for (const service of report.services) {
+    assert.ok(service.quotaNote);
+    if (service.id !== 'vercel') assert.equal(service.settings.monthlyAllowance, undefined);
+  }
+  assert.equal(EMPTY_BUDGETS.services.vercel, undefined, 'defaults require no settings write');
+  const saved = { services: { vercel: { monthlyAllowance: null }, firestore: { dailyReadLimit: null } } };
+  const legacy = summarizeApiUsage(empty(), saved);
+  assert.equal(legacy.services.find(service => service.id === 'vercel').settings.monthlyAllowance, 1000000);
+  assert.equal(legacy.firestoreDaily.metrics[0].referenceDailyLimit, 50000);
+});
+
+test('Vercel free reference triggers exact markers and honors saved overrides and zero', async () => {
+  const usage = await load('../lib/apiUsage.mjs', {
+    './adminSettingsStore.mjs': {},
+    './quotaAlertRules.mjs': quotaAlertRules
+  }, { process: { env: { VERCEL: '1' } } });
+  const now = new Date('2026-10-27T12:00:00Z');
+  for (const [count, markers] of [[699999, []], [700000, [70]], [899999, [70]], [900000, [70, 90]]]) {
+    const state = addUsage(empty(), 'vercel', count, now, 'requests');
+    const report = usage.summarizeApiUsage(state, EMPTY_BUDGETS, now);
+    const thresholds = quotaAlertRules.collectQuotaAlerts(report, now).filter(alert => alert.service === 'vercel').map(alert => alert.threshold);
+    assert.deepEqual(thresholds, markers);
+  }
+  const state = addUsage(empty(), 'vercel', 900000, now, 'requests');
+  for (const allowance of [2000000, 0]) {
+    const report = usage.summarizeApiUsage(state, { services: { vercel: { monthlyAllowance: allowance } } }, now);
+    assert.equal(report.services.find(service => service.id === 'vercel').settings.monthlyAllowance, allowance);
+    assert.equal(quotaAlertRules.collectQuotaAlerts(report, now).filter(alert => alert.service === 'vercel').length, 0);
+  }
+  assert.equal(summarizeApiUsage(state, EMPTY_BUDGETS, now).services.find(service => service.id === 'vercel').quotaPercent, null, 'local requests are not hosting usage');
+});
+
+test('saved daily references drive Firestore percentages and markers, with zero disabling a reference', () => {
+  const now = new Date('2026-10-27T12:00:00Z');
+  const state = addUsage(empty(), 'firestore', 70, now, 'reads');
+  const saved = updateUsageBudgets(EMPTY_BUDGETS, {
+    firestore: { dailyReadLimit: 100, dailyWriteLimit: 200, dailyDeleteLimit: 300 },
+    vercel: { monthlyAllowance: 2000000 }
+  });
+  const report = summarizeApiUsage(state, saved, now);
+  assert.equal(report.firestoreDaily.metrics[0].percent, 70);
+  assert.deepEqual(report.firestoreDaily.metrics.map(metric => metric.referenceDailyLimit), [100, 200, 300]);
+  assert.equal(quotaAlertRules.collectQuotaAlerts(report, now).filter(alert => alert.metric === 'daily-reads').length, 1);
+  saved.services.firestore.dailyReadLimit = 0;
+  const disabled = summarizeApiUsage(state, saved, now);
+  assert.equal(disabled.firestoreDaily.metrics[0].percent, null);
+  assert.equal(disabled.firestoreDaily.metrics[0].forecastPercent, null);
+  assert.equal(quotaAlertRules.collectQuotaAlerts(disabled, now).filter(alert => alert.metric === 'daily-reads').length, 0);
+  for (const key of ['dailyReadLimit', 'dailyWriteLimit', 'dailyDeleteLimit']) {
+    for (const value of [-1, Infinity, NaN, '50000']) {
+      assert.throws(() => updateUsageBudgets(EMPTY_BUDGETS, { firestore: { [key]: value } }), /non-negative number/);
+    }
+  }
+});
+
 function alertReport(percent = 70) {
   return {
     month: '2026-10',
@@ -212,6 +271,10 @@ test('all APIs render default-checked 70% and 90% alert selections with clear de
   }
   assert.ok(html.includes('Save alert selections'));
   assert.ok(html.includes('Limit not configured'));
+  assert.ok(html.includes('1,000,000 function invocations/month'));
+  assert.ok(html.includes('Monthly allowance / target'));
+  assert.ok(html.includes('300 reads/minute/project does not apply'));
+  assert.ok(html.includes('Change them with Configure rates'));
   assert.ok(html.includes('not a scheduler'));
 });
 
@@ -733,9 +796,16 @@ test('admin save-policy endpoint rejects unauthorized and malformed values, pres
   assert.equal(result.status, 200);
   assert.equal((await result.json()).policy.lowQuotaMode, true);
   assert.equal(state.services.firestore.monthlyBudget, 10);
-  await route.POST(request({ action: 'save-budgets', services: { firestore: { monthlyBudget: 30 } } }));
+  for (const key of ['dailyReadLimit', 'dailyWriteLimit', 'dailyDeleteLimit']) {
+    assert.equal((await route.POST(request({ action: 'save-budgets', services: { firestore: { [key]: -1 } } }))).status, 400);
+  }
+  await route.POST(request({ action: 'save-budgets', services: { firestore: { monthlyBudget: 30, dailyReadLimit: 80000, dailyWriteLimit: 0, dailyDeleteLimit: 30000 }, vercel: { monthlyAllowance: 2000000 } } }));
   assert.equal(state.policy.lowQuotaMode, true);
   assert.equal(state.services.firestore.monthlyBudget, 30);
+  assert.equal(state.services.firestore.dailyReadLimit, 80000);
+  assert.equal(state.services.firestore.dailyWriteLimit, 0);
+  assert.equal(state.services.firestore.dailyDeleteLimit, 30000);
+  assert.equal(summarizeApiUsage(empty(), state).services.find(service => service.id === 'vercel').settings.monthlyAllowance, 2000000);
 });
 
 test('public policy reuses persistent apiBudgets across service reloads', async () => {

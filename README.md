@@ -40,6 +40,16 @@ On Vercel, successfully fetched sheet snapshots are stored in Firestore in size-
 
 Health notifications can be configured in **Admin → Health Monitor → Health Notifications**. Admins can enable in-dashboard alerts, enable email, choose immediate, daily, or both, and manage recipients. Immediate email is sent once per newly detected issue (with retry throttling); issues are detected as sheet data is requested. A scheduled full sheet check and daily digest run at 08:00 UTC (approximately noon Gulf Standard Time). Vercel Hobby schedules are once daily and may run up to about 59 minutes later; higher-frequency scheduled monitoring requires a plan that supports more frequent Cron Jobs.
 
+Resolution emails are durably queued before removing an active issue, provided
+an immediate alert was previously accepted by SMTP. Status changes preserve
+that notification eligibility. Failed resolution sends remain queued and retry
+on a subsequent sheet health observation after five minutes, including after a
+server restart. Email and resolution notifications must remain enabled.
+Issue History shows pending, failed (with the error), or SMTP-accepted status
+for newly processed recoveries. SMTP acceptance does not prove inbox delivery.
+A crash after SMTP accepts but before success is recorded can cause a duplicate.
+Previously removed recoveries cannot be reconstructed or resent automatically.
+
 Configure these server-side environment variables for SMTP email and the scheduled job:
 - `SMTP_HOST`: SMTP server hostname (`smtp.gmail.com` for Gmail).
 - `SMTP_PORT`: SMTP server port (`587` for STARTTLS).
@@ -162,6 +172,25 @@ quota emails. Only selected/monitored APIs are evaluated. Monthly markers use
 configured allowances or estimated spend budgets; unknown/unconnected limits
 are not invented. Firestore also uses its clearly labeled UTC-day read, write,
 and delete references. Observed usage and forecasts can trigger a marker.
+
+Free-tier references apply automatically unless overridden: Vercel Hobby
+includes 1,000,000 function invocations/month; Firestore uses 50,000 reads,
+20,000 writes and 20,000 deletes/day. These are assumptions, not verified
+account plans. **Configure rates & budgets** edits the monthly allowance and
+Firestore daily references. Saved numbers override defaults; clearing a
+reference restores its default, while zero disables that reference's markers.
+Existing custom allowances are preserved. No additional polling is introduced.
+See the [Vercel Hobby limits](https://vercel.com/docs/plans/hobby) and
+[Firestore free quota](https://firebase.google.com/docs/firestore/quotas).
+
+Other entries explain why no matching limit is supplied: published CSV feeds
+are not Sheets API requests, token checks are not Firebase active users, GA4
+is indirect, and internal analytics has no separate vendor allowance. SMTP
+and TikTok require provider/endpoint-specific limits. Optional monthly targets
+do not model per-minute or daily rate limits. Vercel compute, memory and
+bandwidth and Firestore storage/transfer remain unmeasured; calendar months
+may differ from provider billing periods. Do not treat partial counters as
+proof that the account is below every free-tier limit.
 
 Quota emails reuse Health Monitor recipients and its global email-enabled
 switch, but are immediate threshold notifications, independent of sheet-alert

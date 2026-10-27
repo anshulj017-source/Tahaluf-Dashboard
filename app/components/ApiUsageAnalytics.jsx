@@ -11,6 +11,11 @@ const fields = [
   ['baseMonthlyCost', 'Base monthly USD'],
   ['monthlyBudget', 'Monthly budget USD']
 ];
+const dailyFields = [
+  ['dailyReadLimit', 'Daily read reference limit'],
+  ['dailyWriteLimit', 'Daily write reference limit'],
+  ['dailyDeleteLimit', 'Daily delete reference limit']
+];
 
 export default function ApiUsageAnalytics({ report, onSaved, onPolicySaved }) {
   const [draft, setDraft] = useState({});
@@ -133,6 +138,7 @@ export default function ApiUsageAnalytics({ report, onSaved, onPolicySaved }) {
       <p className="text-xs text-gray-400">{report.forecastMethod} Available completed days: {report.forecastSampleDays}. Estimates use your rates, not automatic vendor pricing. Firestore combined operations are not a substitute for vendor read/write pricing.</p>
       <p className="text-xs text-amber-200">{report.firestoreDaily?.resetNotice}</p>
       <p className="text-xs text-gray-400">{report.collectionNotice}</p>
+      <p className="text-xs text-gray-400">Free-tier references are assumed, not verified account limits: Vercel Hobby monthly invocations and Firestore daily operations. Change them with Configure rates &amp; budgets. Saved values take precedence; clearing a reference restores its free-tier default, and 0 disables that reference. Other allowances stay unconfigured when no matching provider limit exists.</p>
       <fieldset disabled={savingServices} className="rounded-xl border border-white/10 p-3 space-y-3">
         <legend className="text-sm font-bold px-1">APIs used by Tahaluf</legend>
         <p className="text-xs text-gray-400">Only selected APIs appear in monitoring and receive usage tracking or health probes. This does not disable integrations, authentication, sheet recovery, or analytics itself. Existing history and budgets are retained. Monitoring still needs Firebase for settings and usage storage; reductions depend on which APIs you deselect. Untracked periods leave gaps in totals and forecasts, not proof of zero provider usage.</p>
@@ -155,7 +161,8 @@ export default function ApiUsageAnalytics({ report, onSaved, onPolicySaved }) {
                 onChange={event => setAlertThresholds(current => ({ ...current, [service.id]: { ...current[service.id], [threshold]: event.target.checked } }))} />
               {threshold}%
             </label>)}
-            <span className="text-gray-500">{!report.monitoredServices?.includes(service.id) ? 'Monitoring disabled' : service.id === 'ga4' ? 'Not connected' : service.id !== 'firestore' && !(service.settings.monthlyAllowance > 0 || service.settings.monthlyBudget > 0) ? 'Limit not configured' : 'Reference / configured limits'}</span>
+            <span className="text-gray-500">{!report.monitoredServices?.includes(service.id) ? 'Monitoring disabled' : service.id === 'ga4' ? 'Not connected' : !(service.settings.monthlyAllowance > 0 || service.settings.monthlyBudget > 0 || (service.id === 'firestore' && dailyFields.some(([key]) => service.settings[key] > 0))) ? 'Limit not configured' : 'Reference / configured limits'}</span>
+            <p className="w-full text-gray-400">{service.quotaNote}</p>
           </div>)}
         </div>
         <button type="button" onClick={saveAlerts} className="px-3 py-2 border border-[#14a6d9]/40 rounded-lg text-xs text-[#14a6d9]">{savingAlerts ? 'Saving alerts...' : 'Save alert selections'}</button>
@@ -180,6 +187,7 @@ export default function ApiUsageAnalytics({ report, onSaved, onPolicySaved }) {
             <article key={service.id} className="border border-white/10 rounded-xl p-4 space-y-3">
               <h4 className="font-bold text-sm">{service.name}</h4>
               <p className="text-[11px] text-gray-400">{service.coverage}</p>
+              <p className="text-[11px] text-gray-400">{service.quotaNote}</p>
               <dl className="grid grid-cols-2 gap-2 text-xs">
                 {[
                   ['Observed today', number(service.todayUsage)],
@@ -190,6 +198,7 @@ export default function ApiUsageAnalytics({ report, onSaved, onPolicySaved }) {
                   ['Estimated current spend', money(service.estimatedSpend)],
                   ['Forecast month-end spend', money(service.projectedSpend)],
                   ['Monthly budget', money(service.settings.monthlyBudget)],
+                  ['Monthly allowance / target', number(service.settings.monthlyAllowance)],
                   ['Configured allowance used', service.quotaPercent == null ? 'Not configured' : `${service.quotaPercent.toFixed(1)}%`],
                   ['Estimated budget used', service.budgetPercent == null ? 'Not configured' : `${service.budgetPercent.toFixed(1)}%`]
                 ].map(([label, value]) => <div key={label}><dt className="text-gray-500">{label}</dt><dd className="text-white mt-1">{value}</dd></div>)}
@@ -202,7 +211,7 @@ export default function ApiUsageAnalytics({ report, onSaved, onPolicySaved }) {
                   const peak = Math.max(1, ...report.firestoreDaily.history.map(day => day[metric.metric] || 0));
                   return <div key={metric.metric} className="space-y-1">
                     <p className="text-xs">{metric.metric}: {number(metric.today)} today · forecast {number(metric.projectedToday)} · completed-day mean {number(metric.averageDaily)}</p>
-                    <p className="text-[10px] text-gray-400">Reference only: {number(metric.referenceDailyLimit)} / day; {metric.percent == null ? 'no observations yet' : `${metric.percent.toFixed(1)}% observed`}, {metric.forecastPercent == null ? 'no forecast yet' : `${metric.forecastPercent.toFixed(1)}% forecast`}. Not verified remaining quota.</p>
+                    <p className="text-[10px] text-gray-400">Reference only: {metric.referenceDailyLimit > 0 ? `${number(metric.referenceDailyLimit)} / day` : 'disabled'}; {metric.percent == null ? 'percentage unavailable' : `${metric.percent.toFixed(1)}% observed`}, {metric.forecastPercent == null ? 'no forecast yet' : `${metric.forecastPercent.toFixed(1)}% forecast`}. Not verified remaining quota.</p>
                     <div aria-label={`Firestore ${metric.metric} 14-day UTC history`} className="flex gap-1 items-end h-10">
                       {report.firestoreDaily.history.map(day => <div key={day.date} title={`${day.date} UTC: ${number(day[metric.metric])} ${metric.metric}`} className={`flex-1 rounded-t ${day[metric.metric] == null ? 'bg-gray-700' : 'bg-[#14a6d9]'}`} style={{ height: day[metric.metric] == null ? '2px' : `${Math.max(3, day[metric.metric] / peak * 100)}%` }} />)}
                     </div>
@@ -215,7 +224,7 @@ export default function ApiUsageAnalytics({ report, onSaved, onPolicySaved }) {
               </div>
               <p className="text-[10px] text-gray-500">Last 14 UTC days; hover for daily counts. Gray = no observation coverage.</p>
               {editing && <div className="grid grid-cols-2 gap-2">
-                {fields.map(([key, label]) => <label key={key} className="text-[10px] text-gray-400">{label}
+                {[...fields, ...(service.id === 'firestore' ? dailyFields : [])].map(([key, label]) => <label key={key} className="text-[10px] text-gray-400">{label}
                   <input aria-label={`${service.name} ${label}`} type="number" min="0" step="any" value={draft[service.id]?.[key] ?? ''} placeholder="Not configured" onChange={event => setDraft(current => ({ ...current, [service.id]: { ...current[service.id], [key]: event.target.value === '' ? null : Number(event.target.value) } }))} className="w-full bg-[#041628] rounded-lg border border-gray-600 mt-1 p-2 text-xs text-white" />
                 </label>)}
               </div>}

@@ -505,7 +505,7 @@ export default function DataHealthAdmin({
               <span className="font-semibold text-lime-300">Send resolution email</span>
             </div>
             <span className="text-[10px] text-gray-400 pl-5 leading-tight">
-              Only sent if an issue alert was previously dispatched. If resolved before the delay threshold, neither email is sent.
+              Only sent if an issue alert was previously dispatched. If resolved before the delay threshold, neither email is sent. Failed resolution emails retry on a subsequent sheet health check after five minutes.
             </span>
           </label>
         </div>
@@ -646,6 +646,10 @@ export default function DataHealthAdmin({
                   Detected {formatTimestamp(item.openedAt)}
                   {item.resolvedAt && ` · Resolved ${formatTimestamp(item.resolvedAt)} (after ${formatDuration(item.openedAt, item.resolvedAt)})`}
                 </p>
+                {item.resolutionEmailStatus && <p className="text-[10px] text-gray-400">
+                  Resolution email: {item.resolutionEmailStatus === 'accepted' ? `accepted by SMTP ${formatTimestamp(item.resolutionEmailSentAt)} (inbox delivery not verified)` : item.resolutionEmailStatus === 'failed' ? 'failed; retry on a health check after five minutes' : 'pending; requires email and resolution notifications enabled'}
+                </p>}
+                {item.resolutionEmailError && <p role="alert" className="text-[10px] text-amber-300">{item.resolutionEmailError}</p>}
               </div>
               <span className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${item.resolvedAt ? 'text-emerald-300 border-emerald-400/30 bg-emerald-500/10' : 'text-rose-300 border-rose-400/30 bg-rose-500/10'}`}>
                 {item.resolvedAt ? 'Resolved' : 'Open'}
