@@ -721,7 +721,7 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
             </button>
           </div>
 
-          <div className="w-full h-[400px] mt-4 bg-[#0a2442]/30 rounded-xl p-4 border border-[#cedc28]/10" id="comparison-chart-container">
+          <div className="w-full h-[260px] sm:h-[320px] md:h-[380px] lg:h-[420px] xl:h-[460px] mt-4 bg-[#0a2442]/30 rounded-xl p-2 sm:p-4 border border-[#cedc28]/10" id="comparison-chart-container">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={relativeChartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#cedc28" opacity={0.1} vertical={false} />
@@ -1063,7 +1063,7 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
                   </button>
                 </div>
               </div>
-              <div className="h-64 w-full bg-[#0a2442]/30 rounded-xl p-4 border border-[#cedc28]/10" id="daily-progress-chart-container">
+              <div className="h-56 sm:h-64 md:h-72 lg:h-80 xl:h-96 w-full bg-[#0a2442]/30 rounded-xl p-2 sm:p-4 border border-[#cedc28]/10" id="daily-progress-chart-container">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={dailyChartData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#cedc28" opacity={0.1} />

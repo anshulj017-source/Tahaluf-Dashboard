@@ -223,7 +223,7 @@ export const GaChannelTable = ({ rawData, formatShort }) => {
         </div>
       </div>
 
-      <div className="rounded-xl border border-[#cedc28]/10 custom-scrollbar" style={{ overflowY: 'scroll', overflowX: 'auto', maxHeight: '600px' }}>
+      <div className="rounded-xl border border-[#cedc28]/10 custom-scrollbar touch-scroll" style={{ overflowY: 'scroll', overflowX: 'auto', maxHeight: '600px' }}>
         <table className="w-full text-left border-collapse">
           <thead className="sticky top-0 z-20 bg-[#0a2442]">
             <tr className="bg-[#0a2442] border-b border-[#cedc28]/20 select-none">

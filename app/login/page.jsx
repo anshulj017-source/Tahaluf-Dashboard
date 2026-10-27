@@ -16,14 +16,30 @@ export default function Login() {
       router.push('/');
       return;
     }
+    let resolved = false;
     const unsubscribe = onAuthStateChanged(auth, (user) => {
+      resolved = true;
       if (user) {
         router.push('/');
       } else {
         setLoading(false);
       }
     });
-    return () => unsubscribe();
+
+    const timeout = setTimeout(() => {
+      if (!resolved) {
+        if (auth.currentUser) {
+          router.push('/');
+        } else {
+          setLoading(false);
+        }
+      }
+    }, 2500);
+
+    return () => {
+      unsubscribe();
+      clearTimeout(timeout);
+    };
   }, [router]);
 
   const handleLogin = async (e) => {
@@ -42,9 +58,19 @@ export default function Login() {
 
   if (loading) {
     return (
-      <div className="min-h-screen app-bg flex flex-col items-center justify-center text-[#cedc28] font-bold text-2xl tracking-widest animate-pulse gap-6">
-        <img src="/tahaluf-logo.svg" alt="Loading Logo" className="h-16 object-contain" onError={(e) => e.target.style.display = 'none'} />
-        <span>AUTHENTICATING...</span>
+      <div className="min-h-screen app-bg flex flex-col items-center justify-center text-white p-4 relative overflow-hidden select-none">
+        <div className="pattern-overlay absolute inset-0 z-0 pointer-events-none opacity-30"></div>
+        <div className="relative flex items-center justify-center w-32 h-32 mb-6">
+          <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-[#cedc28]/25 to-[#14a6d9]/25 blur-xl animate-pulse-ring"></div>
+          <div className="absolute inset-0 rounded-full border-2 border-dashed border-[#cedc28]/40 animate-spin-slow"></div>
+          <div className="relative z-10 w-20 h-20 rounded-full bg-[#0a2442] border border-[#cedc28]/35 flex items-center justify-center p-3.5 shadow-[0_0_20px_rgba(206,220,40,0.3)] animate-float-subtle">
+            <img src="/tahaluf-logo.svg" alt="Tahaluf" className="w-full h-full object-contain" onError={(e) => e.target.style.display = 'none'} />
+          </div>
+        </div>
+        <span className="text-xs font-bold text-[#cedc28] tracking-[0.2em] uppercase mb-2">Connecting to Gateway</span>
+        <div className="w-40 bg-[#0a2442] h-1.5 rounded-full overflow-hidden border border-[#cedc28]/25 p-0.5 relative shadow-inner">
+          <div className="h-full bg-gradient-to-r from-[#14a6d9] to-[#cedc28] rounded-full w-2/3 animate-shimmer-flow"></div>
+        </div>
       </div>
     );
   }

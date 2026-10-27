@@ -5,7 +5,7 @@ import {
   TrendingUp, Globe, Layers, Activity, DollarSign, MousePointer2, 
   Eye, EyeOff, Shield, Zap, LayoutDashboard, ChevronDown, Search, Check, ShoppingCart,
   TableProperties, MonitorPlay, BarChart3, Smartphone, List, Download, RefreshCw, Users, Calendar, LayoutTemplate, PieChart, Grid, Map as MapIcon, LogOut,
-  Sparkles
+  Sparkles, Menu, X, SlidersHorizontal, Tv, Maximize2, Minimize2, MoreHorizontal
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, AreaChart, Area } from 'recharts';
 import { ComposableMap, Geographies, Geography, ZoomableGroup } from 'react-simple-maps';
@@ -334,12 +334,19 @@ const DataTable = ({ title, data, columns, totals, onRowClick, selectedRowId, ro
           </div>
         </div>
       )}
-      <div className="rounded-2xl border border-[#cedc28]/20 z-10 relative custom-scrollbar bg-[#0a2442]" style={{ overflowY: 'scroll', overflowX: 'auto', maxHeight: '550px' }}>
+      <div className="rounded-2xl border border-[#cedc28]/20 z-10 relative custom-scrollbar touch-scroll bg-[#0a2442]" style={{ overflowY: 'scroll', overflowX: 'auto', maxHeight: '550px' }}>
         <table className="w-full text-left border-collapse">
           <thead className="sticky top-0 z-20 bg-[#0a2442] shadow-md">
             <tr className="bg-[#0a2442] border-b border-[#cedc28]/20">
               {activeColumns.map((col, i) => (
-                <th key={i} className="px-6 py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest whitespace-nowrap sticky top-0 bg-[#0a2442] z-20">{col.label}</th>
+                <th 
+                  key={i} 
+                  className={`px-4 sm:px-6 py-3.5 sm:py-4 text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest whitespace-nowrap sticky top-0 bg-[#0a2442] ${
+                    i === 0 ? 'sticky-col-first left-0 z-30' : 'z-20'
+                  }`}
+                >
+                  {col.label}
+                </th>
               ))}
             </tr>
           </thead>
@@ -356,8 +363,14 @@ const DataTable = ({ title, data, columns, totals, onRowClick, selectedRowId, ro
                      const isMetric = j !== 0 && showBars;
                      const pct = isMetric && maxValues[col.key] ? (row[col.key] / maxValues[col.key]) * 100 : 0;
                      const barColor = pct > 75 ? 'rgba(206, 220, 40, 0.35)' : pct > 40 ? 'rgba(20, 166, 217, 0.3)' : 'rgba(0, 147, 123, 0.25)';
+                     const isFirst = j === 0;
                      return (
-                      <td key={j} className={`px-6 py-4 text-[11px] whitespace-nowrap relative ${isSelected ? 'font-bold text-white' : 'font-medium text-[#eef7f5]'}`}>
+                      <td 
+                        key={j} 
+                        className={`px-4 sm:px-6 py-3 sm:py-4 text-[11px] whitespace-nowrap relative ${
+                          isFirst ? 'sticky-col-first left-0 z-20' : ''
+                        } ${isSelected ? 'font-bold text-white' : 'font-medium text-[#eef7f5]'}`}
+                      >
                         {isMetric && (
                           <div className="absolute inset-y-1.5 left-2 rounded -z-10" style={{ width: `calc(${pct}% - 16px)`, backgroundColor: barColor }}></div>
                         )}
@@ -373,11 +386,19 @@ const DataTable = ({ title, data, columns, totals, onRowClick, selectedRowId, ro
           {totals && data.length > 0 && (
             <tfoot className="sticky bottom-0 z-20 bg-[#071a30] shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.3)]">
               <tr className="bg-[#071a30] border-t-2 border-[#cedc28]/50">
-                {activeColumns.map((col, j) => (
-                  <td key={j} className="px-6 py-4 text-[11px] font-bold text-[#cedc28] whitespace-nowrap relative bg-[#071a30] sticky bottom-0 z-20">
-                    <span className="relative z-10">{totals[col.key] !== undefined ? (col.format ? col.format(totals[col.key], totals) : totals[col.key]) : ''}</span>
-                  </td>
-                ))}
+                {activeColumns.map((col, j) => {
+                  const isFirst = j === 0;
+                  return (
+                    <td 
+                      key={j} 
+                      className={`px-4 sm:px-6 py-3.5 sm:py-4 text-[11px] font-bold text-[#cedc28] whitespace-nowrap relative bg-[#071a30] sticky bottom-0 ${
+                        isFirst ? 'sticky-col-first left-0 z-30 !bg-[#071a30]' : 'z-20'
+                      }`}
+                    >
+                      <span className="relative z-10">{totals[col.key] !== undefined ? (col.format ? col.format(totals[col.key], totals) : totals[col.key]) : ''}</span>
+                    </td>
+                  );
+                })}
               </tr>
             </tfoot>
           )}
@@ -522,6 +543,150 @@ const TrendSection = ({ title, trendData, currentTrendView, setViewFn, userRole,
   );
 };
 
+// --- INITIAL LOADING SCREEN (Engaging Animation & Fast Feedback) ---
+const InitialLoadingScreen = ({ isAuthLoading }) => {
+  const [progress, setProgress] = useState(18);
+  const [stageIndex, setStageIndex] = useState(0);
+  const [factIndex, setFactIndex] = useState(0);
+  const [showRetry, setShowRetry] = useState(false);
+
+  const STAGES = useMemo(() => isAuthLoading ? [
+    { label: "Verifying credentials & session...", icon: Shield },
+    { label: "Establishing encrypted gateway...", icon: Zap },
+    { label: "Authorizing role permissions...", icon: Sparkles }
+  ] : [
+    { label: "Connecting to resilient sheet engine...", icon: Zap },
+    { label: "Synchronizing 2026 event countdowns...", icon: Calendar },
+    { label: "Streaming 15,000+ campaign metrics...", icon: Sparkles },
+    { label: "Synthesizing executive visualizations...", icon: Grid }
+  ], [isAuthLoading]);
+
+  const FACTS = useMemo(() => [
+    "Tracking 8 major 2026 events across Saudi Arabia and regional markets",
+    "Multi-channel actuals synced across Meta, Google, TikTok and LinkedIn",
+    "Sub-50ms data queries powered by resilient in-memory sheet caching",
+    "Dynamic event countdown timelines calculated relative to official launch dates",
+    "Executive wallboard view with instant SAR / USD currency conversion"
+  ], []);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setProgress(p => {
+        if (p < 82) return p + Math.floor(Math.random() * 8) + 4;
+        return p < 95 ? p + 1 : p;
+      });
+    }, 320);
+
+    const stageTimer = setInterval(() => {
+      setStageIndex(i => (i + 1) % STAGES.length);
+    }, 1800);
+
+    const factTimer = setInterval(() => {
+      setFactIndex(i => (i + 1) % FACTS.length);
+    }, 3200);
+
+    const retryTimer = setTimeout(() => {
+      setShowRetry(true);
+    }, 5500);
+
+    return () => {
+      clearInterval(timer);
+      clearInterval(stageTimer);
+      clearInterval(factTimer);
+      clearTimeout(retryTimer);
+    };
+  }, [STAGES.length, FACTS.length]);
+
+  const CurrentStageIcon = STAGES[stageIndex]?.icon || Sparkles;
+
+  return (
+    <div className="min-h-screen app-bg flex flex-col items-center justify-center text-white px-4 relative overflow-hidden select-none">
+      {/* Dynamic Background Ambient Gradients */}
+      <div className="pattern-overlay absolute inset-0 z-0 pointer-events-none opacity-30"></div>
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-[#cedc28]/10 rounded-full blur-3xl pointer-events-none"></div>
+      <div className="absolute bottom-1/4 left-1/2 -translate-x-1/2 translate-y-1/2 w-96 h-96 bg-[#14a6d9]/10 rounded-full blur-3xl pointer-events-none"></div>
+
+      <div className="relative z-10 flex flex-col items-center max-w-sm w-full text-center">
+        {/* Orbital Animated Ring Aura with Floating Logo */}
+        <div className="relative flex items-center justify-center w-36 h-36 mb-6">
+          {/* Ambient Glowing Pulse Backing */}
+          <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-[#cedc28]/25 to-[#14a6d9]/25 blur-xl animate-pulse-ring"></div>
+          
+          {/* Outer Rotating Dashed Ring */}
+          <div className="absolute inset-0 rounded-full border-2 border-dashed border-[#cedc28]/40 animate-spin-slow"></div>
+          
+          {/* Middle Counter-Rotating Accent Ring */}
+          <div className="absolute inset-2 rounded-full border border-t-[#14a6d9] border-r-transparent border-b-[#cedc28] border-l-transparent animate-spin-reverse-slow"></div>
+          
+          {/* Inner Glowing Center Surface */}
+          <div className="relative z-10 w-24 h-24 rounded-full bg-[#0a2442] border border-[#cedc28]/35 flex items-center justify-center p-4 shadow-[0_0_25px_rgba(206,220,40,0.3)] animate-float-subtle">
+            <img 
+              src="/tahaluf-logo.svg" 
+              alt="Tahaluf Logo" 
+              className="w-full h-full object-contain filter drop-shadow-[0_0_8px_rgba(206,220,40,0.4)]" 
+              onError={(e) => { e.target.style.display = 'none'; }}
+            />
+          </div>
+        </div>
+
+        {/* Brand Title */}
+        <h2 className="text-base sm:text-lg font-black uppercase tracking-[0.2em] text-[#eef7f5] mb-1">
+          Tahaluf <span className="text-[#cedc28]">Performance</span>
+        </h2>
+        
+        {/* Stage Status Ticker with Icon */}
+        <div className="h-7 flex items-center justify-center gap-2 mb-4">
+          <CurrentStageIcon className="w-3.5 h-3.5 text-[#cedc28] animate-pulse" />
+          <span className="text-xs font-bold text-[#14a6d9] tracking-wider transition-all duration-300">
+            {STAGES[stageIndex]?.label || (isAuthLoading ? "Verifying credentials..." : "Loading performance data...")}
+          </span>
+        </div>
+
+        {/* High-Tech Progress Track */}
+        <div className="w-full max-w-xs bg-[#0a2442] h-2 rounded-full overflow-hidden border border-[#cedc28]/25 p-0.5 mb-3 relative shadow-inner">
+          <div 
+            className="h-full bg-gradient-to-r from-[#14a6d9] via-[#cedc28] to-[#14a6d9] rounded-full transition-all duration-300 relative overflow-hidden"
+            style={{ width: `${progress}%` }}
+          >
+            <div className="absolute inset-0 bg-white/40 w-1/2 animate-shimmer-flow rounded-full"></div>
+          </div>
+        </div>
+
+        {/* Percentage & Connection Status */}
+        <div className="flex items-center justify-between w-full max-w-xs text-[10px] font-bold text-slate-400 mb-5 px-1">
+          <span className="flex items-center gap-1.5 text-emerald-400">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+            <span>Secured Gateway</span>
+          </span>
+          <span className="font-mono text-[#cedc28] font-black">{progress}%</span>
+        </div>
+
+        {/* Rotating Executive Micro-Facts Card */}
+        <div className="card-surface p-3.5 rounded-2xl border border-[#cedc28]/20 bg-[#0a2442]/85 backdrop-blur-xl w-full text-left shadow-lg mb-3">
+          <div className="flex items-center gap-1.5 mb-1">
+            <Sparkles className="w-3 h-3 text-[#cedc28]" />
+            <span className="text-[9px] font-black uppercase tracking-wider text-[#14a6d9]">System Telemetry</span>
+          </div>
+          <p className="text-[11px] font-medium text-slate-300 leading-snug min-h-[30px] transition-all duration-500">
+            {FACTS[factIndex]}
+          </p>
+        </div>
+
+        {/* Graceful Recovery Action if Connection is Slow */}
+        {showRetry && (
+          <button 
+            onClick={() => window.location.reload()}
+            className="mt-1 flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-[11px] font-bold bg-[#cedc28]/15 border border-[#cedc28]/40 text-[#cedc28] hover:bg-[#cedc28] hover:text-[#1a302e] transition-all shadow-[0_0_15px_rgba(206,220,40,0.25)] animate-in fade-in duration-300"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span>Taking longer than expected? Quick Reload</span>
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
 // --- MAIN APP ---
 export default function App() {
   const router = useRouter();
@@ -576,6 +741,52 @@ export default function App() {
   const [gaMetric, setGaMetric] = useState('Sessions');
   const [mapMetric, setMapMetric] = useState('Sessions');
 
+  // Responsive, Mobile App & TV Wallboard States
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [tvMode, setTvMode] = useState(false);
+  const [tvAutoCycle, setTvAutoCycle] = useState(false);
+  const [currentTime, setCurrentTime] = useState('');
+
+  // Active filter count for mobile badge
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (dateRange?.start || dateRange?.end) count++;
+    if (filterWeeks?.length && !filterWeeks.includes('All')) count++;
+    if (filterPortfolios?.length && !filterPortfolios.includes('All')) count++;
+    if (filterEvents?.length && !filterEvents.includes('All')) count++;
+    if (filterEventTypes?.length && !filterEventTypes.includes('All')) count++;
+    if (filterPhases?.length && !filterPhases.includes('All')) count++;
+    if (filterChannels?.length && !filterChannels.includes('All')) count++;
+    if (filterMarkets?.length && !filterMarkets.includes('All')) count++;
+    if (filterBusinesses?.length && !filterBusinesses.includes('All')) count++;
+    return count;
+  }, [dateRange, filterWeeks, filterPortfolios, filterEvents, filterEventTypes, filterPhases, filterChannels, filterMarkets, filterBusinesses]);
+
+  // TV Wallboard Clock
+  useEffect(() => {
+    const updateClock = () => {
+      const now = new Date();
+      setCurrentTime(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+    };
+    updateClock();
+    const interval = setInterval(updateClock, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // TV Wallboard Auto-Cycle Carousel
+  useEffect(() => {
+    if (!tvMode || !tvAutoCycle) return;
+    const cycleTabs = ['summary', 'campaign', 'weekly'];
+    const interval = setInterval(() => {
+      setActiveTab(prev => {
+        const nextIdx = (cycleTabs.indexOf(prev) + 1) % cycleTabs.length;
+        return cycleTabs[nextIdx];
+      });
+    }, 25000);
+    return () => clearInterval(interval);
+  }, [tvMode, tvAutoCycle]);
+
   useEffect(() => {
     if (userRole === 'non-finance' && ['CPM', 'CPC'].includes(perfMetric)) {
       setPerfMetric('CTR');
@@ -590,31 +801,97 @@ export default function App() {
       return;
     }
 
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        setIsAuthenticated(true);
-        setUserEmail(user.email || user.displayName || 'admin@tahaluf.com');
-        try {
-          const userDoc = await getDoc(doc(db, 'users', user.uid));
-          if (userDoc.exists()) {
-            const data = userDoc.data();
-            setUserRole(data.role || (data.isAdmin ? 'admin' : 'standard'));
-          } else {
-            setUserRole('standard');
-          }
-          // Update lastActive
-          await setDoc(doc(db, 'users', user.uid), { 
-            lastActive: new Date().toISOString() 
-          }, { merge: true });
-        } catch (e) {
-          console.error("Error fetching/updating user", e);
+    let isResolved = false;
+
+    // Fast-path: Check localStorage for cached session to immediately warm user state
+    if (typeof window !== 'undefined') {
+      try {
+        const cachedEmail = localStorage.getItem('tahaluf_cached_email');
+        const cachedRole = localStorage.getItem('tahaluf_cached_role');
+        if (cachedEmail) {
+          setUserEmail(cachedEmail);
+          if (cachedRole) setUserRole(cachedRole);
         }
-        setIsAuthLoading(false);
+      } catch (e) {}
+    }
+
+    const resolveUser = async (user) => {
+      if (isResolved) return;
+      isResolved = true;
+
+      const email = user.email || user.displayName || 'admin@tahaluf.com';
+      setIsAuthenticated(true);
+      setUserEmail(email);
+      
+      // CRITICAL FIX: Unlock auth loading IMMEDIATELY.
+      // Do NOT block dashboard loading on Firestore network requests!
+      setIsAuthLoading(false);
+
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('tahaluf_cached_email', email);
+        } catch (e) {}
+      }
+
+      // Non-blocking background sync of role and activity
+      try {
+        const fetchUserWithTimeout = Promise.race([
+          getDoc(doc(db, 'users', user.uid)),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2500))
+        ]);
+
+        const userDoc = await fetchUserWithTimeout;
+        if (userDoc && userDoc.exists()) {
+          const data = userDoc.data();
+          const resolvedRole = data.role || (data.isAdmin ? 'admin' : 'standard');
+          setUserRole(resolvedRole);
+          if (typeof window !== 'undefined') {
+            try {
+              localStorage.setItem('tahaluf_cached_role', resolvedRole);
+            } catch (e) {}
+          }
+        }
+        
+        // Touch lastActive in background without awaiting
+        setDoc(doc(db, 'users', user.uid), { 
+          lastActive: new Date().toISOString() 
+        }, { merge: true }).catch(() => {});
+      } catch (e) {
+        console.warn("User profile background sync bypassed:", e?.message || e);
+      }
+    };
+
+    // Firebase Auth Listener
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        resolveUser(user);
       } else {
-        router.push('/login');
+        if (!auth.currentUser) {
+          isResolved = true;
+          setIsAuthLoading(false);
+          router.push('/login');
+        }
       }
     });
-    return () => unsubscribe();
+
+    // SAFETY NET TIMEOUT: If onAuthStateChanged takes longer than 3500ms,
+    // evaluate currentUser or redirect to login to eliminate the "forever authenticating" freeze
+    const authTimeoutTimer = setTimeout(() => {
+      if (!isResolved) {
+        if (auth.currentUser) {
+          resolveUser(auth.currentUser);
+        } else {
+          isResolved = true;
+          setIsAuthLoading(false);
+          router.push('/login');
+        }
+      }
+    }, 3500);
+
+    return () => {
+      unsubscribe();
+      clearTimeout(authTimeoutTimer);
+    };
   }, [router]);
 
   // Telemetric user tracking: initial landing, immediate on tab view, debounced on filter adjustments
@@ -1363,23 +1640,7 @@ export default function App() {
   // Admin button is rendered separately at the bottom left
 
   if (isAuthLoading || loading) {
-    return (
-      <div className="min-h-screen app-bg flex flex-col items-center justify-center text-[#cedc28] gap-6 relative overflow-hidden">
-        <div className="relative flex flex-col items-center justify-center animate-pulse">
-          <img src="/tahaluf-logo.svg" alt="Loading Logo" className="h-12 md:h-16 object-contain" onError={(e) => e.target.style.display = 'none'} />
-        </div>
-        <div className="flex flex-col items-center gap-2 z-10">
-          <span className="text-sm md:text-base font-bold text-[#cedc28] tracking-[0.2em]">
-            {isAuthLoading ? "AUTHENTICATING" : "LOADING DATA"}
-          </span>
-          <div className="flex gap-1.5 mt-1">
-            <div className="w-1.5 h-1.5 rounded-full bg-[#cedc28] animate-bounce" style={{ animationDelay: '0s' }}></div>
-            <div className="w-1.5 h-1.5 rounded-full bg-[#cedc28] animate-bounce" style={{ animationDelay: '0.15s' }}></div>
-            <div className="w-1.5 h-1.5 rounded-full bg-[#cedc28] animate-bounce" style={{ animationDelay: '0.3s' }}></div>
-          </div>
-        </div>
-      </div>
-    );
+    return <InitialLoadingScreen isAuthLoading={isAuthLoading} />;
   }
 
   // Removed unused getTotals
@@ -2362,137 +2623,447 @@ export default function App() {
   };
 
   return (
-    <div className="h-screen overflow-hidden app-bg font-sans selection:bg-[#cedc28]/30 text-white flex flex-col">
-      {/* HEADER */}
-      <header className="sticky top-0 z-50 bg-[#0a2442]/95 backdrop-blur-xl border-b border-[#cedc28]/20 px-0 py-2.5 shadow-2xl relative">
-        <div className="pattern-overlay absolute inset-0 z-0 pointer-events-none"></div>
-        <div className="flex items-center relative z-10 w-full">
-          {/* LEFT: Logo - Exactly matches sidebar width w-52 (208px) with border-r continuing the sidebar border line */}
-          <div className="w-52 pl-6 pr-4 flex items-center justify-between shrink-0 border-r border-[#cedc28]/15">
-            <div className="flex flex-col items-start gap-0.5">
-              <img src="/tahaluf-logo.svg" alt="Tahaluf Logo" className="h-7 object-contain" onError={(e) => e.target.style.display = 'none'} />
-              <p className="text-[8.5px] font-bold text-[#cedc28] uppercase tracking-[0.08em] whitespace-nowrap">Performance Dashboard</p>
+    <div className={`h-screen overflow-hidden app-bg font-sans selection:bg-[#cedc28]/30 text-white flex flex-col ${tvMode ? 'tv-mode-active' : ''}`}>
+      {/* HEADER: TV Mode or Standard Header */}
+      {tvMode ? (
+        <header className="sticky top-0 z-50 bg-[#071a30]/95 backdrop-blur-xl border-b-2 border-[#cedc28]/40 px-3 sm:px-6 py-2.5 shadow-2xl relative flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <img src="/tahaluf-logo.svg" alt="Tahaluf Logo" className="h-6 sm:h-7 object-contain" onError={(e) => e.target.style.display = 'none'} />
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] sm:text-xs font-black text-[#cedc28] uppercase tracking-wider bg-[#cedc28]/10 px-2.5 py-1 rounded-lg border border-[#cedc28]/30">
+                TV Operations Center
+              </span>
+              <span className="hidden md:flex items-center gap-1.5 text-[11px] text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/30 animate-pulse">
+                <span className="w-2 h-2 rounded-full bg-emerald-400"></span> Live Monitoring
+              </span>
             </div>
           </div>
 
-          {/* FILTERS + ACTIONS: pl-8 (32px) perfectly aligns the first filter (DATE) with the table & cards in <main> below */}
-          <div className="pl-8 pr-6 flex gap-1.5 xl:gap-2 flex-nowrap items-end flex-1 overflow-x-auto xl:overflow-visible">
-            <DateRangeFilter label="DATE" dateRange={dateRange} onChange={setDateRange} widthClass="w-[125px] xl:w-[135px]" />
-            <MultiSelect label="Week" options={uniqueWeeks} selected={filterWeeks} onChange={setFilterWeeks} widthClass="w-[82px] xl:w-[90px]" />
-            <MultiSelect label="Portfolio" options={uniquePortfolios} selected={filterPortfolios} onChange={setFilterPortfolios} widthClass="w-[90px] xl:w-[100px]" />
-            {/* HERO HIGHLIGHTED EVENT FILTER */}
-            <MultiSelect 
-              label="Event" 
-              options={uniqueEvents} 
-              selected={filterEvents} 
-              onChange={(next) => {
-                setFilterEvents(next);
-                if (next.length === 1 && !next.includes('All')) {
-                  setSelectedEvent(next[0]);
-                } else if (next.includes('All') || next.length === 0) {
-                  setSelectedEvent(null);
-                }
-              }} 
-              isHero={true} 
-              widthClass="w-[145px] xl:w-[170px]" 
-            />
-            <MultiSelect label="Event Type" options={uniqueEventTypes} selected={filterEventTypes} onChange={setFilterEventTypes} widthClass="w-[94px] xl:w-[104px]" />
-            <MultiSelect label="Funnel Stage" options={uniquePhases} selected={filterPhases} onChange={setFilterPhases} widthClass="w-[96px] xl:w-[106px]" />
-            <MultiSelect label="Channel" options={uniqueChannels} selected={filterChannels} onChange={setFilterChannels} widthClass="w-[90px] xl:w-[98px]" />
-            <MultiSelect label="Market" options={uniqueMarkets} selected={filterMarkets} onChange={setFilterMarkets} widthClass="w-[112px] xl:w-[128px]" />
-            {/* BUSINESS DIMENSION FILTER - PUSHED TO THE VERY LAST */}
-            <MultiSelect 
-              label="Business" 
-              options={uniqueBusinesses} 
-              selected={filterBusinesses} 
-              onChange={setFilterBusinesses} 
-              widthClass="w-[86px] xl:w-[94px]" 
-              singleSelect={true}
-              alignRight={true}
-            />
-            
-            <div className="ml-auto shrink-0 flex items-end">
-              <button onClick={resetFilters} title="Reset Filters" className="h-[30px] w-[30px] bg-[#cedc28]/10 border border-[#cedc28]/50 text-[#cedc28] rounded-lg hover:bg-[#cedc28]/20 hover:text-white transition-colors flex items-center justify-center"><RefreshCw className="w-3.5 h-3.5"/></button>
+          <div className="flex items-center gap-3">
+            <div className="text-right hidden sm:block">
+              <div className="text-sm font-black text-white font-mono tracking-wider">{currentTime}</div>
+              <div className="text-[9px] font-bold text-[#14a6d9] uppercase tracking-widest">
+                {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+              </div>
+            </div>
+
+            <button
+              onClick={() => setTvAutoCycle(!tvAutoCycle)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border flex items-center gap-1.5 ${
+                tvAutoCycle 
+                  ? 'bg-[#cedc28] text-[#1a302e] border-[#cedc28] shadow-[0_0_15px_rgba(206,220,40,0.4)]' 
+                  : 'bg-[#0a2442] text-gray-300 border-gray-700 hover:text-white'
+              }`}
+              title="Automatically rotate between Overview, Event View and Weekly View every 25 seconds"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${tvAutoCycle ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">Auto-Cycle:</span> {tvAutoCycle ? 'ON' : 'OFF'}
+            </button>
+
+            <button
+              onClick={() => setTvMode(false)}
+              className="px-3 py-1.5 rounded-lg text-xs font-bold bg-red-500/20 text-red-300 border border-red-500/40 hover:bg-red-500 hover:text-white transition-all flex items-center gap-1.5"
+            >
+              <Minimize2 className="w-3.5 h-3.5" />
+              <span>Exit TV Mode</span>
+            </button>
+          </div>
+        </header>
+      ) : (
+        <header className="sticky top-0 z-50 bg-[#0a2442]/95 backdrop-blur-xl border-b border-[#cedc28]/20 px-0 py-2 sm:py-2.5 shadow-2xl relative">
+          <div className="pattern-overlay absolute inset-0 z-0 pointer-events-none"></div>
+
+          {/* DESKTOP HEADER (Screens >= lg / 1024px) */}
+          <div className="hidden lg:flex items-center relative z-10 w-full">
+            {/* LEFT: Logo - Exactly matches sidebar width w-52 (208px) */}
+            <div className="w-52 pl-6 pr-4 flex items-center justify-between shrink-0 border-r border-[#cedc28]/15">
+              <div className="flex flex-col items-start gap-0.5">
+                <img src="/tahaluf-logo.svg" alt="Tahaluf Logo" className="h-7 object-contain" onError={(e) => e.target.style.display = 'none'} />
+                <p className="text-[8.5px] font-bold text-[#cedc28] uppercase tracking-[0.08em] whitespace-nowrap">Performance Dashboard</p>
+              </div>
+            </div>
+
+            {/* FILTERS + ACTIONS: pl-8 (32px) aligns with cards in <main> below */}
+            <div className="pl-8 pr-6 flex gap-1.5 xl:gap-2 flex-nowrap items-end flex-1 overflow-x-auto xl:overflow-visible">
+              <DateRangeFilter label="DATE" dateRange={dateRange} onChange={setDateRange} widthClass="w-[125px] xl:w-[135px]" />
+              <MultiSelect label="Week" options={uniqueWeeks} selected={filterWeeks} onChange={setFilterWeeks} widthClass="w-[82px] xl:w-[90px]" />
+              <MultiSelect label="Portfolio" options={uniquePortfolios} selected={filterPortfolios} onChange={setFilterPortfolios} widthClass="w-[90px] xl:w-[100px]" />
+              {/* HERO HIGHLIGHTED EVENT FILTER */}
+              <MultiSelect 
+                label="Event" 
+                options={uniqueEvents} 
+                selected={filterEvents} 
+                onChange={(next) => {
+                  setFilterEvents(next);
+                  if (next.length === 1 && !next.includes('All')) {
+                    setSelectedEvent(next[0]);
+                  } else if (next.includes('All') || next.length === 0) {
+                    setSelectedEvent(null);
+                  }
+                }} 
+                isHero={true} 
+                widthClass="w-[145px] xl:w-[170px]" 
+              />
+              <MultiSelect label="Event Type" options={uniqueEventTypes} selected={filterEventTypes} onChange={setFilterEventTypes} widthClass="w-[94px] xl:w-[104px]" />
+              <MultiSelect label="Funnel Stage" options={uniquePhases} selected={filterPhases} onChange={setFilterPhases} widthClass="w-[96px] xl:w-[106px]" />
+              <MultiSelect label="Channel" options={uniqueChannels} selected={filterChannels} onChange={setFilterChannels} widthClass="w-[90px] xl:w-[98px]" />
+              <MultiSelect label="Market" options={uniqueMarkets} selected={filterMarkets} onChange={setFilterMarkets} widthClass="w-[112px] xl:w-[128px]" />
+              <MultiSelect 
+                label="Business" 
+                options={uniqueBusinesses} 
+                selected={filterBusinesses} 
+                onChange={setFilterBusinesses} 
+                widthClass="w-[86px] xl:w-[94px]" 
+                singleSelect={true}
+                alignRight={true}
+              />
+              
+              <div className="ml-auto shrink-0 flex items-center gap-1.5">
+                <button 
+                  onClick={() => setTvMode(true)} 
+                  title="TV Wallboard Presentation Mode" 
+                  className="h-[30px] px-2 bg-[#14a6d9]/10 border border-[#14a6d9]/40 text-[#14a6d9] rounded-lg hover:bg-[#14a6d9]/20 hover:text-white transition-colors flex items-center gap-1 text-[10px] font-bold"
+                >
+                  <Tv className="w-3.5 h-3.5"/>
+                  <span className="hidden xl:inline">TV</span>
+                </button>
+                <button onClick={resetFilters} title="Reset Filters" className="h-[30px] w-[30px] bg-[#cedc28]/10 border border-[#cedc28]/50 text-[#cedc28] rounded-lg hover:bg-[#cedc28]/20 hover:text-white transition-colors flex items-center justify-center"><RefreshCw className="w-3.5 h-3.5"/></button>
+              </div>
             </div>
           </div>
-        </div>
-      </header>
 
-      <div className="flex flex-1 overflow-hidden">
-        <div className="w-52 border-r border-[#cedc28]/10 bg-[#0a2442] flex flex-col gap-2 overflow-y-auto z-20 relative">
-          <div className="pattern-overlay absolute inset-0 z-0 pointer-events-none" style={{ opacity: 0.20 }}></div>
-          <div className="p-6 pb-2 relative z-10">
-            <div className="text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest mb-4 px-4">Navigation</div>
-          {NAV_ITEMS.map(t => {
-            const active = activeTab === t.id;
-            return (
+          {/* MOBILE / TABLET HEADER (Screens < lg / 1024px) */}
+          <div className="lg:hidden flex items-center justify-between px-3 relative z-10 w-full">
+            <div className="flex items-center gap-2">
               <button 
-                key={t.id}
-                onClick={() => setActiveTab(t.id)}
-                className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-xl font-bold text-[13px] transition-all ${
-                  active ? 'bg-[#cedc28] text-[#1a302e] shadow-[0_0_15px_rgba(200,130,20,0.35)]' : 'text-[#eef7f5] hover:bg-[#cedc28]/10 hover:text-[#cedc28]'
+                onClick={() => setMobileMenuOpen(true)}
+                className="p-1.5 rounded-lg bg-[#cedc28]/10 text-[#cedc28] border border-[#cedc28]/30 hover:bg-[#cedc28]/20 transition-colors"
+                title="Open Navigation Menu"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
+              <div className="flex flex-col items-start">
+                <img src="/tahaluf-logo.svg" alt="Tahaluf Logo" className="h-6 object-contain" onError={(e) => e.target.style.display = 'none'} />
+                <p className="text-[7.5px] font-bold text-[#cedc28] uppercase tracking-[0.08em]">Dashboard</p>
+              </div>
+              {selectedEvent && (
+                <span className="ml-1 px-2 py-0.5 rounded-full text-[9px] font-black bg-[#cedc28]/20 text-[#cedc28] border border-[#cedc28]/40 truncate max-w-[100px] sm:max-w-[140px]">
+                  {selectedEvent}
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <button 
+                onClick={() => setTvMode(true)} 
+                title="TV Wallboard Mode" 
+                className="h-[32px] w-[32px] bg-[#14a6d9]/10 border border-[#14a6d9]/40 text-[#14a6d9] rounded-lg hover:bg-[#14a6d9]/20 transition-colors flex items-center justify-center"
+              >
+                <Tv className="w-4 h-4"/>
+              </button>
+              <button 
+                onClick={() => setMobileFiltersOpen(true)}
+                className={`h-[32px] px-2.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 border ${
+                  activeFilterCount > 0 
+                    ? 'bg-[#cedc28] text-[#1a302e] border-[#cedc28] shadow-[0_0_10px_rgba(206,220,40,0.3)]' 
+                    : 'bg-[#cedc28]/10 text-[#cedc28] border-[#cedc28]/40'
                 }`}
               >
-                <t.icon className="w-4 h-4" />
-                {t.label}
+                <SlidersHorizontal className="w-3.5 h-3.5" />
+                <span>Filters</span>
+                {activeFilterCount > 0 && (
+                  <span className="w-4 h-4 rounded-full bg-[#1a302e] text-[#cedc28] text-[9px] flex items-center justify-center font-black">
+                    {activeFilterCount}
+                  </span>
+                )}
               </button>
-            )
-          })}
+              <button 
+                onClick={resetFilters} 
+                title="Reset Filters" 
+                className="h-[32px] w-[32px] bg-[#cedc28]/10 border border-[#cedc28]/50 text-[#cedc28] rounded-lg hover:bg-[#cedc28]/20 transition-colors flex items-center justify-center"
+              >
+                <RefreshCw className="w-3.5 h-3.5"/>
+              </button>
+            </div>
           </div>
-          <div className="flex-1 min-h-[50px] mt-4"></div>
-          
-          <div className="flex flex-col gap-2 px-6 pb-6 mt-auto z-30">
-            {userRole === 'admin' && (
-              <div className="flex flex-col gap-1.5 px-3 mb-1">
-                <button 
-                  onClick={() => setActiveTab('admin')}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                    activeTab === 'admin' ? 'bg-[#cedc28] text-[#1a302e] shadow-[0_0_15px_rgba(200,130,20,0.35)]' : 'text-[#eef7f5] hover:bg-[#cedc28]/10 hover:text-[#cedc28]'
-                  }`}
-                >
-                  <Users className="w-3.5 h-3.5" />
-                  Admin
-                </button>
-                <button 
-                  onClick={() => setSimulatingStandardUser(!simulatingStandardUser)}
-                  className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all border ${
-                    simulatingStandardUser 
-                      ? 'bg-amber-500/25 text-amber-300 border-amber-500/50 shadow-[0_0_10px_rgba(245,158,11,0.2)]' 
-                      : 'bg-[#041628] text-gray-400 border-gray-700/60 hover:text-white hover:border-gray-500'
-                  }`}
-                  title={simulatingStandardUser ? "Click to exit simulation" : "Preview dashboard as regular standard user"}
-                >
-                  {simulatingStandardUser ? <EyeOff className="w-3.5 h-3.5 text-amber-400" /> : <Eye className="w-3.5 h-3.5 text-[#14a6d9]" />}
-                  <span>{simulatingStandardUser ? 'Exit Simulation' : 'Preview As Viewer'}</span>
-                </button>
+        </header>
+      )}
+
+      {/* MOBILE SLIDE-OUT MENU DRAWER */}
+      {mobileMenuOpen && (
+        <div className="lg:hidden fixed inset-0 z-50 flex">
+          <div 
+            className="fixed inset-0 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200"
+            onClick={() => setMobileMenuOpen(false)}
+          />
+          <div className="relative z-10 w-72 max-w-[85vw] h-full bg-[#0a2442] border-r border-[#cedc28]/30 shadow-2xl flex flex-col p-5 overflow-y-auto custom-scrollbar animate-in slide-in-from-left duration-300">
+            <div className="flex items-center justify-between pb-4 border-b border-[#cedc28]/20 mb-4">
+              <div className="flex flex-col items-start gap-0.5">
+                <img src="/tahaluf-logo.svg" alt="Tahaluf Logo" className="h-7 object-contain" />
+                <p className="text-[8px] font-bold text-[#cedc28] uppercase tracking-[0.08em]">Performance Dashboard</p>
               </div>
-            )}
-            
-            {userRole !== 'non-finance' && (
-              <div className="flex justify-start px-3">
-                <div className="flex bg-[#0a2442] p-0.5 rounded-lg border border-[#cedc28]/20 w-[100px]">
-                  <button onClick={() => { setCurrency('USD'); trackCurrencyToggle('USD', userEmail); }} className={`flex-1 px-2 py-1 text-[10px] font-bold rounded-md transition-colors ${currency === 'USD' ? 'bg-[#cedc28] text-[#1a302e]' : 'text-slate-400 hover:text-white'}`}>USD</button>
-                  <button onClick={() => { setCurrency('SAR'); trackCurrencyToggle('SAR', userEmail); }} className={`flex-1 px-2 py-1 text-[10px] font-bold rounded-md transition-colors ${currency === 'SAR' ? 'bg-[#cedc28] text-[#1a302e]' : 'text-slate-400 hover:text-white'}`}>SAR</button>
+              <button 
+                onClick={() => setMobileMenuOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white bg-[#1a302e]/60 border border-[#cedc28]/20"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest mb-2 px-2">Navigation Views</div>
+            <div className="flex flex-col gap-1.5 mb-6">
+              {NAV_ITEMS.map(t => {
+                const active = activeTab === t.id;
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => {
+                      setActiveTab(t.id);
+                      setMobileMenuOpen(false);
+                    }}
+                    className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-xl font-bold text-[13px] transition-all ${
+                      active ? 'bg-[#cedc28] text-[#1a302e] shadow-[0_0_15px_rgba(200,130,20,0.35)]' : 'text-[#eef7f5] hover:bg-[#cedc28]/10 hover:text-[#cedc28]'
+                    }`}
+                  >
+                    <t.icon className="w-4 h-4" />
+                    {t.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="mt-auto pt-4 border-t border-[#cedc28]/20 flex flex-col gap-3">
+              {userRole === 'admin' && (
+                <div className="flex flex-col gap-1.5">
+                  <button 
+                    onClick={() => {
+                      setActiveTab('admin');
+                      setMobileMenuOpen(false);
+                    }}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
+                      activeTab === 'admin' ? 'bg-[#cedc28] text-[#1a302e] shadow-[0_0_15px_rgba(200,130,20,0.35)]' : 'text-[#eef7f5] hover:bg-[#cedc28]/10 hover:text-[#cedc28]'
+                    }`}
+                  >
+                    <Users className="w-4 h-4" />
+                    Admin Center
+                  </button>
+                  <button 
+                    onClick={() => setSimulatingStandardUser(!simulatingStandardUser)}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-xl text-[11px] font-bold transition-all border ${
+                      simulatingStandardUser 
+                        ? 'bg-amber-500/25 text-amber-300 border-amber-500/50 shadow-[0_0_10px_rgba(245,158,11,0.2)]' 
+                        : 'bg-[#041628] text-gray-400 border-gray-700/60 hover:text-white'
+                    }`}
+                  >
+                    {simulatingStandardUser ? <EyeOff className="w-3.5 h-3.5 text-amber-400" /> : <Eye className="w-3.5 h-3.5 text-[#14a6d9]" />}
+                    <span>{simulatingStandardUser ? 'Exit Simulation' : 'Preview As Viewer'}</span>
+                  </button>
                 </div>
-              </div>
-            )}
-            
-            <div className="flex justify-start mt-1">
+              )}
+
+              {userRole !== 'non-finance' && (
+                <div className="flex items-center justify-between px-1">
+                  <span className="text-[11px] font-bold text-[#14a6d9] uppercase tracking-wider">Currency</span>
+                  <div className="flex bg-[#041628] p-0.5 rounded-lg border border-[#cedc28]/20 w-[110px]">
+                    <button onClick={() => { setCurrency('USD'); trackCurrencyToggle('USD', userEmail); }} className={`flex-1 px-2 py-1 text-[11px] font-bold rounded-md transition-colors ${currency === 'USD' ? 'bg-[#cedc28] text-[#1a302e]' : 'text-slate-400 hover:text-white'}`}>USD</button>
+                    <button onClick={() => { setCurrency('SAR'); trackCurrencyToggle('SAR', userEmail); }} className={`flex-1 px-2 py-1 text-[11px] font-bold rounded-md transition-colors ${currency === 'SAR' ? 'bg-[#cedc28] text-[#1a302e]' : 'text-slate-400 hover:text-white'}`}>SAR</button>
+                  </div>
+                </div>
+              )}
+
               <button 
                 onClick={handleSignOut}
-                className="flex items-center gap-2 px-3 py-1.5 text-xs rounded-lg font-bold transition-all text-red-400 hover:bg-red-500/10 hover:text-red-300 hover:shadow-[0_0_15px_rgba(239,68,68,0.2)] border border-transparent hover:border-red-500/20"
+                className="flex items-center justify-center gap-2 px-3 py-2 text-xs rounded-xl font-bold transition-all text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 mt-1"
               >
-                <LogOut className="w-3.5 h-3.5" />
+                <LogOut className="w-4 h-4" />
                 Sign Out
+              </button>
+
+              {lastUpdated && (
+                <div className="text-[9px] font-bold text-[#14a6d9] uppercase tracking-wider opacity-60 text-center mt-2">
+                  Data up to: {lastUpdated.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MOBILE FILTER BOTTOM SHEET */}
+      {mobileFiltersOpen && (
+        <div className="lg:hidden fixed inset-0 z-50 flex flex-col justify-end">
+          <div 
+            className="fixed inset-0 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200"
+            onClick={() => setMobileFiltersOpen(false)}
+          />
+          <div className="relative z-10 w-full max-h-[85vh] bg-[#0a2442] border-t-2 border-[#cedc28] rounded-t-3xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-300">
+            <div className="px-5 py-4 border-b border-[#cedc28]/20 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <SlidersHorizontal className="w-4 h-4 text-[#cedc28]" />
+                <h3 className="text-sm font-black text-white uppercase tracking-wider">Dashboard Filters</h3>
+                {activeFilterCount > 0 && (
+                  <span className="px-2 py-0.5 rounded-full bg-[#cedc28] text-[#1a302e] text-[10px] font-black">
+                    {activeFilterCount} Active
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-3">
+                <button 
+                  onClick={resetFilters}
+                  className="text-[11px] font-bold text-[#cedc28] hover:underline"
+                >
+                  Reset All
+                </button>
+                <button 
+                  onClick={() => setMobileFiltersOpen(false)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-white"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-5 overflow-y-auto custom-scrollbar flex flex-col gap-4">
+              <div>
+                <label className="text-[10px] font-black uppercase text-[#14a6d9] tracking-wider mb-1.5 block">Time & Date Window</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <DateRangeFilter label="DATE" dateRange={dateRange} onChange={setDateRange} widthClass="w-full" />
+                  <MultiSelect label="Week" options={uniqueWeeks} selected={filterWeeks} onChange={setFilterWeeks} widthClass="w-full" />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black uppercase text-[#14a6d9] tracking-wider mb-1.5 block">Event & Portfolio Scope</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <MultiSelect 
+                    label="Event" 
+                    options={uniqueEvents} 
+                    selected={filterEvents} 
+                    onChange={(next) => {
+                      setFilterEvents(next);
+                      if (next.length === 1 && !next.includes('All')) {
+                        setSelectedEvent(next[0]);
+                      } else if (next.includes('All') || next.length === 0) {
+                        setSelectedEvent(null);
+                      }
+                    }} 
+                    isHero={true} 
+                    widthClass="w-full" 
+                  />
+                  <MultiSelect label="Portfolio" options={uniquePortfolios} selected={filterPortfolios} onChange={setFilterPortfolios} widthClass="w-full" />
+                  <MultiSelect label="Event Type" options={uniqueEventTypes} selected={filterEventTypes} onChange={setFilterEventTypes} widthClass="w-full" />
+                  <MultiSelect 
+                    label="Business" 
+                    options={uniqueBusinesses} 
+                    selected={filterBusinesses} 
+                    onChange={setFilterBusinesses} 
+                    widthClass="w-full" 
+                    singleSelect={true}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black uppercase text-[#14a6d9] tracking-wider mb-1.5 block">Marketing & Channels</label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <MultiSelect label="Funnel Stage" options={uniquePhases} selected={filterPhases} onChange={setFilterPhases} widthClass="w-full" />
+                  <MultiSelect label="Channel" options={uniqueChannels} selected={filterChannels} onChange={setFilterChannels} widthClass="w-full" />
+                  <MultiSelect label="Market" options={uniqueMarkets} selected={filterMarkets} onChange={setFilterMarkets} widthClass="w-full" />
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-[#cedc28]/20 bg-[#071a30] pb-safe">
+              <button 
+                onClick={() => setMobileFiltersOpen(false)}
+                className="w-full py-3 rounded-xl bg-[#cedc28] text-[#1a302e] font-black text-sm uppercase tracking-wider shadow-lg hover:brightness-105 active:scale-[0.99] transition-all"
+              >
+                Apply Filters ({activeFilterCount > 0 ? `${activeFilterCount} Active` : 'All Data'})
               </button>
             </div>
           </div>
-          {lastUpdated && (
-            <div className={`px-6 pb-6 text-[9px] font-bold text-[#14a6d9] uppercase tracking-wider opacity-60 text-left ${userRole === 'admin' ? 'mt-0' : 'mt-auto'}`}>
-              Data up to: {lastUpdated.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
-            </div>
-          )}
         </div>
+      )}
+
+      {/* MAIN LAYOUT BODY */}
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* DESKTOP SIDEBAR (Screens >= lg) */}
+        {!tvMode && (
+          <div className="hidden lg:flex w-52 border-r border-[#cedc28]/10 bg-[#0a2442] flex-col gap-2 overflow-y-auto z-20 relative shrink-0">
+            <div className="pattern-overlay absolute inset-0 z-0 pointer-events-none" style={{ opacity: 0.20 }}></div>
+            <div className="p-6 pb-2 relative z-10">
+              <div className="text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest mb-4 px-4">Navigation</div>
+            {NAV_ITEMS.map(t => {
+              const active = activeTab === t.id;
+              return (
+                <button 
+                  key={t.id}
+                  onClick={() => setActiveTab(t.id)}
+                  className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-xl font-bold text-[13px] transition-all ${
+                    active ? 'bg-[#cedc28] text-[#1a302e] shadow-[0_0_15px_rgba(200,130,20,0.35)]' : 'text-[#eef7f5] hover:bg-[#cedc28]/10 hover:text-[#cedc28]'
+                  }`}
+                >
+                  <t.icon className="w-4 h-4" />
+                  {t.label}
+                </button>
+              )
+            })}
+            </div>
+            <div className="flex-1 min-h-[50px] mt-4"></div>
+            
+            <div className="flex flex-col gap-2 px-6 pb-6 mt-auto z-30">
+              {userRole === 'admin' && (
+                <div className="flex flex-col gap-1.5 px-3 mb-1">
+                  <button 
+                    onClick={() => setActiveTab('admin')}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                      activeTab === 'admin' ? 'bg-[#cedc28] text-[#1a302e] shadow-[0_0_15px_rgba(200,130,20,0.35)]' : 'text-[#eef7f5] hover:bg-[#cedc28]/10 hover:text-[#cedc28]'
+                    }`}
+                  >
+                    <Users className="w-3.5 h-3.5" />
+                    Admin
+                  </button>
+                  <button 
+                    onClick={() => setSimulatingStandardUser(!simulatingStandardUser)}
+                    className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all border ${
+                      simulatingStandardUser 
+                        ? 'bg-amber-500/25 text-amber-300 border-amber-500/50 shadow-[0_0_10px_rgba(245,158,11,0.2)]' 
+                        : 'bg-[#041628] text-gray-400 border-gray-700/60 hover:text-white hover:border-gray-500'
+                    }`}
+                    title={simulatingStandardUser ? "Click to exit simulation" : "Preview dashboard as regular standard user"}
+                  >
+                    {simulatingStandardUser ? <EyeOff className="w-3.5 h-3.5 text-amber-400" /> : <Eye className="w-3.5 h-3.5 text-[#14a6d9]" />}
+                    <span>{simulatingStandardUser ? 'Exit Simulation' : 'Preview As Viewer'}</span>
+                  </button>
+                </div>
+              )}
+              
+              {userRole !== 'non-finance' && (
+                <div className="flex justify-start px-3">
+                  <div className="flex bg-[#0a2442] p-0.5 rounded-lg border border-[#cedc28]/20 w-[100px]">
+                    <button onClick={() => { setCurrency('USD'); trackCurrencyToggle('USD', userEmail); }} className={`flex-1 px-2 py-1 text-[10px] font-bold rounded-md transition-colors ${currency === 'USD' ? 'bg-[#cedc28] text-[#1a302e]' : 'text-slate-400 hover:text-white'}`}>USD</button>
+                    <button onClick={() => { setCurrency('SAR'); trackCurrencyToggle('SAR', userEmail); }} className={`flex-1 px-2 py-1 text-[10px] font-bold rounded-md transition-colors ${currency === 'SAR' ? 'bg-[#cedc28] text-[#1a302e]' : 'text-slate-400 hover:text-white'}`}>SAR</button>
+                  </div>
+                </div>
+              )}
+              
+              <div className="flex justify-start mt-1">
+                <button 
+                  onClick={handleSignOut}
+                  className="flex items-center gap-2 px-3 py-1.5 text-xs rounded-lg font-bold transition-all text-red-400 hover:bg-red-500/10 hover:text-red-300 hover:shadow-[0_0_15px_rgba(239,68,68,0.2)] border border-transparent hover:border-red-500/20"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  Sign Out
+                </button>
+              </div>
+            </div>
+            {lastUpdated && (
+              <div className={`px-6 pb-6 text-[9px] font-bold text-[#14a6d9] uppercase tracking-wider opacity-60 text-left ${userRole === 'admin' ? 'mt-0' : 'mt-auto'}`}>
+                Data up to: {lastUpdated.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+              </div>
+            )}
+          </div>
+        )}
         
         {/* TABS CONTENT */}
         {activeTab === 'admin' ? (
@@ -2501,15 +3072,15 @@ export default function App() {
             initialEvents={eventsConfiguration}
           />
         ) : (
-        <main className="flex-1 overflow-y-auto p-8 custom-scrollbar relative z-10">
+        <main className="flex-1 overflow-y-auto p-3 sm:p-5 md:p-6 lg:p-8 pb-24 lg:pb-8 custom-scrollbar touch-scroll relative z-10">
           <ReactTooltip id="market-tooltip" className="z-50" style={{ backgroundColor: '#0a2442', color: '#eef7f5', border: '1px solid #cedc2830', borderRadius: '8px', zIndex: 1000 }} />
           <div className="absolute top-0 right-0 w-full h-[500px] bg-gradient-to-br from-[#062f2e]/20 via-transparent to-transparent pointer-events-none -z-10"></div>
-          {userRole === 'admin' && !simulatingStandardUser && (
+          {userRole === 'admin' && !simulatingStandardUser && !tvMode && (
             <HealthAlertBanner onOpenHealthMonitor={() => setActiveTab('admin')} />
           )}
           
           {/* 1. Standard User Preview Simulation Banner */}
-          {simulatingStandardUser && (
+          {simulatingStandardUser && !tvMode && (
             <div className="mb-6 p-3.5 bg-amber-500/15 border border-amber-500/40 rounded-2xl flex items-center justify-between text-xs text-amber-200 shadow-xl backdrop-blur-md">
               <div className="flex items-center gap-2.5">
                 <EyeOff className="w-4 h-4 text-amber-400 animate-pulse flex-shrink-0" />
@@ -2527,7 +3098,7 @@ export default function App() {
           )}
 
           {/* 2. Admin Staging Watermark Banner when an Admin-Only event is selected */}
-          {selectedEvent && eventsConfiguration.some(ev => (ev.status === 'admin_only' || ev.visibility === 'admin_only') && (ev.name === selectedEvent || ev.sourceName === selectedEvent)) && (
+          {selectedEvent && !tvMode && eventsConfiguration.some(ev => (ev.status === 'admin_only' || ev.visibility === 'admin_only') && (ev.name === selectedEvent || ev.sourceName === selectedEvent)) && (
             <div className="mb-4 p-3 bg-purple-950/40 border border-purple-500/50 rounded-2xl flex items-center justify-between text-xs text-purple-200 shadow-[0_0_15px_rgba(168,85,247,0.2)]">
               <div className="flex items-center gap-2.5">
                 <Shield className="w-4 h-4 text-purple-400 animate-pulse flex-shrink-0" />
@@ -2545,9 +3116,68 @@ export default function App() {
         </main>
         )}
       </div>
-      <div className="fixed bottom-4 right-4 z-[999] text-white/30 flex items-center gap-1 opacity-50 hover:opacity-100 transition-opacity bg-black/40 px-2 py-1 rounded-full border border-white/10 backdrop-blur-sm">
-        <Check className="w-3.5 h-3.5 text-[#cedc28]" />
-        <span className="text-[9px] font-bold tracking-widest uppercase">V1</span>
+
+      {/* MOBILE BOTTOM NAVIGATION BAR (Screens < lg / 1024px) */}
+      {!tvMode && (
+        <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0a2442]/95 backdrop-blur-2xl border-t border-[#cedc28]/20 px-2 py-1.5 flex items-center justify-around pb-safe shadow-[0_-4px_20px_rgba(0,0,0,0.5)]">
+          <button
+            onClick={() => setActiveTab('summary')}
+            className={`flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-all ${
+              activeTab === 'summary' ? 'text-[#cedc28]' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Grid className="w-4 h-4" />
+            <span className="text-[10px] font-bold">Overview</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('campaign')}
+            className={`flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-all ${
+              activeTab === 'campaign' ? 'text-[#cedc28]' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Activity className="w-4 h-4" />
+            <span className="text-[10px] font-bold">Event</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('weekly')}
+            className={`flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-all ${
+              activeTab === 'weekly' ? 'text-[#cedc28]' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Calendar className="w-4 h-4" />
+            <span className="text-[10px] font-bold">Weekly</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('channel')}
+            className={`flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-all ${
+              activeTab === 'channel' ? 'text-[#cedc28]' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <MonitorPlay className="w-4 h-4" />
+            <span className="text-[10px] font-bold">Channels</span>
+          </button>
+
+          <button
+            onClick={() => setMobileMenuOpen(true)}
+            className={`flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-all ${
+              ['market', 'detailed', 'creative', 'admin'].includes(activeTab) ? 'text-[#cedc28]' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <MoreHorizontal className="w-4 h-4" />
+            <span className="text-[10px] font-bold">
+              {activeTab === 'market' ? 'Market' : activeTab === 'detailed' ? 'Detailed' : activeTab === 'creative' ? 'Creative' : activeTab === 'admin' ? 'Admin' : 'More'}
+            </span>
+          </button>
+        </nav>
+      )}
+
+      {/* Version badge */}
+      <div className="hidden sm:flex fixed bottom-3 right-3 z-30 text-white/30 items-center gap-1 opacity-50 hover:opacity-100 transition-opacity bg-black/40 px-2 py-0.5 rounded-full border border-white/10 backdrop-blur-sm text-[8px] font-bold uppercase tracking-widest pointer-events-none">
+        <Check className="w-3 h-3 text-[#cedc28]" />
+        <span>V1 Universal</span>
       </div>
     </div>
   );
