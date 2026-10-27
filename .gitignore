@@ -35,6 +35,7 @@ yarn-error.log*
 /config/healthNotifications.json
 /config/apiUsage.json
 /config/apiBudgets.json
+/config/quotaAlerts.json
 /config/dashboardFeatures.json
 
 # vercel

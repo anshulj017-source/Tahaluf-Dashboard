@@ -21,6 +21,11 @@ export default function ApiUsageAnalytics({ report, onSaved, onPolicySaved }) {
   const [savingPolicy, setSavingPolicy] = useState(false);
   const [selectedServices, setSelectedServices] = useState([]);
   const [savingServices, setSavingServices] = useState(false);
+  const [alertThresholds, setAlertThresholds] = useState({});
+  const [savingAlerts, setSavingAlerts] = useState(false);
+  useEffect(() => {
+    if (report) setAlertThresholds(report.alertThresholds || {});
+  }, [report]);
   useEffect(() => {
     if (report) setSelectedServices(report.monitoredServices || report.services.map(service => service.id));
   }, [report]);
@@ -47,6 +52,28 @@ export default function ApiUsageAnalytics({ report, onSaved, onPolicySaved }) {
       setError(error.message);
     } finally {
       setSavingServices(false);
+    }
+  };
+
+  const saveAlerts = async () => {
+    setSavingAlerts(true);
+    setError('');
+    setNotice('');
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const response = await fetch('/api/admin/quotas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ action: 'save-alert-thresholds', alertThresholds })
+      });
+      const json = await response.json();
+      if (!response.ok || !json.success) throw new Error(json.error || 'Could not save API alert selections.');
+      await onSaved();
+      setNotice('API alert selections saved. Other server instances may take up to 60 seconds to update.');
+    } catch (error) {
+      setError(error.message);
+    } finally {
+      setSavingAlerts(false);
     }
   };
 
@@ -117,6 +144,25 @@ export default function ApiUsageAnalytics({ report, onSaved, onPolicySaved }) {
         </div>
         <button type="button" onClick={saveServices} className="px-3 py-2 border border-[#14a6d9]/40 rounded-lg text-xs text-[#14a6d9]">{savingServices ? 'Saving APIs...' : 'Save monitored APIs'}</button>
       </fieldset>
+      <fieldset disabled={savingAlerts} className="rounded-xl border border-white/10 p-3 space-y-3">
+        <legend className="text-sm font-bold px-1">API threshold warnings &amp; email</legend>
+        <p className="text-xs text-gray-400">Both markers are enabled by default for every API. Selections control dashboard warnings and emails to the Health Monitor notification recipients, respecting its email-enabled switch. Only monitored APIs are evaluated. Configure an allowance or spend budget for percentage alerts; Firestore also has daily reference markers.</p>
+        <div className="space-y-3">
+          {(report.availableServices || report.services).map(service => <div key={service.id} className="flex flex-wrap gap-3 items-center text-xs">
+            <span className="sm:w-64">{service.name}</span>
+            {[70, 90].map(threshold => <label key={threshold} className="flex gap-2 items-center">
+              <input type="checkbox" aria-label={`${service.name} ${threshold}% alerts`} checked={alertThresholds[service.id]?.[threshold] !== false}
+                onChange={event => setAlertThresholds(current => ({ ...current, [service.id]: { ...current[service.id], [threshold]: event.target.checked } }))} />
+              {threshold}%
+            </label>)}
+            <span className="text-gray-500">{!report.monitoredServices?.includes(service.id) ? 'Monitoring disabled' : service.id === 'ga4' ? 'Not connected' : service.id !== 'firestore' && !(service.settings.monthlyAllowance > 0 || service.settings.monthlyBudget > 0) ? 'Limit not configured' : 'Reference / configured limits'}</span>
+          </div>)}
+        </div>
+        <button type="button" onClick={saveAlerts} className="px-3 py-2 border border-[#14a6d9]/40 rounded-lg text-xs text-[#14a6d9]">{savingAlerts ? 'Saving alerts...' : 'Save alert selections'}</button>
+        <p className="text-xs text-gray-400">Checks run with recorded traffic and monitoring refreshes, not a scheduler. Email is deduplicated per API, metric, marker and UTC day/month; crossing both markers can produce one combined email. Failed deliveries retry on a subsequent check after five minutes. These are partial observations and forecasts, not verified provider quota. SMTP acceptance does not guarantee inbox delivery.</p>
+        <p role="status" className="text-xs text-gray-400">Email check on this instance: {report.alertDelivery?.status || 'not-checked'}{report.alertDelivery?.lastCheckedAt ? ` (${new Date(report.alertDelivery.lastCheckedAt).toLocaleString()})` : ''}.</p>
+        {report.alertDelivery?.lastError && <p role="alert" className="text-xs text-amber-300">Quota notification error: {report.alertDelivery.lastError}</p>}
+      </fieldset>
       <div className="rounded-xl border border-white/10 p-3 space-y-2">
         <button type="button" role="switch" aria-checked={report.policy?.lowQuotaMode === true} onClick={savePolicy} disabled={savingPolicy} className="px-3 py-2 border border-[#14a6d9]/40 rounded-lg text-xs text-[#14a6d9] disabled:opacity-40">
           {savingPolicy ? 'Saving mode...' : `Low-quota mode: ${report.policy?.lowQuotaMode ? 'On' : 'Off'}`}
@@ -157,16 +203,13 @@ export default function ApiUsageAnalytics({ report, onSaved, onPolicySaved }) {
                   return <div key={metric.metric} className="space-y-1">
                     <p className="text-xs">{metric.metric}: {number(metric.today)} today · forecast {number(metric.projectedToday)} · completed-day mean {number(metric.averageDaily)}</p>
                     <p className="text-[10px] text-gray-400">Reference only: {number(metric.referenceDailyLimit)} / day; {metric.percent == null ? 'no observations yet' : `${metric.percent.toFixed(1)}% observed`}, {metric.forecastPercent == null ? 'no forecast yet' : `${metric.forecastPercent.toFixed(1)}% forecast`}. Not verified remaining quota.</p>
-                    {metric.warning && <p role="alert" className="text-xs text-amber-300">{metric.warning === 'critical' ? '90%' : '70%'} reference warning: observed usage or UTC-day pace is approaching/exceeding the reference threshold. Verify actual usage in the provider console.</p>}
                     <div aria-label={`Firestore ${metric.metric} 14-day UTC history`} className="flex gap-1 items-end h-10">
                       {report.firestoreDaily.history.map(day => <div key={day.date} title={`${day.date} UTC: ${number(day[metric.metric])} ${metric.metric}`} className={`flex-1 rounded-t ${day[metric.metric] == null ? 'bg-gray-700' : 'bg-[#14a6d9]'}`} style={{ height: day[metric.metric] == null ? '2px' : `${Math.max(3, day[metric.metric] / peak * 100)}%` }} />)}
                     </div>
                   </div>;
                 })}
               </div>}
-              {service.quotaPercent >= 70 && <p role="alert" className="text-amber-300 text-xs">Observed usage has reached {service.quotaPercent.toFixed(1)}% of your configured monthly allowance (not a verified provider quota).</p>}
-              {service.projectedUsage > service.settings.monthlyAllowance && service.settings.monthlyAllowance > 0 && <p className="text-amber-300 text-xs">Month-end usage forecast exceeds your configured allowance.</p>}
-              {service.forecastOverBudget && <p className="text-amber-300 text-xs">Forecast exceeds the configured monthly budget.</p>}
+              {(report.alerts || []).filter(alert => alert.service === service.id).map(alert => <p key={alert.key} role="alert" className="text-amber-300 text-xs">{alert.message} Verify actual provider usage.</p>)}
               <div aria-label={`${service.name} 14-day usage history`} className="flex gap-1 items-end h-14">
                 {service.history.map(point => <div key={point.date} title={`${point.date}: ${number(point.count)} ${service.unit}`} className={`flex-1 rounded-t ${point.count == null ? 'bg-gray-700' : 'bg-[#14a6d9]'}`} style={{ height: point.count == null ? '2px' : `${Math.max(3, (point.count / max) * 100)}%` }} />)}
               </div>

@@ -156,6 +156,33 @@ analytics persistence, or sheet recovery. Other warm instances may take up to
 monitoring storage still use Firebase; hiding unused providers alone does not
 eliminate those operations or guarantee a particular quota reduction.
 
+Each API has independent **70%** and **90%** threshold selections, both enabled
+by default. **Save alert selections** persists them for dashboard warnings and
+quota emails. Only selected/monitored APIs are evaluated. Monthly markers use
+configured allowances or estimated spend budgets; unknown/unconnected limits
+are not invented. Firestore also uses its clearly labeled UTC-day read, write,
+and delete references. Observed usage and forecasts can trigger a marker.
+
+Quota emails reuse Health Monitor recipients and its global email-enabled
+switch, but are immediate threshold notifications, independent of sheet-alert
+delay/digest settings. Checks run after recorded usage is persisted and on
+monitoring refreshes, with Vercel request-lifetime registration, not a scheduler.
+No traffic means no check; partial telemetry is not authoritative provider
+quota monitoring. Local development uses the same logic; automated tests mock
+SMTP and do not send real quota emails.
+
+Email claims are stored in `appConfig/quotaAlerts` on Vercel (ignored local
+configuration otherwise). Delivery is deduplicated per API, metric, threshold,
+and UTC daily/monthly period. Multiple reached markers may share one email.
+No threshold breach means no notification-state reads or writes. Unchanged
+claims skip writes; warm instances suppress repeated checks for five minutes.
+SMTP/configuration failures are logged and surfaced in API monitoring, with
+retry eligibility after five minutes on subsequent activity. SMTP acceptance
+does not guarantee inbox delivery. A crash or persistence failure after sending
+but before recording success can cause a later duplicate; this is not
+exactly-once email delivery. Delivery state retains approximately 35 days,
+and notification-state operations are not included in observed usage totals.
+
 Analytics persistence applies events to the shared Firestore state inside a
 transaction rather than overwriting it with an instance-local snapshot.
 Concurrent work is drained immediately in batches of at most 100 events and

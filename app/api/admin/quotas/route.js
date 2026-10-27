@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { analyzeConnectedApis, pingService, updateCircuitBreakerState } from '../../../../lib/quotaService.mjs';
 import { isAdminRequest } from '../../../../lib/requireAdminRequest.js';
-import { EMPTY_BUDGETS, observeApiRequest, updateUsageBudgets, updateUsagePolicy, withUsageScope, updateMonitoredServices, getMonitoredServices, readMonitoringSettings } from '../../../../lib/apiUsage.mjs';
+import { API_SERVICES, EMPTY_BUDGETS, observeApiRequest, updateUsageBudgets, updateUsagePolicy, withUsageScope, updateMonitoredServices, getMonitoredServices, readMonitoringSettings } from '../../../../lib/apiUsage.mjs';
 import { updateAdminSetting } from '../../../../lib/adminSettingsStore.mjs';
+import { updateQuotaAlertPreferences } from '../../../../lib/quotaAlertRules.mjs';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -33,6 +34,18 @@ export const POST = withUsageScope(async function POST(request) {
   try {
     const body = await request.json();
     const { action = 'analyze' } = body;
+
+    if (action === 'save-alert-thresholds') {
+      let normalized;
+      try {
+        normalized = updateQuotaAlertPreferences(EMPTY_BUDGETS, body.alertThresholds, API_SERVICES).alertThresholds;
+      } catch (error) {
+        return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+      }
+      const settings = await updateAdminSetting('apiBudgets', EMPTY_BUDGETS, state =>
+        updateQuotaAlertPreferences(state, normalized, API_SERVICES));
+      return NextResponse.json({ success: true, alertThresholds: settings.alertThresholds });
+    }
 
     if (action === 'save-monitored-services') {
       try {
