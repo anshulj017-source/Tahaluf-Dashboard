@@ -2,12 +2,15 @@ import { NextResponse } from 'next/server';
 import {
   getHealthNotificationState,
   saveHealthNotificationSettings,
-  sendTestHealthEmail
+  sendTestHealthEmail,
+  reconcileDisabledHealthChecks
 } from '../../../../lib/healthNotifications.mjs';
 import { getHealthIssues, normalizeHealthNotificationSettings } from '../../../../lib/healthNotificationUtils.mjs';
 import { isAdminRequest } from '../../../../lib/requireAdminRequest.js';
 import { GET as getEventsHealth } from '../events/route.js';
 import { getSmtpTransportConfig } from '../../../../lib/healthEmailTransport.mjs';
+import { getDimensionSettings, saveDimensionSelection, saveHealthCheckSettings, saveEventHealthChecks, loadDimensionStandards } from '../../../../lib/dimensionMonitoring.mjs';
+import { getEventsConfig } from '../../../../lib/eventsConfig.js';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -43,7 +46,8 @@ export async function GET(request) {
       issues,
       history: [...(state.history || [])].reverse(),
       emailConfigured: isEmailConfigured(),
-      updatedAt: state.updatedAt || null
+      updatedAt: state.updatedAt || null,
+      dimensionSettings: await getDimensionSettings()
     });
   } catch (error) {
     console.error('[HEALTH NOTIFICATIONS] Could not load settings:', error);
@@ -57,6 +61,27 @@ export async function POST(request) {
   }
   try {
     const body = await request.json();
+    if (body.action === 'save-event-checks') {
+      const config = await getEventsConfig();
+      if (!config.events.some(event => event.id === body.eventId)) {
+        return NextResponse.json({ success: false, error: 'Unknown event.' }, { status: 400 });
+      }
+      const dimensionSettings = await saveEventHealthChecks(body.eventId, body.checks);
+      await reconcileDisabledHealthChecks();
+      return NextResponse.json({ success: true, dimensionSettings });
+    }
+    if (body.action === 'save-health-checks') {
+      const dimensionSettings = await saveHealthCheckSettings(body);
+      await reconcileDisabledHealthChecks();
+      return NextResponse.json({ success: true, dimensionSettings });
+    }
+    if (body.action === 'save-dimensions') {
+      return NextResponse.json({ success: true, dimensionSettings: await saveDimensionSelection(body.enabledDimensions) });
+    }
+    if (body.action === 'refresh-standards') {
+      const dimensionSettings = await loadDimensionStandards(true);
+      return NextResponse.json({ success: !dimensionSettings.error, dimensionSettings, error: dimensionSettings.error || null }, { status: dimensionSettings.error ? 502 : 200 });
+    }
     if (body.action === 'test-email') {
       await sendTestHealthEmail(body.recipient || '');
       return NextResponse.json({ success: true, message: 'Test email sent.' });

@@ -8,6 +8,8 @@ import {
 import { auth } from '../../lib/firebase';
 import { DEFAULT_HEALTH_NOTIFICATION_SETTINGS, getHealthIssues } from '../../lib/healthNotificationUtils.mjs';
 import { useLowQuotaMode } from './DashboardFeatureContext';
+import { DIMENSIONS, DEFAULT_DIMENSION_SETTINGS } from '../../lib/dimensionStandards.mjs';
+import DimensionFindings from './DimensionFindings';
 
 const getAdminHeaders = async () => {
   const token = await auth.currentUser?.getIdToken();
@@ -55,23 +57,27 @@ const getSuggestedFix = (issue = '') => {
 };
 
 const getStatus = (source) => {
-  if (source.eventDataStatus === 'missing' || (source.kind === 'Actuals' && source.eventRows === 0 && source.eventDataStatus !== 'present')) {
+  if (source.monitoringEnabled === false) return 'disabled';
+  if (source.sheetChecksEnabled !== false && (source.eventDataStatus === 'missing' || (source.kind === 'Actuals' && source.eventRows === 0 && source.eventDataStatus !== 'present'))) {
     return 'missing-data';
   }
   if (source.metricDiscrepancies && source.metricDiscrepancies.length > 0) return 'metric-discrepancy';
-  if (source.state === 'stale' || source.state === 'unavailable' || source.state === 'storage-error') {
+  if (source.sheetChecksEnabled !== false && (source.state === 'stale' || source.state === 'unavailable' || source.state === 'storage-error')) {
     return source.state;
   }
-  return source.state || 'unknown';
+  if (source.dimensionHealth && source.dimensionHealth.status !== 'disabled' && (source.dimensionHealth.status !== 'checked' || source.dimensionHealth.stale || source.dimensionHealth.findings?.length)) return 'dimension-discrepancy';
+  return source.sheetChecksEnabled === false ? 'disabled' : source.state || 'unknown';
 };
 
 const statusPresentation = {
+  disabled: { label: 'Checks disabled', className: 'text-gray-300 border-gray-500/30 bg-gray-500/10' },
   healthy: { label: 'Healthy', className: 'text-lime-300 border-lime-400/30 bg-lime-500/10' },
   stale: { label: 'Serving saved data', className: 'text-amber-300 border-amber-400/30 bg-amber-500/10' },
   unavailable: { label: 'Unavailable', className: 'text-red-300 border-red-400/30 bg-red-500/10' },
   'storage-error': { label: 'Storage issue', className: 'text-red-300 border-red-400/30 bg-red-500/10' },
   'missing-data': { label: 'No event rows', className: 'text-red-300 border-red-400/30 bg-red-500/10' },
   'metric-discrepancy': { label: 'Metric Discrepancy', className: 'text-amber-300 border-amber-400/40 bg-amber-500/10' },
+  'dimension-discrepancy': { label: 'Dimension Check', className: 'text-amber-300 border-amber-400/40 bg-amber-500/10' },
   unknown: { label: 'Not checked', className: 'text-gray-300 border-gray-500/30 bg-gray-500/10' }
 };
 
@@ -96,6 +102,13 @@ export default function DataHealthAdmin({
   const [refreshSummary, setRefreshSummary] = useState(null);
   const [error, setError] = useState(null);
   const [lastCheckedAt, setLastCheckedAt] = useState(null);
+  const [dimensionSettings, setDimensionSettings] = useState(DEFAULT_DIMENSION_SETTINGS);
+  const [dimensionBusy, setDimensionBusy] = useState(false);
+  const [dimensionNotice, setDimensionNotice] = useState(null);
+  const [checkDraft, setCheckDraft] = useState({ metricChecksEnabled: true, dimensionChecksEnabled: true });
+  const [eventCheckDrafts, setEventCheckDrafts] = useState({});
+  const [savingEventChecks, setSavingEventChecks] = useState(null);
+  const [eventCheckNotice, setEventCheckNotice] = useState(null);
 
   const reloadHealth = useCallback(async (silent = false) => {
     if (!silent) {
@@ -159,6 +172,11 @@ export default function DataHealthAdmin({
           setSettings(result.settings);
           setEmailConfigured(result.emailConfigured);
           setIssueHistory(result.history || []);
+          setDimensionSettings(result.dimensionSettings || DEFAULT_DIMENSION_SETTINGS);
+          setCheckDraft({
+            metricChecksEnabled: result.dimensionSettings?.metricChecksEnabled !== false,
+            dimensionChecksEnabled: result.dimensionSettings?.dimensionChecksEnabled !== false
+          });
           onDashboardAlertsEnabledChange(result.settings.dashboardEnabled);
         }
       } catch (settingsError) {
@@ -187,8 +205,8 @@ export default function DataHealthAdmin({
   const healthyCount = actualSources.filter(source =>
     getStatus(source) === 'healthy' && source.eventDataStatus === 'present'
   ).length;
-  const issueCount = actualSources.filter(source => ['stale', 'unavailable', 'storage-error', 'missing-data', 'metric-discrepancy'].includes(getStatus(source))).length;
-  const missingDataCount = actualSources.filter(source => source.eventDataStatus === 'missing' || source.eventRows === 0).length;
+  const issueCount = actualSources.filter(source => ['stale', 'unavailable', 'storage-error', 'missing-data', 'metric-discrepancy', 'dimension-discrepancy'].includes(getStatus(source))).length;
+  const missingDataCount = actualSources.filter(source => source.monitoringEnabled !== false && source.sheetChecksEnabled !== false && (source.eventDataStatus === 'missing' || source.eventRows === 0)).length;
   const totalDiscrepancies = useMemo(() => sheetHealth.reduce((sum, s) => sum + (s.metricDiscrepancies?.length || 0), 0), [sheetHealth]);
   const currentIssues = useMemo(() => getHealthIssues(sheetHealth), [sheetHealth]);
 
@@ -339,6 +357,55 @@ export default function DataHealthAdmin({
     }
   };
 
+  const updateDimensions = async action => {
+    setDimensionBusy(true);
+    setDimensionNotice(null);
+    try {
+      const response = await fetch('/api/admin/health-notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...await getAdminHeaders() },
+        body: JSON.stringify({ action, enabledDimensions: dimensionSettings.enabledDimensions, ...checkDraft })
+      });
+      const result = await response.json();
+      if (result.dimensionSettings) setDimensionSettings(result.dimensionSettings);
+      if (!response.ok || !result.success) throw new Error(result.error || 'Could not update dimension standards.');
+      if (action === 'save-health-checks') {
+        await Promise.all([reloadHealth(), reloadHistory()]);
+        setDimensionNotice({ type: 'success', text: 'Global checks saved. Disabled categories stop checks, dashboard issues and emails; their history is retained as checks disabled, not recovered. Other instances may take up to 60 seconds to update. Refresh sheets after re-enabling to get fresh results.' });
+      } else {
+        setDimensionNotice({ type: 'success', text: 'Saved. Refresh Actuals sheets to apply these standards and selections. Other instances may take up to 60 seconds to receive changes.' });
+      }
+    } catch (dimensionError) {
+      console.error(dimensionError);
+      setDimensionNotice({ type: 'error', text: dimensionError.message });
+    } finally {
+      setDimensionBusy(false);
+    }
+  };
+
+  const saveEventChecks = async (eventId, checks) => {
+    setSavingEventChecks(eventId);
+    setEventCheckNotice(null);
+    try {
+      const response = await fetch('/api/admin/health-notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...await getAdminHeaders() },
+        body: JSON.stringify({ action: 'save-event-checks', eventId, checks })
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.error || 'Could not save event monitoring.');
+      setDimensionSettings(result.dimensionSettings);
+      setEventCheckDrafts(previous => { const next = { ...previous }; delete next[eventId]; return next; });
+      await Promise.all([reloadHealth(), reloadHistory()]);
+      setEventCheckNotice({ eventId, error: false, text: 'Event monitoring saved. Disabled checks stop alerts and emails, not dashboard data. Refresh sheets after re-enabling. Other instances may take up to 60 seconds to update.' });
+    } catch (saveError) {
+      console.error(saveError);
+      setEventCheckNotice({ eventId, error: true, text: saveError.message });
+    } finally {
+      setSavingEventChecks(null);
+    }
+  };
+
   return (
     <section className={`space-y-5 ${active ? '' : 'hidden'}`}>
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
@@ -415,9 +482,18 @@ export default function DataHealthAdmin({
                 <Bell className="w-4 h-4 text-amber-400" />
                 {currentIssues.length} active data health issue{currentIssues.length === 1 ? '' : 's'}
               </div>
-              <ul className="mt-2 space-y-1 text-xs text-amber-100/90">
+              <ul className="mt-3 space-y-3 text-sm text-amber-100/90">
                 {currentIssues.slice(0, 5).map(issue => (
-                  <li key={`${issue.key}:${issue.status}`}>{issue.eventName} {issue.kind}: {issue.message}</li>
+                  <li key={`${issue.key}:${issue.status}`} className="rounded-lg border border-amber-300/20 bg-[#031120]/60 p-3">
+                    <p className="font-bold text-white">{issue.eventName} <span className="font-normal text-slate-300">{issue.kind} / {issue.category || 'feed'}</span></p>
+                    <p className="mt-1 leading-relaxed">{issue.category === 'dimensions' && issue.dimensionFindings?.length
+                      ? `${issue.dimensionFindings.length} dimension findings. Expand the details or see Event Data Checks below.`
+                      : issue.message}</p>
+                    {issue.dimensionFindings?.length > 0 && <details className="mt-2">
+                      <summary className="cursor-pointer py-1 font-semibold text-[#6bd5f7]">View dimension findings</summary>
+                      <div className="mt-3"><DimensionFindings findings={issue.dimensionFindings} standards={dimensionSettings.values} /></div>
+                    </details>}
+                  </li>
                 ))}
                 {currentIssues.length > 5 && <li>And {currentIssues.length - 5} more. See the event checks below.</li>}
               </ul>
@@ -510,6 +586,14 @@ export default function DataHealthAdmin({
           </label>
         </div>
 
+        <div className="flex flex-wrap gap-4 text-xs text-gray-200">
+          {[['metricEmailEnabled', 'Email metric issues'], ['dimensionEmailEnabled', 'Email dimension issues']].map(([key, label]) => <label key={key} className="flex items-center gap-2">
+            <input type="checkbox" checked={settings[key] !== false} disabled={settingsLoading || !settings.emailEnabled}
+              onChange={event => setSettings(previous => ({ ...previous, [key]: event.target.checked }))} className="accent-[#cedc28]" />
+            {label}
+          </label>)}
+          <p className="text-[10px] text-gray-400 w-full">These selections control immediate, daily digest and resolution emails for each category. Dashboard issues remain visible. Use Save notification settings to apply.</p>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="space-y-1.5">
             <label htmlFor="health-email-frequency" className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">
@@ -629,6 +713,55 @@ export default function DataHealthAdmin({
         </div>
       </section>
 
+      <div className="card-surface rounded-2xl border border-[#14a6d9]/20 p-4 space-y-3">
+        <h3 className="text-sm font-bold text-white">Global Health Checks</h3>
+        <p className="text-sm leading-relaxed text-slate-300">Turn off an entire category here. This stops validation, dashboard alerts and category emails. Sheet availability checks continue. Individual dimensions and email-only preferences are retained.</p>
+        <fieldset disabled={dimensionBusy || settingsLoading} className="space-y-3">
+          <legend className="sr-only">Global health check categories</legend>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {[['metricChecksEnabled', 'Enable metric health checks'], ['dimensionChecksEnabled', 'Enable dimension health checks']].map(([key, label]) => <label key={key} className="flex items-center gap-3 rounded-xl border border-white/15 bg-[#071d33] p-4 text-sm font-bold text-white">
+              <input type="checkbox" checked={checkDraft[key]} onChange={event => setCheckDraft(previous => ({ ...previous, [key]: event.target.checked }))} className="h-4 w-4 accent-[#cedc28]" />
+              {label}
+            </label>)}
+          </div>
+          <button type="button" onClick={() => updateDimensions('save-health-checks')} className="rounded-lg border border-[#14a6d9]/40 px-4 py-2 text-sm font-semibold text-[#6bd5f7]">Save global checks</button>
+        </fieldset>
+        {dimensionNotice && <p role="status" className={`text-sm leading-relaxed ${dimensionNotice.type === 'error' ? 'text-red-300' : 'text-lime-300'}`}>{dimensionNotice.text}</p>}
+      </div>
+
+      <div className="card-surface rounded-2xl border border-[#14a6d9]/20 p-4 space-y-3">
+        <h3 className="text-sm font-bold text-white">Dimension Standards</h3>
+        {dimensionSettings.dimensionChecksEnabled === false && <p className="text-sm text-amber-200">Dimension health checks are globally disabled. Your individual dimension selections are retained.</p>}
+        <p className="text-xs text-gray-400">Actuals only, all non-empty records. Values must match the documentation after trimming whitespace and ignoring case. Blanks and missing columns are separate issues; data is never rewritten. Row samples are CSV record numbers, including the header.</p>
+        <a href="https://docs.google.com/spreadsheets/d/1D1BzodAQS45oJ27xwhk9FJkxFFzJk-r9x0lQzWG6u4w/edit?gid=593739615" target="_blank" rel="noreferrer" className="text-xs text-[#14a6d9]">Open standards documentation</a>
+        <p className="text-[10px] text-gray-400">Last standards sync: {formatTimestamp(dimensionSettings.fetchedAt)}. Cached for 24 hours; failed refreshes retain the last valid standards and show a warning. Selection changes take effect on the next sheet refresh.</p>
+        {dimensionSettings.error && <p role="alert" className="text-xs text-amber-300">{dimensionSettings.error}</p>}
+        <fieldset disabled={dimensionBusy || settingsLoading} className="space-y-3">
+          <legend className="text-xs text-gray-300">Dimensions to validate</legend>
+          <div className="flex gap-3 text-xs text-[#14a6d9]">
+            <button type="button" onClick={() => setDimensionSettings(previous => ({ ...previous, enabledDimensions: DIMENSIONS.map(dimension => dimension.id) }))}>Select all dimensions</button>
+            <button type="button" onClick={() => setDimensionSettings(previous => ({ ...previous, enabledDimensions: [] }))}>Clear all dimensions</button>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {DIMENSIONS.map(dimension => <label key={dimension.id} className="flex gap-2 items-center text-xs text-gray-200">
+              <input type="checkbox" checked={dimensionSettings.enabledDimensions.includes(dimension.id)} onChange={event => setDimensionSettings(previous => ({
+                ...previous, enabledDimensions: event.target.checked ? [...previous.enabledDimensions, dimension.id] : previous.enabledDimensions.filter(id => id !== dimension.id)
+              }))} className="accent-[#cedc28]" />
+              {dimension.label}
+              <span className="text-gray-500">({dimensionSettings.values?.[dimension.id]?.length ?? 0} standards)</span>
+            </label>)}
+          </div>
+          <div className="flex gap-3 text-xs text-[#14a6d9]">
+            <button type="button" onClick={() => updateDimensions('save-dimensions')}>Save dimension checks</button>
+            <button type="button" onClick={() => updateDimensions('refresh-standards')}>Refresh standards</button>
+          </div>
+        </fieldset>
+        <details className="text-xs text-gray-400">
+          <summary className="cursor-pointer">View allowed standard values</summary>
+          {DIMENSIONS.map(dimension => <p key={dimension.id} className="mt-2"><strong>{dimension.label}:</strong> {dimensionSettings.values?.[dimension.id]?.join(', ') || 'Standards not loaded'}</p>)}
+        </details>
+      </div>
+
       <div className="card-surface rounded-2xl border border-[#14a6d9]/20 overflow-hidden">
         <div className="px-4 py-3 border-b border-white/5">
           <h3 className="text-xs font-bold text-white uppercase tracking-widest">Issue History</h3>
@@ -639,20 +772,27 @@ export default function DataHealthAdmin({
         <div className="max-h-80 overflow-y-auto divide-y divide-gray-700/30">
           {issueHistory.map(item => (
             <div key={item.id} className="px-4 py-3 flex flex-wrap items-start justify-between gap-2">
-              <div className="min-w-0 space-y-0.5">
+              <div className="min-w-0 flex-1 space-y-2">
                 <p className="text-xs font-bold text-white">{item.eventName} <span className="font-medium text-gray-400">— {item.kind} — {item.status}</span></p>
-                <p className="text-[11px] text-gray-400">{item.message}</p>
+                <details className="text-sm text-slate-300">
+                  <summary className="cursor-pointer py-1 font-semibold text-[#6bd5f7]">View issue details</summary>
+                  <div className="mt-2">
+                    {item.dimensionFindings?.length
+                      ? <DimensionFindings findings={item.dimensionFindings} />
+                      : <p className="break-words leading-relaxed">{item.message}</p>}
+                  </div>
+                </details>
                 <p className="text-[10px] text-gray-500">
                   Detected {formatTimestamp(item.openedAt)}
                   {item.resolvedAt && ` · Resolved ${formatTimestamp(item.resolvedAt)} (after ${formatDuration(item.openedAt, item.resolvedAt)})`}
                 </p>
                 {item.resolutionEmailStatus && <p className="text-[10px] text-gray-400">
-                  Resolution email: {item.resolutionEmailStatus === 'accepted' ? `accepted by SMTP ${formatTimestamp(item.resolutionEmailSentAt)} (inbox delivery not verified)` : item.resolutionEmailStatus === 'failed' ? 'failed; retry on a health check after five minutes' : 'pending; requires email and resolution notifications enabled'}
+                  Resolution email: {item.resolutionEmailStatus === 'checks-disabled' ? 'not sent; checks disabled' : item.resolutionEmailStatus === 'accepted' ? `accepted by SMTP ${formatTimestamp(item.resolutionEmailSentAt)} (inbox delivery not verified)` : item.resolutionEmailStatus === 'failed' ? 'failed; retry on a health check after five minutes' : 'pending; requires email and resolution notifications enabled'}
                 </p>}
                 {item.resolutionEmailError && <p role="alert" className="text-[10px] text-amber-300">{item.resolutionEmailError}</p>}
               </div>
               <span className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${item.resolvedAt ? 'text-emerald-300 border-emerald-400/30 bg-emerald-500/10' : 'text-rose-300 border-rose-400/30 bg-rose-500/10'}`}>
-                {item.resolvedAt ? 'Resolved' : 'Open'}
+                {item.resolution === 'checks-disabled' ? 'Checks disabled' : item.resolvedAt ? 'Resolved' : 'Open'}
               </span>
             </div>
           ))}
@@ -672,7 +812,34 @@ export default function DataHealthAdmin({
         <div className="divide-y divide-gray-700/30">
           {eventGroups.map(event => (
             <article key={event.eventId} className="p-4 space-y-3">
-              <h4 className="text-sm font-bold text-white">{event.eventName}</h4>
+              <h4 className="text-base font-bold text-white">{event.eventName}</h4>
+              <fieldset disabled={settingsLoading || savingEventChecks !== null} className="rounded-xl border border-white/15 bg-[#071d33] p-4 space-y-3">
+                <legend className="px-1 text-sm font-bold text-white">{event.eventName} monitoring controls</legend>
+                <p className="text-xs leading-relaxed text-slate-300">Applies to this event&apos;s Actuals and Planned sheets. Global category switches take precedence. Disabling monitoring does not stop data loading or change shared-sheet monitoring for other events.</p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {[['monitoringEnabled', 'Monitor this event'], ['sheetChecksEnabled', 'Sheet availability and event rows'], ['metricChecksEnabled', 'Metric checks'], ['dimensionChecksEnabled', 'Dimension checks (Actuals)']].map(([key, label]) => {
+                    const draft = eventCheckDrafts[event.eventId] || dimensionSettings.eventChecks?.[event.eventId] || {};
+                    return <label key={key} className="flex items-center gap-2 text-sm text-white">
+                      <input type="checkbox" aria-label={`${event.eventName}: ${label}`} checked={draft[key] !== false}
+                        disabled={key !== 'monitoringEnabled' && draft.monitoringEnabled === false}
+                        onChange={change => setEventCheckDrafts(previous => ({
+                          ...previous, [event.eventId]: {
+                            monitoringEnabled: true, sheetChecksEnabled: true, metricChecksEnabled: true, dimensionChecksEnabled: true,
+                            ...draft, [key]: change.target.checked
+                          }
+                        }))} className="h-4 w-4 accent-[#cedc28]" />
+                      {label}
+                    </label>;
+                  })}
+                </div>
+                <button type="button" onClick={() => saveEventChecks(event.eventId, {
+                  monitoringEnabled: true, sheetChecksEnabled: true, metricChecksEnabled: true, dimensionChecksEnabled: true,
+                  ...(eventCheckDrafts[event.eventId] || dimensionSettings.eventChecks?.[event.eventId])
+                })} className="rounded-lg border border-[#14a6d9]/40 px-3 py-2 text-sm font-semibold text-[#6bd5f7]">
+                  {savingEventChecks === event.eventId ? 'Saving...' : `Save ${event.eventName} checks`}
+                </button>
+                {eventCheckNotice?.eventId === event.eventId && <p role="status" className={`text-sm ${eventCheckNotice.error ? 'text-red-300' : 'text-lime-300'}`}>{eventCheckNotice.text}</p>}
+              </fieldset>
               {event.sources.map(source => {
                 const status = getStatus(source);
                 const presentation = statusPresentation[status] || statusPresentation.unknown;
@@ -708,13 +875,25 @@ export default function DataHealthAdmin({
                             <span className="text-amber-300">This sheet has no event-name column; event-specific data could not be verified.</span>
                           )}
                         </div>
-                        {source.lastError && (
+                        {source.metricChecksEnabled === false && <p className="text-sm text-slate-300">Metric health checks are globally disabled.</p>}
+                        {source.dimensionHealth && <div className="mt-3 space-y-3 rounded-xl border border-white/10 bg-[#031120]/70 p-4">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h4 className="text-sm font-bold text-white">Dimension checks</h4>
+                            <span className="rounded-full border border-white/20 px-2 py-1 text-xs font-semibold text-slate-200">{source.dimensionHealth.status}</span>
+                          </div>
+                          <p className="text-xs leading-relaxed text-slate-300">Checked {formatTimestamp(source.dimensionHealth.checkedAt)}. Standards synced {formatTimestamp(source.dimensionHealth.standardsFetchedAt)}.</p>
+                          {(source.dimensionHealth.error || source.dimensionHealth.stale) && <p role="alert" className="rounded-lg border border-amber-300/30 p-3 text-sm leading-relaxed text-amber-200">{source.dimensionHealth.error || 'Standards are stale; refresh standards.'}</p>}
+                          <DimensionFindings findings={source.dimensionHealth.findings} standards={dimensionSettings.values} />
+                        </div>}
+                        {source.monitoringEnabled === false && <p className="text-sm text-slate-300">Health monitoring is disabled for this event. Data ingestion remains active.</p>}
+                        {source.sheetChecksEnabled === false && source.monitoringEnabled !== false && <p className="text-sm text-slate-300">Sheet availability and event-row checks are disabled for this event.</p>}
+                        {source.sheetChecksEnabled !== false && source.lastError && (
                           <div className="text-[10px] pt-1">
                             <div className="text-red-300">{source.lastError}</div>
                             <div className="text-[#14a6d9] mt-0.5">Suggested fix: {getSuggestedFix(source.lastError)}</div>
                           </div>
                         )}
-                        {source.kind === 'Actuals' && source.eventDataStatus === 'missing' && (
+                        {source.sheetChecksEnabled !== false && source.kind === 'Actuals' && source.eventDataStatus === 'missing' && (
                           <div className="text-[10px] text-[#14a6d9]">
                             Suggested fix: Check that this tab contains rows tagged with this event name and that its GID is correct.
                           </div>

@@ -7,9 +7,11 @@ import {
   summarizeSheetData
 } from '../../../lib/sheetCache.mjs';
 import { getEventsConfig } from '../../../lib/eventsConfig.js';
-import { observeHealthSource } from '../../../lib/healthNotifications.mjs';
+import { observeHealthSourceIssues } from '../../../lib/healthNotifications.mjs';
 import { getHealthIssues } from '../../../lib/healthNotificationUtils.mjs';
 import { observeApiRequest, observeApiUsage, withUsageScope } from '../../../lib/apiUsage.mjs';
+import { summarizeDimensions, getDimensionSettings } from '../../../lib/dimensionMonitoring.mjs';
+import { dimensionHealthForSource, applyHealthCheckSettings, eventHealthChecks } from '../../../lib/dimensionStandards.mjs';
 
 // In-memory cache for sheets: Map<url, { data: string, timestamp: number }>
 // TTL: 5 minutes fresh cache. If Google Sheets fails/times out, stale data is served as resilient fallback.
@@ -69,11 +71,12 @@ async function reportHealthForSheet(cacheKey, health = {}) {
   try {
     const byCacheKey = await getConfiguredSourcesByCacheKey();
     const sources = byCacheKey.get(cacheKey) || [];
+    const checkSettings = await getDimensionSettings();
 
     for (const source of sources) {
-      const monitoredSource = { ...source, ...health, ...getEventDataStats(source, health) };
-      const issue = getHealthIssues([monitoredSource])[0] || null;
-      await observeHealthSource(`${source.eventId}:${source.kind}`, issue);
+      const monitoredSource = applyHealthCheckSettings({ ...source, ...health, ...getEventDataStats(source, health), dimensionHealth: dimensionHealthForSource(source, health.dimensionValidation) }, checkSettings);
+      const issues = getHealthIssues([monitoredSource]);
+      await observeHealthSourceIssues(`${source.eventId}:${source.kind}`, issues);
     }
   } catch (error) {
     console.error('[HEALTH ALERT] Could not process a sheet health update:', error);
@@ -225,7 +228,14 @@ async function getSheet(request) {
 
     let dataSummary;
     try {
-      dataSummary = summarizeSheetData(text);
+      const checkSettings = await getDimensionSettings();
+      const sources = (await getConfiguredSourcesByCacheKey()).get(cacheKey) || [];
+      dataSummary = summarizeSheetData(text, {
+        metricChecksEnabled: checkSettings.metricChecksEnabled !== false && sources.some(source => eventHealthChecks(source.eventId, checkSettings).metricChecksEnabled)
+      });
+      if (sources.some(source => source.kind === 'Actuals' && eventHealthChecks(source.eventId, checkSettings).dimensionChecksEnabled)) {
+        dataSummary.dimensionValidation = await summarizeDimensions(text);
+      }
     } catch (error) {
       return await serveFallbackOrEmpty(`Google Sheets returned invalid CSV: ${error.message}`);
     }

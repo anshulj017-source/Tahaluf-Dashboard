@@ -229,7 +229,7 @@ function testHealthNotifications() {
   }, '2026-10-26T12:00:00.000Z', 'https://tahaluf-dashboard.vercel.app');
   assert(resolutionEmail.subject.includes('[RESOLVED]'), 'Resolution email subject contains [RESOLVED]');
   assert(resolutionEmail.html.includes('Issue Resolved'), 'Resolution HTML contains Issue Resolved');
-  assert(resolutionEmail.html.includes('Healthy &amp; Operational'), 'Resolution HTML confirms healthy status');
+  assert(resolutionEmail.html.includes('Reported issue cleared'), 'Resolution HTML confirms only the reported issue cleared');
 
   const digestEmail = formatDailyDigestEmail([
     { eventName: 'GSTS 26', kind: 'Actuals', status: 'missing-data', message: 'No rows' }

@@ -50,6 +50,82 @@ for newly processed recoveries. SMTP acceptance does not prove inbox delivery.
 A crash after SMTP accepts but before success is recorded can cause a duplicate.
 Previously removed recoveries cannot be reconstructed or resent automatically.
 
+#### Dimension standards and category emails
+
+**Health Monitor → Dimension Standards** checks the 11 documented dimensions
+(EVENT, EVENT TYPE, FUNNEL STAGE, Channel, Strategy, Campaign Type,
+Campaign Objective, MARKET, Targeting, Ad Format and Language) against the
+[standards tab](https://docs.google.com/spreadsheets/d/1D1BzodAQS45oJ27xwhk9FJkxFFzJk-r9x0lQzWG6u4w/edit?gid=593739615).
+Each column is an independent list, not a row-wise combination rule. All
+dimensions are enabled initially. Select/unselect dimensions and save; changes
+apply on the next Actuals sheet refresh (other instances cache settings for up
+to 60 seconds). Planned data is not dimension-validated.
+
+Checks scan all non-empty raw CSV records on existing sheet refreshes, before
+dashboard fallbacks or transformations. Matching trims edge whitespace and
+ignores case, but preserves punctuation and does not fuzzy-match or rewrite
+data. Approved DB headers (such as `Event Name DB` and `Funnel Stage DB`) take
+precedence over their documented header aliases. Unknown values, blanks and
+missing columns are reported separately, with counts and up to three sample
+values/CSV record numbers (including the header). These are CSV records, not
+guaranteed original Google Sheet row numbers. Event attribution accepts the
+dashboard's short-year display names, but value validation still requires the
+documented event spelling, such as `GSTS 2026`.
+
+The standards CSV is fetched at most daily per warm instance during refresh
+activity, with a persisted last-known-good copy in `appConfig/dimensionStandards`
+(ignored local JSON otherwise). **Refresh standards** updates it manually;
+**Refresh sheet** then applies it. Fetches are coalesced per instance.
+Failures are logged and surfaced, with five-minute retry backoff. Missing or
+stale standards never silently pass validation. Metadata is bounded to 256 KiB,
+30 event groups per sheet and three samples per finding; an overflow is explicitly
+unavailable, not healthy. Routine health inspection reads existing metadata,
+without rescanning or downloading source sheets.
+
+**Email metric issues** and **Email dimension issues** independently control
+immediate, digest and resolution emails, both enabled by default. Save them
+with notification settings. The global email switch, recipients, grace period,
+frequency and resolution switch still apply. Dashboard issues remain visible
+when category email is off. Feed, metric and dimension issues have separate
+keys, so recovering one category does not clear another. Existing legacy
+combined issues transition on their next health observation. No new polling or
+cron schedule is added; no traffic means no immediate validation/notification.
+
+**Global Health Checks** separately enables/disables metric and dimension
+validation, both on by default for existing installations. **Save global checks**
+persists these controls. Turning off a category suppresses its cached findings,
+issue counts, immediate/digest emails and queued resolution emails; it does not
+disable sheet availability checks, data ingestion or the other category.
+Historical issues are retained as **Checks disabled**, not reported as recovered.
+Previously queued recoveries for that category are cancelled rather than replayed
+when checks are re-enabled. An already in-flight email cannot be recalled.
+Other instances may take up to 60 seconds to receive changes.
+
+Metric aggregation/comparison and dimension validation are skipped while their
+global check is disabled. Individual dimension selections and email-only
+preferences are retained. Refresh sheets after re-enabling; the first metric
+refresh after a snapshot taken with metric checks disabled establishes a fresh
+baseline rather than comparing across the disabled interval.
+
+Dimension warnings use grouped cards with readable issue types and record counts,
+sample-value chips, and expandable CSV record/allowed-value details. The active
+alert summary stays compact; detailed findings are available per event and in
+new issue-history records. Legacy history messages remain under an expandable
+details section.
+
+Each event under **Event Data Checks** also has saved monitoring controls:
+**Monitor this event** disables all its health categories, while sheet
+availability/event-row, metric and dimension controls can be disabled
+independently. They apply to that event's Actuals and Planned sources
+(dimension validation remains Actuals-only). Global category switches always
+take precedence. All events default to enabled; individual selections survive
+master-switch changes. Disabled checks do not contribute dashboard warnings,
+digests, issue or recovery emails, and existing issues are marked **Checks
+disabled**, not recovered. History and dashboard data remain intact.
+Scheduled health refreshes omit events with no effective checks. Shared sheets
+may still be fetched and validated for other monitored events; source findings
+are filtered per event. Changes propagate through the 60-second settings cache.
+
 Configure these server-side environment variables for SMTP email and the scheduled job:
 - `SMTP_HOST`: SMTP server hostname (`smtp.gmail.com` for Gmail).
 - `SMTP_PORT`: SMTP server port (`587` for STARTTLS).

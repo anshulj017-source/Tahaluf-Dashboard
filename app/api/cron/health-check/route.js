@@ -4,6 +4,8 @@ import { getHealthIssues } from '../../../../lib/healthNotificationUtils.mjs';
 import { sendDailyHealthDigest } from '../../../../lib/healthNotifications.mjs';
 import { GET as getEventsHealth } from '../../admin/events/route.js';
 import { GET as refreshSheet } from '../../sheets/route.js';
+import { getDimensionSettings } from '../../../../lib/dimensionMonitoring.mjs';
+import { eventHealthChecks } from '../../../../lib/dimensionStandards.mjs';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -35,7 +37,11 @@ export async function GET(request) {
 
   try {
     const config = await getEventsConfig();
-    const sources = config.events.flatMap(event => [
+    const checkSettings = await getDimensionSettings();
+    const sources = config.events.filter(event => {
+      const checks = eventHealthChecks(event.id, checkSettings);
+      return checks.sheetChecksEnabled || checks.metricChecksEnabled || checks.dimensionChecksEnabled;
+    }).flatMap(event => [
       { eventId: event.id, name: event.name, kind: 'Actuals', gid: event.gid || '' },
       ...(event.plannedGid
         ? [{ eventId: event.id, name: event.name, kind: 'Planned', gid: event.plannedGid }]

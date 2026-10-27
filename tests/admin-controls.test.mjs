@@ -15,6 +15,12 @@ import {
 } from '../lib/apiUsage.mjs';
 import { readAdminSetting, updateAdminSetting } from '../lib/adminSettingsStore.mjs';
 import * as healthUtils from '../lib/healthNotificationUtils.mjs';
+import * as dimensionRules from '../lib/dimensionStandards.mjs';
+import * as d3 from 'd3';
+import React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import * as healthTemplates from '../lib/healthEmailTemplates.mjs';
+import { summarizeSheetData, storeSheetSnapshot, getSheetCacheHealth } from '../lib/sheetCache.mjs';
 
 const require = createRequire(import.meta.url);
 
@@ -22,7 +28,7 @@ async function loadInstrumentedModule(relativePath, overrides = {}, globals = {}
   const file = new URL(relativePath, import.meta.url);
   const source = await fs.readFile(file, 'utf8');
   const compiled = ts.transpileModule(source, {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true }
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true, jsx: ts.JsxEmit.React }
   }).outputText;
   const sandboxModule = { exports: {} };
   vm.runInNewContext(compiled, {
@@ -337,6 +343,8 @@ test('routine health inspection does not hydrate missing sheets or load configur
       storeSheetSnapshot: () => { assert.fail('routine inspection must not repair or write snapshots'); }
     },
     '../../sheets/route': {},
+    '../../../../lib/dimensionMonitoring.mjs': { getDimensionSettings: async () => ({}) },
+    '../../../../lib/dimensionStandards.mjs': dimensionRules,
     '../../../../lib/apiUsage.mjs': { withUsageScope: handler => handler }
   }, {
     process: { env: { COMBINED_COUNTRY_CSV_URL: 'https://example.test/sheet' } },
@@ -735,6 +743,7 @@ async function resolutionHarness(persistent = true) {
   let beforeSend = null;
   const sent = [];
   const errors = [];
+  let checkSettings = { metricChecksEnabled: true, dimensionChecksEnabled: true };
   const ref = {
     get: async () => ({ exists: true, data: () => structuredClone(state) }),
     set: async patch => { state = { ...state, ...structuredClone(patch) }; writes++; }
@@ -759,10 +768,13 @@ async function resolutionHarness(persistent = true) {
     },
     'node:util': { isDeepStrictEqual: (left, right) => JSON.stringify(left) === JSON.stringify(right) },
     './healthNotificationUtils.mjs': healthUtils,
+    './dimensionMonitoring.mjs': { getDimensionSettings: async () => checkSettings },
+    './dimensionStandards.mjs': dimensionRules,
     './healthEmailTransport.mjs': { getSmtpTransportConfig: () => ({ host: 'smtp.example.test' }) },
     './healthEmailTemplates.mjs': {
       formatHealthAlertEmail: () => ({ subject: 'Issue', text: 'Issue' }),
-      formatHealthResolvedEmail: () => ({ subject: 'Resolved', text: 'Resolved' })
+      formatHealthResolvedEmail: () => ({ subject: 'Resolved', text: 'Resolved' }),
+      formatDailyDigestEmail: () => ({ subject: 'Digest', text: 'Digest' })
     },
     './firebaseAdmin.js': { getFirebaseAdmin: () => ({ adminDb: db }) },
     './apiUsage.mjs': { observeApiUsage: () => {} },
@@ -784,7 +796,8 @@ async function resolutionHarness(persistent = true) {
   return {
     health: await reload(), reload, clock, sent, errors, state: () => state, writes: () => writes,
     fail: value => { failure = value; }, reject: value => { rejected = value; },
-    beforeSend: hook => { beforeSend = hook; }
+    beforeSend: hook => { beforeSend = hook; },
+    checks: next => { checkSettings = { ...checkSettings, ...next }; }
   };
 }
 
@@ -878,4 +891,561 @@ test('resolution settings and alert grace period prevent unwanted recovery email
   await harness.health.observeHealthSource(recoveryIssue.key, null);
   assert.equal(harness.sent.length, 0);
   assert.equal(Object.keys(harness.state().pendingResolutions).length, 0);
+});
+
+const standardsCsv = () => d3.csvFormat([Object.fromEntries(dimensionRules.DIMENSIONS.map(dimension => [
+  dimension.label, dimension.id === 'event' ? 'GSTS 2026' : `${dimension.id} standard`
+]))]);
+const dimensionContext = enabledDimensions => ({
+  values: dimensionRules.parseDimensionStandards(standardsCsv()),
+  enabledDimensions: enabledDimensions || dimensionRules.DEFAULT_DIMENSION_SETTINGS.enabledDimensions,
+  fetchedAt: '2026-10-27T00:00:00.000Z'
+});
+const validDimensionRow = () => Object.fromEntries(dimensionRules.DIMENSIONS.map(dimension => [
+  dimension.headers[0], dimension.id === 'event' ? 'GSTS 2026' : `${dimension.id} standard`
+]));
+const dimensionSource = validation => ({
+  eventId: 'gsts', eventName: 'GSTS 26', kind: 'Actuals', state: 'healthy', eventDataStatus: 'present',
+  dimensionHealth: dimensionRules.dimensionHealthForSource({ eventName: 'GSTS 26', kind: 'Actuals' }, validation)
+});
+
+test('standards parser treats columns as independent lists and rejects missing or empty standards', () => {
+  const parsed = dimensionRules.parseDimensionStandards(standardsCsv());
+  assert.equal(Object.keys(parsed).length, 11);
+  assert.deepEqual(parsed.event, ['GSTS 2026']);
+  const rows = d3.csvParse(standardsCsv());
+  rows.push({ EVENT: 'SAIF 2026', Language: 'Another language' });
+  const extended = dimensionRules.parseDimensionStandards(d3.csvFormat(rows));
+  assert.deepEqual(extended.event, ['GSTS 2026', 'SAIF 2026']);
+  assert.equal(extended.strategy.length, 1, 'blank standards cells are not allowed values');
+  assert.throws(() => dimensionRules.parseDimensionStandards('EVENT\nGSTS 2026'), /column missing/);
+  rows[0].Strategy = '';
+  assert.throws(() => dimensionRules.parseDimensionStandards(d3.csvFormat(rows)), /empty or too large/);
+  for (const invalid of [null, {}, ['no-such-dimension'], ['event', 'event']]) {
+    assert.throws(() => dimensionRules.validateDimensionSelection(invalid));
+  }
+  assert.deepEqual(dimensionRules.validateDimensionSelection([]), []);
+});
+
+test('all eleven dimensions validate raw values with exact normalization and preferred headers', () => {
+  const row = validDimensionRow();
+  for (const key of Object.keys(row)) row[key] = ` ${row[key].toUpperCase()} `;
+  row.EVENT = 'ignored lower-priority header';
+  const result = dimensionRules.checkDimensionRows(d3.csvFormat([row]), dimensionContext());
+  assert.equal(result.status, 'checked');
+  assert.equal(result.groups[0].findings.length, 0);
+  assert.equal(result.columns.event, 'Event Name DB');
+  assert.equal(dimensionSource(result).dimensionHealth.findings.length, 0);
+  row['Event Name DB'] = 'GSTS 26';
+  row.Channel = 'channel_standard';
+  const invalid = dimensionRules.checkDimensionRows(d3.csvFormat([row]), dimensionContext());
+  assert.equal(invalid.groups[0].findings.length, 2, 'no fuzzy matching, punctuation rewriting or implicit standard aliases');
+  assert.equal(dimensionSource(invalid).dimensionHealth.findings.length, 2, 'display year alias attributes to correct event without accepting invalid value');
+});
+
+test('blanks, non-standard values and missing columns have separate counts and bounded record samples', () => {
+  const rows = Array.from({ length: 10 }, (_, index) => ({
+    ...validDimensionRow(), Channel: index < 5 ? '' : `Unknown${index}`, 'Language DB': ''
+  }));
+  for (const row of rows) {
+    delete row['Strategy DB'];
+    delete row['Language DB'];
+    row.Language = '';
+  }
+  const result = dimensionRules.checkDimensionRows(d3.csvFormat(rows), dimensionContext());
+  const findings = result.groups[0].findings;
+  assert.equal(findings.find(finding => finding.dimension === 'strategy').type, 'missing-column');
+  assert.equal(findings.find(finding => finding.dimension === 'strategy').count, 10);
+  assert.equal(findings.find(finding => finding.dimension === 'language').type, 'blank');
+  assert.equal(findings.find(finding => finding.dimension === 'channel' && finding.type === 'blank').count, 5);
+  const invalid = findings.find(finding => finding.dimension === 'channel' && finding.type === 'non-standard');
+  assert.equal(invalid.count, 5);
+  assert.deepEqual(invalid.sampleRows, [7, 8, 9]);
+  assert.equal(invalid.values.length, 3);
+  const selected = dimensionRules.checkDimensionRows(d3.csvFormat(rows), dimensionContext(['event']));
+  assert.equal(selected.groups[0].findings.length, 0, 'deselected columns do not generate findings');
+  assert.equal(dimensionRules.checkDimensionRows('', { enabledDimensions: [] }).status, 'disabled');
+  assert.equal(dimensionRules.checkDimensionRows('', { enabledDimensions: ['event'] }).status, 'unavailable');
+});
+
+test('findings stay event-scoped, invalid unmapped event names remain visible and Planned is excluded', () => {
+  const rows = [
+    { ...validDimensionRow(), Channel: 'bad' },
+    { ...validDimensionRow(), 'Event Name DB': 'SAIF 2026', Channel: 'channel standard' },
+    { ...validDimensionRow(), 'Event Name DB': 'typo-event' }
+  ];
+  const context = dimensionContext();
+  context.values.event.push('SAIF 2026');
+  const validation = dimensionRules.checkDimensionRows(d3.csvFormat(rows), context);
+  const source = dimensionSource(validation);
+  assert.equal(source.dimensionHealth.findings.filter(finding => finding.dimension === 'channel').length, 1);
+  assert.equal(source.dimensionHealth.findings.find(finding => finding.sheetWide).values[0], 'typo-event');
+  const saif = dimensionRules.dimensionHealthForSource({ eventName: 'SAIF 26', kind: 'Actuals' }, validation);
+  assert.equal(saif.findings.filter(finding => finding.dimension === 'channel').length, 0);
+  assert.equal(dimensionRules.dimensionHealthForSource({ kind: 'Planned' }, validation), null);
+  const overflow = dimensionRules.checkDimensionRows(d3.csvFormat(Array.from({ length: 31 }, (_, i) => ({
+    ...validDimensionRow(), 'Event Name DB': `event${i}`
+  }))), context);
+  assert.equal(overflow.status, 'unavailable');
+  assert.match(overflow.error, /Too many event groups/);
+  const large = dimensionRules.checkDimensionRows(d3.csvFormat(Array.from({ length: 90 }, (_, i) => Object.fromEntries(
+    dimensionRules.DIMENSIONS.map(dimension => [
+      dimension.headers[0], dimension.id === 'event' ? `event${Math.floor(i / 3)}` : `${i}${'\u754c'.repeat(200)}`
+    ])
+  ))), context);
+  assert.equal(large.status, 'unavailable');
+  assert.match(large.error, /256 KiB/);
+});
+
+test('feed, metric and dimension issues remain separate and missing or stale standards never pass', () => {
+  const validation = dimensionRules.checkDimensionRows(d3.csvFormat([{ ...validDimensionRow(), Channel: 'bad' }]), dimensionContext());
+  const source = {
+    ...dimensionSource(validation), state: 'stale', lastError: 'Timeout',
+    metricDiscrepancies: [{ channel: 'X', metric: 'clicks', previousValue: 20, currentValue: 10, dropPercent: 50 }]
+  };
+  const issues = healthUtils.getHealthIssues([source]);
+  assert.deepEqual(issues.map(issue => issue.key), ['gsts:Actuals', 'gsts:Actuals:metrics', 'gsts:Actuals:dimensions']);
+  assert.deepEqual(issues.map(issue => issue.category), ['feed', 'metrics', 'dimensions']);
+  assert.match(issues[2].message, /Channel: non-standard, 1 rows/);
+  const unavailable = healthUtils.getHealthIssues([dimensionSource(null)]);
+  assert.equal(unavailable[0].status, 'dimension-unavailable');
+  const stale = healthUtils.getHealthIssues([dimensionSource({ ...validation, stale: true, error: 'Network failed' })]);
+  assert.equal(stale[0].status, 'dimension-unavailable');
+  assert.match(stale[0].message, /stale standards: Network failed/);
+});
+
+test('dimension settings cache standards for a day, coalesces fetches and retains valid values on failure', async () => {
+  const clock = fakeClock();
+  let state = structuredClone(dimensionRules.DEFAULT_DIMENSION_SETTINGS);
+  let fetches = 0;
+  let writes = 0;
+  let fail = false;
+  const errors = [];
+  const monitor = await loadInstrumentedModule('../lib/dimensionMonitoring.mjs', {
+    './adminSettingsStore.mjs': {
+      readAdminSetting: async () => structuredClone(state),
+      updateAdminSetting: async (_, defaults, update) => { state = update(state); writes++; return structuredClone(state); }
+    },
+    './dimensionStandards.mjs': dimensionRules
+  }, {
+    Date: clock.Date, AbortSignal,
+    fetch: async url => {
+      fetches++;
+      assert.equal(url, dimensionRules.STANDARDS_URL);
+      if (fail) throw new Error('Standards unavailable');
+      return { ok: true, text: async () => standardsCsv() };
+    },
+    console: { error: (...args) => errors.push(args) }
+  });
+  await Promise.all(Array.from({ length: 100 }, () => monitor.loadDimensionStandards()));
+  assert.equal(fetches, 1);
+  assert.equal(writes, 1);
+  await monitor.summarizeDimensions(d3.csvFormat([validDimensionRow()]));
+  assert.equal(fetches, 1);
+  assert.equal(writes, 1, 'warm validation does not write settings');
+  clock.advance(24 * 60 * 60_000);
+  fail = true;
+  const stale = await monitor.loadDimensionStandards();
+  assert.equal(stale.stale, true);
+  assert.ok(stale.values.event);
+  assert.match(stale.error, /Standards unavailable/);
+  await monitor.loadDimensionStandards();
+  assert.equal(fetches, 2, 'failed refresh has five-minute backoff');
+  assert.equal(errors.length, 1);
+  fail = false;
+  await monitor.loadDimensionStandards(true);
+  assert.equal(fetches, 3);
+  assert.equal(state.error, null);
+  await monitor.saveDimensionSelection([]);
+  const disabled = await monitor.summarizeDimensions('');
+  assert.equal(disabled.status, 'disabled');
+  assert.equal(fetches, 3, 'all-off validation does not fetch standards');
+  assert.ok(state.values.event, 'selection save retains standards');
+  await assert.rejects(monitor.saveDimensionSelection(['invalid']));
+});
+
+test('new category email preferences default enabled and filter immediate, digest and resolution sends', async () => {
+  assert.equal(healthUtils.normalizeHealthNotificationSettings({}).metricEmailEnabled, true);
+  assert.equal(healthUtils.normalizeHealthNotificationSettings({}).dimensionEmailEnabled, true);
+  for (const [category, setting] of [['metrics', 'metricEmailEnabled'], ['dimensions', 'dimensionEmailEnabled']]) {
+    const harness = await resolutionHarness();
+    const issue = { ...recoveryIssue, key: `${recoveryIssue.key}:${category}`, category };
+    await harness.health.saveHealthNotificationSettings({ ...harness.state().settings, [setting]: false });
+    await harness.health.observeHealthSource(issue.key, issue);
+    assert.equal(harness.sent.length, 0);
+    assert.ok(harness.state().activeIssues[issue.key], 'dashboard issue remains tracked');
+    const digest = await harness.health.sendDailyHealthDigest([issue]);
+    assert.equal(digest.sent, false);
+    await harness.health.saveHealthNotificationSettings({ ...harness.state().settings, [setting]: true });
+    await harness.health.observeHealthSource(issue.key, issue);
+    assert.equal(harness.sent.length, 1);
+    await harness.health.saveHealthNotificationSettings({ ...harness.state().settings, [setting]: false });
+    await harness.health.observeHealthSource(issue.key, null);
+    assert.equal(harness.sent.length, 1, 'category-off recovery stays pending without sending');
+    await harness.health.saveHealthNotificationSettings({ ...harness.state().settings, [setting]: true });
+    await harness.health.observeHealthSource(issue.key, null);
+    assert.equal(harness.sent.length, 2);
+  }
+});
+
+test('source-scoped observations resolve only recovered categories, even when another send fails', async () => {
+  const harness = await resolutionHarness();
+  const metrics = { ...recoveryIssue, key: `${recoveryIssue.key}:metrics`, category: 'metrics' };
+  const dimensions = { ...recoveryIssue, key: `${recoveryIssue.key}:dimensions`, category: 'dimensions' };
+  await harness.health.observeHealthSourceIssues(recoveryIssue.key, [metrics, dimensions]);
+  assert.equal(harness.sent.length, 2);
+  await harness.health.observeHealthSourceIssues(recoveryIssue.key, [dimensions]);
+  assert.equal(harness.sent.length, 3);
+  assert.ok(harness.state().activeIssues[dimensions.key]);
+  assert.equal(harness.state().activeIssues[metrics.key], undefined);
+  assert.equal(harness.state().history.filter(item => item.resolvedAt).length, 1);
+  const other = { ...recoveryIssue, key: 'other:Actuals' };
+  await harness.health.observeHealthSource(other.key, other);
+  await harness.health.observeHealthSourceIssues(recoveryIssue.key, []);
+  assert.ok(harness.state().activeIssues[other.key], 'other events are not resolved');
+  const failing = await resolutionHarness();
+  failing.beforeSend(async () => { if (failing.sent.length === 1) throw new Error('one category failed'); });
+  await assert.rejects(failing.health.observeHealthSourceIssues(recoveryIssue.key, [metrics, dimensions]), /one category failed/);
+  assert.equal(failing.sent.length, 2, 'one failed send must not suppress the other category');
+});
+
+test('dimension alert templates escape raw values and identify the category without claiming full recovery', () => {
+  const issue = {
+    ...recoveryIssue, category: 'dimensions', status: 'dimension-discrepancy',
+    message: 'Language: non-standard <script>alert(1)</script>',
+    dimensionFindings: [{ label: 'Language', type: 'non-standard', count: 2, values: ['<script>'], sampleRows: [2, 3] }]
+  };
+  const alert = healthTemplates.formatHealthAlertEmail(issue);
+  assert.ok(alert.subject.includes('[dimensions]'));
+  assert.ok(alert.html.includes('Dimension Standards Check'));
+  assert.ok(alert.html.includes('&lt;script&gt;'));
+  assert.ok(!alert.html.includes('<script>'));
+  assert.ok(alert.text.includes('CSV records 2, 3'));
+  const resolved = healthTemplates.formatHealthResolvedEmail(issue, new Date().toISOString());
+  assert.ok(resolved.html.includes('Other issue categories may still require attention'));
+});
+
+test('Health Monitor renders all selected dimensions and independent enabled category email checkboxes', async () => {
+  const component = await loadInstrumentedModule('../app/components/DataHealthAdmin.jsx', {
+    '../../lib/firebase': { auth: {} },
+    '../../lib/healthNotificationUtils.mjs': healthUtils,
+    './DashboardFeatureContext': { useLowQuotaMode: () => false },
+    '../../lib/dimensionStandards.mjs': dimensionRules,
+    './DimensionFindings': (await loadInstrumentedModule('../app/components/DimensionFindings.jsx')).default
+  });
+  const html = renderToStaticMarkup(React.createElement(component.default));
+  assert.ok(html.includes('Dimension Standards'));
+  assert.ok(html.includes('Email metric issues'));
+  assert.ok(html.includes('Email dimension issues'));
+  assert.ok(html.includes('Save dimension checks'));
+  assert.ok(html.includes('Refresh standards'));
+  assert.ok(html.includes('Actuals only'));
+  for (const dimension of dimensionRules.DIMENSIONS) assert.ok(html.includes(dimension.label), dimension.id);
+  assert.ok(html.includes('Enable metric health checks'));
+  assert.ok(html.includes('Enable dimension health checks'));
+  assert.ok(html.includes('Save global checks'));
+  assert.equal((html.match(/checked=""/g) || []).length, 18, '11 dimensions, two global checks and five email/dashboard controls default checked');
+});
+
+test('dimension settings endpoints enforce admin auth and validate selections without touching email settings', async () => {
+  let authorized = false;
+  let writes = 0;
+  const route = await loadInstrumentedModule('../app/api/admin/health-notifications/route.js', {
+    '../../../../lib/eventsConfig.js': {},
+    'next/server': { NextResponse: { json: (body, options) => Response.json(body, options) } },
+    '../../../../lib/healthNotifications.mjs': {},
+    '../../../../lib/healthNotificationUtils.mjs': healthUtils,
+    '../../../../lib/requireAdminRequest.js': { isAdminRequest: async () => authorized },
+    '../events/route.js': {},
+    '../../../../lib/healthEmailTransport.mjs': {},
+    '../../../../lib/dimensionMonitoring.mjs': {
+      saveDimensionSelection: async ids => { const enabledDimensions = dimensionRules.validateDimensionSelection(ids); writes++; return { enabledDimensions }; },
+      loadDimensionStandards: async () => { writes++; return { error: 'Google unavailable' }; }
+    }
+  }, { Response });
+  const request = body => ({ json: async () => body });
+  assert.equal((await route.POST(request({ action: 'save-dimensions', enabledDimensions: [] }))).status, 401);
+  assert.equal((await route.POST(request({ action: 'refresh-standards' }))).status, 401);
+  assert.equal(writes, 0);
+  authorized = true;
+  assert.equal((await route.POST(request({ action: 'save-dimensions', enabledDimensions: ['bad'] }))).status, 400);
+  assert.equal(writes, 0);
+  const saved = await route.POST(request({ action: 'save-dimensions', enabledDimensions: ['language'] }));
+  assert.deepEqual((await saved.json()).dimensionSettings.enabledDimensions, ['language']);
+  assert.equal((await route.POST(request({ action: 'refresh-standards' }))).status, 502);
+});
+
+test('sheet refresh validates Actuals once, stores findings and forwards all categories without rechecking cache hits or Planned', async () => {
+  const csv = d3.csvFormat([{ ...validDimensionRow(), Channel: 'bad' }]);
+  const validation = dimensionRules.checkDimensionRows(csv, dimensionContext());
+  let scans = 0;
+  let fetches = 0;
+  const stored = [];
+  const observed = [];
+  const route = await loadInstrumentedModule('../app/api/sheets/route.js', {
+    'next/server': { NextResponse: Response },
+    '../../../lib/sheetCache.mjs': {
+      getSheetCacheKey: url => url,
+      getSheetSnapshot: async () => null,
+      summarizeSheetData: () => ({ rowCount: 1, eventColumn: 'Event Name DB', eventBreakdown: { 'GSTS 2026': { rows: 1 } } }),
+      storeSheetSnapshot: async (_, text, summary) => {
+        stored.push(summary);
+        return { ...summary, state: 'healthy', hasCachedData: true, metricDiscrepancies: [{ channel: 'X', metric: 'clicks', previousValue: 20, currentValue: 10, dropPercent: 50 }] };
+      }
+    },
+    '../../../lib/eventsConfig.js': { getEventsConfig: async () => ({ events: [{ id: 'gsts', name: 'GSTS 26', sourceName: 'GSTS', gid: '1', plannedGid: '2' }] }) },
+    '../../../lib/healthNotifications.mjs': { observeHealthSourceIssues: async (key, issues) => observed.push({ key, issues }) },
+    '../../../lib/healthNotificationUtils.mjs': healthUtils,
+    '../../../lib/apiUsage.mjs': { observeApiRequest: () => {}, observeApiUsage: () => {}, withUsageScope: handler => handler },
+    '../../../lib/dimensionMonitoring.mjs': { getDimensionSettings: async () => ({}), summarizeDimensions: async text => { scans++; assert.equal(text, csv); return validation; } },
+    '../../../lib/dimensionStandards.mjs': dimensionRules
+  }, {
+    Response, Request, AbortController,
+    process: { env: { COMBINED_COUNTRY_CSV_URL: 'https://example.test?csv=1' } },
+    fetch: async () => { fetches++; return new Response(csv); }
+  });
+  const request = gid => new Request(`http://localhost/api/sheets?type=combined&gid=${gid}`);
+  assert.equal((await route.GET(request('1'))).status, 200);
+  assert.equal(scans, 1);
+  assert.equal(stored[0].dimensionValidation, validation);
+  assert.deepEqual(Array.from(observed[0].issues, issue => issue.category), ['metrics', 'dimensions']);
+  await route.GET(request('1'));
+  assert.equal(scans, 1);
+  assert.equal(fetches, 1, 'warm cache hit adds no fetches or validation');
+  await route.GET(request('2'));
+  assert.equal(scans, 1, 'Planned does not scan dimensions');
+  assert.equal(stored[1].dimensionValidation, undefined);
+  assert.ok(observed.at(-1).issues.every(issue => issue.category !== 'dimensions'));
+});
+
+test('global switches filter cached category findings without hiding sheet availability issues', () => {
+  const validation = dimensionRules.checkDimensionRows(d3.csvFormat([{ ...validDimensionRow(), Channel: 'bad' }]), dimensionContext());
+  const source = {
+    ...dimensionSource(validation), state: 'stale',
+    metricDiscrepancies: [{ channel: 'X', metric: 'clicks', previousValue: 20, currentValue: 10, dropPercent: 50 }]
+  };
+  const both = dimensionRules.applyHealthCheckSettings(source, {});
+  assert.equal(healthUtils.getHealthIssues([both]).length, 3);
+  const metricsOff = dimensionRules.applyHealthCheckSettings(source, { metricChecksEnabled: false });
+  assert.deepEqual(healthUtils.getHealthIssues([metricsOff]).map(issue => issue.category), ['feed', 'dimensions']);
+  const dimensionsOff = dimensionRules.applyHealthCheckSettings(source, { dimensionChecksEnabled: false });
+  assert.deepEqual(healthUtils.getHealthIssues([dimensionsOff]).map(issue => issue.category), ['feed', 'metrics']);
+  assert.equal(dimensionsOff.dimensionHealth.status, 'disabled');
+  const disabled = dimensionRules.applyHealthCheckSettings(source, { metricChecksEnabled: false, dimensionChecksEnabled: false });
+  assert.deepEqual(healthUtils.getHealthIssues([disabled]).map(issue => issue.category), ['feed']);
+  assert.equal(source.dimensionHealth.status, 'checked', 'filtering leaves stored findings intact');
+});
+
+test('global check settings require booleans, preserve dimension selections and skip standards fetching when off', async () => {
+  let state = { ...dimensionRules.DEFAULT_DIMENSION_SETTINGS, enabledDimensions: ['channel'], values: dimensionContext().values };
+  let writes = 0;
+  const monitor = await loadInstrumentedModule('../lib/dimensionMonitoring.mjs', {
+    './adminSettingsStore.mjs': {
+      readAdminSetting: async () => structuredClone(state),
+      updateAdminSetting: async (_, defaults, update) => { state = update(state); writes++; return state; }
+    },
+    './dimensionStandards.mjs': dimensionRules
+  }, { fetch: () => { assert.fail('Globally disabled dimensions must not fetch standards'); } });
+  for (const invalid of [null, {}, { metricChecksEnabled: 'false', dimensionChecksEnabled: true }]) {
+    await assert.rejects(monitor.saveHealthCheckSettings(invalid), /must be booleans/);
+  }
+  assert.equal(writes, 0);
+  await monitor.saveHealthCheckSettings({ metricChecksEnabled: true, dimensionChecksEnabled: false });
+  assert.deepEqual(state.enabledDimensions, ['channel']);
+  assert.ok(state.values.event);
+  assert.equal((await monitor.summarizeDimensions('')).status, 'disabled');
+  await monitor.saveDimensionSelection(['language']);
+  assert.equal(state.dimensionChecksEnabled, false, 'individual selection does not re-enable global checks');
+});
+
+test('disabling checks retires active issues and queued recoveries without sending misleading resolution emails', async () => {
+  for (const [category, flag] of [['metrics', 'metricChecksEnabled'], ['dimensions', 'dimensionChecksEnabled']]) {
+    const harness = await resolutionHarness();
+    const issue = { ...recoveryIssue, key: `${recoveryIssue.key}:${category}`, category };
+    await harness.health.observeHealthSource(issue.key, issue);
+    const feed = { ...recoveryIssue, key: 'other:Actuals', category: 'feed' };
+    await harness.health.observeHealthSource(feed.key, feed);
+    assert.equal(harness.sent.length, 2);
+    harness.checks({ [flag]: false });
+    await harness.health.reconcileDisabledHealthChecks();
+    assert.equal(harness.state().history[0].resolution, 'checks-disabled');
+    assert.equal(harness.state().activeIssues[issue.key], undefined);
+    assert.ok(harness.state().activeIssues[feed.key], 'feed checks continue');
+    await harness.health.observeHealthSource(issue.key, issue);
+    assert.equal(harness.state().activeIssues[issue.key], undefined);
+    assert.equal(harness.sent.length, 2, 'no issue or recovery email when category checks are disabled');
+    assert.equal((await harness.health.sendDailyHealthDigest([issue])).sent, false);
+    const pending = await resolutionHarness();
+    await pending.health.observeHealthSource(issue.key, issue);
+    pending.fail(true);
+    await pending.health.observeHealthSource(issue.key, null);
+    assert.equal(Object.keys(pending.state().pendingResolutions).length, 1);
+    pending.checks({ [flag]: false });
+    await pending.health.reconcileDisabledHealthChecks();
+    assert.equal(Object.keys(pending.state().pendingResolutions).length, 0);
+    assert.equal(pending.state().history[0].resolutionEmailStatus, 'checks-disabled');
+    pending.checks({ [flag]: true });
+    pending.fail(false);
+    pending.clock.advance(5 * 60_000);
+    await pending.health.observeHealthSource(issue.key, null);
+    assert.equal(pending.sent.length, 2, 're-enabling cannot replay a cancelled recovery');
+  }
+});
+
+test('metric global disable skips aggregation and resets baselines before re-enabling', async () => {
+  const csv = 'Event Name DB,Date,Channel,Clicks\nGSTS 2026,2026-10-27,Search,100';
+  const key = `global-metric-test-${Date.now()}`;
+  const originalVercel = process.env.VERCEL;
+  delete process.env.VERCEL;
+  try {
+    const enabled = summarizeSheetData(csv);
+    assert.equal(enabled.channelMetrics24h.length, 1);
+    await storeSheetSnapshot(key, csv, enabled);
+    const disabled = summarizeSheetData(csv, { metricChecksEnabled: false });
+    assert.deepEqual(disabled.channelMetrics24h, []);
+    assert.equal(disabled.latest24hDate, null);
+    assert.equal(disabled.rowCount, 1, 'source row health is still computed');
+    await storeSheetSnapshot(key, csv, disabled);
+    const health = (await getSheetCacheHealth([key]))[key];
+    assert.deepEqual(health.metricBaselines, {});
+    assert.deepEqual(health.metricDiscrepancies, []);
+    const smaller = csv.replace(',100', ',10');
+    const resumed = await storeSheetSnapshot(key, smaller, summarizeSheetData(smaller));
+    assert.deepEqual(resumed.metricDiscrepancies, [], 'first refreshed snapshot becomes the new baseline');
+  } finally {
+    if (originalVercel === undefined) delete process.env.VERCEL;
+    else process.env.VERCEL = originalVercel;
+  }
+});
+
+test('dimension cards group readable findings and hide record details behind accessible disclosures', async () => {
+  const component = await loadInstrumentedModule('../app/components/DimensionFindings.jsx');
+  const findings = [
+    { dimension: 'channel', label: 'Channel', type: 'blank', count: 25, values: [], sampleRows: [2, 4] },
+    { dimension: 'channel', label: 'Channel', type: 'non-standard', count: 3, values: ['<unknown>'], sampleRows: [6] },
+    { dimension: 'language', label: 'Language', type: 'missing-column', count: 28, values: [], sampleRows: [2] }
+  ];
+  const html = renderToStaticMarkup(React.createElement(component.default, { findings, standards: { channel: ['Search', 'LinkedIn'] } }));
+  assert.ok(html.includes('2 dimensions need attention'));
+  assert.equal((html.match(/aria-label="Channel findings"/g) || []).length, 1);
+  assert.ok(html.includes('25 records'));
+  assert.ok(html.includes('Non-standard value'));
+  assert.ok(html.includes('Missing column'));
+  assert.ok(html.includes('&lt;unknown&gt;'));
+  assert.ok(html.includes('<details'));
+  assert.ok(html.includes('View sample records'));
+  assert.ok(html.includes('View allowed values'));
+  assert.ok(html.includes('text-sm'));
+});
+
+test('global check endpoint enforces auth, validates input and reconciles disabled history', async () => {
+  let authorized = false;
+  let writes = 0;
+  let reconciles = 0;
+  const route = await loadInstrumentedModule('../app/api/admin/health-notifications/route.js', {
+    '../../../../lib/eventsConfig.js': {},
+    'next/server': { NextResponse: { json: (body, options) => Response.json(body, options) } },
+    '../../../../lib/healthNotifications.mjs': { reconcileDisabledHealthChecks: async () => { reconciles++; } },
+    '../../../../lib/healthNotificationUtils.mjs': healthUtils,
+    '../../../../lib/requireAdminRequest.js': { isAdminRequest: async () => authorized },
+    '../events/route.js': {},
+    '../../../../lib/healthEmailTransport.mjs': {},
+    '../../../../lib/dimensionMonitoring.mjs': {
+      saveHealthCheckSettings: async body => {
+        if (typeof body.metricChecksEnabled !== 'boolean' || typeof body.dimensionChecksEnabled !== 'boolean') throw new Error('Invalid check selections');
+        writes++;
+        return { metricChecksEnabled: body.metricChecksEnabled, dimensionChecksEnabled: body.dimensionChecksEnabled };
+      }
+    }
+  });
+  const request = body => ({ json: async () => ({ action: 'save-health-checks', ...body }) });
+  assert.equal((await route.POST(request({ metricChecksEnabled: false, dimensionChecksEnabled: false }))).status, 401);
+  assert.equal(writes, 0);
+  authorized = true;
+  assert.equal((await route.POST(request({ metricChecksEnabled: 'false', dimensionChecksEnabled: false }))).status, 400);
+  assert.equal(writes, 0);
+  assert.equal(reconciles, 0);
+  const saved = await route.POST(request({ metricChecksEnabled: false, dimensionChecksEnabled: true }));
+  assert.equal(saved.status, 200);
+  assert.equal((await saved.json()).dimensionSettings.metricChecksEnabled, false);
+  assert.equal(reconciles, 1);
+});
+
+test('per-event master and category switches preserve other events and global precedence', () => {
+  const settings = { eventChecks: { gsts: { monitoringEnabled: false }, saif: { sheetChecksEnabled: false, dimensionChecksEnabled: false } } };
+  const issue = { eventId: 'gsts', category: 'feed' };
+  for (const category of ['feed', 'metrics', 'dimensions']) {
+    assert.equal(dimensionRules.isHealthCheckEnabled({ ...issue, category }, settings), false);
+    assert.equal(dimensionRules.isHealthCheckEnabled({ eventId: 'other', category }, settings), true);
+  }
+  assert.equal(dimensionRules.isHealthCheckEnabled({ eventId: 'saif', category: 'feed' }, settings), false);
+  assert.equal(dimensionRules.isHealthCheckEnabled({ eventId: 'saif', category: 'metrics' }, settings), true);
+  assert.equal(dimensionRules.isHealthCheckEnabled({ eventId: 'saif', category: 'dimensions' }, settings), false);
+  assert.equal(dimensionRules.isHealthCheckEnabled({ eventId: 'saif', category: 'metrics' }, { ...settings, metricChecksEnabled: false }), false);
+  const source = { eventId: 'gsts', kind: 'Actuals', state: 'stale', eventDataStatus: 'missing', metricDiscrepancies: [{}], dimensionHealth: { status: 'unavailable' } };
+  assert.deepEqual(healthUtils.getHealthIssues([dimensionRules.applyHealthCheckSettings(source, settings)]), []);
+  assert.equal(source.state, 'stale', 'monitoring does not modify ingestion or stored source health');
+});
+
+test('per-event checks persist independently with strict validation and retained selections', async () => {
+  let state = { ...dimensionRules.DEFAULT_DIMENSION_SETTINGS, eventChecks: { other: { monitoringEnabled: false } } };
+  let writes = 0;
+  const monitor = await loadInstrumentedModule('../lib/dimensionMonitoring.mjs', {
+    './adminSettingsStore.mjs': {
+      readAdminSetting: async () => state,
+      updateAdminSetting: async (_, defaults, update) => { state = update(state); writes++; return state; }
+    },
+    './dimensionStandards.mjs': dimensionRules
+  });
+  const checks = { monitoringEnabled: false, sheetChecksEnabled: true, metricChecksEnabled: false, dimensionChecksEnabled: true };
+  for (const [id, input] of [['', checks], ['__proto__', checks], ['gsts', {}], ['gsts', { ...checks, sheetChecksEnabled: 'false' }]]) {
+    await assert.rejects(monitor.saveEventHealthChecks(id, input));
+  }
+  assert.equal(writes, 0);
+  await monitor.saveEventHealthChecks('gsts', checks);
+  assert.equal(state.eventChecks.other.monitoringEnabled, false);
+  assert.equal(state.eventChecks.gsts.metricChecksEnabled, false);
+  await monitor.saveHealthCheckSettings({ metricChecksEnabled: false, dimensionChecksEnabled: true });
+  assert.deepEqual(structuredClone(state.eventChecks.gsts), checks);
+  await monitor.saveEventHealthChecks('gsts', { ...checks, monitoringEnabled: true });
+  assert.equal(state.eventChecks.gsts.sheetChecksEnabled, true);
+  assert.equal(state.eventChecks.gsts.metricChecksEnabled, false);
+});
+
+test('disabling event sheet checks retires only that event feed issue without false recovery mail', async () => {
+  const harness = await resolutionHarness();
+  const issue = { ...recoveryIssue, eventId: 'gsts', category: 'feed' };
+  const other = { ...recoveryIssue, key: 'other:Actuals', eventId: 'other', category: 'feed' };
+  await harness.health.observeHealthSource(issue.key, issue);
+  await harness.health.observeHealthSource(other.key, other);
+  harness.checks({ eventChecks: { gsts: { sheetChecksEnabled: false } } });
+  await harness.health.reconcileDisabledHealthChecks();
+  assert.equal(harness.state().history[0].resolution, 'checks-disabled');
+  assert.ok(harness.state().activeIssues[other.key]);
+  assert.equal(harness.sent.length, 2);
+  assert.equal((await harness.health.sendDailyHealthDigest([issue])).sent, false);
+});
+
+test('event monitoring endpoint rejects unauthorized and unknown events before persisting', async () => {
+  let authorized = false;
+  let writes = 0;
+  let reconciles = 0;
+  const route = await loadInstrumentedModule('../app/api/admin/health-notifications/route.js', {
+    'next/server': { NextResponse: { json: (body, options) => Response.json(body, options) } },
+    '../../../../lib/eventsConfig.js': { getEventsConfig: async () => ({ events: [{ id: 'gsts' }] }) },
+    '../../../../lib/healthNotifications.mjs': { reconcileDisabledHealthChecks: async () => { reconciles++; } },
+    '../../../../lib/healthNotificationUtils.mjs': healthUtils,
+    '../../../../lib/requireAdminRequest.js': { isAdminRequest: async () => authorized },
+    '../events/route.js': {},
+    '../../../../lib/healthEmailTransport.mjs': {},
+    '../../../../lib/dimensionMonitoring.mjs': { saveEventHealthChecks: async (id, checks) => { writes++; return { eventChecks: { [id]: checks } }; } }
+  });
+  const request = eventId => ({ json: async () => ({ action: 'save-event-checks', eventId, checks: { monitoringEnabled: false } }) });
+  assert.equal((await route.POST(request('gsts'))).status, 401);
+  authorized = true;
+  assert.equal((await route.POST(request('unknown'))).status, 400);
+  assert.equal(writes, 0);
+  assert.equal((await route.POST(request('gsts'))).status, 200);
+  assert.equal(writes, 1);
+  assert.equal(reconciles, 1);
 });

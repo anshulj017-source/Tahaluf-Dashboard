@@ -16,6 +16,8 @@ import {
 } from '../../../../lib/sheetCache.mjs';
 import { GET as refreshSheet } from '../../sheets/route';
 import { withUsageScope } from '../../../../lib/apiUsage.mjs';
+import { summarizeDimensions, getDimensionSettings } from '../../../../lib/dimensionMonitoring.mjs';
+import { dimensionHealthForSource, applyHealthCheckSettings, eventHealthChecks } from '../../../../lib/dimensionStandards.mjs';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -86,6 +88,7 @@ async function getEvents(request) {
       inspectOnly ? Promise.resolve([]) : getEventsHistory()
     ]);
     const sheetBaseUrl = process.env.COMBINED_COUNTRY_CSV_URL;
+    const checkSettings = await getDimensionSettings();
     const dataSources = config.events.flatMap(event => [
       { eventId: event.id, eventName: event.name, sourceName: event.sourceName || event.name, kind: 'Actuals', gid: event.gid || '' },
       ...(event.plannedGid
@@ -123,7 +126,13 @@ async function getEvents(request) {
             if (res.ok) {
               const text = await res.text();
               if (text && text.length > 50 && !text.includes('<!DOCTYPE html')) {
-                const summary = summarizeSheetData(text);
+                const sharedSources = dataSources.filter(item => item.cacheKey === source.cacheKey);
+                const summary = summarizeSheetData(text, {
+                  metricChecksEnabled: sharedSources.some(item => eventHealthChecks(item.eventId, checkSettings).metricChecksEnabled)
+                });
+                if (sharedSources.some(item => item.kind === 'Actuals' && eventHealthChecks(item.eventId, checkSettings).dimensionChecksEnabled)) {
+                  summary.dimensionValidation = await summarizeDimensions(text);
+                }
                 const health = await storeSheetSnapshot(source.cacheKey, text, summary);
                 healthByKey[source.cacheKey] = health;
               }
@@ -134,7 +143,7 @@ async function getEvents(request) {
         })
       );
     }
-    const sheetHealth = dataSources.map(source => ({
+    const sheetHealth = dataSources.map(source => applyHealthCheckSettings({
       ...source,
       ...(source.cacheKey
         ? healthByKey[source.cacheKey]
@@ -146,8 +155,9 @@ async function getEvents(request) {
             lastFailureAt: null,
             lastError: 'COMBINED_COUNTRY_CSV_URL is not configured'
           }),
-      ...(source.cacheKey ? getEventDataStats(source, healthByKey[source.cacheKey] || {}) : {})
-    }));
+      ...(source.cacheKey ? getEventDataStats(source, healthByKey[source.cacheKey] || {}) : {}),
+      dimensionHealth: dimensionHealthForSource(source, healthByKey[source.cacheKey]?.dimensionValidation)
+    }, checkSettings));
     return NextResponse.json({
       success: true,
       config,
