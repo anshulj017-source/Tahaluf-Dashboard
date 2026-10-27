@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { auth } from '../../lib/firebase';
 import { DEFAULT_HEALTH_NOTIFICATION_SETTINGS, getHealthIssues } from '../../lib/healthNotificationUtils.mjs';
+import { useLowQuotaMode } from './DashboardFeatureContext';
 
 const getAdminHeaders = async () => {
   const token = await auth.currentUser?.getIdToken();
@@ -79,6 +80,7 @@ export default function DataHealthAdmin({
   onIssueCountChange = () => {},
   onDashboardAlertsEnabledChange = () => {}
 }) {
+  const lowQuotaMode = useLowQuotaMode();
   const [sheetHealth, setSheetHealth] = useState([]);
   const [settings, setSettings] = useState(DEFAULT_HEALTH_NOTIFICATION_SETTINGS);
   const [emailConfigured, setEmailConfigured] = useState(false);
@@ -101,7 +103,7 @@ export default function DataHealthAdmin({
       setError(null);
     }
     try {
-      const response = await fetch('/api/admin/events');
+      const response = await fetch('/api/admin/events?inspectOnly=true');
       const result = await response.json();
       if (!response.ok || !result.success) {
         throw new Error(result.error || 'Could not load sheet health.');
@@ -129,12 +131,19 @@ export default function DataHealthAdmin({
   }, []);
 
   useEffect(() => {
+    if (!active) return;
     reloadHealth();
-    const intervalId = window.setInterval(() => { reloadHealth(true); reloadHistory(); }, 60_000);
+    if (lowQuotaMode) return;
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      reloadHealth(true);
+      reloadHistory();
+    }, 60_000);
     return () => window.clearInterval(intervalId);
-  }, [reloadHealth, reloadHistory]);
+  }, [active, reloadHealth, reloadHistory, lowQuotaMode]);
 
   useEffect(() => {
+    if (!active) return;
     let cancelled = false;
     const loadSettings = async () => {
       setSettingsLoading(true);
@@ -161,7 +170,7 @@ export default function DataHealthAdmin({
     };
     loadSettings();
     return () => { cancelled = true; };
-  }, [onDashboardAlertsEnabledChange]);
+  }, [active, onDashboardAlertsEnabledChange]);
 
   const eventGroups = useMemo(() => {
     const groups = new Map();

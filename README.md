@@ -80,6 +80,83 @@ Usage recording registers persistence with Vercel's `waitUntil` request lifetime
 and does not wait for telemetry database transactions before returning sheet
 data, authentication results, or analytics responses. Local Node processes run
 the same persistence promises without a Vercel lifetime extension.
+Concurrent observations on a warm instance share a serialized batch rather than
+opening competing transactions for every sample. Every sample retains its
+observation date and metric; there is no timed buffer or intentional sampling.
+Batch failures are logged and counted as incomplete telemetry. This reduces
+contention and transaction overhead during bursts, but is not a project-wide
+quota cap and does not reduce isolated observations to zero writes.
+
+Health Monitor fetches and polls only while its admin section is active; periodic
+requests also stop when the browser document is hidden. Reopening the section
+reloads its health and notification settings. Notification transactions skip
+writes when an issue is unchanged or there is nothing to resolve; alert retry,
+opening, status changes, and resolution history remain enabled.
+Analytics heartbeats run every two minutes while visible (previously every 25
+seconds); tab changes and page-hide/exit dwell flushes remain enabled. Continuous
+visible use generates 30 rather than 144 heartbeat requests per hour (~79% fewer).
+Live dwell reporting can lag by two minutes, and abrupt browser termination can
+lose the unsent interval. Per-event analytics persistence remains unchanged.
+The Analytics admin panel automatically refreshes every 30 seconds while visible
+(previously six seconds), reducing periodic requests from 600 to 120 per hour.
+Manual refresh and filter changes still fetch immediately.
+
+On Vercel, feature configuration and API budget reads are cached for 60 seconds
+per warm server instance, with concurrent reads sharing one fetch. Successful
+and failed saves invalidate the same-instance cache; other instances see changes
+after their cache expires. Failed reads are not cached or replaced with stale
+defaults. Returned settings are copied so callers cannot mutate the cache.
+Live usage counters and authorization/role checks are never served from this
+cache. Local file-backed settings remain uncached.
+Provider-wide usage must still be monitored in Firebase; these changes alone do
+not guarantee remaining below its free tier.
+
+Routine Health Monitor requests use `?inspectOnly=true`: they inspect metadata,
+reuse it for up to 60 seconds per warm instance, and do not load configuration
+history, fetch missing CSVs, or write recovery snapshots. Explicit sheet refresh
+and the existing recovery paths remain available.
+
+Browsers supporting Web Locks elect one visible dashboard tab to report dwell
+heartbeats. Other tabs still report actual interactions; ownership is retried
+on visibility changes and heartbeat ticks. Browsers without Web Locks retain
+per-tab tracking. This measures foreground dashboard dwell rather than summing
+simultaneously visible windows.
+
+API monitoring includes an optional persistent low-quota mode. It pauses
+automatic Analytics, Health Monitor, and API Hub refreshes and periodic dwell
+heartbeats; initial loads, manual refreshes, filter changes, tab/exit dwell
+flushes, real interactions, and essential dashboard/authentication/settings
+operations remain enabled. Policy propagation uses the visible client's
+60-second settings refresh and the server's 60-second cache, so other tabs and
+instances may take up to about two minutes to reflect a change. It is not a
+Firestore hard spending limit.
+
+Usage history is collected when instrumented traffic occurs, not by an
+autonomous scheduled job. Review the daily trends over several complete days
+and compare them with Firebase Console project-wide usage before concluding
+that the project is below quota. UTC observation days do not match Firestore's
+midnight-Pacific free-quota reset. Uninstrumented clients, failed telemetry,
+and serverless termination can leave gaps; no zero-usage day proves zero
+provider activity.
+
+Usage observations within one instrumented request (including nested handlers
+and awaited work) share a single persistence flush instead of generating a
+transaction per observation. Successful usage-storage transactions count their
+own document reads, retries, and write without recursively recording themselves.
+Failed transactions and other uninstrumented operations remain coverage gaps.
+
+Analytics persistence applies events to the shared Firestore state inside a
+transaction rather than overwriting it with an instance-local snapshot.
+Concurrent work is drained immediately in batches of at most 100 events and
+registered with Vercel's request lifetime; there is no delayed timer or durable
+queue. Events for the same user in a batch share one user-document write.
+Client retries reuse an event identifier; the shared summary retains the last
+500 identifiers for deduplication (older retries may count again). Admin reads
+hydrate persisted analytics; this adds reads in exchange for cross-instance
+consistency. Failed event batches are retried once, logged, and surfaced as
+incomplete persistence, not guaranteed delivery. Fresh persisted stores start
+with measured zero counts; existing historical values are preserved and are
+not retroactively certified as accurate.
 
 **Admin → Feature Controls** organizes views, presentation tools, exports,
 currency switching and the admin health banner. Each has **Everyone**, **Admin

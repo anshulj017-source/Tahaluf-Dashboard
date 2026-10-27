@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { isAdminRequest } from '../../../../lib/requireAdminRequest.js';
 import { getFirebaseAdmin } from '../../../../lib/firebaseAdmin.js';
 import { getAnalyticsSummary, resetAnalyticsData } from '../../../../lib/analyticsService.mjs';
-import { observeApiRequest } from '../../../../lib/apiUsage.mjs';
+import { observeApiRequest, withUsageScope } from '../../../../lib/apiUsage.mjs';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -34,7 +34,7 @@ async function checkAdmin(req) {
   }
 }
 
-export async function GET(req) {
+async function getAnalytics(req) {
   await observeApiRequest('analytics');
   try {
     const isAdmin = await checkAdmin(req);
@@ -56,7 +56,7 @@ export async function GET(req) {
   }
 }
 
-export async function POST(req) {
+async function updateAnalytics(req) {
   await observeApiRequest('analytics');
   try {
     const isAdmin = await checkAdmin(req);
@@ -83,7 +83,7 @@ export async function POST(req) {
   }
 }
 
-export async function DELETE(req) {
+async function deleteAnalytics(req) {
   await observeApiRequest('analytics');
   try {
     const isAdmin = await checkAdmin(req);
@@ -91,10 +91,14 @@ export async function DELETE(req) {
       return NextResponse.json({ error: 'Unauthorized: Administrator access required' }, { status: 403 });
     }
 
-    const resetStore = resetAnalyticsData();
+    await resetAnalyticsData();
     return NextResponse.json({ success: true, message: 'Analytics data successfully reset' }, { status: 200 });
   } catch (error) {
     console.error('Admin analytics DELETE error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+
+export const GET = withUsageScope(getAnalytics);
+export const POST = withUsageScope(updateAnalytics);
+export const DELETE = withUsageScope(deleteAnalytics);

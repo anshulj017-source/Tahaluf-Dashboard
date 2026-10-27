@@ -12,12 +12,13 @@ const fields = [
   ['monthlyBudget', 'Monthly budget USD']
 ];
 
-export default function ApiUsageAnalytics({ report, onSaved }) {
+export default function ApiUsageAnalytics({ report, onSaved, onPolicySaved }) {
   const [draft, setDraft] = useState({});
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [savingPolicy, setSavingPolicy] = useState(false);
   useEffect(() => {
     if (report && !editing) setDraft(Object.fromEntries(report.services.map(service => [service.id, service.settings])));
   }, [report, editing]);
@@ -45,6 +46,28 @@ export default function ApiUsageAnalytics({ report, onSaved }) {
     }
   };
 
+  const savePolicy = async () => {
+    setSavingPolicy(true);
+    setError('');
+    setNotice('');
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const response = await fetch('/api/admin/quotas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ action: 'save-policy', lowQuotaMode: !report.policy?.lowQuotaMode })
+      });
+      const json = await response.json();
+      if (!response.ok || !json.success) throw new Error(json.error || 'Could not save low-quota mode.');
+      await onPolicySaved?.(json.policy);
+      setNotice(`Low-quota mode ${json.policy.lowQuotaMode ? 'enabled' : 'disabled'}.`);
+    } catch (error) {
+      setError(error.message);
+    } finally {
+      setSavingPolicy(false);
+    }
+  };
+
   if (!report) return null;
   return (
     <section className="space-y-4 rounded-2xl border border-[#14a6d9]/30 p-5 bg-[#031120]/70">
@@ -54,6 +77,14 @@ export default function ApiUsageAnalytics({ report, onSaved }) {
       </div>
       <p className="text-xs text-gray-400">Observed application traffic, not provider-wide billing. Monitoring began {report.startedAt ? new Date(report.startedAt).toLocaleString() : 'with the first measured request'}. Provider actual spend and hard quotas are not connected. Local requests do not count as Vercel usage.</p>
       <p className="text-xs text-gray-400">{report.forecastMethod} Available completed days: {report.forecastSampleDays}. Estimates use your rates, not automatic vendor pricing. Firestore combined operations are not a substitute for vendor read/write pricing.</p>
+      <p className="text-xs text-amber-200">{report.firestoreDaily?.resetNotice}</p>
+      <p className="text-xs text-gray-400">{report.collectionNotice}</p>
+      <div className="rounded-xl border border-white/10 p-3 space-y-2">
+        <button type="button" role="switch" aria-checked={report.policy?.lowQuotaMode === true} onClick={savePolicy} disabled={savingPolicy} className="px-3 py-2 border border-[#14a6d9]/40 rounded-lg text-xs text-[#14a6d9] disabled:opacity-40">
+          {savingPolicy ? 'Saving mode...' : `Low-quota mode: ${report.policy?.lowQuotaMode ? 'On' : 'Off'}`}
+        </button>
+        <p className="text-xs text-gray-400">Optional, persistent policy. Pauses automatic admin analytics, health and quota refreshes; manual refresh remains available. Other controls pick up changes on the next visible-page policy check (60 seconds), plus up to 60 seconds of instance caching. Essential dashboard data, authentication and configuration remain enabled. No sampling or dropping important events.</p>
+      </div>
       {report.failedSamples > 0 && <p role="alert" className="text-amber-300 text-xs">Telemetry is incomplete: {report.failedSamples} sample writes failed on this instance. {report.lastError}</p>}
       {error && <p role="alert" className="text-red-300 text-sm">{error}</p>}
       {notice && <p role="status" className="text-lime-300 text-sm">{notice}</p>}
@@ -79,6 +110,23 @@ export default function ApiUsageAnalytics({ report, onSaved }) {
                 ].map(([label, value]) => <div key={label}><dt className="text-gray-500">{label}</dt><dd className="text-white mt-1">{value}</dd></div>)}
               </dl>
               {service.id === 'firestore' && <p className="text-xs text-gray-400">Month-to-date: {number(service.metrics.reads || 0)} reads, {number(service.metrics.writes || 0)} writes, {number(service.metrics.deletes || 0)} deletes observed.</p>}
+              {service.id === 'firestore' && report.firestoreDaily && <div className="space-y-3">
+                <h5 className="font-bold text-xs">Daily observed Firestore operations — UTC, partial coverage</h5>
+                <p className="text-[11px] text-gray-400">{report.firestoreDaily.forecastMethod}</p>
+                {report.firestoreDaily.metrics.map(metric => {
+                  const peak = Math.max(1, ...report.firestoreDaily.history.map(day => day[metric.metric] || 0));
+                  return <div key={metric.metric} className="space-y-1">
+                    <p className="text-xs">{metric.metric}: {number(metric.today)} today · forecast {number(metric.projectedToday)} · completed-day mean {number(metric.averageDaily)}</p>
+                    <p className="text-[10px] text-gray-400">Reference only: {number(metric.referenceDailyLimit)} / day; {metric.percent == null ? 'no observations yet' : `${metric.percent.toFixed(1)}% observed`}, {metric.forecastPercent == null ? 'no forecast yet' : `${metric.forecastPercent.toFixed(1)}% forecast`}. Not verified remaining quota.</p>
+                    {metric.warning && <p role="alert" className="text-xs text-amber-300">{metric.warning === 'critical' ? '90%' : '70%'} reference warning: observed usage or UTC-day pace is approaching/exceeding the reference threshold. Verify actual usage in the provider console.</p>}
+                    <div aria-label={`Firestore ${metric.metric} 14-day UTC history`} className="flex gap-1 items-end h-10">
+                      {report.firestoreDaily.history.map(day => <div key={day.date} title={`${day.date} UTC: ${number(day[metric.metric])} ${metric.metric}`} className={`flex-1 rounded-t ${day[metric.metric] == null ? 'bg-gray-700' : 'bg-[#14a6d9]'}`} style={{ height: day[metric.metric] == null ? '2px' : `${Math.max(3, day[metric.metric] / peak * 100)}%` }} />)}
+                    </div>
+                  </div>;
+                })}
+              </div>}
+              {service.quotaPercent >= 70 && <p role="alert" className="text-amber-300 text-xs">Observed usage has reached {service.quotaPercent.toFixed(1)}% of your configured monthly allowance (not a verified provider quota).</p>}
+              {service.projectedUsage > service.settings.monthlyAllowance && service.settings.monthlyAllowance > 0 && <p className="text-amber-300 text-xs">Month-end usage forecast exceeds your configured allowance.</p>}
               {service.forecastOverBudget && <p className="text-amber-300 text-xs">Forecast exceeds the configured monthly budget.</p>}
               <div aria-label={`${service.name} 14-day usage history`} className="flex gap-1 items-end h-14">
                 {service.history.map(point => <div key={point.date} title={`${point.date}: ${number(point.count)} ${service.unit}`} className={`flex-1 rounded-t ${point.count == null ? 'bg-gray-700' : 'bg-[#14a6d9]'}`} style={{ height: point.count == null ? '2px' : `${Math.max(3, (point.count / max) * 100)}%` }} />)}

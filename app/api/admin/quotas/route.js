@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
-import { analyzeConnectedApis, pingService, updateCircuitBreakerState, getCircuitBreakerState } from '../../../../lib/quotaService.mjs';
+import { analyzeConnectedApis, pingService, updateCircuitBreakerState } from '../../../../lib/quotaService.mjs';
 import { isAdminRequest } from '../../../../lib/requireAdminRequest.js';
-import { EMPTY_BUDGETS, observeApiRequest, validateBudgets } from '../../../../lib/apiUsage.mjs';
+import { EMPTY_BUDGETS, observeApiRequest, updateUsageBudgets, updateUsagePolicy, withUsageScope } from '../../../../lib/apiUsage.mjs';
 import { updateAdminSetting } from '../../../../lib/adminSettingsStore.mjs';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-export async function GET(request) {
+export const GET = withUsageScope(async function GET(request) {
   if (!await isAdminRequest(request)) {
     return NextResponse.json({ success: false, error: 'Admin access required.' }, { status: 401 });
   }
@@ -23,9 +23,9 @@ export async function GET(request) {
       error: error.message || 'Failed to analyze API quotas'
     }, { status: 500 });
   }
-}
+});
 
-export async function POST(request) {
+export const POST = withUsageScope(async function POST(request) {
   if (!await isAdminRequest(request)) {
     return NextResponse.json({ success: false, error: 'Admin access required.' }, { status: 401 });
   }
@@ -35,16 +35,22 @@ export async function POST(request) {
     const { action = 'analyze' } = body;
 
     if (action === 'save-budgets') {
-      let services;
+      let normalized;
       try {
-        services = validateBudgets(body.services);
+        normalized = updateUsageBudgets(EMPTY_BUDGETS, body.services).services;
       } catch (error) {
         return NextResponse.json({ success: false, error: error.message }, { status: 400 });
       }
-      const budgets = await updateAdminSetting('apiBudgets', EMPTY_BUDGETS, () => ({
-        services, updatedAt: new Date().toISOString()
-      }));
+      const budgets = await updateAdminSetting('apiBudgets', EMPTY_BUDGETS, state => updateUsageBudgets(state, normalized));
       return NextResponse.json({ success: true, budgets });
+    }
+
+    if (action === 'save-policy') {
+      if (typeof body.lowQuotaMode !== 'boolean') {
+        return NextResponse.json({ success: false, error: 'lowQuotaMode must be a boolean.' }, { status: 400 });
+      }
+      const budgets = await updateAdminSetting('apiBudgets', EMPTY_BUDGETS, state => updateUsagePolicy(state, body.lowQuotaMode));
+      return NextResponse.json({ success: true, policy: budgets.policy });
     }
 
     if (action === 'ping') {
@@ -82,4 +88,4 @@ export async function POST(request) {
       error: error.message || 'Failed to execute quota action'
     }, { status: 400 });
   }
-}
+});

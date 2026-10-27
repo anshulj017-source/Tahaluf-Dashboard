@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from 'next/server';
-import { observeApiRequest, observeApiUsage } from '../../../../lib/apiUsage.mjs';
+import { observeApiRequest, observeApiUsage, withUsageScope } from '../../../../lib/apiUsage.mjs';
 
-export async function GET(request: Request) {
+async function getCreatives(request: Request) {
   await observeApiRequest();
   const { searchParams } = new URL(request.url);
   const accessToken = searchParams.get('access_token') || process.env.TIKTOK_ACCESS_TOKEN;
@@ -257,3 +257,5 @@ export async function GET(request: Request) {
     );
   }
 }
+
+export const GET = withUsageScope(getCreatives);

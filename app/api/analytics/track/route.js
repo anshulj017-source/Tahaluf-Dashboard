@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 import { recordAnalyticsEvent } from '../../../../lib/analyticsService.mjs';
-import { observeApiRequest } from '../../../../lib/apiUsage.mjs';
+import { observeApiRequest, withUsageScope } from '../../../../lib/apiUsage.mjs';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-export async function POST(req) {
+async function track(req) {
   await observeApiRequest('analytics');
   try {
     let body = {};
@@ -39,6 +39,7 @@ export async function POST(req) {
     const tab = rawTab === 'overview' ? 'summary' : rawTab;
 
     const payload = {
+      eventId: body.eventId,
       eventType: body.eventType || 'page_view',
       userEmail: body.userEmail || 'anonymous',
       userRole: body.userRole || 'standard',
@@ -66,3 +67,5 @@ export async function POST(req) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+
+export const POST = withUsageScope(track);

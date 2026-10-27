@@ -694,6 +694,7 @@ export default function App() {
   const [eventsConfiguration, setEventsConfiguration] = useState([]);
   const [simulatingStandardUser, setSimulatingStandardUser] = useState(false);
   const [featureConfig, setFeatureConfig] = useState(null);
+  const [lowQuotaMode, setLowQuotaMode] = useState(false);
   const [featureError, setFeatureError] = useState('');
   const featureAllowed = (id) => featureConfig !== null && isFeatureEnabled(featureConfig, id, userRole, simulatingStandardUser);
 
@@ -707,6 +708,8 @@ export default function App() {
         if (!response.ok || !json.success) throw new Error(json.error || 'Could not load feature controls.');
         if (!disposed) {
           setFeatureConfig(json.config);
+          setLowQuotaMode(json.policy?.lowQuotaMode === true);
+          window.__tahaluf_low_quota_mode = json.policy?.lowQuotaMode === true;
           setFeatureError('');
         }
       } catch (error) {
@@ -715,7 +718,9 @@ export default function App() {
       }
     };
     refresh();
-    const interval = setInterval(refresh, 60000);
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') refresh();
+    }, 60000);
     window.addEventListener('focus', refresh);
     return () => {
       disposed = true;
@@ -2727,7 +2732,7 @@ export default function App() {
   };
 
   return (
-    <DashboardFeatureContext.Provider value={{ config: featureConfig || DEFAULT_FEATURE_CONFIG, role: userRole, preview: simulatingStandardUser }}>
+    <DashboardFeatureContext.Provider value={{ config: featureConfig || DEFAULT_FEATURE_CONFIG, role: userRole, preview: simulatingStandardUser, lowQuotaMode }}>
     <div className={`h-screen overflow-hidden app-bg font-sans selection:bg-[#cedc28]/30 text-white flex flex-col ${tvMode ? 'tv-mode-active' : ''}`}>
       {/* HEADER: TV Mode or Standard Header */}
       {tvMode ? (
@@ -3218,6 +3223,7 @@ export default function App() {
             </div>
           )}
 
+          {lowQuotaMode && <p role="status" className="mb-4 p-3 border border-amber-500/40 rounded-xl text-sm text-amber-200">Low-quota mode is active: automatic admin monitoring refreshes and periodic analytics heartbeats are paused. Dashboard data, manual refreshes, and real interactions remain available.</p>}
           {featureError && <p role="alert" className="mb-4 p-3 border border-red-500/40 rounded-xl text-sm text-red-300">Feature settings could not refresh: {featureError}. {featureConfig ? 'Using the last loaded settings.' : 'Dashboard features are unavailable until settings load. Retrying automatically.'}</p>}
           {featureAllowed(activeTab) ? renderContent() : !featureError && <p className="text-sm text-gray-400">Loading dashboard feature settings...</p>}
         </main>

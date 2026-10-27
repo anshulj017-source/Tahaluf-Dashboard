@@ -9,8 +9,10 @@ import {
   RotateCcw, ShieldCheck, History
 } from 'lucide-react';
 import { auth } from '../../lib/firebase';
+import { useLowQuotaMode } from './DashboardFeatureContext';
 
 export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' }) {
+  const lowQuotaMode = useLowQuotaMode();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -80,16 +82,17 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
 
   useEffect(() => {
     fetchAnalytics();
+    if (lowQuotaMode) return;
 
-    // Auto-refresh telemetry stream every 6 seconds when document is visible
+    // Keep live telemetry available without polling on every few seconds of dwell.
     const timer = setInterval(() => {
       if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
         fetchAnalytics(true);
       }
-    }, 6000);
+    }, 30000);
 
     return () => clearInterval(timer);
-  }, [timeRange, userFilter, selectedUserEmail]);
+  }, [timeRange, userFilter, selectedUserEmail, lowQuotaMode]);
 
   const handleAction = async (actionId, willEnable, reason = '') => {
     setActionLoadingId(actionId);
@@ -355,6 +358,8 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com' 
 
   return (
     <div className="space-y-8 animate-fadeIn pb-12">
+      {data?.persistence?.lastError && <p role="alert" className="p-3 border border-amber-500/40 rounded-xl text-sm text-amber-200">Analytics persistence is incomplete on this instance: {data.persistence.failedEvents || 0} events failed. {data.persistence.lastError}</p>}
+      {data?.persistence?.mode === 'memory-only' && <p role="status" className="p-3 border border-amber-500/40 rounded-xl text-sm text-amber-200">Analytics is running in memory-only mode. These observations are not durably backed up.</p>}
       {/* HEADER & CONTROLS */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-4 border-b border-gray-800">
         <div>

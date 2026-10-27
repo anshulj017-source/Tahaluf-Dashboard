@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { auth } from '../../lib/firebase';
 import ApiUsageAnalytics from './ApiUsageAnalytics';
+import { useLowQuotaMode } from './DashboardFeatureContext';
 
 const getAdminHeaders = async () => {
   const token = await auth.currentUser?.getIdToken();
@@ -37,7 +38,7 @@ const getStatusBadge = (status) => {
       return (
         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-lime-500/10 text-lime-300 border border-lime-400/30">
           <CheckCircle2 className="w-3 h-3 text-lime-400" />
-          Optimal
+          Connectivity OK
         </span>
       );
     case 'observed':
@@ -47,14 +48,14 @@ const getStatusBadge = (status) => {
       return (
         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-500/15 text-amber-300 border border-amber-400/40">
           <AlertTriangle className="w-3 h-3 text-amber-400" />
-          Quota Limit (Shield Active)
+          Connectivity warning
         </span>
       );
     case 'critical':
       return (
         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-rose-500/15 text-rose-300 border border-rose-400/40">
           <ShieldAlert className="w-3 h-3 text-rose-400" />
-          Quota Exceeded (Workaround Live)
+          Service error
         </span>
       );
     default:
@@ -73,7 +74,8 @@ const getProgressColor = (percent) => {
   return 'bg-lime-400 text-lime-400';
 };
 
-export default function ApiQuotasAdmin({ active = true }) {
+export default function ApiQuotasAdmin({ active = true, onPolicySaved }) {
+  const lowQuotaMode = useLowQuotaMode();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -178,7 +180,7 @@ export default function ApiQuotasAdmin({ active = true }) {
             <span>API Infrastructure &amp; Quota Safeguard Hub</span>
           </div>
           <p className="text-[#14a6d9] text-xs font-medium mt-1">
-            Real-time quota monitoring, live latency benchmarks, active workarounds, and optimization suggestions across all connected APIs.
+            Partial application usage observations and on-demand connectivity checks. Provider quotas are not verified; collection runs with traffic, not an autonomous daily scheduler.
           </p>
           {lastAuditAt && (
             <div className="text-[10px] text-gray-500 mt-1 flex items-center gap-1.5">
@@ -221,11 +223,11 @@ export default function ApiQuotasAdmin({ active = true }) {
             {data?.summary?.criticalServices > 0 ? (
               <span className="text-amber-300">Shield Engaged</span>
             ) : (
-              <span className="text-lime-400">All Optimal</span>
+              <span className="text-[#14a6d9]">Partial coverage</span>
             )}
           </div>
           <p className="text-[10px] text-gray-500">
-            {data?.summary?.criticalServices > 0 ? 'Workaround preventing client disruption' : 'All endpoints within quota'}
+            {data?.summary?.criticalServices > 0 ? 'Review observed service errors' : 'Provider-wide quotas and billing not connected'}
           </p>
         </div>
 
@@ -252,7 +254,11 @@ export default function ApiQuotasAdmin({ active = true }) {
         </div>
       </div>
 
-      <ApiUsageAnalytics report={data?.usage} onSaved={() => fetchQuotas(true)} />
+      {lowQuotaMode && <p className="text-xs text-amber-200">Low-quota mode: background quota refresh paused. Initial loads and manual audits remain available, including policy controls.</p>}
+      <ApiUsageAnalytics report={data?.usage} onSaved={() => fetchQuotas(true)} onPolicySaved={async policy => {
+        setData(previous => ({ ...previous, policy, usage: { ...previous.usage, policy } }));
+        await onPolicySaved?.(policy);
+      }} />
 
       {/* ACTIVE SAFEGUARDS & CIRCUIT BREAKER CONTROL PANEL */}
       <div className="card-surface rounded-2xl border border-[#cedc28]/30 p-5 bg-[#031120]/70 space-y-4">

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { observeApiRequest, observeApiUsage } from '../../../../lib/apiUsage.mjs';
+import { observeApiRequest, observeApiUsage, withUsageScope } from '../../../../lib/apiUsage.mjs';
 
-export async function GET(request: Request) {
+async function handleCallback(request: Request) {
   await observeApiRequest();
   const { searchParams } = new URL(request.url);
   const authCode = searchParams.get('auth_code');
@@ -69,3 +69,5 @@ export async function GET(request: Request) {
     );
   }
 }
+
+export const GET = withUsageScope(handleCallback);

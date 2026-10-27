@@ -9,7 +9,7 @@ import {
 import { getEventsConfig } from '../../../lib/eventsConfig.js';
 import { observeHealthSource } from '../../../lib/healthNotifications.mjs';
 import { getHealthIssues } from '../../../lib/healthNotificationUtils.mjs';
-import { observeApiRequest, observeApiUsage } from '../../../lib/apiUsage.mjs';
+import { observeApiRequest, observeApiUsage, withUsageScope } from '../../../lib/apiUsage.mjs';
 
 // In-memory cache for sheets: Map<url, { data: string, timestamp: number }>
 // TTL: 5 minutes fresh cache. If Google Sheets fails/times out, stale data is served as resilient fallback.
@@ -80,7 +80,7 @@ async function reportHealthForSheet(cacheKey, health = {}) {
   }
 }
 
-export async function GET(request) {
+async function getSheet(request) {
   const { searchParams } = new URL(request.url);
   const type = searchParams.get('type');
   const forceRefresh = searchParams.get('refresh') === 'true' || searchParams.get('force') === 'true';
@@ -273,3 +273,5 @@ export async function GET(request) {
     return await serveFallbackOrEmpty(`Error fetching sheet: ${error.message || error}`);
   }
 }
+
+export const GET = withUsageScope(getSheet);

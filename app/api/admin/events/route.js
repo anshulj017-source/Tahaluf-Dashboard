@@ -15,6 +15,7 @@ import {
   summarizeSheetData 
 } from '../../../../lib/sheetCache.mjs';
 import { GET as refreshSheet } from '../../sheets/route';
+import { withUsageScope } from '../../../../lib/apiUsage.mjs';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -73,15 +74,16 @@ function getEventDataStats(source, health) {
   };
 }
 
-export async function GET(request) {
+async function getEvents(request) {
   try {
+    const inspectOnly = request && new URL(request.url).searchParams.get('inspectOnly') === 'true';
     if (request && new URL(request.url).searchParams.get('configOnly') === 'true') {
       const config = await getEventsConfig();
       return NextResponse.json({ success: true, config });
     }
     const [config, history] = await Promise.all([
       getEventsConfig(),
-      getEventsHistory()
+      inspectOnly ? Promise.resolve([]) : getEventsHistory()
     ]);
     const sheetBaseUrl = process.env.COMBINED_COUNTRY_CSV_URL;
     const dataSources = config.events.flatMap(event => [
@@ -98,7 +100,7 @@ export async function GET(request) {
     const cacheKeys = dataSources.map(source => source.cacheKey).filter(Boolean);
     let healthByKey = {};
     try {
-      healthByKey = await getSheetCacheHealth(cacheKeys);
+      healthByKey = await getSheetCacheHealth(cacheKeys, { maxAgeMs: inspectOnly ? 60_000 : 0 });
     } catch (err) {
       console.warn('Could not read sheet cache health (using memory/fallback):', err?.message || err);
     }
@@ -107,7 +109,7 @@ export async function GET(request) {
     const uncachedSources = dataSources.filter(source => 
       source.cacheKey && (!healthByKey[source.cacheKey]?.hasCachedData || (healthByKey[source.cacheKey]?.rowCount || 0) === 0)
     );
-    if (uncachedSources.length > 0 && sheetBaseUrl) {
+    if (!inspectOnly && uncachedSources.length > 0 && sheetBaseUrl) {
       const uniqueUncached = Array.from(new Map(uncachedSources.map(s => [s.cacheKey, s])).values());
       await Promise.allSettled(
         uniqueUncached.map(async source => {
@@ -163,7 +165,7 @@ export async function GET(request) {
   }
 }
 
-export async function POST(req) {
+async function updateEvents(req) {
   try {
     const body = await req.json();
     const { action = 'save', author = 'Admin' } = body;
@@ -408,3 +410,6 @@ export async function POST(req) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
+
+export const GET = withUsageScope(getEvents);
+export const POST = withUsageScope(updateEvents);
