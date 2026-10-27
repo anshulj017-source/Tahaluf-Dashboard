@@ -54,7 +54,9 @@ const getSuggestedFix = (issue = '') => {
 };
 
 const getStatus = (source) => {
-  if (source.eventDataStatus === 'missing') return 'missing-data';
+  if (source.eventDataStatus === 'missing' || (source.kind === 'Actuals' && source.eventRows === 0 && source.eventDataStatus !== 'present')) {
+    return 'missing-data';
+  }
   if (source.metricDiscrepancies && source.metricDiscrepancies.length > 0) return 'metric-discrepancy';
   if (source.state === 'stale' || source.state === 'unavailable' || source.state === 'storage-error') {
     return source.state;
@@ -177,7 +179,7 @@ export default function DataHealthAdmin({
     getStatus(source) === 'healthy' && source.eventDataStatus === 'present'
   ).length;
   const issueCount = actualSources.filter(source => ['stale', 'unavailable', 'storage-error', 'missing-data', 'metric-discrepancy'].includes(getStatus(source))).length;
-  const missingDataCount = actualSources.filter(source => source.eventDataStatus === 'missing').length;
+  const missingDataCount = actualSources.filter(source => source.eventDataStatus === 'missing' || source.eventRows === 0).length;
   const totalDiscrepancies = useMemo(() => sheetHealth.reduce((sum, s) => sum + (s.metricDiscrepancies?.length || 0), 0), [sheetHealth]);
   const currentIssues = useMemo(() => getHealthIssues(sheetHealth), [sheetHealth]);
 
@@ -398,16 +400,28 @@ export default function DataHealthAdmin({
 
       {settings.dashboardEnabled && currentIssues.length > 0 && (
         <div className="rounded-2xl border border-amber-400/40 bg-amber-500/10 p-4">
-          <div className="flex items-center gap-2 text-sm font-bold text-amber-200">
-            <Bell className="w-4 h-4" />
-            {currentIssues.length} active data health issue{currentIssues.length === 1 ? '' : 's'}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2 text-sm font-bold text-amber-200">
+                <Bell className="w-4 h-4 text-amber-400" />
+                {currentIssues.length} active data health issue{currentIssues.length === 1 ? '' : 's'}
+              </div>
+              <ul className="mt-2 space-y-1 text-xs text-amber-100/90">
+                {currentIssues.slice(0, 5).map(issue => (
+                  <li key={`${issue.key}:${issue.status}`}>{issue.eventName} {issue.kind}: {issue.message}</li>
+                ))}
+                {currentIssues.length > 5 && <li>And {currentIssues.length - 5} more. See the event checks below.</li>}
+              </ul>
+            </div>
+            <button
+              onClick={refreshAllHealth}
+              disabled={loading || Boolean(refreshingSheet) || Boolean(refreshProgress)}
+              className="px-3.5 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/50 text-amber-200 text-xs font-bold uppercase tracking-wider flex items-center gap-2 shrink-0 self-start sm:self-auto transition-all"
+            >
+              <Zap className="w-3.5 h-3.5 text-amber-300" />
+              Auto-Resolve All Issues
+            </button>
           </div>
-          <ul className="mt-2 space-y-1 text-xs text-amber-100/90">
-            {currentIssues.slice(0, 5).map(issue => (
-              <li key={`${issue.key}:${issue.status}`}>{issue.eventName} {issue.kind}: {issue.message}</li>
-            ))}
-            {currentIssues.length > 5 && <li>And {currentIssues.length - 5} more. See the event checks below.</li>}
-          </ul>
         </div>
       )}
 

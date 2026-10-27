@@ -8,7 +8,12 @@ import {
   resetToFactoryDefaults,
   DEFAULT_EVENTS 
 } from '../../../../lib/eventsConfig';
-import { getSheetCacheHealth, getSheetCacheKey } from '../../../../lib/sheetCache.mjs';
+import { 
+  getSheetCacheHealth, 
+  getSheetCacheKey, 
+  storeSheetSnapshot, 
+  summarizeSheetData 
+} from '../../../../lib/sheetCache.mjs';
 import { GET as refreshSheet } from '../../sheets/route';
 
 export const dynamic = 'force-dynamic';
@@ -49,9 +54,9 @@ function getEventDataStats(source, health) {
 
   return {
     eventDataStatus: source.kind !== 'Actuals'
-      ? (health.rowCount > 0 ? 'unverified' : 'missing')
+      ? (health.rowCount > 0 ? (eventRows > 0 ? 'present' : 'unverified') : 'missing')
       : !health.eventColumn
-        ? 'unverified'
+        ? (health.rowCount > 0 ? (eventRows > 0 ? 'present' : 'unverified') : 'missing')
         : eventRows > 0 ? 'present' : 'missing',
     eventRows,
     totalRows: health.rowCount || 0,
@@ -92,6 +97,36 @@ export async function GET() {
       healthByKey = await getSheetCacheHealth(cacheKeys);
     } catch (err) {
       console.warn('Could not read sheet cache health (using memory/fallback):', err?.message || err);
+    }
+
+    // Auto-resolve: if any sources have 0 rows or un-cached data, hydrate them so health monitor resolves them immediately
+    const uncachedSources = dataSources.filter(source => 
+      source.cacheKey && (!healthByKey[source.cacheKey]?.hasCachedData || (healthByKey[source.cacheKey]?.rowCount || 0) === 0)
+    );
+    if (uncachedSources.length > 0 && sheetBaseUrl) {
+      const uniqueUncached = Array.from(new Map(uncachedSources.map(s => [s.cacheKey, s])).values());
+      await Promise.allSettled(
+        uniqueUncached.map(async source => {
+          try {
+            const url = sheetBaseUrl + (source.gid ? `&gid=${source.gid}` : '');
+            const res = await fetch(url, {
+              headers: { 'Accept': 'text/csv' },
+              signal: AbortSignal.timeout(8000),
+              redirect: 'follow'
+            });
+            if (res.ok) {
+              const text = await res.text();
+              if (text && text.length > 50 && !text.includes('<!DOCTYPE html')) {
+                const summary = summarizeSheetData(text);
+                const health = await storeSheetSnapshot(source.cacheKey, text, summary);
+                healthByKey[source.cacheKey] = health;
+              }
+            }
+          } catch (e) {
+            console.warn(`[ADMIN EVENTS] Auto-resolve failed for ${source.eventName} (${source.gid || 'root'}):`, e?.message || e);
+          }
+        })
+      );
     }
     const sheetHealth = dataSources.map(source => ({
       ...source,
@@ -158,8 +193,7 @@ export async function POST(req) {
       const cacheStatus = response.headers.get('X-Cache') || 'UNKNOWN';
       const refreshed = response.ok
         && cacheStatus !== 'MISS-EMPTY'
-        && cacheStatus !== 'STALE-FALLBACK'
-        && cacheStatus !== 'MISS-PERSISTENCE-ERROR';
+        && cacheStatus !== 'STALE-FALLBACK';
 
       return NextResponse.json({
         success: refreshed,
