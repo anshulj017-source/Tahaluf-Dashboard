@@ -744,6 +744,11 @@ async function testAdminEventsApi() {
   const adminEventsUrl = `http://localhost:${PORT}/api/admin/events`;
 
   try {
+    const configResponse = await fetch(`${adminEventsUrl}?configOnly=true`);
+    const configData = await configResponse.json();
+    assert(configResponse.status === 200 && configData.success === true, 'Dashboard config-only endpoint returns success');
+    assert(Array.isArray(configData.config?.events), 'Dashboard config-only response includes configured events');
+    assert(!('sheetHealth' in configData) && !('history' in configData), 'Dashboard config-only response excludes health checks and version history');
     const res = await fetch(adminEventsUrl);
     assert(res.status === 200, 'Admin Events API: Returns HTTP 200');
 
@@ -752,6 +757,7 @@ async function testAdminEventsApi() {
     assert(data.config && Array.isArray(data.config.events), 'Admin Events API: Returns events array');
     assert(data.config.events.length >= 8, `Admin Events API: Contains at least 8 events (found: ${data.config?.events?.length})`);
     assert(Array.isArray(data.sheetHealth), 'Admin Events API: Reports configured sheet health');
+    assert(JSON.stringify(configData.config.events) === JSON.stringify(data.config.events), 'Config-only and full admin endpoint return the same event definitions');
 
     // Verify key events exist in config
     const eventNames = data.config.events.map(e => e.name);

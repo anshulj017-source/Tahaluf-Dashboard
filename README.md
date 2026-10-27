@@ -25,6 +25,10 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 ## Automated Testing & Validation
 
+Dashboard startup requests `/api/admin/events?configOnly=true` to retrieve event
+definitions without waiting for admin health checks, sheet hydration, or version
+history. The full admin endpoint retains those diagnostics for admin views.
+
 The repository includes an automated test suite (`tests/dashboard.test.mjs`) that verifies:
 - Mathematical parsing & zero-division safety (CTR, CPM, CPC, CPA).
 - Event name and portfolio normalizations (P1 vs P3, SMLC 26, BIO 26, CPHI 26, etc.).
@@ -72,6 +76,10 @@ the chart displays the last 14. Monitoring storage itself incurs Firestore
 reads/writes on Vercel and is excluded from observed application operations.
 Monitoring write errors are logged and surfaced as incomplete telemetry on the
 current instance; instrumented business requests continue to function.
+Usage recording registers persistence with Vercel's `waitUntil` request lifetime
+and does not wait for telemetry database transactions before returning sheet
+data, authentication results, or analytics responses. Local Node processes run
+the same persistence promises without a Vercel lifetime extension.
 
 **Admin → Feature Controls** organizes views, presentation tools, exports,
 currency switching and the admin health banner. Each has **Everyone**, **Admin

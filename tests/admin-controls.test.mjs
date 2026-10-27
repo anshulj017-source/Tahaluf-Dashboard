@@ -8,7 +8,7 @@ import {
   isFeatureEnabled, validateFeatureModes
 } from '../lib/dashboardFeatures.mjs';
 import {
-  API_SERVICES, EMPTY_BUDGETS, addUsage, summarizeApiUsage, validateBudgets
+  API_SERVICES, EMPTY_BUDGETS, addUsage, summarizeApiUsage, validateBudgets, observeApiUsage
 } from '../lib/apiUsage.mjs';
 import { readAdminSetting, updateAdminSetting } from '../lib/adminSettingsStore.mjs';
 
@@ -155,6 +155,37 @@ test('local settings persist, serialize concurrent updates and propagate corrupt
     process.chdir(original);
     if (vercel === undefined) delete process.env.VERCEL;
     else process.env.VERCEL = vercel;
+    await fs.rm(directory, { recursive: true });
+  }
+});
+
+test('usage persistence runs after the response path and is registered with the Vercel request lifetime', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'tahaluf-usage-tests-'));
+  const original = process.cwd();
+  const vercel = process.env.VERCEL;
+  const contextKey = Symbol.for('@vercel/request-context');
+  const originalContext = globalThis[contextKey];
+  const pending = [];
+  globalThis[contextKey] = { get: () => ({ waitUntil: promise => pending.push(promise) }) };
+  delete process.env.VERCEL;
+  process.chdir(directory);
+  try {
+    const result = observeApiUsage('sheets', 2);
+    assert.equal(result, undefined, 'callers do not await database persistence');
+    observeApiUsage('firestore', 3, 'reads');
+    assert.equal(pending.length, 2, 'every observation has a registered background task');
+    await Promise.all(pending);
+    const persisted = await readAdminSetting('apiUsage', {});
+    const today = new Date().toISOString().slice(0, 10);
+    assert.equal(persisted.days[today].sheets.count, 2);
+    assert.equal(persisted.days[today].firestore.metrics.reads, 3);
+  } finally {
+    await Promise.all(pending);
+    process.chdir(original);
+    if (vercel === undefined) delete process.env.VERCEL;
+    else process.env.VERCEL = vercel;
+    if (originalContext === undefined) delete globalThis[contextKey];
+    else globalThis[contextKey] = originalContext;
     await fs.rm(directory, { recursive: true });
   }
 });

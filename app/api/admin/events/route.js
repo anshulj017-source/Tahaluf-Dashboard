@@ -73,8 +73,12 @@ function getEventDataStats(source, health) {
   };
 }
 
-export async function GET() {
+export async function GET(request) {
   try {
+    if (request && new URL(request.url).searchParams.get('configOnly') === 'true') {
+      const config = await getEventsConfig();
+      return NextResponse.json({ success: true, config });
+    }
     const [config, history] = await Promise.all([
       getEventsConfig(),
       getEventsHistory()

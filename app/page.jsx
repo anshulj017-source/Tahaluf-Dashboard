@@ -1191,7 +1191,7 @@ export default function App() {
       // 1. Fetch dynamic event configurations from Admin API
       let configuredEvents = [];
       try {
-        const eventsRes = await fetch('/api/admin/events');
+        const eventsRes = await fetch('/api/admin/events?configOnly=true');
         if (eventsRes.ok) {
           const eventsData = await eventsRes.json();
           if (eventsData.config && Array.isArray(eventsData.config.events) && eventsData.config.events.length > 0) {

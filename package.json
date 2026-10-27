@@ -13,6 +13,7 @@
     "setup-hooks": "cp scripts/pre-push.sh .git/hooks/pre-push && chmod +x .git/hooks/pre-push"
   },
   "dependencies": {
+    "@vercel/functions": "^2.0.0",
     "@clerk/themes": "^2.0.0",
     "d3": "^7.8.5",
     "d3-scale": "^4.0.2",
