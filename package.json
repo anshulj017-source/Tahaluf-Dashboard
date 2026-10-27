@@ -7,8 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node tests/dashboard.test.mjs",
-    "prepublish-check": "node tests/dashboard.test.mjs && next build",
+    "test": "node --test tests/admin-controls.test.mjs && node tests/dashboard.test.mjs",
+    "prepublish-check": "npm test && next build",
     "backup": "bash scripts/backup-to-mirror.sh",
     "setup-hooks": "cp scripts/pre-push.sh .git/hooks/pre-push && chmod +x .git/hooks/pre-push"
   },

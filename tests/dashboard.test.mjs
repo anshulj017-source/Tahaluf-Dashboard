@@ -1181,7 +1181,7 @@ async function testApiQuotasLogic() {
 
   // Test ping functionality
   const pingResult = await pingService('vercel');
-  assert(pingResult.status === 'healthy', 'Vercel service ping reports healthy');
+  assert(pingResult.status === 'unknown' && pingResult.latencyMs === null, 'Vercel configuration is not reported as a measured health check');
 }
 
 async function testApiQuotasApi() {
@@ -1201,7 +1201,7 @@ async function testApiQuotasApi() {
   });
   assert(pingRes.status === 200, 'POST /api/admin/quotas ping returns HTTP 200');
   const pingData = await pingRes.json();
-  assert(pingData.success === true && pingData.result?.status === 'healthy', 'Live ping returns healthy status');
+  assert(pingData.success === true && pingData.result?.status === 'unknown' && pingData.result?.latencyMs === null, 'Live Vercel check does not invent a health status or latency');
 }
 
 // -------------------------------------------------------------

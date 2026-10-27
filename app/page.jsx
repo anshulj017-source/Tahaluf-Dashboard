@@ -36,6 +36,8 @@ import {
   trackExport 
 } from '../lib/analyticsTracker.js';
 import { getClientDashboardCache, setClientDashboardCache } from '../lib/clientCache.js';
+import { DASHBOARD_FEATURES, DEFAULT_FEATURE_CONFIG, isFeatureEnabled } from '../lib/dashboardFeatures.mjs';
+import { DashboardFeatureContext, ExportButton } from './components/DashboardFeatureContext';
 
 const GEO_URL = "https://unpkg.com/world-atlas@2.0.2/countries-110m.json";
 
@@ -317,13 +319,13 @@ const DataTable = ({ title, data, columns, totals, onRowClick, selectedRowId, ro
             </div>
           ) : <div />}
           <div className="flex items-end gap-3">
-            <button 
+            <ExportButton
               onClick={exportCSV}
               title="Export as CSV"
               className="p-1.5 flex items-center justify-center surface-inset border border-[#cedc28]/30 rounded-lg text-[#cedc28] hover:bg-[#cedc28] hover:text-[#1a302e] transition-colors"
             >
               <Download className="w-4 h-4" />
-            </button>
+            </ExportButton>
             {allowColumnSelect && (
               <MultiSelect 
                 label="Metrics" 
@@ -691,6 +693,46 @@ export default function App() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [eventsConfiguration, setEventsConfiguration] = useState([]);
   const [simulatingStandardUser, setSimulatingStandardUser] = useState(false);
+  const [featureConfig, setFeatureConfig] = useState(null);
+  const [featureError, setFeatureError] = useState('');
+  const featureAllowed = (id) => featureConfig !== null && isFeatureEnabled(featureConfig, id, userRole, simulatingStandardUser);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    let disposed = false;
+    const refresh = async () => {
+      try {
+        const response = await fetch('/api/features', { cache: 'no-store' });
+        const json = await response.json();
+        if (!response.ok || !json.success) throw new Error(json.error || 'Could not load feature controls.');
+        if (!disposed) {
+          setFeatureConfig(json.config);
+          setFeatureError('');
+        }
+      } catch (error) {
+        console.error('[FEATURES]', error);
+        if (!disposed) setFeatureError(error.message);
+      }
+    };
+    refresh();
+    const interval = setInterval(refresh, 60000);
+    window.addEventListener('focus', refresh);
+    return () => {
+      disposed = true;
+      clearInterval(interval);
+      window.removeEventListener('focus', refresh);
+    };
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (!featureConfig) return;
+    const enabled = id => isFeatureEnabled(featureConfig, id, userRole, simulatingStandardUser);
+    if (activeTab === 'admin' && userRole === 'admin') return;
+    if (!enabled(activeTab)) {
+      const firstView = DASHBOARD_FEATURES.find(feature => feature.group === 'Dashboard views' && enabled(feature.id));
+      setActiveTab(firstView?.id || 'summary');
+    }
+  }, [featureConfig, userRole, simulatingStandardUser, activeTab]);
   
   // State: Global Filters
   const [dateRange, setDateRange] = useState({ start: '', end: '', preset: 'auto' });
@@ -725,6 +767,13 @@ export default function App() {
   const [tvMode, setTvMode] = useState(false);
   const [tvAutoCycle, setTvAutoCycle] = useState(false);
   const [currentTime, setCurrentTime] = useState('');
+
+  useEffect(() => {
+    if (!featureConfig) return;
+    if (!isFeatureEnabled(featureConfig, 'tv', userRole, simulatingStandardUser)) setTvMode(false);
+    if (!isFeatureEnabled(featureConfig, 'tvAutoCycle', userRole, simulatingStandardUser)) setTvAutoCycle(false);
+    if (!isFeatureEnabled(featureConfig, 'currency', userRole, simulatingStandardUser)) setCurrency('USD');
+  }, [featureConfig, userRole, simulatingStandardUser]);
 
   // Active filter count for mobile badge
   const activeFilterCount = useMemo(() => {
@@ -777,7 +826,8 @@ export default function App() {
   // TV Wallboard Auto-Cycle Carousel
   useEffect(() => {
     if (!tvMode || !tvAutoCycle) return;
-    const cycleTabs = ['summary', 'campaign', 'weekly'];
+    const cycleTabs = ['summary', 'campaign', 'weekly'].filter(id => isFeatureEnabled(featureConfig, id, userRole, simulatingStandardUser));
+    if (!cycleTabs.length || !isFeatureEnabled(featureConfig, 'tvAutoCycle', userRole, simulatingStandardUser)) return;
     const interval = setInterval(() => {
       setActiveTab(prev => {
         const nextIdx = (cycleTabs.indexOf(prev) + 1) % cycleTabs.length;
@@ -785,7 +835,7 @@ export default function App() {
       });
     }, 25000);
     return () => clearInterval(interval);
-  }, [tvMode, tvAutoCycle]);
+  }, [tvMode, tvAutoCycle, featureConfig, userRole, simulatingStandardUser]);
 
   useEffect(() => {
     if (userRole === 'non-finance' && ['CPM', 'CPC'].includes(perfMetric)) {
@@ -1680,9 +1730,9 @@ export default function App() {
     { id: 'channel', label: 'Channel View', icon: MonitorPlay },
     { id: 'market', label: 'Market View', icon: MapIcon },
     { id: 'detailed', label: 'Detailed View', icon: PieChart },
-    /* { id: 'webtraffic', label: 'Web Traffic', icon: Users }, */
+    { id: 'webtraffic', label: 'Web Traffic', icon: Users },
     { id: 'creative', label: 'Creative View', icon: LayoutTemplate },
-  ];
+  ].filter(item => featureAllowed(item.id));
 
   // Admin button is rendered separately at the bottom left
 
@@ -1706,6 +1756,7 @@ export default function App() {
     : plannedData.filter(p => !p.eventType || filterEventTypes.includes(p.eventType));
 
   const generatePpt = async () => {
+      if (!featureAllowed('exports')) return;
       if (isGenerating) return;
       setIsGenerating(true);
       try {
@@ -2676,6 +2727,7 @@ export default function App() {
   };
 
   return (
+    <DashboardFeatureContext.Provider value={{ config: featureConfig || DEFAULT_FEATURE_CONFIG, role: userRole, preview: simulatingStandardUser }}>
     <div className={`h-screen overflow-hidden app-bg font-sans selection:bg-[#cedc28]/30 text-white flex flex-col ${tvMode ? 'tv-mode-active' : ''}`}>
       {/* HEADER: TV Mode or Standard Header */}
       {tvMode ? (
@@ -2700,7 +2752,7 @@ export default function App() {
               </div>
             </div>
 
-            <button
+            {featureAllowed('tvAutoCycle') && <button
               onClick={() => setTvAutoCycle(!tvAutoCycle)}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border flex items-center gap-1.5 ${
                 tvAutoCycle 
@@ -2711,7 +2763,7 @@ export default function App() {
             >
               <RefreshCw className={`w-3.5 h-3.5 ${tvAutoCycle ? 'animate-spin' : ''}`} />
               <span className="hidden sm:inline">Auto-Cycle:</span> {tvAutoCycle ? 'ON' : 'OFF'}
-            </button>
+            </button>}
 
             <button
               onClick={() => setTvMode(false)}
@@ -2772,14 +2824,14 @@ export default function App() {
               />
               
               <div className="ml-auto shrink-0 flex items-center gap-1.5">
-                <button 
+                {featureAllowed('tv') && <button
                   onClick={() => setTvMode(true)} 
                   title="TV Wallboard Presentation Mode" 
                   className="h-[30px] px-2 bg-[#14a6d9]/10 border border-[#14a6d9]/40 text-[#14a6d9] rounded-lg hover:bg-[#14a6d9]/20 hover:text-white transition-colors flex items-center gap-1 text-[10px] font-bold"
                 >
                   <Tv className="w-3.5 h-3.5"/>
                   <span className="hidden xl:inline">TV</span>
-                </button>
+                </button>}
                 <button onClick={resetFilters} title="Reset Filters" className="h-[30px] w-[30px] bg-[#cedc28]/10 border border-[#cedc28]/50 text-[#cedc28] rounded-lg hover:bg-[#cedc28]/20 hover:text-white transition-colors flex items-center justify-center"><RefreshCw className="w-3.5 h-3.5"/></button>
               </div>
             </div>
@@ -2807,13 +2859,13 @@ export default function App() {
             </div>
 
             <div className="flex items-center gap-1.5">
-              <button 
+              {featureAllowed('tv') && <button
                 onClick={() => setTvMode(true)} 
                 title="TV Wallboard Mode" 
                 className="h-[32px] w-[32px] bg-[#14a6d9]/10 border border-[#14a6d9]/40 text-[#14a6d9] rounded-lg hover:bg-[#14a6d9]/20 transition-colors flex items-center justify-center"
               >
                 <Tv className="w-4 h-4"/>
-              </button>
+              </button>}
               <button 
                 onClick={() => setMobileFiltersOpen(true)}
                 className={`h-[32px] px-2.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 border ${
@@ -2914,7 +2966,7 @@ export default function App() {
                 </div>
               )}
 
-              {userRole !== 'non-finance' && (
+              {userRole !== 'non-finance' && featureAllowed('currency') && (
                 <div className="flex items-center justify-between px-1">
                   <span className="text-[11px] font-bold text-[#14a6d9] uppercase tracking-wider">Currency</span>
                   <div className="flex bg-[#041628] p-0.5 rounded-lg border border-[#cedc28]/20 w-[110px]">
@@ -3091,7 +3143,7 @@ export default function App() {
                 </div>
               )}
               
-              {userRole !== 'non-finance' && (
+              {userRole !== 'non-finance' && featureAllowed('currency') && (
                 <div className="flex justify-start px-3">
                   <div className="flex bg-[#0a2442] p-0.5 rounded-lg border border-[#cedc28]/20 w-[100px]">
                     <button onClick={() => { setCurrency('USD'); trackCurrencyToggle('USD', userEmail); }} className={`flex-1 px-2 py-1 text-[10px] font-bold rounded-md transition-colors ${currency === 'USD' ? 'bg-[#cedc28] text-[#1a302e]' : 'text-slate-400 hover:text-white'}`}>USD</button>
@@ -3119,16 +3171,17 @@ export default function App() {
         )}
         
         {/* TABS CONTENT */}
-        {activeTab === 'admin' ? (
+        {activeTab === 'admin' && userRole === 'admin' ? (
           <AdminView 
             currentUserEmail={userEmail || (auth?.currentUser?.email) || 'admin@tahaluf.com'} 
             initialEvents={eventsConfiguration}
+            onFeaturesSaved={setFeatureConfig}
           />
         ) : (
         <main className="flex-1 overflow-y-auto p-3 sm:p-5 md:p-6 lg:p-8 pb-24 lg:pb-8 custom-scrollbar touch-scroll relative z-10">
           <ReactTooltip id="market-tooltip" className="z-50" style={{ backgroundColor: '#0a2442', color: '#eef7f5', border: '1px solid #cedc2830', borderRadius: '8px', zIndex: 1000 }} />
           <div className="absolute top-0 right-0 w-full h-[500px] bg-gradient-to-br from-[#062f2e]/20 via-transparent to-transparent pointer-events-none -z-10"></div>
-          {userRole === 'admin' && !simulatingStandardUser && !tvMode && (
+          {featureAllowed('healthBanner') && !tvMode && (
             <HealthAlertBanner onOpenHealthMonitor={() => setActiveTab('admin')} />
           )}
           
@@ -3165,7 +3218,8 @@ export default function App() {
             </div>
           )}
 
-          {renderContent()}
+          {featureError && <p role="alert" className="mb-4 p-3 border border-red-500/40 rounded-xl text-sm text-red-300">Feature settings could not refresh: {featureError}. {featureConfig ? 'Using the last loaded settings.' : 'Dashboard features are unavailable until settings load. Retrying automatically.'}</p>}
+          {featureAllowed(activeTab) ? renderContent() : !featureError && <p className="text-sm text-gray-400">Loading dashboard feature settings...</p>}
         </main>
         )}
       </div>
@@ -3173,45 +3227,12 @@ export default function App() {
       {/* MOBILE BOTTOM NAVIGATION BAR (Screens < lg / 1024px) */}
       {!tvMode && (
         <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0a2442]/95 backdrop-blur-2xl border-t border-[#cedc28]/20 px-2 py-1.5 flex items-center justify-around pb-safe shadow-[0_-4px_20px_rgba(0,0,0,0.5)]">
-          <button
-            onClick={() => setActiveTab('summary')}
-            className={`flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-all ${
-              activeTab === 'summary' ? 'text-[#cedc28]' : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <Grid className="w-4 h-4" />
-            <span className="text-[10px] font-bold">Overview</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('campaign')}
-            className={`flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-all ${
-              activeTab === 'campaign' ? 'text-[#cedc28]' : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <Activity className="w-4 h-4" />
-            <span className="text-[10px] font-bold">Event</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('weekly')}
-            className={`flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-all ${
-              activeTab === 'weekly' ? 'text-[#cedc28]' : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <Calendar className="w-4 h-4" />
-            <span className="text-[10px] font-bold">Weekly</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('channel')}
-            className={`flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-all ${
-              activeTab === 'channel' ? 'text-[#cedc28]' : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <MonitorPlay className="w-4 h-4" />
-            <span className="text-[10px] font-bold">Channels</span>
-          </button>
+          {NAV_ITEMS.filter(item => ['summary', 'campaign', 'weekly', 'channel'].includes(item.id)).map(item => (
+            <button key={item.id} onClick={() => setActiveTab(item.id)} className={`flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-all ${activeTab === item.id ? 'text-[#cedc28]' : 'text-slate-400 hover:text-white'}`}>
+              <item.icon className="w-4 h-4" />
+              <span className="text-[10px] font-bold">{item.label.replace(' View', '')}</span>
+            </button>
+          ))}
 
           <button
             onClick={() => setMobileMenuOpen(true)}
@@ -3233,5 +3254,6 @@ export default function App() {
         <span>V1 Universal</span>
       </div>
     </div>
+    </DashboardFeatureContext.Provider>
   );
 }

@@ -1,7 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from 'next/server';
+import { observeApiRequest, observeApiUsage } from '../../../../lib/apiUsage.mjs';
 
 export async function GET(request: Request) {
+  await observeApiRequest();
   const { searchParams } = new URL(request.url);
   const accessToken = searchParams.get('access_token') || process.env.TIKTOK_ACCESS_TOKEN;
   const advertiserId = searchParams.get('advertiser_id') || process.env.TIKTOK_ADVERTISER_ID;
@@ -51,6 +53,7 @@ export async function GET(request: Request) {
       reportUrl.searchParams.set('page', currentPage.toString());
       console.log(`Fetching TikTok report page ${currentPage}...`, reportUrl.toString());
 
+      await observeApiUsage('tiktok');
       const response = await fetch(reportUrl.toString(), {
         method: 'GET',
         headers: {
@@ -107,6 +110,7 @@ export async function GET(request: Request) {
             adGetUrl.searchParams.append('filtering', JSON.stringify({ ad_ids: chunk }));
             adGetUrl.searchParams.append('page_size', '100');
             
+            await observeApiUsage('tiktok');
             const adResponse = await fetch(adGetUrl.toString(), {
               headers: { 'Access-Token': accessToken }
             });
@@ -142,6 +146,7 @@ export async function GET(request: Request) {
               videoInfoUrl.searchParams.append('advertiser_id', advertiserId);
               videoInfoUrl.searchParams.append('video_ids', JSON.stringify(chunk));
 
+              await observeApiUsage('tiktok');
               const videoResponse = await fetch(videoInfoUrl.toString(), {
                 headers: { 'Access-Token': accessToken }
               });
@@ -168,6 +173,7 @@ export async function GET(request: Request) {
               imageInfoUrl.searchParams.append('advertiser_id', advertiserId);
               imageInfoUrl.searchParams.append('image_ids', JSON.stringify(chunk));
 
+              await observeApiUsage('tiktok');
               const imageResponse = await fetch(imageInfoUrl.toString(), {
                 headers: { 'Access-Token': accessToken }
               });
@@ -196,6 +202,7 @@ export async function GET(request: Request) {
                 const m = adToMediaMap[adId];
                 try {
                    const oembedUrl = `https://www.tiktok.com/oembed?url=https://www.tiktok.com/video/${m.tiktokItemId}`;
+                   await observeApiUsage('tiktok');
                    const oRes = await fetch(oembedUrl);
                    const oData = await oRes.json();
                    if (oData && oData.thumbnail_url) {

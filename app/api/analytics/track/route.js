@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server';
 import { recordAnalyticsEvent } from '../../../../lib/analyticsService.mjs';
+import { observeApiRequest } from '../../../../lib/apiUsage.mjs';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 export async function POST(req) {
+  await observeApiRequest('analytics');
   try {
     let body = {};
     const contentType = req.headers.get('content-type') || '';

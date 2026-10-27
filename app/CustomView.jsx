@@ -1,4 +1,6 @@
 'use client';
+import { ExportButton } from './components/DashboardFeatureContext';
+
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import * as d3 from 'd3';
@@ -444,9 +446,9 @@ export default function CustomView({ adData = [], exRate = 1, exSym = "$", forma
                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 relative z-30">
                      <h3 className="text-lg font-bold text-white flex items-center gap-2 uppercase tracking-widest text-sm whitespace-nowrap">
                        <TrendingUp className="text-[#cedc28] w-5 h-5" /> Dynamic Comparison
-                       <button data-html2canvas-ignore="true" type="button" onClick={() => exportChart('dynamic-comparison-chart', 'Dynamic_Comparison')} className="ml-2 p-1.5 hover:bg-[rgba(206,220,40,0.1)] rounded-lg transition-colors text-[#14a6d9] relative z-50 cursor-pointer" title="Download Chart">
+                       <ExportButton data-html2canvas-ignore="true" type="button" onClick={() => exportChart('dynamic-comparison-chart', 'Dynamic_Comparison')} className="ml-2 p-1.5 hover:bg-[rgba(206,220,40,0.1)] rounded-lg transition-colors text-[#14a6d9] relative z-50 cursor-pointer" title="Download Chart">
                          <Camera className="w-4 h-4" />
-                       </button>
+                       </ExportButton>
                      </h3>
                      <div data-html2canvas-ignore="true" className="flex flex-wrap items-center gap-3 w-full md:w-auto relative z-[50]">
                         <MultiSelectDropdown label="X-Axis" options={DIMENSIONS} selected={chartDimX} onChange={setChartDimX} singleSelect className="relative min-w-[150px]" />
@@ -480,9 +482,9 @@ export default function CustomView({ adData = [], exRate = 1, exSym = "$", forma
                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 relative z-30">
                      <h3 className="text-lg font-bold text-white flex items-center gap-2 uppercase tracking-widest text-sm">
                        <Activity className="text-[#cedc28] w-5 h-5" /> Dynamic Split
-                       <button data-html2canvas-ignore="true" type="button" onClick={() => exportChart('dynamic-split-chart', 'Dynamic_Split')} className="ml-2 p-1.5 hover:bg-[rgba(206,220,40,0.1)] rounded-lg transition-colors text-[#14a6d9] relative z-50 cursor-pointer" title="Download Chart">
+                       <ExportButton data-html2canvas-ignore="true" type="button" onClick={() => exportChart('dynamic-split-chart', 'Dynamic_Split')} className="ml-2 p-1.5 hover:bg-[rgba(206,220,40,0.1)] rounded-lg transition-colors text-[#14a6d9] relative z-50 cursor-pointer" title="Download Chart">
                          <Camera className="w-4 h-4" />
-                       </button>
+                       </ExportButton>
                      </h3>
                      <div data-html2canvas-ignore="true" className="flex flex-wrap items-center gap-3 w-full md:w-auto relative z-[50]">
                         <MultiSelectDropdown label="Split By" options={PIE_DIMENSIONS} selected={pieDim} onChange={setPieDim} singleSelect className="relative min-w-[150px]" />
@@ -547,9 +549,9 @@ export default function CustomView({ adData = [], exRate = 1, exSym = "$", forma
                      onChange={setSelectedMetrics} 
                      className="relative min-w-[200px]"
                    />
-                   <button onClick={exportCSV} className="h-[44px] px-6 bg-[#0a2442] border border-[#cedc28]/30 rounded-xl text-[#cedc28] font-bold text-sm hover:bg-[#cedc28]/10 transition-colors shadow-[0_0_15px_rgba(200,130,20,0.1)] flex items-center gap-2 mt-5">
+                   <ExportButton onClick={exportCSV} className="h-[44px] px-6 bg-[#0a2442] border border-[#cedc28]/30 rounded-xl text-[#cedc28] font-bold text-sm hover:bg-[#cedc28]/10 transition-colors shadow-[0_0_15px_rgba(200,130,20,0.1)] flex items-center gap-2 mt-5">
                      <Download className="w-4 h-4" /> Export CSV
-                   </button>
+                   </ExportButton>
                  </div>
               </div>
               <div className="rounded-xl border border-[#cedc28]/10 custom-scrollbar relative z-10 pb-4" style={{ overflowY: 'scroll', overflowX: 'auto', maxHeight: '600px' }}>

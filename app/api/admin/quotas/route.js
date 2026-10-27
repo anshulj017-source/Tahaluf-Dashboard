@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { analyzeConnectedApis, pingService, updateCircuitBreakerState, getCircuitBreakerState } from '../../../../lib/quotaService.mjs';
 import { isAdminRequest } from '../../../../lib/requireAdminRequest.js';
+import { EMPTY_BUDGETS, observeApiRequest, validateBudgets } from '../../../../lib/apiUsage.mjs';
+import { updateAdminSetting } from '../../../../lib/adminSettingsStore.mjs';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -11,6 +13,7 @@ export async function GET(request) {
   }
 
   try {
+    await observeApiRequest();
     const analysis = await analyzeConnectedApis();
     return NextResponse.json(analysis);
   } catch (error) {
@@ -30,6 +33,19 @@ export async function POST(request) {
   try {
     const body = await request.json();
     const { action = 'analyze' } = body;
+
+    if (action === 'save-budgets') {
+      let services;
+      try {
+        services = validateBudgets(body.services);
+      } catch (error) {
+        return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+      }
+      const budgets = await updateAdminSetting('apiBudgets', EMPTY_BUDGETS, () => ({
+        services, updatedAt: new Date().toISOString()
+      }));
+      return NextResponse.json({ success: true, budgets });
+    }
 
     if (action === 'ping') {
       const { service = 'all' } = body;

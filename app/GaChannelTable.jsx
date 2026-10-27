@@ -1,3 +1,4 @@
+import { ExportButton } from './components/DashboardFeatureContext';
 import React, { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import * as d3 from 'd3';
@@ -205,14 +206,14 @@ export const GaChannelTable = ({ rawData, formatShort }) => {
               className="bg-[#0a2442] text-[#eef7f5] text-sm pl-9 pr-4 py-2 rounded-full outline-none border border-[#cedc28]/30 focus:border-[#cedc28]"
             />
           </div>
-          <button 
+          <ExportButton
             onClick={handleDownloadCSV}
             className="px-4 py-2 rounded-full text-sm font-bold bg-[#0a2442] text-[#cedc28] border border-[#cedc28]/30 hover:bg-[#cedc28] hover:text-[#1a302e] transition-colors flex items-center gap-2"
             title="Download CSV"
           >
             <Download size={16} />
             CSV
-          </button>
+          </ExportButton>
           <button 
             onClick={openCompare}
             disabled={selectedChannels.length === 0}

@@ -7,6 +7,7 @@ import {
   RefreshCw, Shield, ShieldAlert, ShieldCheck, Sparkles, Zap, ArrowUpRight
 } from 'lucide-react';
 import { auth } from '../../lib/firebase';
+import ApiUsageAnalytics from './ApiUsageAnalytics';
 
 const getAdminHeaders = async () => {
   const token = await auth.currentUser?.getIdToken();
@@ -39,6 +40,8 @@ const getStatusBadge = (status) => {
           Optimal
         </span>
       );
+    case 'observed':
+      return <span className="text-[10px] text-[#14a6d9]">Usage observed</span>;
     case 'warning':
     case 'quota-exceeded':
       return (
@@ -58,7 +61,7 @@ const getStatusBadge = (status) => {
       return (
         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-gray-500/10 text-gray-300 border border-gray-500/30">
           <HelpCircle className="w-3 h-3 text-gray-400" />
-          Checking
+          Not verified
         </span>
       );
   }
@@ -79,6 +82,7 @@ export default function ApiQuotasAdmin({ active = true }) {
   const [lastAuditAt, setLastAuditAt] = useState(null);
   const [pingResults, setPingResults] = useState({});
   const [pinging, setPinging] = useState(null);
+  const measuredServices = data?.services?.filter(service => Number.isFinite(service.latencyMs)) || [];
 
   const fetchQuotas = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -147,7 +151,8 @@ export default function ApiQuotasAdmin({ active = true }) {
         body: JSON.stringify({ action: 'ping', service: serviceId })
       });
       const json = await res.json();
-      if (json.success && json.result) {
+      if (!res.ok || !json.success || !json.result) throw new Error(json.error || 'Service check failed.');
+      if (json.result) {
         setPingResults(prev => ({
           ...prev,
           [serviceId]: json.result
@@ -155,6 +160,7 @@ export default function ApiQuotasAdmin({ active = true }) {
       }
     } catch (err) {
       console.error(err);
+      setError(err.message || 'Service check failed.');
     } finally {
       setPinging(null);
     }
@@ -204,10 +210,9 @@ export default function ApiQuotasAdmin({ active = true }) {
         <div className="card-surface p-4 rounded-2xl border border-white/5 space-y-1">
           <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Services Monitored</div>
           <div className="text-2xl font-black text-white flex items-baseline gap-2">
-            <span>{data?.summary?.totalServices || 5}</span>
-            <span className="text-xs text-lime-400 font-semibold">100% Protected</span>
+            <span>{data?.summary?.totalServices ?? '—'}</span>
           </div>
-          <p className="text-[10px] text-gray-500">Firestore, Vercel, Sheets, SMTP, Auth</p>
+          <p className="text-[10px] text-gray-500">Connected services and integration coverage</p>
         </div>
 
         <div className="card-surface p-4 rounded-2xl border border-white/5 space-y-1">
@@ -227,7 +232,7 @@ export default function ApiQuotasAdmin({ active = true }) {
         <div className="card-surface p-4 rounded-2xl border border-white/5 space-y-1">
           <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Active Guardrails</div>
           <div className="text-2xl font-black text-[#cedc28] flex items-baseline gap-2">
-            <span>{data?.summary?.activeGuardrailsCount || 11}</span>
+            <span>{data?.summary?.activeGuardrailsCount ?? '—'}</span>
             <span className="text-xs text-gray-400 font-normal">in place</span>
           </div>
           <p className="text-[10px] text-gray-500">Zero downtime fallbacks active</p>
@@ -237,16 +242,17 @@ export default function ApiQuotasAdmin({ active = true }) {
           <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Avg Endpoint Latency</div>
           <div className="text-2xl font-black text-[#14a6d9] flex items-baseline gap-2">
             <span>
-              {data?.services
-                ? Math.round(data.services.reduce((acc, s) => acc + (s.latencyMs || 0), 0) / data.services.length)
-                : 28}
+              {measuredServices.length
+                ? Math.round(measuredServices.reduce((acc, service) => acc + service.latencyMs, 0) / measuredServices.length)
+                : '—'}
               ms
             </span>
-            <span className="text-xs text-lime-400 font-semibold">Sub-50ms</span>
           </div>
           <p className="text-[10px] text-gray-500">Serving from Edge &amp; Memory</p>
         </div>
       </div>
+
+      <ApiUsageAnalytics report={data?.usage} onSaved={() => fetchQuotas(true)} />
 
       {/* ACTIVE SAFEGUARDS & CIRCUIT BREAKER CONTROL PANEL */}
       <div className="card-surface rounded-2xl border border-[#cedc28]/30 p-5 bg-[#031120]/70 space-y-4">
@@ -381,12 +387,13 @@ export default function ApiQuotasAdmin({ active = true }) {
                     {getStatusBadge(service.status)}
                     <button
                       onClick={() => pingSingleService(service.id)}
-                      disabled={isPinging}
+                      disabled={isPinging || !['firestore', 'sheets', 'smtp', 'vercel'].includes(service.id)}
                       className="text-[10px] text-gray-400 hover:text-white flex items-center gap-1 font-mono transition-colors"
                     >
                       <RefreshCw className={`w-2.5 h-2.5 ${isPinging ? 'animate-spin' : ''}`} />
-                      <span>{pingRes ? `${pingRes.latencyMs}ms` : `${service.latencyMs}ms`}</span>
+                      <span>{Number.isFinite(pingRes?.latencyMs ?? service.latencyMs) ? `${pingRes?.latencyMs ?? service.latencyMs}ms` : 'Not measured'}</span>
                     </button>
+                    {pingRes?.error && <span className="text-[10px] text-amber-300 max-w-[180px]">{pingRes.error}</span>}
                   </div>
                 </div>
 
@@ -399,22 +406,22 @@ export default function ApiQuotasAdmin({ active = true }) {
                         <div className="flex items-center justify-between text-xs">
                           <span className="text-gray-300 font-medium">{quota.metric}</span>
                           <span className="font-mono text-[11px] text-gray-400">
-                            <strong className="text-white">{quota.used.toLocaleString()}</strong> / {quota.limit.toLocaleString()} {quota.unit}
-                            {' '}(<span className={colorClass.split(' ')[1]}>{quota.percent}%</span>)
+                            <strong className="text-white">{quota.used == null ? 'Not connected' : quota.used.toLocaleString()}</strong> / {quota.limit == null ? 'No allowance configured' : quota.limit.toLocaleString()} {quota.unit}
+                            {quota.percent != null && <> (<span className={colorClass.split(' ')[1]}>{quota.percent.toFixed(1)}%</span>)</>}
                           </span>
                         </div>
-                        <div className="w-full bg-white/5 h-2 rounded-full overflow-hidden border border-white/5">
+                        {quota.percent != null && <div className="w-full bg-white/5 h-2 rounded-full overflow-hidden border border-white/5">
                           <div
                             className={`h-full rounded-full transition-all duration-500 ${colorClass.split(' ')[0]}`}
                             style={{ width: `${Math.min(100, Math.max(2, quota.percent))}%` }}
                           />
-                        </div>
+                        </div>}
                       </div>
                     );
                   })}
                   <div className="text-[10px] text-gray-500 flex items-center justify-between pt-0.5">
                     <span>{service.quotaResetText}</span>
-                    <span className="text-gray-400">Circuit breaker auto-engages at 90%</span>
+                    <span className="text-gray-400">Configured allowance, not a provider limit</span>
                   </div>
                 </div>
 

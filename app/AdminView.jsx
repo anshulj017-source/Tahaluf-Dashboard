@@ -5,8 +5,9 @@ import EventsAdmin from './components/EventsAdmin';
 import DataHealthAdmin from './components/DataHealthAdmin';
 import AnalyticsAdmin from './components/AnalyticsAdmin';
 import ApiQuotasAdmin from './components/ApiQuotasAdmin';
+import FeatureControlsAdmin from './components/FeatureControlsAdmin';
 
-export default function AdminView({ currentUserEmail = 'admin@tahaluf.com', initialEvents = [] }) {
+export default function AdminView({ currentUserEmail = 'admin@tahaluf.com', initialEvents = [], onFeaturesSaved }) {
   const [activeSection, setActiveSection] = useState('events');
   const [users, setUsers] = useState([]);
   const [healthIssueCount, setHealthIssueCount] = useState(0);
@@ -181,7 +182,10 @@ export default function AdminView({ currentUserEmail = 'admin@tahaluf.com', init
         )}
 
         {/* ADMIN SUB-TABS */}
-        <div className="flex border-b border-gray-700/60 mb-8 gap-6">
+        <div className="flex flex-wrap border-b border-gray-700/60 mb-8 gap-6">
+          <button onClick={() => setActiveSection('features')} className={`pb-3 text-xs font-bold uppercase tracking-wider border-b-2 ${activeSection === 'features' ? 'border-[#cedc28] text-[#cedc28]' : 'border-transparent text-gray-400 hover:text-white'}`}>
+            Feature Controls
+          </button>
           <button
             onClick={() => setActiveSection('events')}
             className={`pb-3 text-xs font-bold uppercase tracking-wider flex items-center gap-2 border-b-2 transition-all ${
@@ -255,6 +259,7 @@ export default function AdminView({ currentUserEmail = 'admin@tahaluf.com', init
 
         {/* SECTION: API INFRASTRUCTURE & QUOTA HUB */}
         <ApiQuotasAdmin active={activeSection === 'quotas'} />
+        {activeSection === 'features' && <FeatureControlsAdmin onSaved={onFeaturesSaved} />}
 
         {/* SECTION 2: USER ACCESS MANAGEMENT */}
         {activeSection === 'users' && (

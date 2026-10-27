@@ -1,3 +1,4 @@
+import { ExportButton } from './components/DashboardFeatureContext';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import * as d3 from 'd3';
 import { 
@@ -598,14 +599,14 @@ export default function CreativeView({ data, exRate = 1, exSym = '$', formatShor
          <div className="flex flex-wrap items-center justify-between gap-2.5">
            {/* Left Controls: Export + Filters */}
            <div className="flex flex-wrap items-center gap-2">
-             <button 
+             <ExportButton
                onClick={exportCSV}
                title="Export as CSV"
                className="h-[32px] px-2.5 flex items-center justify-center gap-1.5 bg-[#0a2442] border border-[#cedc28]/30 rounded-lg text-[#cedc28] hover:bg-[#cedc28]/20 hover:border-[#cedc28] transition-colors text-xs font-bold shadow-sm"
              >
                <Download className="w-3.5 h-3.5 flex-shrink-0" />
                <span className="whitespace-nowrap">Export</span>
-             </button>
+             </ExportButton>
 
              <div className="w-36 flex-shrink-0">
                <MultiSelectDropdown 

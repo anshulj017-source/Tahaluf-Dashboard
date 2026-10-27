@@ -1,4 +1,6 @@
 'use client';
+import { ExportButton } from './components/DashboardFeatureContext';
+
 
 import React, { useState, useMemo } from 'react';
 
@@ -526,9 +528,9 @@ export default function MarketView({ adData, gaData, exRate = 1, exSym = '$', fo
                   <option value="purchases">Conversions</option>
                   {userRole !== 'non-finance' && <option value="cpa">CPA</option>}
                 </select>
-                <button onClick={() => exportChart('export-trend-chart', 'Daily_Comparison_Trend')} className="html2canvas-ignore p-2 rounded-full hover:bg-white/10 text-white/50 hover:text-white transition-colors" title="Export Chart">
+                <ExportButton onClick={() => exportChart('export-trend-chart', 'Daily_Comparison_Trend')} className="html2canvas-ignore p-2 rounded-full hover:bg-white/10 text-white/50 hover:text-white transition-colors" title="Export Chart">
                   <Camera className="w-4 h-4" />
-                </button>
+                </ExportButton>
               </div>
             </div>
             
@@ -567,9 +569,9 @@ export default function MarketView({ adData, gaData, exRate = 1, exSym = '$', fo
                     <option value="purchases">Conversions</option>
                     {userRole !== 'non-finance' && <option value="cpa">CPA</option>}
                   </select>
-                  <button onClick={() => exportChart('export-channel-split', 'Channel_Budget_Split')} className="html2canvas-ignore p-2 rounded-full hover:bg-white/10 text-white/50 hover:text-white transition-colors" title="Export Chart">
+                  <ExportButton onClick={() => exportChart('export-channel-split', 'Channel_Budget_Split')} className="html2canvas-ignore p-2 rounded-full hover:bg-white/10 text-white/50 hover:text-white transition-colors" title="Export Chart">
                     <Camera className="w-4 h-4" />
-                  </button>
+                  </ExportButton>
                 </div>
               </div>
               <div className="h-80 mb-6">
@@ -633,12 +635,12 @@ export default function MarketView({ adData, gaData, exRate = 1, exSym = '$', fo
                      onChange={setSelectedMetrics}
                    />
                  </div>
-                 <button onClick={() => exportChart('export-detailed-metrics', 'Detailed_Event_Metrics')} className="html2canvas-ignore p-2 rounded-full hover:bg-white/10 text-white/50 hover:text-white transition-colors" title="Export Image">
+                 <ExportButton onClick={() => exportChart('export-detailed-metrics', 'Detailed_Event_Metrics')} className="html2canvas-ignore p-2 rounded-full hover:bg-white/10 text-white/50 hover:text-white transition-colors" title="Export Image">
                    <Camera className="w-4 h-4" />
-                 </button>
-                 <button onClick={handleExportDetailedMetrics} className="html2canvas-ignore p-2 rounded-full hover:bg-white/10 text-white/50 hover:text-white transition-colors" title="Export CSV">
+                 </ExportButton>
+                 <ExportButton onClick={handleExportDetailedMetrics} className="html2canvas-ignore p-2 rounded-full hover:bg-white/10 text-white/50 hover:text-white transition-colors" title="Export CSV">
                    <Download className="w-4 h-4" />
-                 </button>
+                 </ExportButton>
                </div>
              </div>
              

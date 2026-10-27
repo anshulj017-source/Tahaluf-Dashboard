@@ -1,3 +1,4 @@
+import { ExportButton } from './components/DashboardFeatureContext';
 import React, { useState, useMemo } from 'react';
 
 import * as d3 from 'd3';
@@ -681,7 +682,7 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
               ))}
             </div>
             
-            <button
+            <ExportButton
               onClick={async () => {
                 try {
                   const el = document.getElementById('comparison-chart-container');
@@ -718,7 +719,7 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
               title="Download Chart as Image"
             >
               <Camera size={14} />
-            </button>
+            </ExportButton>
           </div>
 
           <div className="w-full h-[260px] sm:h-[320px] md:h-[380px] lg:h-[420px] xl:h-[460px] mt-4 bg-[#0a2442]/30 rounded-xl p-2 sm:p-4 border border-[#cedc28]/10" id="comparison-chart-container">
@@ -782,13 +783,13 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
             <h3 className="text-xl font-anton uppercase text-[#eef7f5] flex items-center gap-3">
               <Layers className="text-[#cedc28]" /> Event Performance Summary
             </h3>
-            <button
+            <ExportButton
               onClick={handleExportComparisonCSV}
               className="px-3 py-2 flex items-center gap-2 rounded-lg bg-[#0a2442] border border-[#cedc28]/20 text-[#cedc28] hover:bg-[#cedc28]/10 transition-colors shadow-[0_0_10px_rgba(200,130,20,0.1)] text-xs font-bold"
               title="Export Comparison to CSV"
             >
               <Download size={14} /> Export Table
-            </button>
+            </ExportButton>
           </div>
           <div className="rounded-xl border border-[#cedc28]/20 bg-[#0a2442]/50 custom-scrollbar" style={{ overflowY: 'scroll', overflowX: 'auto', maxHeight: '600px' }}>
             <table className="w-full text-left border-collapse whitespace-nowrap">
@@ -1022,7 +1023,7 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
                       </button>
                     ))}
                   </div>
-                  <button
+                  <ExportButton
                     onClick={async () => {
                       try {
                         const el = document.getElementById('daily-progress-chart-container');
@@ -1060,7 +1061,7 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
                     title="Download Chart as Image"
                   >
                     <Camera size={14} />
-                  </button>
+                  </ExportButton>
                 </div>
               </div>
               <div className="h-56 sm:h-64 md:h-72 lg:h-80 xl:h-96 w-full bg-[#0a2442]/30 rounded-xl p-2 sm:p-4 border border-[#cedc28]/10" id="daily-progress-chart-container">
@@ -1118,13 +1119,13 @@ export default function CampaignView({ adData, plannedData = [], exRate = 1, exS
           )}
 
           <div className="flex justify-end items-center mb-6 gap-4">
-            <button
+            <ExportButton
               onClick={handleExportCSV}
               className="px-3 py-2 flex items-center gap-2 rounded-lg bg-[#0a2442] border border-[#cedc28]/20 text-[#cedc28] hover:bg-[#cedc28]/10 transition-colors shadow-[0_0_10px_rgba(200,130,20,0.1)] text-xs font-bold"
               title="Export to CSV (Excel)"
             >
               <Download size={14} /> Export Table
-            </button>
+            </ExportButton>
             {plannedTableData.length > 0 && (
               <div className="flex bg-[#0a2442] rounded-lg p-1 border border-[#cedc28]/20">
                 <button 

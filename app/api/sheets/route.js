@@ -9,6 +9,7 @@ import {
 import { getEventsConfig } from '../../../lib/eventsConfig.js';
 import { observeHealthSource } from '../../../lib/healthNotifications.mjs';
 import { getHealthIssues } from '../../../lib/healthNotificationUtils.mjs';
+import { observeApiRequest, observeApiUsage } from '../../../lib/apiUsage.mjs';
 
 // In-memory cache for sheets: Map<url, { data: string, timestamp: number }>
 // TTL: 5 minutes fresh cache. If Google Sheets fails/times out, stale data is served as resilient fallback.
@@ -171,6 +172,8 @@ export async function GET(request) {
   };
 
   try {
+    await observeApiRequest();
+    await observeApiUsage('sheets');
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout for large sheets (up to 13MB)
 
@@ -198,6 +201,7 @@ export async function GET(request) {
         : 'Google Sheets returned Loading...';
       console.log(`${retryReason}. Retrying for ${url}`);
       await new Promise(r => setTimeout(r, 1000));
+      await observeApiUsage('sheets');
       const retryController = new AbortController();
       const retryTimeout = setTimeout(() => retryController.abort(), 10000);
       response = await fetch(url, { 

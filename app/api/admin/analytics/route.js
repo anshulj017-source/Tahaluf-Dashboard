@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { isAdminRequest } from '../../../../lib/requireAdminRequest.js';
 import { getFirebaseAdmin } from '../../../../lib/firebaseAdmin.js';
 import { getAnalyticsSummary, resetAnalyticsData } from '../../../../lib/analyticsService.mjs';
+import { observeApiRequest } from '../../../../lib/apiUsage.mjs';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -34,6 +35,7 @@ async function checkAdmin(req) {
 }
 
 export async function GET(req) {
+  await observeApiRequest('analytics');
   try {
     const isAdmin = await checkAdmin(req);
     if (!isAdmin) {
@@ -55,6 +57,7 @@ export async function GET(req) {
 }
 
 export async function POST(req) {
+  await observeApiRequest('analytics');
   try {
     const isAdmin = await checkAdmin(req);
     if (!isAdmin) {
@@ -81,6 +84,7 @@ export async function POST(req) {
 }
 
 export async function DELETE(req) {
+  await observeApiRequest('analytics');
   try {
     const isAdmin = await checkAdmin(req);
     if (!isAdmin) {

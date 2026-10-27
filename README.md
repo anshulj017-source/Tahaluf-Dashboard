@@ -51,6 +51,52 @@ To run the test suite:
 npm test
 ```
 
+### API monitoring and feature controls
+
+**Admin → API & Quotas Hub** includes usage analytics for internal analytics,
+GA4, Vercel, Firestore, published Sheets feeds, SMTP, Firebase Auth and TikTok.
+Counters describe the instrumented operations listed on each card, **not**
+provider-wide quotas or invoices. GA4 is currently sheet-fed, not a direct Data
+API integration. Vercel usage is only counted on Vercel, never from local
+development. Actual provider spend remains explicitly unavailable until a
+provider billing integration is connected; no sample usage figures are shown.
+
+Admins can configure a monthly USD budget, included usage allowance, base cost,
+and rate per 1,000 observed units for each service. These produce **estimates**,
+not vendor invoices or enforcement limits. For providers with multiple billing
+dimensions (especially Firestore reads/writes and Vercel compute/bandwidth), a
+single blended rate is only an approximation. Forecasts use up to seven completed
+UTC collection days, excluding the partial first day and current day. No history
+is invented before collection begins. Daily counters retain 93 calendar dates;
+the chart displays the last 14. Monitoring storage itself incurs Firestore
+reads/writes on Vercel and is excluded from observed application operations.
+Monitoring write errors are logged and surfaced as incomplete telemetry on the
+current instance; instrumented business requests continue to function.
+
+**Admin → Feature Controls** organizes views, presentation tools, exports,
+currency switching and the admin health banner. Each has **Everyone**, **Admin
+only**, or **Disabled** visibility, with administrator/viewer draft previews.
+TV auto-cycle also requires TV mode and only visits enabled views. Export
+visibility covers CSV and chart-image buttons across dashboard views, but never
+admin configuration backups. Existing non-finance permissions remain in effect.
+At least one dashboard view must remain public. Admin Center and administrative
+configuration access cannot be disabled, preventing accidental lockout.
+Feature visibility is a UX control, not a replacement for API authorization.
+
+Saved changes apply immediately to the editing dashboard. Other open dashboards
+refresh settings every 60 seconds and on window focus. Concurrent feature saves
+are rejected with a conflict; reload before retrying.
+On Vercel, settings and usage persist in Firestore `appConfig` documents
+`dashboardFeatures`, `apiUsage`, and `apiBudgets`. Locally they persist in
+corresponding ignored JSON files under `config/`, surviving server restarts
+without committing local configuration or telemetry. Failed settings saves are
+reported rather than falling back to non-persistent memory.
+
+`npm test` runs deterministic feature, forecast, budget and persistence tests
+before the existing dashboard suite. Live sheet/API checks require the local
+server at `http://localhost:3000`, working upstream sheets and the appropriate
+local authentication setup.
+
 To run both the test suite and a production build verification:
 ```bash
 npm run prepublish-check
@@ -70,6 +116,12 @@ To learn more about Next.js, take a look at the following resources:
 You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
 ## Deploy on Vercel
+
+The pre-push hook mirrors published source commits to the private backup
+repository. Environment files are never copied or force-added to that backup.
+Keep deployment secrets in Vercel environment settings or a secrets manager.
+If an older backup included environment files, rotate the affected credentials;
+removing them from the current snapshot does not remove Git history.
 
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 

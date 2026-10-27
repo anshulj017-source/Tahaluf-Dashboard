@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
+import { observeApiRequest, observeApiUsage } from '../../../../lib/apiUsage.mjs';
 
 export async function GET(request: Request) {
+  await observeApiRequest();
   const { searchParams } = new URL(request.url);
   const authCode = searchParams.get('auth_code');
   const state = searchParams.get('state');
@@ -27,6 +29,7 @@ export async function GET(request: Request) {
   }
 
   try {
+    await observeApiUsage('tiktok');
     const tokenResponse = await fetch('https://business-api.tiktok.com/open_api/v1.3/oauth2/access_token/', {
       method: 'POST',
       headers: {

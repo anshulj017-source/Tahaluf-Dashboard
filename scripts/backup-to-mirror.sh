@@ -27,13 +27,7 @@ git reset --quiet --hard origin/main
 find "$MIRROR" -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
 git -C "$REPO" archive "$SHA" | tar -x -C "$MIRROR"
 
-# Keep including .env.local like the previous backup did (private repo).
-if [ -f "$REPO/.env.local" ]; then
-  cp -f "$REPO/.env.local" "$MIRROR/.env.local"
-fi
-
 git add -A
-git add -f .env.local 2>/dev/null || true
 
 if git diff --cached --quiet; then
   echo "[backup] No changes to back up (commit ${SHA:0:7})."

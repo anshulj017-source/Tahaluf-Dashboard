@@ -1,4 +1,6 @@
 'use client';
+import { ExportButton } from './components/DashboardFeatureContext';
+
 
 import { useState, useMemo } from 'react';
 
@@ -486,9 +488,9 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
                 <option value="purchases">Conversions</option>
                 {userRole !== 'non-finance' && <option value="cpa">CPA</option>}
               </select>
-              <button onClick={() => exportChart('comparison-trend-chart', 'comparison_trend')} className="p-1.5 rounded-lg bg-[#0a2442] border border-[#cedc28]/20 text-[#cedc28] hover:bg-[#cedc28]/10 transition-colors shadow-[0_0_10px_rgba(200,130,20,0.1)] text-xs font-bold" title="Export Image" data-html2canvas-ignore="true">
+              <ExportButton onClick={() => exportChart('comparison-trend-chart', 'comparison_trend')} className="p-1.5 rounded-lg bg-[#0a2442] border border-[#cedc28]/20 text-[#cedc28] hover:bg-[#cedc28]/10 transition-colors shadow-[0_0_10px_rgba(200,130,20,0.1)] text-xs font-bold" title="Export Image" data-html2canvas-ignore="true">
                 <Camera size={14} />
-              </button>
+              </ExportButton>
             </div>
           </div>
           
@@ -515,9 +517,9 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
               <h3 className="text-lg font-bold text-white flex items-center gap-2">
                 <BarChart3 className="text-[#cedc28] w-5 h-5" /> Phases Across Channels
               </h3>
-              <button onClick={() => exportChart('phases-across-channels-chart', 'phases_across_channels')} className="p-1.5 rounded-lg bg-[#0a2442] border border-[#cedc28]/20 text-[#cedc28] hover:bg-[#cedc28]/10 transition-colors shadow-[0_0_10px_rgba(200,130,20,0.1)] text-xs font-bold" title="Export Image" data-html2canvas-ignore="true">
+              <ExportButton onClick={() => exportChart('phases-across-channels-chart', 'phases_across_channels')} className="p-1.5 rounded-lg bg-[#0a2442] border border-[#cedc28]/20 text-[#cedc28] hover:bg-[#cedc28]/10 transition-colors shadow-[0_0_10px_rgba(200,130,20,0.1)] text-xs font-bold" title="Export Image" data-html2canvas-ignore="true">
                 <Camera size={14} />
-              </button>
+              </ExportButton>
             </div>
             <div className="h-80 mb-6">
               <ResponsiveContainer width="100%" height="100%">
@@ -573,9 +575,9 @@ export default function ChannelView({ adData, exRate = 1, exSym = '$', formatSho
              <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 gap-4">
                <div className="flex items-center gap-4">
                  <h3 className="text-lg font-bold text-white flex items-center gap-2">Detailed Funnel Stage Metrics</h3>
-                 <button onClick={handleExportDetailedMetrics} className="p-1.5 rounded-lg bg-[#0a2442] border border-[#cedc28]/20 text-[#cedc28] hover:bg-[#cedc28]/10 transition-colors shadow-[0_0_10px_rgba(200,130,20,0.1)] text-xs font-bold" title="Export CSV">
+                 <ExportButton onClick={handleExportDetailedMetrics} className="p-1.5 rounded-lg bg-[#0a2442] border border-[#cedc28]/20 text-[#cedc28] hover:bg-[#cedc28]/10 transition-colors shadow-[0_0_10px_rgba(200,130,20,0.1)] text-xs font-bold" title="Export CSV">
                    <Download size={14} />
-                 </button>
+                 </ExportButton>
                </div>
                <MetricMultiSelectDropdown 
                  options={AVAILABLE_METRICS}
