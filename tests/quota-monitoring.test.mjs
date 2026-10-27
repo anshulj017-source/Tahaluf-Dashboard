@@ -5,9 +5,9 @@ import vm from 'node:vm';
 import { createRequire } from 'node:module';
 import ts from 'typescript';
 import {
-  EMPTY_BUDGETS, addUsage, createUsageRecorder, createUsageScope,
+  API_SERVICES, EMPTY_BUDGETS, addUsage, createUsageRecorder, createUsageScope,
   includeUsageStorageOverhead, normalizeUsagePolicy, summarizeApiUsage,
-  updateUsageBudgets, updateUsagePolicy
+  updateUsageBudgets, updateUsagePolicy, getMonitoredServices, updateMonitoredServices
 } from '../lib/apiUsage.mjs';
 
 const require = createRequire(import.meta.url);
@@ -27,6 +27,142 @@ async function load(relativePath, overrides, globals = {}) {
   }, { filename: file.pathname });
   return sandboxModule.exports;
 }
+
+test('monitoring selection defaults compatibly and preserves budgets, policy and empty selections', () => {
+  assert.deepEqual(getMonitoredServices({}), API_SERVICES.map(service => service.id));
+  const state = { services: { sheets: { monthlyBudget: 10 } }, policy: { lowQuotaMode: true } };
+  const next = updateMonitoredServices(state, ['sheets']);
+  assert.deepEqual(next.services, state.services);
+  assert.deepEqual(next.policy, state.policy);
+  assert.deepEqual(getMonitoredServices(updateMonitoredServices(next, [])), []);
+  assert.deepEqual(updateUsageBudgets(next, {}).monitoredServices, ['sheets']);
+  assert.deepEqual(updateUsagePolicy(next, false).monitoredServices, ['sheets']);
+  for (const invalid of [null, {}, ['unknown'], ['sheets', 'sheets'], [1]]) {
+    assert.throws(() => updateMonitoredServices(state, invalid), /known API/);
+  }
+});
+
+test('disabled samples produce zero usage writes and enabled samples alone are retained', async () => {
+  let state = empty();
+  let transactions = 0;
+  let selected = [];
+  const pending = [];
+  const usage = await load('../lib/apiUsage.mjs', {
+    '@vercel/functions': { waitUntil: task => pending.push(task) },
+    './adminSettingsStore.mjs': {
+      readAdminSetting: async () => ({ monitoredServices: selected }),
+      updateAdminSetting: async (_, defaults, update) => { transactions++; state = update(state); }
+    }
+  }, { process: { env: { VERCEL: '1' } } });
+  usage.observeApiUsage('tiktok', 50);
+  await Promise.all(pending);
+  assert.equal(transactions, 0);
+  selected = ['sheets'];
+  await usage.withUsageScope(async () => {
+    usage.observeApiUsage('sheets', 2);
+    usage.observeApiUsage('tiktok', 100);
+    usage.observeApiUsage('firestore', 100, 'reads');
+  })();
+  await Promise.all(pending);
+  assert.equal(transactions, 1);
+  const day = state.days[new Date().toISOString().slice(0, 10)];
+  assert.equal(day.sheets.count, 2);
+  assert.equal(day.tiktok, undefined);
+  assert.equal(day.firestore, undefined, 'disabled Firestore counters include no storage overhead');
+});
+
+test('usage reports keep all selectors and budgets while excluding disabled cards and skipping all-off reads', async () => {
+  const reads = [];
+  let selected = ['sheets'];
+  const usage = await load('../lib/apiUsage.mjs', {
+    './adminSettingsStore.mjs': {
+      readAdminSetting: async key => {
+        reads.push(key);
+        return key === 'apiBudgets'
+          ? { services: { tiktok: { monthlyBudget: 99 } }, monitoredServices: selected }
+          : empty();
+      }
+    }
+  }, { process: { env: {} } });
+  const report = await usage.getApiUsageReport();
+  assert.deepEqual(Array.from(report.services, service => service.id), ['sheets']);
+  assert.equal(report.availableServices.length, API_SERVICES.length);
+  assert.equal(report.availableServices.find(service => service.id === 'tiktok').settings.monthlyBudget, 99);
+  selected = [];
+  reads.length = 0;
+  assert.equal((await usage.getApiUsageReport()).services.length, 0);
+  assert.deepEqual(reads, ['apiBudgets']);
+});
+
+test('analysis with no APIs selected performs no provider probes and returns no service cards', async () => {
+  const quota = await load('../lib/quotaService.mjs', {
+    './healthEmailTransport.mjs': { getSmtpTransportConfig: () => { assert.fail('SMTP must not be checked'); } },
+    './apiUsage.mjs': {
+      getMonitoredServices: () => [],
+      readMonitoringSettings: async () => ({ monitoredServices: [] }),
+      getApiUsageReport: async () => ({ services: [], policy: {} })
+    },
+    './firebaseAdmin.js': { getFirebaseAdmin: () => { assert.fail('Firestore must not be probed'); } }
+  }, { fetch: () => { assert.fail('No outbound probe permitted'); } });
+  const result = await quota.analyzeConnectedApis();
+  assert.equal(result.services.length, 0);
+  assert.equal(result.summary.totalServices, 0);
+  assert.equal(result.overallHealth, 'unknown');
+});
+
+test('a Sheets-only selection probes Sheets once and omits Firestore, SMTP and other API cards', async () => {
+  let probes = 0;
+  const quota = await load('../lib/quotaService.mjs', {
+    './healthEmailTransport.mjs': { getSmtpTransportConfig: () => { assert.fail('SMTP must not be checked'); } },
+    './apiUsage.mjs': {
+      getMonitoredServices: () => ['sheets'],
+      readMonitoringSettings: async () => ({ monitoredServices: ['sheets'] }),
+      observeApiUsage: service => { assert.equal(service, 'sheets'); },
+      getApiUsageReport: async () => ({
+        services: [{ id: 'sheets', settings: {}, monthUsage: 5, unit: 'fetches', quotaPercent: null }],
+        policy: {}
+      })
+    },
+    './firebaseAdmin.js': { getFirebaseAdmin: () => { assert.fail('Firestore must not be probed'); } }
+  }, {
+    AbortSignal,
+    process: { env: { COMBINED_COUNTRY_CSV_URL: 'https://example.test/sheet' } },
+    fetch: async (_, options) => { probes++; assert.equal(options.method, 'HEAD'); return { ok: true, status: 200 }; }
+  });
+  const result = await quota.analyzeConnectedApis();
+  assert.equal(probes, 1);
+  assert.deepEqual(Array.from(result.services, service => service.id), ['sheets']);
+  assert.equal(result.summary.totalServices, 1);
+});
+
+test('API selection saves require admin access, validate IDs, and disabled manual pings never run', async () => {
+  let admin = false;
+  let writes = 0;
+  let saved = { monitoredServices: ['sheets'], services: {}, policy: { lowQuotaMode: true } };
+  const route = await load('../app/api/admin/quotas/route.js', {
+    '../../../../lib/requireAdminRequest.js': { isAdminRequest: async () => admin },
+    '../../../../lib/quotaService.mjs': { pingService: () => { assert.fail('Disabled service must not be probed'); } },
+    '../../../../lib/apiUsage.mjs': {
+      EMPTY_BUDGETS, updateMonitoredServices, getMonitoredServices,
+      readMonitoringSettings: async () => saved,
+      withUsageScope: handler => handler
+    },
+    '../../../../lib/adminSettingsStore.mjs': {
+      updateAdminSetting: async (_, defaults, update) => { writes++; saved = update(saved); return saved; }
+    }
+  });
+  const request = body => ({ json: async () => body });
+  assert.equal((await route.POST(request({ action: 'save-monitored-services', services: [] }))).status, 401);
+  admin = true;
+  assert.equal((await route.POST(request({ action: 'save-monitored-services', services: ['bad'] }))).status, 400);
+  assert.equal(writes, 0);
+  assert.equal((await route.POST(request({ action: 'ping', service: 'firestore' }))).status, 400);
+  assert.equal((await route.POST(request({ action: 'save-monitored-services', services: [] }))).status, 200);
+  assert.equal(writes, 1);
+  assert.equal(saved.policy.lowQuotaMode, true);
+  const all = await (await route.POST(request({ action: 'ping', service: 'all' }))).json();
+  assert.deepEqual(all.results, {});
+});
 
 function collector() {
   let state = empty();
@@ -157,6 +293,7 @@ test('production scoped recorder counts its committed storage overhead and retry
   const usage = await load('../lib/apiUsage.mjs', {
     '@vercel/functions': { waitUntil: task => pending.push(task) },
     './adminSettingsStore.mjs': {
+      readAdminSetting: async () => EMPTY_BUDGETS,
       updateAdminSetting: async (key, defaults, update) => {
         assert.equal(key, 'apiUsage');
         transactions++;

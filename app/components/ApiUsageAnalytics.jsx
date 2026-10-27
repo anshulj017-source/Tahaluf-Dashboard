@@ -19,9 +19,36 @@ export default function ApiUsageAnalytics({ report, onSaved, onPolicySaved }) {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [savingPolicy, setSavingPolicy] = useState(false);
+  const [selectedServices, setSelectedServices] = useState([]);
+  const [savingServices, setSavingServices] = useState(false);
   useEffect(() => {
-    if (report && !editing) setDraft(Object.fromEntries(report.services.map(service => [service.id, service.settings])));
+    if (report) setSelectedServices(report.monitoredServices || report.services.map(service => service.id));
+  }, [report]);
+  useEffect(() => {
+    if (report && !editing) setDraft(Object.fromEntries((report.availableServices || report.services).map(service => [service.id, service.settings])));
   }, [report, editing]);
+
+  const saveServices = async () => {
+    setSavingServices(true);
+    setError('');
+    setNotice('');
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const response = await fetch('/api/admin/quotas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ action: 'save-monitored-services', services: selectedServices })
+      });
+      const json = await response.json();
+      if (!response.ok || !json.success) throw new Error(json.error || 'Could not save monitored APIs.');
+      await onSaved();
+      setNotice('Monitored APIs saved. Other server instances may take up to 60 seconds to update.');
+    } catch (error) {
+      setError(error.message);
+    } finally {
+      setSavingServices(false);
+    }
+  };
 
   const save = async () => {
     setSaving(true);
@@ -79,6 +106,17 @@ export default function ApiUsageAnalytics({ report, onSaved, onPolicySaved }) {
       <p className="text-xs text-gray-400">{report.forecastMethod} Available completed days: {report.forecastSampleDays}. Estimates use your rates, not automatic vendor pricing. Firestore combined operations are not a substitute for vendor read/write pricing.</p>
       <p className="text-xs text-amber-200">{report.firestoreDaily?.resetNotice}</p>
       <p className="text-xs text-gray-400">{report.collectionNotice}</p>
+      <fieldset disabled={savingServices} className="rounded-xl border border-white/10 p-3 space-y-3">
+        <legend className="text-sm font-bold px-1">APIs used by Tahaluf</legend>
+        <p className="text-xs text-gray-400">Only selected APIs appear in monitoring and receive usage tracking or health probes. This does not disable integrations, authentication, sheet recovery, or analytics itself. Existing history and budgets are retained. Monitoring still needs Firebase for settings and usage storage; reductions depend on which APIs you deselect. Untracked periods leave gaps in totals and forecasts, not proof of zero provider usage.</p>
+        <div className="grid sm:grid-cols-2 gap-3">
+          {(report.availableServices || report.services).map(service => <label key={service.id} className="flex items-center gap-2 text-xs">
+            <input type="checkbox" checked={selectedServices.includes(service.id)} onChange={event => setSelectedServices(current => event.target.checked ? [...current, service.id] : current.filter(id => id !== service.id))} />
+            {service.name}
+          </label>)}
+        </div>
+        <button type="button" onClick={saveServices} className="px-3 py-2 border border-[#14a6d9]/40 rounded-lg text-xs text-[#14a6d9]">{savingServices ? 'Saving APIs...' : 'Save monitored APIs'}</button>
+      </fieldset>
       <div className="rounded-xl border border-white/10 p-3 space-y-2">
         <button type="button" role="switch" aria-checked={report.policy?.lowQuotaMode === true} onClick={savePolicy} disabled={savingPolicy} className="px-3 py-2 border border-[#14a6d9]/40 rounded-lg text-xs text-[#14a6d9] disabled:opacity-40">
           {savingPolicy ? 'Saving mode...' : `Low-quota mode: ${report.policy?.lowQuotaMode ? 'On' : 'Off'}`}
@@ -89,6 +127,7 @@ export default function ApiUsageAnalytics({ report, onSaved, onPolicySaved }) {
       {error && <p role="alert" className="text-red-300 text-sm">{error}</p>}
       {notice && <p role="status" className="text-lime-300 text-sm">{notice}</p>}
       <div className="grid md:grid-cols-2 gap-4">
+        {report.services.length === 0 && <p className="text-sm text-gray-400">API monitoring is disabled. Select APIs above to resume. Previously recorded history is retained.</p>}
         {report.services.map(service => {
           const max = Math.max(1, ...service.history.map(point => point.count || 0));
           return (

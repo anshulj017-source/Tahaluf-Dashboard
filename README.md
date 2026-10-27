@@ -145,6 +145,17 @@ transaction per observation. Successful usage-storage transactions count their
 own document reads, retries, and write without recursively recording themselves.
 Failed transactions and other uninstrumented operations remain coverage gaps.
 
+The API Hub's **APIs used by Tahaluf** selector persists a shared monitoring
+allowlist. Existing installations start with all services selected; admins can
+select only the integrations they use, or none. Deselected services are excluded
+from cards, health probes (including manual/all-service pings), and new persisted
+usage samples. Previously recorded history and budget settings are retained.
+This controls monitoring, not the underlying integrations, authentication,
+analytics persistence, or sheet recovery. Other warm instances may take up to
+60 seconds to observe a saved selection. Settings, authentication and shared
+monitoring storage still use Firebase; hiding unused providers alone does not
+eliminate those operations or guarantee a particular quota reduction.
+
 Analytics persistence applies events to the shared Firestore state inside a
 transaction rather than overwriting it with an instance-local snapshot.
 Concurrent work is drained immediately in batches of at most 100 events and

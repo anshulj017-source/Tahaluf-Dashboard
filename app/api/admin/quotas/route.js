@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { analyzeConnectedApis, pingService, updateCircuitBreakerState } from '../../../../lib/quotaService.mjs';
 import { isAdminRequest } from '../../../../lib/requireAdminRequest.js';
-import { EMPTY_BUDGETS, observeApiRequest, updateUsageBudgets, updateUsagePolicy, withUsageScope } from '../../../../lib/apiUsage.mjs';
+import { EMPTY_BUDGETS, observeApiRequest, updateUsageBudgets, updateUsagePolicy, withUsageScope, updateMonitoredServices, getMonitoredServices, readMonitoringSettings } from '../../../../lib/apiUsage.mjs';
 import { updateAdminSetting } from '../../../../lib/adminSettingsStore.mjs';
 
 export const dynamic = 'force-dynamic';
@@ -34,6 +34,16 @@ export const POST = withUsageScope(async function POST(request) {
     const body = await request.json();
     const { action = 'analyze' } = body;
 
+    if (action === 'save-monitored-services') {
+      try {
+        updateMonitoredServices(EMPTY_BUDGETS, body.services);
+      } catch (error) {
+        return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+      }
+      const settings = await updateAdminSetting('apiBudgets', EMPTY_BUDGETS, state => updateMonitoredServices(state, body.services));
+      return NextResponse.json({ success: true, monitoredServices: settings.monitoredServices });
+    }
+
     if (action === 'save-budgets') {
       let normalized;
       try {
@@ -55,14 +65,16 @@ export const POST = withUsageScope(async function POST(request) {
 
     if (action === 'ping') {
       const { service = 'all' } = body;
+      const enabled = getMonitoredServices(await readMonitoringSettings());
       if (service === 'all') {
-        const results = {
-          firestore: await pingService('firestore'),
-          sheets: await pingService('sheets'),
-          smtp: await pingService('smtp'),
-          vercel: await pingService('vercel')
-        };
+        const results = Object.fromEntries(await Promise.all(
+          ['firestore', 'sheets', 'smtp', 'vercel'].filter(id => enabled.includes(id))
+            .map(async id => [id, await pingService(id)])
+        ));
         return NextResponse.json({ success: true, results });
+      }
+      if (!enabled.includes(service)) {
+        return NextResponse.json({ success: false, error: 'Monitoring is disabled for this API.' }, { status: 400 });
       }
       const result = await pingService(service);
       return NextResponse.json({ success: true, service, result });
