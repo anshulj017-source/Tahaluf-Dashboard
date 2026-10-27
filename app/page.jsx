@@ -35,6 +35,7 @@ import {
   trackTrendView, 
   trackExport 
 } from '../lib/analyticsTracker.js';
+import { getClientDashboardCache, setClientDashboardCache } from '../lib/clientCache.js';
 
 const GEO_URL = "https://unpkg.com/world-atlas@2.0.2/countries-110m.json";
 
@@ -673,6 +674,7 @@ export default function App() {
   const [adData, setAdData] = useState([]);
   const [gaData, setGaData] = useState([]);
   const [creativeData, setCreativeData] = useState([]);
+  const [plannedData, setPlannedData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingProgress, setLoadingProgress] = useState(15);
   const [loadingStatus, setLoadingStatus] = useState('Verifying session...');
@@ -748,6 +750,28 @@ export default function App() {
     updateClock();
     const interval = setInterval(updateClock, 1000);
     return () => clearInterval(interval);
+  }, []);
+
+  // Instant Client Cache Warmup (<30ms load time from IndexedDB)
+  useEffect(() => {
+    let mounted = true;
+    getClientDashboardCache().then(cached => {
+      if (!mounted || !cached) return;
+      if (cached.ads && Array.isArray(cached.ads) && cached.ads.length > 0) {
+        const hydratedAds = cached.ads.map(d => ({
+          ...d,
+          dateObj: d.date ? new Date(d.date) : null
+        }));
+        setAdData(hydratedAds);
+        setCreativeData(hydratedAds);
+        if (cached.planned) setPlannedData(cached.planned);
+        if (cached.timelines) setEventWeekTimelines(cached.timelines);
+        if (cached.eventsConfig) setEventsConfiguration(cached.eventsConfig);
+        if (cached.lastUpdated) setLastUpdated(new Date(cached.lastUpdated));
+        setLoading(false);
+      }
+    });
+    return () => { mounted = false; };
   }, []);
 
   // TV Wallboard Auto-Cycle Carousel
@@ -1327,6 +1351,15 @@ export default function App() {
       } else {
         setLastUpdated(new Date());
       }
+
+      setClientDashboardCache({
+        ads: combinedAds,
+        planned: parsedPlannedData,
+        timelines,
+        eventsConfig: configuredEvents,
+        lastUpdated: latestDataDate.toISOString()
+      });
+
       setLoadingProgress(100);
       setLoadingStatus('Ready! Rendering visualizations...');
       setLoading(false);

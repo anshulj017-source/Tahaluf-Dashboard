@@ -133,6 +133,8 @@ export async function GET(request) {
       headers: {
         'Content-Type': 'text/csv',
         'Cache-Control': 'public, max-age=300, stale-while-revalidate=600',
+        'CDN-Cache-Control': 'public, s-maxage=600, stale-while-revalidate=1200',
+        'Vercel-CDN-Cache-Control': 'public, s-maxage=600, stale-while-revalidate=1200',
         'X-Cache': 'HIT'
       },
     });
@@ -152,6 +154,8 @@ export async function GET(request) {
         headers: {
           'Content-Type': 'text/csv',
           'Cache-Control': 'public, max-age=60, stale-while-revalidate=300',
+          'CDN-Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
+          'Vercel-CDN-Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
           'X-Cache': 'STALE-FALLBACK'
         }
       });
@@ -243,6 +247,8 @@ export async function GET(request) {
         headers: {
           'Content-Type': 'text/csv',
           'Cache-Control': 'public, max-age=300, stale-while-revalidate=600',
+          'CDN-Cache-Control': 'public, s-maxage=600, stale-while-revalidate=1200',
+          'Vercel-CDN-Cache-Control': 'public, s-maxage=600, stale-while-revalidate=1200',
           'X-Cache': 'MISS-PERSISTENCE-ERROR'
         }
       });
@@ -254,6 +260,8 @@ export async function GET(request) {
       headers: {
         'Content-Type': 'text/csv',
         'Cache-Control': 'public, max-age=300, stale-while-revalidate=600',
+        'CDN-Cache-Control': 'public, s-maxage=600, stale-while-revalidate=1200',
+        'Vercel-CDN-Cache-Control': 'public, s-maxage=600, stale-while-revalidate=1200',
         'X-Cache': health?.state === 'storage-error' ? 'MISS-PERSISTENCE-ERROR' : 'MISS'
       },
     });
