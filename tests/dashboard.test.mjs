@@ -44,6 +44,12 @@ import {
   generateEventWeekTimeline
 } from '../lib/weekTimeline.mjs';
 import {
+  analyzeConnectedApis,
+  updateCircuitBreakerState,
+  getCircuitBreakerState,
+  pingService
+} from '../lib/quotaService.mjs';
+import {
   getCountryFlag,
   getCountryName,
   recordAnalyticsEvent,
@@ -1144,6 +1150,61 @@ function testEventViewContracts() {
 }
 
 // -------------------------------------------------------------
+// 10. API QUOTAS, SAFEGUARDS & CIRCUIT BREAKER TESTS
+// -------------------------------------------------------------
+async function testApiQuotasLogic() {
+  console.log('\n--- 10. Testing API Quotas, Safeguards & Circuit Breaker Logic ---');
+
+  const analysis = await analyzeConnectedApis();
+  assert(analysis.success === true, 'Quota Analysis reports success: true');
+  assert(Array.isArray(analysis.services), 'Services array is present');
+  assert(analysis.services.length >= 5, `Monitors at least 5 services (found: ${analysis.services.length})`);
+
+  const firestoreService = analysis.services.find(s => s.id === 'firestore');
+  assert(Boolean(firestoreService), 'Analysis includes Google Cloud Firestore');
+  assert(Array.isArray(firestoreService.quotas), 'Firestore reports quota metrics');
+  assert(firestoreService.activeWorkarounds.length > 0, 'Firestore reports active workarounds');
+  assert(firestoreService.recommendations.length > 0, 'Firestore reports optimization recommendations');
+
+  const vercelService = analysis.services.find(s => s.id === 'vercel');
+  assert(Boolean(vercelService), 'Analysis includes Vercel Edge & Serverless Network');
+
+  const sheetsService = analysis.services.find(s => s.id === 'sheets');
+  assert(Boolean(sheetsService), 'Analysis includes Google Sheets Publishing API');
+
+  // Test circuit breaker state toggle & restore
+  const originalState = getCircuitBreakerState();
+  const toggled = updateCircuitBreakerState({ forceMemoryCache: true });
+  assert(toggled.forceMemoryCache === true, 'Circuit breaker toggles forceMemoryCache to true');
+  const restored = updateCircuitBreakerState({ forceMemoryCache: originalState.forceMemoryCache });
+  assert(restored.forceMemoryCache === originalState.forceMemoryCache, 'Circuit breaker restores original state');
+
+  // Test ping functionality
+  const pingResult = await pingService('vercel');
+  assert(pingResult.status === 'healthy', 'Vercel service ping reports healthy');
+}
+
+async function testApiQuotasApi() {
+  console.log('\n--- Testing Live API Quotas Endpoint ---');
+  const url = `http://localhost:${PORT}/api/admin/quotas`;
+  const res = await fetch(url);
+  assert(res.status === 200, 'GET /api/admin/quotas returns HTTP 200');
+  const data = await res.json();
+  assert(data.success === true, 'GET /api/admin/quotas reports success: true');
+  assert(data.services?.length >= 5, 'Live API returns all monitored services');
+
+  // Test live ping action
+  const pingRes = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'ping', service: 'vercel' })
+  });
+  assert(pingRes.status === 200, 'POST /api/admin/quotas ping returns HTTP 200');
+  const pingData = await pingRes.json();
+  assert(pingData.success === true && pingData.result?.status === 'healthy', 'Live ping returns healthy status');
+}
+
+// -------------------------------------------------------------
 // MAIN TEST RUNNER
 // -------------------------------------------------------------
 async function runAllTests() {
@@ -1165,6 +1226,7 @@ async function runAllTests() {
   test24hMetricIntegrity();
   testEventViewContracts();
   await testAnalyticsLogic();
+  await testApiQuotasLogic();
 
   // Check if local dev server is running before attempting API integration tests
   try {
@@ -1173,6 +1235,7 @@ async function runAllTests() {
       await testApiEndpoints();
       await testAdminEventsApi();
       await testAnalyticsApi();
+      await testApiQuotasApi();
     } else {
       console.warn(`Local server responded with status ${health.status}, skipping live API tests.`);
     }

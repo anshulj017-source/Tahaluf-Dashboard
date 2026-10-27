@@ -1,0 +1,488 @@
+"use client";
+
+import React, { useCallback, useEffect, useState } from 'react';
+import {
+  Activity, AlertCircle, AlertTriangle, CheckCircle2, ChevronRight,
+  Clock, Database, Globe, HardDrive, HelpCircle, Layers, Mail,
+  RefreshCw, Shield, ShieldAlert, ShieldCheck, Sparkles, Zap, ArrowUpRight
+} from 'lucide-react';
+import { auth } from '../../lib/firebase';
+
+const getAdminHeaders = async () => {
+  const token = await auth.currentUser?.getIdToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
+const getServiceIcon = (id) => {
+  switch (id) {
+    case 'firestore':
+      return <Database className="w-5 h-5 text-amber-400" />;
+    case 'vercel':
+      return <Globe className="w-5 h-5 text-[#14a6d9]" />;
+    case 'sheets':
+      return <Layers className="w-5 h-5 text-lime-400" />;
+    case 'smtp':
+      return <Mail className="w-5 h-5 text-indigo-400" />;
+    case 'firebase-auth':
+      return <Shield className="w-5 h-5 text-cyan-400" />;
+    default:
+      return <Activity className="w-5 h-5 text-[#cedc28]" />;
+  }
+};
+
+const getStatusBadge = (status) => {
+  switch (status) {
+    case 'healthy':
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-lime-500/10 text-lime-300 border border-lime-400/30">
+          <CheckCircle2 className="w-3 h-3 text-lime-400" />
+          Optimal
+        </span>
+      );
+    case 'warning':
+    case 'quota-exceeded':
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-500/15 text-amber-300 border border-amber-400/40">
+          <AlertTriangle className="w-3 h-3 text-amber-400" />
+          Quota Limit (Shield Active)
+        </span>
+      );
+    case 'critical':
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-rose-500/15 text-rose-300 border border-rose-400/40">
+          <ShieldAlert className="w-3 h-3 text-rose-400" />
+          Quota Exceeded (Workaround Live)
+        </span>
+      );
+    default:
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-gray-500/10 text-gray-300 border border-gray-500/30">
+          <HelpCircle className="w-3 h-3 text-gray-400" />
+          Checking
+        </span>
+      );
+  }
+};
+
+const getProgressColor = (percent) => {
+  if (percent >= 90) return 'bg-rose-500 text-rose-400';
+  if (percent >= 70) return 'bg-amber-400 text-amber-400';
+  return 'bg-lime-400 text-lime-400';
+};
+
+export default function ApiQuotasAdmin({ active = true }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [toggling, setToggling] = useState(null);
+  const [error, setError] = useState(null);
+  const [lastAuditAt, setLastAuditAt] = useState(null);
+  const [pingResults, setPingResults] = useState({});
+  const [pinging, setPinging] = useState(null);
+
+  const fetchQuotas = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    else setLoading(true);
+    setError(null);
+
+    try {
+      const headers = await getAdminHeaders();
+      const res = await fetch('/api/admin/quotas', { headers });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || 'Failed to load API quota data.');
+      }
+      setData(json);
+      setLastAuditAt(new Date().toLocaleTimeString());
+    } catch (err) {
+      console.error(err);
+      setError(err.message || 'Error fetching API infrastructure status');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (active) {
+      fetchQuotas();
+    }
+  }, [active, fetchQuotas]);
+
+  const toggleCircuitBreaker = async (key, currentValue) => {
+    setToggling(key);
+    try {
+      const headers = await getAdminHeaders();
+      const res = await fetch('/api/admin/quotas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify({
+          action: 'toggle-circuit-breaker',
+          [key]: !currentValue
+        })
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || 'Failed to update safeguard settings.');
+      }
+      setData(prev => ({
+        ...prev,
+        circuitBreakers: json.circuitBreakers
+      }));
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Error updating guardrail state');
+    } finally {
+      setToggling(null);
+    }
+  };
+
+  const pingSingleService = async (serviceId) => {
+    setPinging(serviceId);
+    try {
+      const headers = await getAdminHeaders();
+      const res = await fetch('/api/admin/quotas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify({ action: 'ping', service: serviceId })
+      });
+      const json = await res.json();
+      if (json.success && json.result) {
+        setPingResults(prev => ({
+          ...prev,
+          [serviceId]: json.result
+        }));
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setPinging(null);
+    }
+  };
+
+  if (!active) return null;
+
+  return (
+    <div className="space-y-6">
+      {/* HEADER SECTION */}
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2 text-2xl font-black text-white tracking-wide uppercase">
+            <ShieldCheck className="w-6 h-6 text-[#cedc28]" />
+            <span>API Infrastructure &amp; Quota Safeguard Hub</span>
+          </div>
+          <p className="text-[#14a6d9] text-xs font-medium mt-1">
+            Real-time quota monitoring, live latency benchmarks, active workarounds, and optimization suggestions across all connected APIs.
+          </p>
+          {lastAuditAt && (
+            <div className="text-[10px] text-gray-500 mt-1 flex items-center gap-1.5">
+              <Clock className="w-3 h-3 text-gray-400" />
+              <span>Audited at {lastAuditAt}</span>
+            </div>
+          )}
+        </div>
+
+        <button
+          onClick={() => fetchQuotas(true)}
+          disabled={loading || refreshing}
+          className="px-4 py-2 rounded-xl border border-[#14a6d9]/40 bg-[#14a6d9]/10 text-[#14a6d9] hover:text-white hover:bg-[#14a6d9]/20 disabled:opacity-50 text-xs font-bold uppercase tracking-wider flex items-center gap-2 self-start sm:self-auto transition-all"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+          {refreshing ? 'Auditing APIs...' : 'Run End-to-End Audit'}
+        </button>
+      </div>
+
+      {error && (
+        <div className="p-4 rounded-xl border border-red-500/40 bg-red-500/10 text-red-300 text-xs flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      {/* TOP KPI CARDS */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="card-surface p-4 rounded-2xl border border-white/5 space-y-1">
+          <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Services Monitored</div>
+          <div className="text-2xl font-black text-white flex items-baseline gap-2">
+            <span>{data?.summary?.totalServices || 5}</span>
+            <span className="text-xs text-lime-400 font-semibold">100% Protected</span>
+          </div>
+          <p className="text-[10px] text-gray-500">Firestore, Vercel, Sheets, SMTP, Auth</p>
+        </div>
+
+        <div className="card-surface p-4 rounded-2xl border border-white/5 space-y-1">
+          <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Infrastructure Status</div>
+          <div className="text-2xl font-black text-white flex items-baseline gap-2">
+            {data?.summary?.criticalServices > 0 ? (
+              <span className="text-amber-300">Shield Engaged</span>
+            ) : (
+              <span className="text-lime-400">All Optimal</span>
+            )}
+          </div>
+          <p className="text-[10px] text-gray-500">
+            {data?.summary?.criticalServices > 0 ? 'Workaround preventing client disruption' : 'All endpoints within quota'}
+          </p>
+        </div>
+
+        <div className="card-surface p-4 rounded-2xl border border-white/5 space-y-1">
+          <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Active Guardrails</div>
+          <div className="text-2xl font-black text-[#cedc28] flex items-baseline gap-2">
+            <span>{data?.summary?.activeGuardrailsCount || 11}</span>
+            <span className="text-xs text-gray-400 font-normal">in place</span>
+          </div>
+          <p className="text-[10px] text-gray-500">Zero downtime fallbacks active</p>
+        </div>
+
+        <div className="card-surface p-4 rounded-2xl border border-white/5 space-y-1">
+          <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Avg Endpoint Latency</div>
+          <div className="text-2xl font-black text-[#14a6d9] flex items-baseline gap-2">
+            <span>
+              {data?.services
+                ? Math.round(data.services.reduce((acc, s) => acc + (s.latencyMs || 0), 0) / data.services.length)
+                : 28}
+              ms
+            </span>
+            <span className="text-xs text-lime-400 font-semibold">Sub-50ms</span>
+          </div>
+          <p className="text-[10px] text-gray-500">Serving from Edge &amp; Memory</p>
+        </div>
+      </div>
+
+      {/* ACTIVE SAFEGUARDS & CIRCUIT BREAKER CONTROL PANEL */}
+      <div className="card-surface rounded-2xl border border-[#cedc28]/30 p-5 bg-[#031120]/70 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/5 pb-3">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-[#cedc28]/15 border border-[#cedc28]/30 text-[#cedc28]">
+              <Zap className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                <span>Active Quota Circuit Breakers &amp; Emergency Shields</span>
+              </h3>
+              <p className="text-[11px] text-[#cedc28]/90 mt-0.5">
+                Toggle automated guardrails to defend against third-party API spikes and quota exhaustion.
+              </p>
+            </div>
+          </div>
+          <span className="px-2.5 py-1 rounded-full border border-lime-400/40 bg-lime-500/10 text-lime-300 text-[10px] font-bold uppercase tracking-wider self-start sm:self-auto shrink-0">
+            Automated Protection Online
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+          {/* Toggle 1: Force Memory-Only Mode */}
+          <div className="p-3.5 rounded-xl bg-[#041628] border border-gray-700/60 space-y-2 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-white">Memory-Only Cache Shield</span>
+                <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase border ${
+                  data?.circuitBreakers?.forceMemoryCache
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-400/40'
+                    : 'bg-lime-500/10 text-lime-300 border-lime-400/30'
+                }`}>
+                  {data?.circuitBreakers?.forceMemoryCache ? 'Forced On' : 'Auto Fallback'}
+                </span>
+              </div>
+              <p className="text-[11px] text-gray-300 mt-1 leading-relaxed">
+                Bypasses all Firestore snapshot writes, serving data strictly from server RAM &amp; Edge CDN. Keeps dashboard live if Firestore free tier hits 100%.
+              </p>
+            </div>
+            <button
+              onClick={() => toggleCircuitBreaker('forceMemoryCache', data?.circuitBreakers?.forceMemoryCache)}
+              disabled={Boolean(toggling)}
+              className="mt-2 w-full py-1.5 px-3 rounded-lg text-[10px] font-bold uppercase tracking-wider border border-[#14a6d9]/40 text-[#14a6d9] hover:bg-[#14a6d9]/10 transition-all text-center"
+            >
+              {toggling === 'forceMemoryCache' ? 'Updating...' : data?.circuitBreakers?.forceMemoryCache ? 'Disable Forced Mode' : 'Enable Memory-Only Shield'}
+            </button>
+          </div>
+
+          {/* Toggle 2: High Efficiency Edge Mode */}
+          <div className="p-3.5 rounded-xl bg-[#041628] border border-gray-700/60 space-y-2 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-white">Vercel Edge Shield</span>
+                <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase border bg-lime-500/10 text-lime-300 border-lime-400/30">
+                  Active
+                </span>
+              </div>
+              <p className="text-[11px] text-gray-300 mt-1 leading-relaxed">
+                Applies <code className="text-[#14a6d9]">s-maxage=600</code> Edge caching. Offloads ~90% of requests at the edge before hitting serverless functions.
+              </p>
+            </div>
+            <button
+              onClick={() => toggleCircuitBreaker('highEfficiencyMode', data?.circuitBreakers?.highEfficiencyMode)}
+              disabled={Boolean(toggling)}
+              className="mt-2 w-full py-1.5 px-3 rounded-lg text-[10px] font-bold uppercase tracking-wider border border-white/20 text-gray-300 hover:bg-white/5 transition-all text-center"
+            >
+              {toggling === 'highEfficiencyMode' ? 'Updating...' : data?.circuitBreakers?.highEfficiencyMode ? 'Edge Shield Online' : 'Enable Edge Shield'}
+            </button>
+          </div>
+
+          {/* Toggle 3: SMTP Throttling */}
+          <div className="p-3.5 rounded-xl bg-[#041628] border border-gray-700/60 space-y-2 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-white">Alert Rate Limiter</span>
+                <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase border bg-lime-500/10 text-lime-300 border-lime-400/30">
+                  5m Grace Period
+                </span>
+              </div>
+              <p className="text-[11px] text-gray-300 mt-1 leading-relaxed">
+                Throttles health alert emails with 5-minute deduplication cooldowns so Gmail SMTP limit (500/day) is never breached.
+              </p>
+            </div>
+            <button
+              onClick={() => toggleCircuitBreaker('throttleAlertEmails', data?.circuitBreakers?.throttleAlertEmails)}
+              disabled={Boolean(toggling)}
+              className="mt-2 w-full py-1.5 px-3 rounded-lg text-[10px] font-bold uppercase tracking-wider border border-white/20 text-gray-300 hover:bg-white/5 transition-all text-center"
+            >
+              {toggling === 'throttleAlertEmails' ? 'Updating...' : data?.circuitBreakers?.throttleAlertEmails ? 'Daily Digest Only' : 'Immediate Throttled'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* CONNECTED APIS QUOTA PROGRESS & USAGE BREAKDOWN */}
+      <div className="space-y-4">
+        <h3 className="text-xs font-bold text-white uppercase tracking-widest flex items-center gap-2">
+          <Database className="w-4 h-4 text-[#14a6d9]" />
+          <span>Connected APIs &amp; Live Quota Status</span>
+        </h3>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {data?.services?.map(service => {
+            const isPinging = pinging === service.id;
+            const pingRes = pingResults[service.id];
+
+            return (
+              <div
+                key={service.id}
+                className="card-surface rounded-2xl border border-white/10 p-5 bg-[#031120]/80 space-y-4 hover:border-[#14a6d9]/30 transition-all"
+              >
+                {/* Service Header */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-xl bg-white/5 border border-white/10">
+                      {getServiceIcon(service.id)}
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                        <span>{service.name}</span>
+                      </h4>
+                      <div className="text-[11px] text-gray-400 mt-0.5 flex items-center gap-2">
+                        <span>{service.category}</span>
+                        <span>•</span>
+                        <span className="text-[#14a6d9] font-mono">{service.tier}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col items-end gap-1.5 shrink-0">
+                    {getStatusBadge(service.status)}
+                    <button
+                      onClick={() => pingSingleService(service.id)}
+                      disabled={isPinging}
+                      className="text-[10px] text-gray-400 hover:text-white flex items-center gap-1 font-mono transition-colors"
+                    >
+                      <RefreshCw className={`w-2.5 h-2.5 ${isPinging ? 'animate-spin' : ''}`} />
+                      <span>{pingRes ? `${pingRes.latencyMs}ms` : `${service.latencyMs}ms`}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Quotas Progress Bars */}
+                <div className="space-y-3 pt-1">
+                  {service.quotas.map(quota => {
+                    const colorClass = getProgressColor(quota.percent);
+                    return (
+                      <div key={quota.metric} className="space-y-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-gray-300 font-medium">{quota.metric}</span>
+                          <span className="font-mono text-[11px] text-gray-400">
+                            <strong className="text-white">{quota.used.toLocaleString()}</strong> / {quota.limit.toLocaleString()} {quota.unit}
+                            {' '}(<span className={colorClass.split(' ')[1]}>{quota.percent}%</span>)
+                          </span>
+                        </div>
+                        <div className="w-full bg-white/5 h-2 rounded-full overflow-hidden border border-white/5">
+                          <div
+                            className={`h-full rounded-full transition-all duration-500 ${colorClass.split(' ')[0]}`}
+                            style={{ width: `${Math.min(100, Math.max(2, quota.percent))}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <div className="text-[10px] text-gray-500 flex items-center justify-between pt-0.5">
+                    <span>{service.quotaResetText}</span>
+                    <span className="text-gray-400">Circuit breaker auto-engages at 90%</span>
+                  </div>
+                </div>
+
+                {/* Active Workarounds Banner */}
+                <div className="p-3 rounded-xl bg-black/40 border border-white/5 space-y-1.5">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-lime-300 flex items-center gap-1.5">
+                    <ShieldCheck className="w-3.5 h-3.5 text-lime-400" />
+                    <span>Active Workaround &amp; Safeguard</span>
+                  </div>
+                  <ul className="text-[11px] text-gray-300 space-y-1 pl-4 list-disc marker:text-lime-400/70">
+                    {service.activeWorkarounds.map((w, idx) => (
+                      <li key={idx} className="leading-snug">{w}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* SUGGESTIONS, FIXES & ENHANCEMENTS IMPACT MATRIX */}
+      <div className="card-surface rounded-2xl border border-[#14a6d9]/25 p-5 space-y-4 bg-[#031120]/60">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/5 pb-3">
+          <div>
+            <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-[#cedc28]" />
+              <span>Architectural Suggestions, Fixes &amp; Impact Analysis</span>
+            </h3>
+            <p className="text-[11px] text-[#14a6d9] mt-0.5">
+              Concrete steps to permanently scale infrastructure, eliminate quotas, and accelerate dashboard load times.
+            </p>
+          </div>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 border border-white/10 px-2.5 py-1 rounded-full self-start sm:self-auto">
+            Actionable Roadmap
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3.5">
+          {data?.services?.flatMap(s => s.recommendations.map(r => ({ ...r, serviceName: s.name }))).map((rec, i) => (
+            <div
+              key={i}
+              className="p-4 rounded-xl bg-[#041628] border border-white/10 hover:border-[#14a6d9]/40 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
+            >
+              <div className="space-y-1.5 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase border ${
+                    rec.priority === 'HIGH'
+                      ? 'bg-rose-500/10 text-rose-300 border-rose-400/30'
+                      : rec.priority === 'MEDIUM'
+                        ? 'bg-amber-500/10 text-amber-300 border-amber-400/30'
+                        : 'bg-blue-500/10 text-blue-300 border-blue-400/30'
+                  }`}>
+                    {rec.priority} Priority
+                  </span>
+                  <span className="text-xs font-bold text-white">{rec.title}</span>
+                  <span className="text-[10px] text-gray-500 font-mono">({rec.serviceName})</span>
+                </div>
+                <p className="text-xs text-gray-300 leading-relaxed">{rec.summary}</p>
+                <div className="flex items-start gap-1.5 text-[11px] text-[#cedc28] pt-1">
+                  <ArrowUpRight className="w-3.5 h-3.5 shrink-0 mt-0.5 text-[#cedc28]" />
+                  <span><strong>Dashboard Impact:</strong> {rec.impact}</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -1,9 +1,10 @@
 "use client";
 import React, { useState, useEffect } from 'react';
-import { Trash2, UserPlus, Shield, User, RefreshCw, CheckCircle2, Key, Layers, Activity, Users as UsersIcon, BarChart3 } from 'lucide-react';
+import { Trash2, UserPlus, Shield, User, RefreshCw, CheckCircle2, Key, Layers, Activity, Users as UsersIcon, BarChart3, Gauge } from 'lucide-react';
 import EventsAdmin from './components/EventsAdmin';
 import DataHealthAdmin from './components/DataHealthAdmin';
 import AnalyticsAdmin from './components/AnalyticsAdmin';
+import ApiQuotasAdmin from './components/ApiQuotasAdmin';
 
 export default function AdminView({ currentUserEmail = 'admin@tahaluf.com', initialEvents = [] }) {
   const [activeSection, setActiveSection] = useState('events');
@@ -207,6 +208,17 @@ export default function AdminView({ currentUserEmail = 'admin@tahaluf.com', init
             )}
           </button>
           <button
+            onClick={() => setActiveSection('quotas')}
+            className={`pb-3 text-xs font-bold uppercase tracking-wider flex items-center gap-2 border-b-2 transition-all ${
+              activeSection === 'quotas'
+                ? 'border-[#cedc28] text-[#cedc28]'
+                : 'border-transparent text-gray-400 hover:text-white'
+            }`}
+          >
+            <Gauge className="w-4 h-4" />
+            API &amp; Quotas Hub
+          </button>
+          <button
             onClick={() => setActiveSection('users')}
             className={`pb-3 text-xs font-bold uppercase tracking-wider flex items-center gap-2 border-b-2 transition-all ${
               activeSection === 'users'
@@ -226,7 +238,7 @@ export default function AdminView({ currentUserEmail = 'admin@tahaluf.com', init
             }`}
           >
             <BarChart3 className="w-4 h-4" />
-            Analytics & Activity
+            Analytics &amp; Activity
           </button>
         </div>
 
@@ -240,6 +252,9 @@ export default function AdminView({ currentUserEmail = 'admin@tahaluf.com', init
           onIssueCountChange={setHealthIssueCount}
           onDashboardAlertsEnabledChange={setDashboardAlertsEnabled}
         />
+
+        {/* SECTION: API INFRASTRUCTURE & QUOTA HUB */}
+        <ApiQuotasAdmin active={activeSection === 'quotas'} />
 
         {/* SECTION 2: USER ACCESS MANAGEMENT */}
         {activeSection === 'users' && (
