@@ -34,6 +34,12 @@ if git diff --cached --quiet; then
   exit 0
 fi
 
+# Use verified GitHub account identity so Vercel and GitHub associate commits with itsjohn9-cell
+export GIT_AUTHOR_NAME="itsjohn9-cell"
+export GIT_AUTHOR_EMAIL="338554005+itsjohn9-cell@users.noreply.github.com"
+export GIT_COMMITTER_NAME="itsjohn9-cell"
+export GIT_COMMITTER_EMAIL="338554005+itsjohn9-cell@users.noreply.github.com"
+
 git commit --quiet -m "Backup: $(date '+%Y-%m-%d %H:%M:%S') - ${SHA:0:7} $SUBJECT"
 gitb push --quiet origin main
 echo "[backup] Pushed ${SHA:0:7} to itsjohn9-cell/backupdashboard"
