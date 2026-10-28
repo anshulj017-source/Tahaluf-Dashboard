@@ -16,6 +16,7 @@ import { dimensionHealthForSource, applyHealthCheckSettings, eventHealthChecks }
 // In-memory cache for sheets: Map<url, { data: string, timestamp: number }>
 // TTL: 5 minutes fresh cache. If Google Sheets fails/times out, stale data is served as resilient fallback.
 const sheetCache = new Map();
+const pendingFetches = new Map(); // Map<string, Promise<{ text: string, status: number, headers: Record<string, string> }>>
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const sourceMapCache = { expiresAt: 0, byCacheKey: new Map() };
 const getSpreadsheetFormulaError = (text) =>
@@ -144,6 +145,22 @@ async function getSheet(request) {
     });
   }
 
+  // Coalesce onto an in-flight request for the exact same URL to dedupe concurrent upstream fetches
+  if (!forceRefresh && pendingFetches.has(url)) {
+    try {
+      const coalesced = await pendingFetches.get(url);
+      return new NextResponse(coalesced.text, {
+        status: coalesced.status,
+        headers: {
+          ...coalesced.headers,
+          'X-Cache': 'HIT-COALESCED'
+        }
+      });
+    } catch (e) {
+      // If the coalesced in-flight fetch failed, proceed with our own attempt
+    }
+  }
+
   const serveFallbackOrEmpty = async (reason) => {
     try {
       const health = await recordSheetFailure(cacheKey, reason);
@@ -153,7 +170,8 @@ async function getSheet(request) {
     }
     if (cached && cached.data) {
       console.warn(`[CACHE RESILIENCE] ${reason} for ${url}. Serving stale cached data as fallback.`);
-      return new NextResponse(cached.data, {
+      return {
+        text: cached.data,
         status: 200,
         headers: {
           'Content-Type': 'text/csv',
@@ -162,125 +180,142 @@ async function getSheet(request) {
           'Vercel-CDN-Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
           'X-Cache': 'STALE-FALLBACK'
         }
-      });
+      };
     }
     console.warn(`[CACHE RESILIENCE] ${reason} for ${url}. No cache available, returning empty response.`);
-    return new NextResponse('', {
+    return {
+      text: '',
       status: 200,
       headers: { 
         'Content-Type': 'text/csv',
         'X-Cache': 'MISS-EMPTY'
       }
-    });
+    };
   };
 
-  try {
-    await observeApiRequest();
-    await observeApiUsage('sheets');
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout for large sheets (up to 13MB)
-
-    let response = await fetch(url, { 
-      cache: 'no-store', 
-      redirect: 'follow',
-      signal: controller.signal 
-    });
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      return await serveFallbackOrEmpty(`Google Sheets returned HTTP status ${response.status}`);
-    }
-    
-    let text = await response.text();
-
-    if (text.startsWith('<!DOCTYPE') || text.startsWith('<html')) {
-      return await serveFallbackOrEmpty('Google Sheets returned HTML instead of CSV');
-    }
-
-    const formulaError = getSpreadsheetFormulaError(text);
-    if (text.startsWith('Loading...') || formulaError) {
-      const retryReason = formulaError
-        ? `Google Sheets returned ${formulaError}`
-        : 'Google Sheets returned Loading...';
-      console.log(`${retryReason}. Retrying for ${url}`);
-      await new Promise(r => setTimeout(r, 1000));
+  const executeFetch = async () => {
+    try {
+      await observeApiRequest();
       await observeApiUsage('sheets');
-      const retryController = new AbortController();
-      const retryTimeout = setTimeout(() => retryController.abort(), 10000);
-      response = await fetch(url, { 
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout for large sheets (up to 13MB)
+
+      let response = await fetch(url, { 
         cache: 'no-store', 
         redirect: 'follow',
-        signal: retryController.signal 
+        signal: controller.signal 
       });
-      clearTimeout(retryTimeout);
+      clearTimeout(timeoutId);
 
-      if (response.ok) {
-        text = await response.text();
+      if (!response.ok) {
+        return await serveFallbackOrEmpty(`Google Sheets returned HTTP status ${response.status}`);
       }
-      const retryFormulaError = getSpreadsheetFormulaError(text);
-      if (!response.ok || text.startsWith('<!DOCTYPE') || text.startsWith('<html') || text.startsWith('Loading...') || retryFormulaError) {
-        const retryFailure = retryFormulaError
-          ? `Google Sheets retry returned spreadsheet formula error (${retryFormulaError})`
-          : 'Google Sheets retry failed or returned invalid response';
-        return await serveFallbackOrEmpty(retryFailure);
-      }
-    }
+      
+      let text = await response.text();
 
-    let dataSummary;
-    try {
-      const checkSettings = await getDimensionSettings();
-      const sources = (await getConfiguredSourcesByCacheKey()).get(cacheKey) || [];
-      dataSummary = summarizeSheetData(text, {
-        metricChecksEnabled: checkSettings.metricChecksEnabled !== false && sources.some(source => eventHealthChecks(source.eventId, checkSettings).metricChecksEnabled)
-      });
-      if (sources.some(source => source.kind === 'Actuals' && eventHealthChecks(source.eventId, checkSettings).dimensionChecksEnabled)) {
-        dataSummary.dimensionValidation = await summarizeDimensions(text);
+      if (text.startsWith('<!DOCTYPE') || text.startsWith('<html')) {
+        return await serveFallbackOrEmpty('Google Sheets returned HTML instead of CSV');
       }
-    } catch (error) {
-      return await serveFallbackOrEmpty(`Google Sheets returned invalid CSV: ${error.message}`);
-    }
-    if (text.trim().length <= 50 || dataSummary.rowCount === 0) {
-      return await serveFallbackOrEmpty('Google Sheets returned an empty or incomplete CSV response');
-    }
 
-    let health;
-    try {
-      health = await storeSheetSnapshot(cacheKey, text, dataSummary);
-      sheetCache.set(url, { data: text, timestamp: Date.now() });
-    } catch (error) {
-      console.warn('[SHEET CACHE] Could not persist sheet to Firestore (using in-memory cache):', error?.message || error);
-      sheetCache.set(url, { data: text, timestamp: Date.now() });
+      const formulaError = getSpreadsheetFormulaError(text);
+      if (text.startsWith('Loading...') || formulaError) {
+        const retryReason = formulaError
+          ? `Google Sheets returned ${formulaError}`
+          : 'Google Sheets returned Loading...';
+        console.log(`${retryReason}. Retrying for ${url}`);
+        await new Promise(r => setTimeout(r, 1000));
+        await observeApiUsage('sheets');
+        const retryController = new AbortController();
+        const retryTimeout = setTimeout(() => retryController.abort(), 10000);
+        response = await fetch(url, { 
+          cache: 'no-store', 
+          redirect: 'follow',
+          signal: retryController.signal 
+        });
+        clearTimeout(retryTimeout);
+
+        if (response.ok) {
+          text = await response.text();
+        }
+        const retryFormulaError = getSpreadsheetFormulaError(text);
+        if (!response.ok || text.startsWith('<!DOCTYPE') || text.startsWith('<html') || text.startsWith('Loading...') || retryFormulaError) {
+          const retryFailure = retryFormulaError
+            ? `Google Sheets retry returned spreadsheet formula error (${retryFormulaError})`
+            : 'Google Sheets retry failed or returned invalid response';
+          return await serveFallbackOrEmpty(retryFailure);
+        }
+      }
+
+      let dataSummary;
       try {
-        health = await recordSheetFailure(cacheKey, `Cache storage failed: ${error.message || error}`, 'storage-error');
-        await reportHealthForSheet(cacheKey, health);
-      } catch (statusError) {
-        console.error('[SHEET CACHE] Could not record cache storage failure:', statusError);
+        const checkSettings = await getDimensionSettings();
+        const sources = (await getConfiguredSourcesByCacheKey()).get(cacheKey) || [];
+        dataSummary = summarizeSheetData(text, {
+          metricChecksEnabled: checkSettings.metricChecksEnabled !== false && sources.some(source => eventHealthChecks(source.eventId, checkSettings).metricChecksEnabled)
+        });
+        if (sources.some(source => source.kind === 'Actuals' && eventHealthChecks(source.eventId, checkSettings).dimensionChecksEnabled)) {
+          dataSummary.dimensionValidation = await summarizeDimensions(text);
+        }
+      } catch (error) {
+        return await serveFallbackOrEmpty(`Google Sheets returned invalid CSV: ${error.message}`);
       }
-      return new NextResponse(text, {
+      if (text.trim().length <= 50 || dataSummary.rowCount === 0) {
+        return await serveFallbackOrEmpty('Google Sheets returned an empty or incomplete CSV response');
+      }
+
+      let health;
+      try {
+        health = await storeSheetSnapshot(cacheKey, text, dataSummary);
+        sheetCache.set(url, { data: text, timestamp: Date.now() });
+      } catch (error) {
+        console.warn('[SHEET CACHE] Could not persist sheet to Firestore (using in-memory cache):', error?.message || error);
+        sheetCache.set(url, { data: text, timestamp: Date.now() });
+        try {
+          health = await recordSheetFailure(cacheKey, `Cache storage failed: ${error.message || error}`, 'storage-error');
+          await reportHealthForSheet(cacheKey, health);
+        } catch (statusError) {
+          console.error('[SHEET CACHE] Could not record cache storage failure:', statusError);
+        }
+        return {
+          text,
+          status: 200,
+          headers: {
+            'Content-Type': 'text/csv',
+            'Cache-Control': 'public, max-age=300, stale-while-revalidate=600',
+            'CDN-Cache-Control': 'public, s-maxage=600, stale-while-revalidate=1200',
+            'Vercel-CDN-Cache-Control': 'public, s-maxage=600, stale-while-revalidate=1200',
+            'X-Cache': 'MISS-PERSISTENCE-ERROR'
+          }
+        };
+      }
+
+      await reportHealthForSheet(cacheKey, health);
+      return {
+        text,
         status: 200,
         headers: {
           'Content-Type': 'text/csv',
           'Cache-Control': 'public, max-age=300, stale-while-revalidate=600',
           'CDN-Cache-Control': 'public, s-maxage=600, stale-while-revalidate=1200',
           'Vercel-CDN-Cache-Control': 'public, s-maxage=600, stale-while-revalidate=1200',
-          'X-Cache': 'MISS-PERSISTENCE-ERROR'
+          'X-Cache': health?.state === 'storage-error' ? 'MISS-PERSISTENCE-ERROR' : 'MISS'
         }
-      });
+      };
+    } catch (error) {
+      return await serveFallbackOrEmpty(`Error fetching sheet: ${error.message || error}`);
     }
+  };
 
-    await reportHealthForSheet(cacheKey, health);
-    return new NextResponse(text, {
-      status: 200,
-      headers: {
-        'Content-Type': 'text/csv',
-        'Cache-Control': 'public, max-age=300, stale-while-revalidate=600',
-        'CDN-Cache-Control': 'public, s-maxage=600, stale-while-revalidate=1200',
-        'Vercel-CDN-Cache-Control': 'public, s-maxage=600, stale-while-revalidate=1200',
-        'X-Cache': health?.state === 'storage-error' ? 'MISS-PERSISTENCE-ERROR' : 'MISS'
-      },
+  const inFlightPromise = executeFetch();
+  pendingFetches.set(url, inFlightPromise);
+  try {
+    const res = await inFlightPromise;
+    return new NextResponse(res.text, {
+      status: res.status,
+      headers: res.headers
     });
-  } catch (error) {
-    return await serveFallbackOrEmpty(`Error fetching sheet: ${error.message || error}`);
+  } finally {
+    pendingFetches.delete(url);
   }
 }
 

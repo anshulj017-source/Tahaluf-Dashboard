@@ -5,7 +5,7 @@ import {
   TrendingUp, Globe, Layers, Activity, DollarSign, MousePointer2, 
   Eye, EyeOff, Shield, Zap, LayoutDashboard, ChevronDown, Search, Check, ShoppingCart,
   TableProperties, MonitorPlay, BarChart3, Smartphone, List, Download, RefreshCw, Users, Calendar, LayoutTemplate, PieChart, Grid, Map as MapIcon, LogOut,
-  Sparkles, Menu, X, SlidersHorizontal, Tv, Maximize2, Minimize2, MoreHorizontal
+  Sparkles, Menu, X, SlidersHorizontal, Tv, Maximize2, Minimize2, MoreHorizontal, Settings
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, AreaChart, Area } from 'recharts';
 import { ComposableMap, Geographies, Geography, ZoomableGroup } from 'react-simple-maps';
@@ -778,12 +778,19 @@ export default function App() {
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [tvMode, setTvMode] = useState(false);
   const [tvAutoCycle, setTvAutoCycle] = useState(false);
+  const [tvCycleIntervalSec, setTvCycleIntervalSec] = useState(25);
+  const [tvCycleViews, setTvCycleViews] = useState(['summary', 'campaign', 'weekly']);
+  const [showTvSettings, setShowTvSettings] = useState(false);
+  const [isQuickJumpOpen, setIsQuickJumpOpen] = useState(false);
+  const [quickJumpSearch, setQuickJumpSearch] = useState('');
   const [currentTime, setCurrentTime] = useState('');
 
   useEffect(() => {
     if (!featureConfig) return;
     if (!isFeatureEnabled(featureConfig, 'tv', userRole, simulatingStandardUser)) setTvMode(false);
     if (!isFeatureEnabled(featureConfig, 'tvAutoCycle', userRole, simulatingStandardUser)) setTvAutoCycle(false);
+    if (!isFeatureEnabled(featureConfig, 'tvCustomization', userRole, simulatingStandardUser)) setShowTvSettings(false);
+    if (!isFeatureEnabled(featureConfig, 'quickJump', userRole, simulatingStandardUser)) setIsQuickJumpOpen(false);
     if (!isFeatureEnabled(featureConfig, 'currency', userRole, simulatingStandardUser)) setCurrency('USD');
   }, [featureConfig, userRole, simulatingStandardUser]);
 
@@ -838,16 +845,34 @@ export default function App() {
   // TV Wallboard Auto-Cycle Carousel
   useEffect(() => {
     if (!tvMode || !tvAutoCycle) return;
-    const cycleTabs = ['summary', 'campaign', 'weekly'].filter(id => isFeatureEnabled(featureConfig, id, userRole, simulatingStandardUser));
+    const baseViews = tvCycleViews.length > 0 ? tvCycleViews : ['summary', 'campaign', 'weekly'];
+    const cycleTabs = baseViews.filter(id => isFeatureEnabled(featureConfig, id, userRole, simulatingStandardUser));
     if (!cycleTabs.length || !isFeatureEnabled(featureConfig, 'tvAutoCycle', userRole, simulatingStandardUser)) return;
+    const intervalMs = Math.max(10, tvCycleIntervalSec) * 1000;
     const interval = setInterval(() => {
       setActiveTab(prev => {
         const nextIdx = (cycleTabs.indexOf(prev) + 1) % cycleTabs.length;
         return cycleTabs[nextIdx];
       });
-    }, 25000);
+    }, intervalMs);
     return () => clearInterval(interval);
-  }, [tvMode, tvAutoCycle, featureConfig, userRole, simulatingStandardUser]);
+  }, [tvMode, tvAutoCycle, tvCycleIntervalSec, tvCycleViews, featureConfig, userRole, simulatingStandardUser]);
+
+  // Command Palette (Cmd + K / Ctrl + K) Quick Jump Listener
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        if (isFeatureEnabled(featureConfig, 'quickJump', userRole, simulatingStandardUser)) {
+          e.preventDefault();
+          setIsQuickJumpOpen(prev => !prev);
+        }
+      } else if (e.key === 'Escape' && isQuickJumpOpen) {
+        setIsQuickJumpOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [featureConfig, userRole, simulatingStandardUser, isQuickJumpOpen]);
 
   useEffect(() => {
     if (userRole === 'non-finance' && ['CPM', 'CPC'].includes(perfMetric)) {
@@ -1302,10 +1327,12 @@ export default function App() {
           }
         });
 
-      const [allActualsArrays, allPlannedArrays] = await Promise.all([
-        Promise.all(actualsPromises),
-        Promise.all(plannedPromises)
+      const [actualsResults, plannedResults] = await Promise.all([
+        Promise.allSettled(actualsPromises),
+        Promise.allSettled(plannedPromises)
       ]);
+      const allActualsArrays = actualsResults.map(r => r.status === 'fulfilled' ? r.value : []);
+      const allPlannedArrays = plannedResults.map(r => r.status === 'fulfilled' ? r.value : []);
 
       setLoadingProgress(92);
       setLoadingStatus('Synthesizing week countdown timelines...');
@@ -2817,43 +2844,118 @@ export default function App() {
     <div className={`h-screen overflow-hidden app-bg font-sans selection:bg-[#cedc28]/30 text-white flex flex-col ${tvMode ? 'tv-mode-active' : ''}`}>
       {/* HEADER: TV Mode or Standard Header */}
       {tvMode ? (
-        <header className="sticky top-0 z-50 bg-[#071a30]/95 backdrop-blur-xl border-b-2 border-[#cedc28]/40 px-3 sm:px-6 py-2.5 shadow-2xl relative flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <img src="/tahaluf-logo.svg" alt="Tahaluf Logo" className="h-6 sm:h-7 object-contain" onError={(e) => e.target.style.display = 'none'} />
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] sm:text-xs font-black text-[#cedc28] uppercase tracking-wider bg-[#cedc28]/10 px-2.5 py-1 rounded-lg border border-[#cedc28]/30">
+        <header className="sticky top-0 z-50 bg-[#071a30]/95 backdrop-blur-xl border-b-2 border-[#cedc28]/40 px-3 sm:px-6 py-2.5 shadow-2xl relative flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <img src="/tahaluf-logo.svg" alt="Tahaluf Logo" className="h-6 sm:h-7 object-contain shrink-0" onError={(e) => e.target.style.display = 'none'} />
+            <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+              <span className="text-[10px] sm:text-xs font-black text-[#cedc28] uppercase tracking-wider bg-[#cedc28]/10 px-2 sm:px-2.5 py-1 rounded-lg border border-[#cedc28]/30 truncate">
                 TV Operations Center
               </span>
-              <span className="hidden md:flex items-center gap-1.5 text-[11px] text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/30 animate-pulse">
+              <span className="hidden md:flex items-center gap-1.5 text-[11px] text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/30 animate-pulse shrink-0">
                 <span className="w-2 h-2 rounded-full bg-emerald-400"></span> Live Monitoring
               </span>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="text-right hidden sm:block">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            <div className="text-right hidden sm:block shrink-0">
               <div className="text-sm font-black text-white font-mono tracking-wider">{currentTime}</div>
               <div className="text-[9px] font-bold text-[#14a6d9] uppercase tracking-widest">
                 {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
               </div>
             </div>
 
-            {featureAllowed('tvAutoCycle') && <button
-              onClick={() => setTvAutoCycle(!tvAutoCycle)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border flex items-center gap-1.5 ${
-                tvAutoCycle 
-                  ? 'bg-[#cedc28] text-[#1a302e] border-[#cedc28] shadow-[0_0_15px_rgba(206,220,40,0.4)]' 
-                  : 'bg-[#0a2442] text-gray-300 border-gray-700 hover:text-white'
-              }`}
-              title="Automatically rotate between Overview, Event View and Weekly View every 25 seconds"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${tvAutoCycle ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">Auto-Cycle:</span> {tvAutoCycle ? 'ON' : 'OFF'}
-            </button>}
+            {featureAllowed('tvAutoCycle') && (
+              <div className="relative flex items-center gap-1.5 shrink-0">
+                <button
+                  onClick={() => setTvAutoCycle(!tvAutoCycle)}
+                  className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all border flex items-center gap-1.5 shrink-0 ${
+                    tvAutoCycle 
+                      ? 'bg-[#cedc28] text-[#1a302e] border-[#cedc28] shadow-[0_0_15px_rgba(206,220,40,0.4)]' 
+                      : 'bg-[#0a2442] text-gray-300 border-gray-700 hover:text-white'
+                  }`}
+                  title={`Automatically rotate between enabled views every ${tvCycleIntervalSec}s`}
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${tvAutoCycle ? 'animate-spin' : ''}`} />
+                  <span className="hidden sm:inline">Auto-Cycle:</span> {tvAutoCycle ? 'ON' : 'OFF'}
+                </button>
+
+                {featureAllowed('tvCustomization') && (
+                  <button
+                    onClick={() => setShowTvSettings(!showTvSettings)}
+                    className="p-1.5 rounded-lg border border-gray-700 bg-[#0a2442] text-gray-300 hover:text-white hover:border-[#cedc28]/40 transition shrink-0"
+                    title="Configure TV Wallboard rotation speed and views"
+                  >
+                    <Settings className="w-3.5 h-3.5" />
+                  </button>
+                )}
+
+                {showTvSettings && featureAllowed('tvCustomization') && (
+                  <div className="absolute top-full right-0 mt-2 w-64 rounded-xl border border-white/15 bg-[#031120] p-3 text-xs text-white shadow-2xl z-50">
+                    <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-2 font-bold text-[#cedc28]">
+                      <span>TV Wallboard Settings</span>
+                      <button onClick={() => setShowTvSettings(false)} className="text-slate-400 hover:text-white">✕</button>
+                    </div>
+                    <div className="space-y-2">
+                      <div>
+                        <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">Rotation Interval</label>
+                        <div className="grid grid-cols-4 gap-1">
+                          {[15, 25, 45, 60].map(sec => (
+                            <button
+                              key={sec}
+                              type="button"
+                              onClick={() => setTvCycleIntervalSec(sec)}
+                              className={`rounded py-1 font-mono text-center text-xs border ${
+                                tvCycleIntervalSec === sec
+                                  ? 'border-[#cedc28] bg-[#cedc28]/20 text-[#cedc28] font-bold'
+                                  : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10'
+                              }`}
+                            >
+                              {sec}s
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="pt-2 border-t border-white/10">
+                        <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">Enabled Rotation Slides</label>
+                        <div className="space-y-1">
+                          {[
+                            ['summary', 'Overview'],
+                            ['campaign', 'Event View'],
+                            ['weekly', 'Weekly Pacing'],
+                            ['channel', 'Channel Matrix'],
+                            ['market', 'Market View']
+                          ].map(([id, label]) => {
+                            const isIncluded = tvCycleViews.includes(id);
+                            return (
+                              <label key={id} className="flex items-center gap-2 text-slate-200 hover:text-white cursor-pointer py-0.5">
+                                <input
+                                  type="checkbox"
+                                  checked={isIncluded}
+                                  onChange={e => {
+                                    if (e.target.checked) {
+                                      setTvCycleViews(prev => [...prev, id]);
+                                    } else {
+                                      setTvCycleViews(prev => prev.filter(v => v !== id));
+                                    }
+                                  }}
+                                  className="accent-[#cedc28]"
+                                />
+                                <span>{label}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             <button
               onClick={() => setTvMode(false)}
-              className="px-3 py-1.5 rounded-lg text-xs font-bold bg-red-500/20 text-red-300 border border-red-500/40 hover:bg-red-500 hover:text-white transition-all flex items-center gap-1.5"
+              className="px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold bg-red-500/20 text-red-300 border border-red-500/40 hover:bg-red-500 hover:text-white transition-all flex items-center gap-1.5 shrink-0"
             >
               <Minimize2 className="w-3.5 h-3.5" />
               <span>Exit TV Mode</span>
@@ -2873,20 +2975,20 @@ export default function App() {
           <div className="pattern-overlay absolute inset-0 z-0 pointer-events-none"></div>
 
           {/* DESKTOP HEADER (Screens >= lg / 1024px) */}
-          <div className="hidden lg:flex items-center relative z-10 w-full">
+          <div className="hidden lg:flex items-center justify-between relative z-10 w-full px-4 xl:px-6">
             {/* LEFT: Logo - Exactly matches sidebar width w-52 (208px) */}
-            <div className="w-52 pl-6 pr-4 flex items-center justify-between shrink-0 border-r border-[#cedc28]/15">
+            <div className="w-52 pr-4 flex items-center justify-between shrink-0 border-r border-[#cedc28]/15">
               <div className="flex flex-col items-start gap-0.5">
                 <img src="/tahaluf-logo.svg" alt="Tahaluf Logo" className="h-7 object-contain" onError={(e) => e.target.style.display = 'none'} />
                 <p className="text-[8.5px] font-bold text-[#cedc28] uppercase tracking-[0.08em] whitespace-nowrap">Performance Dashboard</p>
               </div>
             </div>
 
-            {/* FILTERS + ACTIONS: pl-8 (32px) aligns with cards in <main> below */}
-            <div className="pl-8 pr-6 flex gap-1.5 xl:gap-2 flex-nowrap items-end flex-1 overflow-x-auto xl:overflow-visible">
-              <DateRangeFilter label="DATE" dateRange={dateRange} onChange={setDateRange} widthClass="w-[125px] xl:w-[135px]" />
-              <MultiSelect label="Week" options={uniqueWeeks} selected={filterWeeks} onChange={setFilterWeeks} widthClass="w-[82px] xl:w-[90px]" />
-              <MultiSelect label="Portfolio" options={uniquePortfolios} selected={filterPortfolios} onChange={setFilterPortfolios} widthClass="w-[90px] xl:w-[100px]" />
+            {/* CENTER: FILTERS (scrollable horizontally if constrained, compact responsive widths) */}
+            <div className="px-3 xl:px-4 flex gap-1.5 xl:gap-2 flex-nowrap items-end flex-1 min-w-0 overflow-x-auto custom-scrollbar">
+              <DateRangeFilter label="DATE" dateRange={dateRange} onChange={setDateRange} widthClass="w-[115px] xl:w-[125px] 2xl:w-[135px]" />
+              <MultiSelect label="Week" options={uniqueWeeks} selected={filterWeeks} onChange={setFilterWeeks} widthClass="w-[76px] xl:w-[84px] 2xl:w-[90px]" />
+              <MultiSelect label="Portfolio" options={uniquePortfolios} selected={filterPortfolios} onChange={setFilterPortfolios} widthClass="w-[82px] xl:w-[90px] 2xl:w-[100px]" />
               {/* HERO HIGHLIGHTED EVENT FILTER */}
               <MultiSelect 
                 label="Event" 
@@ -2901,68 +3003,100 @@ export default function App() {
                   }
                 }} 
                 isHero={true} 
-                widthClass="w-[145px] xl:w-[170px]" 
+                widthClass="w-[130px] xl:w-[145px] 2xl:w-[170px]" 
               />
-              <MultiSelect label="Event Type" options={uniqueEventTypes} selected={filterEventTypes} onChange={setFilterEventTypes} widthClass="w-[94px] xl:w-[104px]" />
-              <MultiSelect label="Funnel Stage" options={uniquePhases} selected={filterPhases} onChange={setFilterPhases} widthClass="w-[96px] xl:w-[106px]" />
-              <MultiSelect label="Channel" options={uniqueChannels} selected={filterChannels} onChange={setFilterChannels} widthClass="w-[90px] xl:w-[98px]" />
-              <MultiSelect label="Market" options={uniqueMarkets} selected={filterMarkets} onChange={setFilterMarkets} widthClass="w-[112px] xl:w-[128px]" />
+              <MultiSelect label="Event Type" options={uniqueEventTypes} selected={filterEventTypes} onChange={setFilterEventTypes} widthClass="w-[86px] xl:w-[94px] 2xl:w-[104px]" />
+              <MultiSelect label="Funnel Stage" options={uniquePhases} selected={filterPhases} onChange={setFilterPhases} widthClass="w-[88px] xl:w-[96px] 2xl:w-[106px]" />
+              <MultiSelect label="Channel" options={uniqueChannels} selected={filterChannels} onChange={setFilterChannels} widthClass="w-[82px] xl:w-[90px] 2xl:w-[98px]" />
+              <MultiSelect label="Market" options={uniqueMarkets} selected={filterMarkets} onChange={setFilterMarkets} widthClass="w-[100px] xl:w-[112px] 2xl:w-[128px]" />
               <MultiSelect 
                 label="Business" 
                 options={uniqueBusinesses} 
                 selected={filterBusinesses} 
                 onChange={setFilterBusinesses} 
-                widthClass="w-[86px] xl:w-[94px]" 
+                widthClass="w-[78px] xl:w-[86px] 2xl:w-[94px]" 
                 singleSelect={true}
                 alignRight={true}
               />
-              
-              <div className="ml-auto shrink-0 flex items-center gap-1.5">
-                {featureAllowed('tv') && <button
+            </div>
+
+            {/* RIGHT: PINNED ACTIONS (ALWAYS VISIBLE & ACCESSIBLE ACROSS DYNAMIC SCREEN SIZES) */}
+            <div className="pl-3 shrink-0 flex items-center gap-1.5 border-l border-[#cedc28]/15">
+              {featureAllowed('quickJump') && (
+                <button
+                  onClick={() => setIsQuickJumpOpen(true)}
+                  title="Search & Quick Jump (Cmd+K)"
+                  className="h-[30px] px-2 bg-white/5 border border-white/15 text-slate-300 rounded-lg hover:bg-white/10 hover:text-white transition-colors flex items-center gap-1.5 text-[10px] font-semibold shrink-0"
+                >
+                  <Search className="w-3 h-3 text-[#14a6d9]" />
+                  <span className="hidden 2xl:inline">Search</span>
+                  <kbd className="hidden 2xl:inline-block rounded bg-black/40 px-1 py-0.2 text-[9px] text-slate-400 font-mono">⌘K</kbd>
+                </button>
+              )}
+              {featureAllowed('tv') && (
+                <button
                   onClick={() => setTvMode(true)} 
                   title="TV Wallboard Presentation Mode" 
-                  className="h-[30px] px-2 bg-[#14a6d9]/10 border border-[#14a6d9]/40 text-[#14a6d9] rounded-lg hover:bg-[#14a6d9]/20 hover:text-white transition-colors flex items-center gap-1 text-[10px] font-bold"
+                  className="h-[30px] px-2.5 bg-[#14a6d9]/15 border border-[#14a6d9]/50 text-[#14a6d9] rounded-lg hover:bg-[#14a6d9]/25 hover:text-white transition-colors flex items-center gap-1.5 text-[10px] font-bold shadow-sm shrink-0"
                 >
                   <Tv className="w-3.5 h-3.5"/>
-                  <span className="hidden xl:inline">TV</span>
-                </button>}
-                <button onClick={resetFilters} title="Reset Filters" className="h-[30px] w-[30px] bg-[#cedc28]/10 border border-[#cedc28]/50 text-[#cedc28] rounded-lg hover:bg-[#cedc28]/20 hover:text-white transition-colors flex items-center justify-center"><RefreshCw className="w-3.5 h-3.5"/></button>
-              </div>
+                  <span className="inline font-bold">TV</span>
+                </button>
+              )}
+              <button 
+                onClick={resetFilters} 
+                title="Reset Filters" 
+                className="h-[30px] w-[30px] bg-[#cedc28]/10 border border-[#cedc28]/50 text-[#cedc28] rounded-lg hover:bg-[#cedc28]/20 hover:text-white transition-colors flex items-center justify-center shrink-0"
+              >
+                <RefreshCw className="w-3.5 h-3.5"/>
+              </button>
             </div>
           </div>
 
           {/* MOBILE / TABLET HEADER (Screens < lg / 1024px) */}
-          <div className="lg:hidden flex items-center justify-between px-3 relative z-10 w-full">
-            <div className="flex items-center gap-2">
+          <div className="lg:hidden flex items-center justify-between px-3 relative z-10 w-full gap-2">
+            <div className="flex items-center gap-2 min-w-0">
               <button 
                 onClick={() => setMobileMenuOpen(true)}
-                className="p-1.5 rounded-lg bg-[#cedc28]/10 text-[#cedc28] border border-[#cedc28]/30 hover:bg-[#cedc28]/20 transition-colors"
+                className="p-1.5 rounded-lg bg-[#cedc28]/10 text-[#cedc28] border border-[#cedc28]/30 hover:bg-[#cedc28]/20 transition-colors shrink-0"
                 title="Open Navigation Menu"
               >
                 <Menu className="w-5 h-5" />
               </button>
-              <div className="flex flex-col items-start">
+              <div className="flex flex-col items-start shrink-0">
                 <img src="/tahaluf-logo.svg" alt="Tahaluf Logo" className="h-6 object-contain" onError={(e) => e.target.style.display = 'none'} />
                 <p className="text-[7.5px] font-bold text-[#cedc28] uppercase tracking-[0.08em]">Dashboard</p>
               </div>
               {selectedEvent && (
-                <span className="ml-1 px-2 py-0.5 rounded-full text-[9px] font-black bg-[#cedc28]/20 text-[#cedc28] border border-[#cedc28]/40 truncate max-w-[100px] sm:max-w-[140px]">
+                <span className="ml-1 px-2 py-0.5 rounded-full text-[9px] font-black bg-[#cedc28]/20 text-[#cedc28] border border-[#cedc28]/40 truncate max-w-[80px] sm:max-w-[130px]">
                   {selectedEvent}
                 </span>
               )}
             </div>
 
-            <div className="flex items-center gap-1.5">
-              {featureAllowed('tv') && <button
-                onClick={() => setTvMode(true)} 
-                title="TV Wallboard Mode" 
-                className="h-[32px] w-[32px] bg-[#14a6d9]/10 border border-[#14a6d9]/40 text-[#14a6d9] rounded-lg hover:bg-[#14a6d9]/20 transition-colors flex items-center justify-center"
-              >
-                <Tv className="w-4 h-4"/>
-              </button>}
+            <div className="flex items-center gap-1.5 shrink-0">
+              {featureAllowed('quickJump') && (
+                <button
+                  onClick={() => setIsQuickJumpOpen(true)}
+                  title="Search & Quick Jump (Cmd+K)"
+                  className="h-[32px] w-[32px] bg-white/5 border border-white/15 text-slate-300 rounded-lg hover:bg-white/10 hover:text-white transition-colors flex items-center justify-center shrink-0"
+                >
+                  <Search className="w-3.5 h-3.5 text-[#14a6d9]" />
+                </button>
+              )}
+              {featureAllowed('tv') && (
+                <button
+                  onClick={() => setTvMode(true)} 
+                  title="TV Wallboard Mode" 
+                  className="h-[32px] px-2 bg-[#14a6d9]/15 border border-[#14a6d9]/50 text-[#14a6d9] rounded-lg hover:bg-[#14a6d9]/25 transition-colors flex items-center gap-1 text-[11px] font-bold shrink-0"
+                >
+                  <Tv className="w-3.5 h-3.5"/>
+                  <span className="hidden sm:inline">TV</span>
+                </button>
+              )}
               <button 
                 onClick={() => setMobileFiltersOpen(true)}
-                className={`h-[32px] px-2.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 border ${
+                className={`h-[32px] px-2.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 border shrink-0 ${
                   activeFilterCount > 0 
                     ? 'bg-[#cedc28] text-[#1a302e] border-[#cedc28] shadow-[0_0_10px_rgba(206,220,40,0.3)]' 
                     : 'bg-[#cedc28]/10 text-[#cedc28] border-[#cedc28]/40'
@@ -2979,7 +3113,7 @@ export default function App() {
               <button 
                 onClick={resetFilters} 
                 title="Reset Filters" 
-                className="h-[32px] w-[32px] bg-[#cedc28]/10 border border-[#cedc28]/50 text-[#cedc28] rounded-lg hover:bg-[#cedc28]/20 transition-colors flex items-center justify-center"
+                className="h-[32px] w-[32px] bg-[#cedc28]/10 border border-[#cedc28]/50 text-[#cedc28] rounded-lg hover:bg-[#cedc28]/20 transition-colors flex items-center justify-center shrink-0"
               >
                 <RefreshCw className="w-3.5 h-3.5"/>
               </button>
@@ -3029,6 +3163,18 @@ export default function App() {
                   </button>
                 );
               })}
+              {featureAllowed('tv') && (
+                <button
+                  onClick={() => {
+                    setTvMode(true);
+                    setMobileMenuOpen(false);
+                  }}
+                  className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl font-bold text-[13px] text-[#14a6d9] bg-[#14a6d9]/10 border border-[#14a6d9]/30 hover:bg-[#14a6d9]/20 transition-all"
+                >
+                  <Tv className="w-4 h-4" />
+                  TV Wallboard Mode
+                </button>
+              )}
             </div>
 
             <div className="mt-auto pt-4 border-t border-[#cedc28]/20 flex flex-col gap-3">
@@ -3360,6 +3506,143 @@ export default function App() {
         <Check className="w-3 h-3 text-[#cedc28]" />
         <span>V1 Universal</span>
       </div>
+
+      {/* COMMAND PALETTE MODAL (CMD + K) */}
+      {isQuickJumpOpen && featureAllowed('quickJump') && (
+        <div 
+          className="fixed inset-0 z-50 flex items-start justify-center pt-20 px-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-150"
+          onClick={() => setIsQuickJumpOpen(false)}
+        >
+          <div 
+            className="w-full max-w-xl rounded-2xl border border-white/20 bg-[#071d33] shadow-2xl overflow-hidden text-white"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Search Input Bar */}
+            <div className="flex items-center gap-3 px-4 py-3 border-b border-white/10 bg-[#041628]">
+              <Search className="w-5 h-5 text-[#14a6d9] shrink-0" />
+              <input
+                type="text"
+                autoFocus
+                value={quickJumpSearch}
+                onChange={e => setQuickJumpSearch(e.target.value)}
+                placeholder="Jump to event, view, or tool..."
+                className="w-full bg-transparent text-sm text-white placeholder:text-slate-500 focus:outline-none"
+              />
+              <kbd className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-mono text-slate-400">ESC</kbd>
+            </div>
+
+            {/* Results List */}
+            <div className="max-h-80 overflow-y-auto p-2 space-y-3">
+              {/* Filtered Events & Nav Items */}
+              {(() => {
+                const q = quickJumpSearch.trim().toLowerCase();
+                const matchedEvents = uniqueEvents.filter(ev => ev !== 'All' && (!q || ev.toLowerCase().includes(q)));
+                const matchedNav = NAV_ITEMS.filter(item => featureAllowed(item.id) && (!q || item.label.toLowerCase().includes(q)));
+
+                return (
+                  <>
+                    {matchedNav.length > 0 && (
+                      <div>
+                        <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Views & Dashboards</div>
+                        <div className="space-y-0.5">
+                          {matchedNav.map(item => (
+                            <button
+                              key={item.id}
+                              type="button"
+                              onClick={() => {
+                                setActiveTab(item.id);
+                                setIsQuickJumpOpen(false);
+                                setQuickJumpSearch('');
+                              }}
+                              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-left transition ${
+                                activeTab === item.id ? 'bg-[#14a6d9]/20 text-[#6bd5f7]' : 'hover:bg-white/5 text-slate-200'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <item.icon className="w-4 h-4 text-[#14a6d9]" />
+                                <span>{item.label}</span>
+                              </div>
+                              <span className="text-[10px] text-slate-500 font-mono">Jump →</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {matchedEvents.length > 0 && (
+                      <div>
+                        <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Events</div>
+                        <div className="grid grid-cols-2 gap-1">
+                          {matchedEvents.map(ev => (
+                            <button
+                              key={ev}
+                              type="button"
+                              onClick={() => {
+                                setSelectedEvent(ev);
+                                setFilterEvents([ev]);
+                                setActiveTab('campaign');
+                                setIsQuickJumpOpen(false);
+                                setQuickJumpSearch('');
+                              }}
+                              className="flex items-center justify-between px-3 py-2 rounded-lg text-xs text-left bg-white/5 hover:bg-[#cedc28]/15 hover:text-[#cedc28] transition border border-transparent hover:border-[#cedc28]/30"
+                            >
+                              <span className="truncate">{ev}</span>
+                              <span className="text-[10px] text-slate-500 shrink-0 font-mono">Open</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Quick Utilities */}
+                    <div>
+                      <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Quick Actions</div>
+                      <div className="space-y-0.5">
+                        {featureAllowed('currency') && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              toggleCurrency();
+                              setIsQuickJumpOpen(false);
+                            }}
+                            className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs text-slate-300 hover:bg-white/5 transition"
+                          >
+                            <div className="flex items-center gap-2">
+                              <DollarSign className="w-4 h-4 text-emerald-400" />
+                              <span>Toggle Currency (Currently {currency})</span>
+                            </div>
+                            <span className="text-[10px] text-slate-400">Switch to {currency === 'USD' ? 'SAR' : 'USD'}</span>
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            resetFilters();
+                            setIsQuickJumpOpen(false);
+                          }}
+                          className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs text-slate-300 hover:bg-white/5 transition"
+                        >
+                          <div className="flex items-center gap-2">
+                            <RefreshCw className="w-4 h-4 text-[#cedc28]" />
+                            <span>Reset All Filters</span>
+                          </div>
+                          <span className="text-[10px] text-slate-400">Clear filters</span>
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+            
+            {/* Footer */}
+            <div className="px-4 py-2 border-t border-white/10 bg-[#041628] flex items-center justify-between text-[11px] text-slate-500">
+              <span>Quickly navigate events and dashboard sections</span>
+              <span className="font-mono">Tahaluf Intelligence</span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
     </DashboardFeatureContext.Provider>
   );

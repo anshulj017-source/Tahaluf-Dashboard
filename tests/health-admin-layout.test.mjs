@@ -185,7 +185,7 @@ async function setupHealthAdmin(sourceFixture, { delaySettings = false, globalCh
     'lucide-react': new Proxy({}, { get: () => icon }),
     '../../lib/firebase': { auth: { currentUser: null } },
     '../../lib/healthNotificationUtils.mjs': { DEFAULT_HEALTH_NOTIFICATION_SETTINGS, getHealthIssues },
-    './DashboardFeatureContext': { useLowQuotaMode: () => false },
+    './DashboardFeatureContext': { useLowQuotaMode: () => false, useDashboardFeature: () => true },
     '../../lib/dimensionStandards.mjs': {
       DEFAULT_DIMENSION_SETTINGS,
       DIMENSIONS: [{ id: 'geo', label: 'Geo' }]

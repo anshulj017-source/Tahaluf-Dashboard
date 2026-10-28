@@ -335,7 +335,35 @@ function test24hMetricIntegrity() {
   const check3 = checkMetricDiscrepancies(current3, baseline1);
   assert(check3.discrepancies.length === 0, 'Micro-drop within tolerance is safely ignored');
 
-  // Test 4: Health issue detection for metric discrepancy
+  // Test 4: Partial-day filtering prevents false regression alerts for today
+  const todayUtc = '2026-10-28';
+  const baselineToday = {
+    'SMLC 26:::Google Ads:::2026-10-28': { cost: 150, impressions: 3000, clicks: 80, conversions: 8 }
+  };
+  const currentTodayDrop = [
+    { eventName: 'SMLC 26', channel: 'Google Ads', date: todayUtc, cost: 80, impressions: 3000, clicks: 80, conversions: 8 }
+  ];
+  const checkFilteredToday = checkMetricDiscrepancies(currentTodayDrop, baselineToday, { filterPartialCurrentDay: true, currentDay: todayUtc });
+  assert(checkFilteredToday.discrepancies.length === 0, 'Partial current-day regression drop is filtered out when enabled');
+
+  const checkUnfilteredToday = checkMetricDiscrepancies(currentTodayDrop, baselineToday, { filterPartialCurrentDay: false, currentDay: todayUtc });
+  assert(checkUnfilteredToday.discrepancies.length === 1, 'Partial current-day regression drop is detected when filtering is disabled');
+  assert(checkUnfilteredToday.discrepancies[0].metric === 'cost', 'Discrepancy correctly flags cost');
+  assert(checkUnfilteredToday.discrepancies[0].isPartialDay === true, 'Discrepancy correctly flags isPartialDay');
+
+  // Test 5: Extraction with excludePartialCurrentDay
+  const multiDayCsv = [
+    'Event Name DB,Channel,Date,Cost,Impressions,Clicks,Conversions',
+    'SMLC 26,Google Ads,2026-10-27,200,5000,120,15',
+    'SMLC 26,Google Ads,2026-10-28,40,800,15,2'
+  ].join('\n');
+  const extractFiltered = extractChannelMetrics24h(multiDayCsv, '', { excludePartialCurrentDay: true, currentDay: '2026-10-28' });
+  assert(extractFiltered.latestDate === '2026-10-27', 'excludePartialCurrentDay selects previous closed day 2026-10-27');
+
+  const extractUnfiltered = extractChannelMetrics24h(multiDayCsv, '', { excludePartialCurrentDay: false });
+  assert(extractUnfiltered.latestDate === '2026-10-28', 'Standard extraction selects latest date 2026-10-28');
+
+  // Test 6: Health issue detection for metric discrepancy
   const healthIssues = getHealthIssues([
     {
       eventId: 'smlc-26',
@@ -740,6 +768,16 @@ async function testApiEndpoints() {
   assert(xCache === 'HIT', `X-Cache header indicates cache HIT (got: ${xCache})`);
   assert(cacheControl && cacheControl.includes('stale-while-revalidate'), `Cache-Control includes stale-while-revalidate (got: ${cacheControl})`);
   assert(elapsed < 200, `Cached response returned in <200ms (actual: ${elapsed}ms)`);
+
+  // Verify concurrent request in-flight deduplication / coalescing
+  const concurrentUrl = `${LOCAL_API_BASE}?type=combined&gid=1121987876`;
+  const [resA, resB] = await Promise.all([
+    fetch(concurrentUrl),
+    fetch(concurrentUrl)
+  ]);
+  assert(resA.status === 200 && resB.status === 200, 'Concurrent sheet requests both return HTTP 200');
+  const cacheHeaders = [resA.headers.get('x-cache'), resB.headers.get('x-cache')];
+  assert(cacheHeaders.some(h => ['HIT', 'HIT-COALESCED', 'MISS', 'STALE-FALLBACK'].includes(h)), 'Concurrent sheet requests handled via coalesced caching');
 }
 
 // -------------------------------------------------------------
@@ -1158,6 +1196,7 @@ async function testAnalyticsApi() {
     assert(revertPostJson.status === 'reverted', 'Reverted action status updated to reverted');
     assert(revertPostJson.actionsHistory.some(h => h.actionId === 'smart_default_b2b' && h.operation === 'REVERT'), 'Reverted action tracked in audit history');
   } catch (err) {
+    console.error('Analytics API failure stack:', err);
     assert(false, `Analytics API: Exception (${err.message})`);
   }
 }
@@ -1251,12 +1290,16 @@ function testFeatureControlsLogic() {
   console.log('\n--- 11. Testing Dashboard Feature Controls & Role Permissions ---');
   
   // 1. Verify all managed features are declared
-  assert(Array.isArray(DASHBOARD_FEATURES) && DASHBOARD_FEATURES.length >= 14, 'DASHBOARD_FEATURES defines all managed modules');
+  assert(Array.isArray(DASHBOARD_FEATURES) && DASHBOARD_FEATURES.length >= 18, 'DASHBOARD_FEATURES defines all managed modules');
   const featureIds = DASHBOARD_FEATURES.map(f => f.id);
   assert(featureIds.includes('tv'), 'Includes tv mode feature');
   assert(featureIds.includes('aiSummary'), 'Includes aiSummary feature');
   assert(featureIds.includes('granularTimeline'), 'Includes granularTimeline feature');
   assert(featureIds.includes('benchmarkComparison'), 'Includes benchmarkComparison feature');
+  assert(featureIds.includes('quickJump'), 'Includes quickJump feature');
+  assert(featureIds.includes('dimensionExport'), 'Includes dimensionExport feature');
+  assert(featureIds.includes('bulkDimensionImport'), 'Includes bulkDimensionImport feature');
+  assert(featureIds.includes('tvCustomization'), 'Includes tvCustomization feature');
 
   // 2. Verify all new features default strictly to admin_only (zero disruption to live standard users)
   const aiFeature = DASHBOARD_FEATURES.find(f => f.id === 'aiSummary');
@@ -1265,6 +1308,15 @@ function testFeatureControlsLogic() {
   assert(timelineFeature?.defaultMode === 'admin_only', 'New feature granularTimeline defaults to admin_only');
   const benchmarkFeature = DASHBOARD_FEATURES.find(f => f.id === 'benchmarkComparison');
   assert(benchmarkFeature?.defaultMode === 'admin_only', 'New feature benchmarkComparison defaults to admin_only');
+
+  const auditFeatures = ['quickJump', 'dimensionExport', 'bulkDimensionImport', 'tvCustomization'];
+  for (const afId of auditFeatures) {
+    const feat = DASHBOARD_FEATURES.find(f => f.id === afId);
+    assert(feat?.defaultMode === 'admin_only', `New feature ${afId} defaults strictly to admin_only`);
+    assert(isFeatureEnabled(DEFAULT_FEATURE_CONFIG, afId, 'standard') === false, `Standard user cannot view ${afId}`);
+    assert(isFeatureEnabled(DEFAULT_FEATURE_CONFIG, afId, 'admin') === true, `Admin user can access ${afId}`);
+    assert(isFeatureEnabled(DEFAULT_FEATURE_CONFIG, afId, 'admin', true) === false, `Persona preview hides ${afId} for standard view`);
+  }
 
   // 3. Verify standard user role cannot access admin_only features
   assert(isFeatureEnabled(DEFAULT_FEATURE_CONFIG, 'summary', 'standard') === true, 'Standard user can view Overview');
@@ -1280,12 +1332,13 @@ function testFeatureControlsLogic() {
   // 5. Verify simulator preview mode: when admin previews as standard user, admin_only features are hidden
   assert(isFeatureEnabled(DEFAULT_FEATURE_CONFIG, 'aiSummary', 'admin', true) === false, 'Persona preview hides aiSummary for standard view');
 
-  // 6. Verify cascading dependencies (tvAutoCycle requires tv)
+  // 6. Verify cascading dependencies (tvAutoCycle & tvCustomization require tv)
   const disabledTvConfig = {
     revision: 1,
-    modes: { ...DEFAULT_FEATURE_CONFIG.modes, tv: 'disabled', tvAutoCycle: 'public' }
+    modes: { ...DEFAULT_FEATURE_CONFIG.modes, tv: 'disabled', tvAutoCycle: 'public', tvCustomization: 'admin_only' }
   };
   assert(isFeatureEnabled(disabledTvConfig, 'tvAutoCycle', 'admin') === false, 'tvAutoCycle is disabled when parent tv feature is disabled');
+  assert(isFeatureEnabled(disabledTvConfig, 'tvCustomization', 'admin') === false, 'tvCustomization is disabled when parent tv feature is disabled');
 
   // 7. Verify validateFeatureModes validation
   const validModes = validateFeatureModes({ aiSummary: 'public' });

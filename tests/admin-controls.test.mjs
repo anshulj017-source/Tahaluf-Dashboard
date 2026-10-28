@@ -550,6 +550,49 @@ test('TV auto-cycle obeys its parent visibility', () => {
   assert.equal(isFeatureEnabled(config, 'tvAutoCycle', 'admin'), false);
 });
 
+test('audit enhancements features default to admin_only and obey permissions', async () => {
+  const { extractChannelMetrics24h, checkMetricDiscrepancies } = await import('../lib/metricIntegrity.mjs');
+  
+  const newFeatureIds = ['quickJump', 'dimensionExport', 'bulkDimensionImport', 'tvCustomization'];
+  for (const id of newFeatureIds) {
+    const feature = DASHBOARD_FEATURES.find(f => f.id === id);
+    assert.ok(feature, `Feature ${id} is registered in DASHBOARD_FEATURES`);
+    assert.equal(feature.defaultMode, 'admin_only', `Feature ${id} defaults to admin_only`);
+    assert.equal(isFeatureEnabled(DEFAULT_FEATURE_CONFIG, id, 'standard'), false, `Standard user cannot access ${id} by default`);
+    assert.equal(isFeatureEnabled(DEFAULT_FEATURE_CONFIG, id, 'admin'), true, `Admin user can access ${id} by default`);
+    assert.equal(isFeatureEnabled(DEFAULT_FEATURE_CONFIG, id, 'admin', true), false, `Simulator preview hides ${id} for standard persona`);
+  }
+
+  // tvCustomization requires parent tv feature
+  const tvDisabledConfig = { modes: { ...DEFAULT_FEATURE_CONFIG.modes, tv: 'disabled', tvCustomization: 'admin_only' } };
+  assert.equal(isFeatureEnabled(tvDisabledConfig, 'tvCustomization', 'admin'), false, 'tvCustomization is disabled if tv is disabled');
+
+  // Verify partial-day metric integrity filtering
+  const csvWithToday = [
+    'Event Name DB,Channel,Date,Cost,Impressions,Clicks,Conversions',
+    'SMLC 26,Google Ads,2026-10-27,200,5000,120,15',
+    'SMLC 26,Google Ads,2026-10-28,50,1000,20,3'
+  ].join('\n');
+
+  // Extract with excludePartialCurrentDay: true when today is 2026-10-28
+  const resFiltered = extractChannelMetrics24h(csvWithToday, '', { excludePartialCurrentDay: true, currentDay: '2026-10-28' });
+  assert.equal(resFiltered.latestDate, '2026-10-27', 'Excludes partial current day and picks latest complete date');
+
+  // Check discrepancies with filterPartialCurrentDay: true
+  const baseline = {
+    'SMLC 26:::Google Ads:::2026-10-28': { cost: 100, impressions: 2000, clicks: 40, conversions: 5 }
+  };
+  const current = [
+    { eventName: 'SMLC 26', channel: 'Google Ads', date: '2026-10-28', cost: 50, impressions: 1000, clicks: 20, conversions: 3 }
+  ];
+  const discFiltered = checkMetricDiscrepancies(current, baseline, { filterPartialCurrentDay: true, currentDay: '2026-10-28' });
+  assert.equal(discFiltered.discrepancies.length, 0, 'Ignores partial current-day drops when filterPartialCurrentDay is enabled');
+
+  const discUnfiltered = checkMetricDiscrepancies(current, baseline, { filterPartialCurrentDay: false, currentDay: '2026-10-28' });
+  assert.ok(discUnfiltered.discrepancies.length > 0, 'Flags regression drop when filterPartialCurrentDay is false');
+  assert.equal(discUnfiltered.discrepancies[0].isPartialDay, true, 'Marks discrepancy with isPartialDay context flag');
+});
+
 test('feature input rejects unknown modes, unknown features and viewer lockout', () => {
   for (const modes of [null, [], { tv: 'yes' }, { admin: 'public' }, { healthBanner: 'public' }]) {
     assert.throws(() => validateFeatureModes(modes));

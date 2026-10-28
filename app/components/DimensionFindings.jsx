@@ -6,6 +6,48 @@ const labels = {
   'non-standard': 'Non-standard value'
 };
 
+function stringSimilarity(s1, s2) {
+  const a = String(s1 || '').trim().toLowerCase();
+  const b = String(s2 || '').trim().toLowerCase();
+  if (!a || !b) return 0;
+  if (a === b) return 1;
+  if (a.includes(b) || b.includes(a)) {
+    return Math.min(a.length, b.length) / Math.max(a.length, b.length);
+  }
+  const matrix = Array.from({ length: a.length + 1 }, () => new Array(b.length + 1).fill(0));
+  for (let i = 0; i <= a.length; i++) matrix[i][0] = i;
+  for (let j = 0; j <= b.length; j++) matrix[0][j] = j;
+
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1,
+        matrix[i][j - 1] + 1,
+        matrix[i - 1][j - 1] + cost
+      );
+    }
+  }
+  const maxLen = Math.max(a.length, b.length);
+  return 1 - matrix[a.length][b.length] / maxLen;
+}
+
+function findBestSuggestion(value, candidateLists = []) {
+  if (!value) return null;
+  const allCandidates = candidateLists.flat().filter(Boolean);
+  let best = null;
+  let maxSim = 0;
+  for (const cand of allCandidates) {
+    if (cand.toLowerCase() === value.toLowerCase()) continue;
+    const sim = stringSimilarity(value, cand);
+    if (sim > maxSim && sim >= 0.6) {
+      maxSim = sim;
+      best = cand;
+    }
+  }
+  return best ? { suggestion: best, score: Math.round(maxSim * 100) } : null;
+}
+
 export default function DimensionFindings({
   findings = [],
   standards = {},
@@ -53,31 +95,44 @@ export default function DimensionFindings({
                   const targetId = finding.eventId || eventId;
                   const isEventAccepting = acceptingKey === `${id}:${value}:event`;
                   const isGlobalAccepting = acceptingKey === `${id}:${value}:global`;
+                  const bestSuggestion = finding.type === 'non-standard'
+                    ? findBestSuggestion(value, [standards[id] || [], customValues[id] || [], eventCustomValues[targetId]?.[id] || []])
+                    : null;
+
                   return (
-                    <div key={value} className="flex flex-wrap items-center justify-between gap-2 rounded bg-white/10 p-2">
-                      <code className="max-w-full break-all font-mono text-xs text-white">{value}</code>
-                      {onAcceptValue && finding.type === 'non-standard' && (
-                        <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
-                          {targetId && (
+                    <div key={value} className="flex flex-col gap-1.5 rounded bg-white/10 p-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <code className="max-w-full break-all font-mono text-xs text-white">{value}</code>
+                        {onAcceptValue && finding.type === 'non-standard' && (
+                          <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
+                            {targetId && (
+                              <button
+                                type="button"
+                                disabled={Boolean(acceptingKey)}
+                                onClick={() => handleAccept(id, value, targetId, 'event')}
+                                className="rounded border border-amber-400/40 bg-amber-500/10 px-2 py-1 font-medium text-amber-200 hover:bg-amber-500/20 disabled:opacity-50"
+                                title={`Accept "${value}" for ${eventName || targetId}`}
+                              >
+                                {isEventAccepting ? 'Accepting…' : `+ Accept for ${eventName || targetId}`}
+                              </button>
+                            )}
                             <button
                               type="button"
                               disabled={Boolean(acceptingKey)}
-                              onClick={() => handleAccept(id, value, targetId, 'event')}
-                              className="rounded border border-amber-400/40 bg-amber-500/10 px-2 py-1 font-medium text-amber-200 hover:bg-amber-500/20 disabled:opacity-50"
-                              title={`Accept "${value}" for ${eventName || targetId}`}
+                              onClick={() => handleAccept(id, value, null, 'global')}
+                              className="rounded border border-[#14a6d9]/40 bg-[#14a6d9]/10 px-2 py-1 font-medium text-[#6bd5f7] hover:bg-[#14a6d9]/20 disabled:opacity-50"
+                              title={`Accept "${value}" across all events globally`}
                             >
-                              {isEventAccepting ? 'Accepting…' : `+ Accept for ${eventName || targetId}`}
+                              {isGlobalAccepting ? 'Accepting…' : '+ Accept globally'}
                             </button>
-                          )}
-                          <button
-                            type="button"
-                            disabled={Boolean(acceptingKey)}
-                            onClick={() => handleAccept(id, value, null, 'global')}
-                            className="rounded border border-[#14a6d9]/40 bg-[#14a6d9]/10 px-2 py-1 font-medium text-[#6bd5f7] hover:bg-[#14a6d9]/20 disabled:opacity-50"
-                            title={`Accept "${value}" across all events globally`}
-                          >
-                            {isGlobalAccepting ? 'Accepting…' : '+ Accept globally'}
-                          </button>
+                          </div>
+                        )}
+                      </div>
+                      {bestSuggestion && (
+                        <div className="flex items-center gap-1.5 text-[11px] text-lime-300/90 bg-lime-950/40 border border-lime-500/20 rounded px-2 py-0.5">
+                          <span>💡 Did you mean standard:</span>
+                          <span className="font-semibold text-lime-200 underline underline-offset-2">{bestSuggestion.suggestion}</span>
+                          <span className="text-[10px] text-lime-400/60">({bestSuggestion.score}% match)</span>
                         </div>
                       )}
                     </div>

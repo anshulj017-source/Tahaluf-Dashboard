@@ -2,11 +2,14 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Activity, AlertCircle, Bell, Mail, Plus, RefreshCw, Save, Trash2
+  Activity, AlertCircle, Bell, Download, FileSpreadsheet, Mail, Plus, RefreshCw, Save, Trash2, Upload
 } from 'lucide-react';
 import { auth } from '../../lib/firebase';
 import { DEFAULT_HEALTH_NOTIFICATION_SETTINGS, getHealthIssues } from '../../lib/healthNotificationUtils.mjs';
-import { useLowQuotaMode } from './DashboardFeatureContext';
+import * as FeatureCtx from './DashboardFeatureContext';
+
+const useLowQuotaMode = typeof FeatureCtx.useLowQuotaMode === 'function' ? FeatureCtx.useLowQuotaMode : () => false;
+const useDashboardFeature = typeof FeatureCtx.useDashboardFeature === 'function' ? FeatureCtx.useDashboardFeature : () => true;
 import { DIMENSIONS, DEFAULT_DIMENSION_SETTINGS } from '../../lib/dimensionStandards.mjs';
 import DimensionFindings from './DimensionFindings';
 import { AdminTabs, useAdminDirtyGuard, useAdminView } from './AdminUI';
@@ -98,6 +101,10 @@ export default function DataHealthAdmin({
   const [customEventId, setCustomEventId] = useState('');
   const [customDimension, setCustomDimension] = useState(DIMENSIONS[0]?.id || 'event');
   const [customDraftValue, setCustomDraftValue] = useState('');
+  const [showBulkImport, setShowBulkImport] = useState(false);
+  const [bulkImportText, setBulkImportText] = useState('');
+  const dimensionExportAllowed = useDashboardFeature('dimensionExport');
+  const bulkImportAllowed = useDashboardFeature('bulkDimensionImport');
   const [savedSettings, setSavedSettings] = useState(DEFAULT_HEALTH_NOTIFICATION_SETTINGS);
   const [savedDimensionDraft, setSavedDimensionDraft] = useState('');
   const [eventSearch, setEventSearch] = useState('');
@@ -568,6 +575,102 @@ export default function DataHealthAdmin({
     }
   };
 
+  const handleBulkImport = async () => {
+    if (!bulkImportText.trim()) return;
+    const items = Array.from(new Set(
+      bulkImportText
+        .split(/[\r\n,]+/)
+        .map(v => v.replace(/^["']|["']$/g, '').trim())
+        .filter(Boolean)
+    ));
+    if (!items.length) return;
+
+    setDimensionBusy(true);
+    setDimensionNotice(null);
+    try {
+      let body;
+      if (customScope === 'event' && customEventId) {
+        const currentList = dimensionSettings.eventCustomValues?.[customEventId]?.[customDimension] || [];
+        const combined = Array.from(new Set([...currentList, ...items]));
+        body = {
+          action: 'save-event-custom-values',
+          eventId: customEventId,
+          eventCustomValues: {
+            ...(dimensionSettings.eventCustomValues?.[customEventId] || {}),
+            [customDimension]: combined
+          }
+        };
+      } else {
+        const currentList = dimensionSettings.customValues?.[customDimension] || [];
+        const combined = Array.from(new Set([...currentList, ...items]));
+        body = {
+          action: 'save-custom-values',
+          customValues: {
+            ...(dimensionSettings.customValues || {}),
+            [customDimension]: combined
+          }
+        };
+      }
+      const response = await fetch('/api/admin/health-notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...await getAdminHeaders() },
+        body: JSON.stringify(body)
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.error || 'Could not bulk import values.');
+      if (result.dimensionSettings) {
+        setDimensionSettings(result.dimensionSettings);
+      }
+      setDimensionNotice({
+        type: 'success',
+        text: `Successfully imported ${items.length} custom value${items.length === 1 ? '' : 's'}.`
+      });
+      setBulkImportText('');
+      setShowBulkImport(false);
+      await reloadHealth(true);
+    } catch (importErr) {
+      console.error(importErr);
+      setDimensionNotice({ type: 'error', text: importErr.message });
+    } finally {
+      setDimensionBusy(false);
+    }
+  };
+
+  const exportDimensionFindingsCsv = () => {
+    const rows = [
+      ['Event', 'Dimension', 'Issue Type', 'Affected Rows Count', 'Sample Non-Standard Values', 'Sample CSV Rows', 'Checked At']
+    ];
+    let totalCount = 0;
+    sheetHealth.forEach(source => {
+      (source.dimensionHealth?.findings || []).forEach(f => {
+        totalCount++;
+        rows.push([
+          f.eventName || source.eventName || source.eventId || 'General',
+          f.label || f.dimension,
+          f.type,
+          f.count || 0,
+          (f.values || []).join('; '),
+          (f.sampleRows || []).join(', '),
+          source.dimensionHealth?.checkedAt || ''
+        ]);
+      });
+    });
+    if (totalCount === 0) {
+      alert('No dimension findings found across monitored sources to export.');
+      return;
+    }
+    const csvContent = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `dimension-audit-findings-${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   const saveEventChecks = async (eventId, checks) => {
     setSavingEventChecks(eventId);
     setEventCheckNotice(null);
@@ -825,11 +928,24 @@ export default function DataHealthAdmin({
 
             <div className="mt-4 rounded-xl border border-white/10 bg-[#041628]/90 p-4 space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-3">
-                <div>
-                  <h4 className="text-xs font-bold text-white flex items-center gap-2">
-                    <span>Standards & Accepted Values Manager</span>
-                    <span className="rounded-full bg-[#14a6d9]/20 px-2 py-0.5 text-[10px] font-medium text-[#6bd5f7]">Custom Overrides</span>
-                  </h4>
+                <div className="flex-1">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h4 className="text-xs font-bold text-white flex items-center gap-2">
+                      <span>Standards & Accepted Values Manager</span>
+                      <span className="rounded-full bg-[#14a6d9]/20 px-2 py-0.5 text-[10px] font-medium text-[#6bd5f7]">Custom Overrides</span>
+                    </h4>
+                    {dimensionExportAllowed && (
+                      <button
+                        type="button"
+                        onClick={exportDimensionFindingsCsv}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-amber-400/40 bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-200 hover:bg-amber-500/20 transition"
+                        title="Download dimension audit compliance findings as CSV"
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                        <span>Export Findings CSV</span>
+                      </button>
+                    )}
+                  </div>
                   <p className="mt-0.5 text-[10px] text-slate-400">
                     Values pulled from the standards sheet are automatically accepted. Add accepted values globally or for a specific event to prevent false-positive discrepancies.
                   </p>
@@ -934,7 +1050,49 @@ export default function DataHealthAdmin({
                       </span>
                     )}
                   </div>
+                  {bulkImportAllowed && (
+                    <button
+                      type="button"
+                      onClick={() => setShowBulkImport(!showBulkImport)}
+                      className="inline-flex items-center gap-1.5 text-xs text-[#6bd5f7] hover:text-white transition"
+                    >
+                      <Upload className="h-3 w-3" />
+                      <span>{showBulkImport ? 'Close Bulk Import' : 'Bulk Import Values'}</span>
+                    </button>
+                  )}
                 </div>
+
+                {showBulkImport && (
+                  <div className="rounded-lg border border-[#14a6d9]/30 bg-[#041628] p-3 space-y-2">
+                    <label className="block text-[10px] font-semibold text-slate-300">
+                      Paste list of accepted values (separated by newlines or commas):
+                    </label>
+                    <textarea
+                      value={bulkImportText}
+                      onChange={e => setBulkImportText(e.target.value)}
+                      placeholder={"Value 1\nValue 2\nValue 3"}
+                      rows={3}
+                      className="w-full rounded-md border border-white/10 bg-[#031120] p-2 text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-[#14a6d9]"
+                    />
+                    <div className="flex justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => { setShowBulkImport(false); setBulkImportText(''); }}
+                        className="rounded px-2.5 py-1 text-xs text-slate-400 hover:text-white"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        disabled={dimensionBusy || !bulkImportText.trim()}
+                        onClick={handleBulkImport}
+                        className="rounded bg-[#14a6d9] px-3 py-1 text-xs font-semibold text-black hover:bg-[#6bd5f7] disabled:opacity-50 transition"
+                      >
+                        {dimensionBusy ? 'Importing…' : 'Import Values'}
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {/* List of custom additions */}
                 {(() => {
