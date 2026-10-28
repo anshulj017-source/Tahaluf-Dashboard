@@ -9,7 +9,17 @@ import { getHealthIssues, normalizeHealthNotificationSettings } from '../../../.
 import { isAdminRequest } from '../../../../lib/requireAdminRequest.js';
 import { GET as getEventsHealth } from '../events/route.js';
 import { getSmtpTransportConfig } from '../../../../lib/healthEmailTransport.mjs';
-import { getDimensionSettings, saveDimensionSelection, saveHealthCheckSettings, saveEventHealthChecks, loadDimensionStandards } from '../../../../lib/dimensionMonitoring.mjs';
+import {
+  getDimensionSettings,
+  saveDimensionSelection,
+  saveHealthCheckSettings,
+  saveEventHealthChecks,
+  loadDimensionStandards,
+  saveCustomValues,
+  saveEventCustomValues,
+  saveExcludedValues,
+  acceptDimensionValue
+} from '../../../../lib/dimensionMonitoring.mjs';
 import { getEventsConfig } from '../../../../lib/eventsConfig.js';
 
 export const dynamic = 'force-dynamic';
@@ -77,6 +87,27 @@ export async function POST(request) {
     }
     if (body.action === 'save-dimensions') {
       return NextResponse.json({ success: true, dimensionSettings: await saveDimensionSelection(body.enabledDimensions) });
+    }
+    if (body.action === 'save-custom-values') {
+      const dimensionSettings = await saveCustomValues(body.customValues);
+      return NextResponse.json({ success: true, dimensionSettings });
+    }
+    if (body.action === 'save-event-custom-values') {
+      const dimensionSettings = await saveEventCustomValues(body.eventId, body.eventCustomValues);
+      return NextResponse.json({ success: true, dimensionSettings });
+    }
+    if (body.action === 'save-excluded-values') {
+      const dimensionSettings = await saveExcludedValues(body.excludedValues);
+      return NextResponse.json({ success: true, dimensionSettings });
+    }
+    if (body.action === 'accept-dimension-value') {
+      const dimensionSettings = await acceptDimensionValue({
+        dimension: body.dimension,
+        value: body.value,
+        eventId: body.eventId,
+        scope: body.scope
+      });
+      return NextResponse.json({ success: true, dimensionSettings });
     }
     if (body.action === 'refresh-standards') {
       const dimensionSettings = await loadDimensionStandards(true);

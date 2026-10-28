@@ -75,7 +75,7 @@ const PORT = process.env.PORT || 3000;
 const LOCAL_API_BASE = `http://localhost:${PORT}/api/sheets`;
 
 const REQUIRED_SHEET_GIDS = [
-  { name: 'GSTS Actuals (Default GID)', gid: '' },
+  { name: 'GSTS Actuals', gid: '120681662' },
   { name: 'SAIF 26 Actuals', gid: '1196409184' },
   { name: 'KoG 26 Actuals', gid: '1486784585' },
   { name: 'Black Hat Actuals', gid: '659941332' },
@@ -748,6 +748,7 @@ async function testApiEndpoints() {
 async function testAdminEventsApi() {
   console.log('\n--- 6. Testing Admin Events Configuration & Version Control ---');
   const adminEventsUrl = `http://localhost:${PORT}/api/admin/events`;
+  let baselineEvents = null;
 
   try {
     const configResponse = await fetch(`${adminEventsUrl}?configOnly=true`);
@@ -755,6 +756,7 @@ async function testAdminEventsApi() {
     assert(configResponse.status === 200 && configData.success === true, 'Dashboard config-only endpoint returns success');
     assert(Array.isArray(configData.config?.events), 'Dashboard config-only response includes configured events');
     assert(!('sheetHealth' in configData) && !('history' in configData), 'Dashboard config-only response excludes health checks and version history');
+    baselineEvents = configData.config?.events ? structuredClone(configData.config.events) : null;
     const res = await fetch(adminEventsUrl);
     assert(res.status === 200, 'Admin Events API: Returns HTTP 200');
 
@@ -888,6 +890,23 @@ async function testAdminEventsApi() {
     }
   } catch (err) {
     assert(false, `Admin Events API: Exception (${err.message})`);
+  } finally {
+    if (baselineEvents && baselineEvents.length > 0) {
+      try {
+        await fetch(adminEventsUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'save',
+            events: baselineEvents,
+            description: 'Test cleanup: restore verified baseline configuration',
+            author: 'Automated Test Cleanup'
+          })
+        });
+      } catch (cleanErr) {
+        console.warn('Could not restore baseline events configuration after test:', cleanErr?.message);
+      }
+    }
   }
 }
 

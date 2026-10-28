@@ -17,7 +17,7 @@ const sections = [
   { id: 'users', label: 'User Access', icon: UsersIcon },
 ];
 
-export default function AdminView({ active = true, currentUserEmail = 'admin@tahaluf.com', initialEvents = [], onFeaturesSaved }) {
+export default function AdminView({ active = true, currentUserEmail = 'admin@tahaluf.com', initialEvents = [], onFeaturesSaved, onEventsSaved }) {
   const [activeSection, setActiveSection] = useAdminView('admin', 'users', sections.map(section => section.id));
   const [visited, setVisited] = useState({ events: true });
   const [dirtyScopes, setDirtyScopes] = useState({});
@@ -224,7 +224,7 @@ export default function AdminView({ active = true, currentUserEmail = 'admin@tah
 
         {/* SECTION 1: EVENTS & DATA CONFIGURATION */}
         <div hidden={activeSection !== 'events'}>
-          <EventsAdmin currentUserEmail={currentUserEmail} initialEvents={initialEvents} />
+          <EventsAdmin currentUserEmail={currentUserEmail} initialEvents={initialEvents} onEventsSaved={onEventsSaved} />
         </div>
 
         <DataHealthAdmin

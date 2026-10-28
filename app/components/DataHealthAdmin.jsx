@@ -94,6 +94,10 @@ export default function DataHealthAdmin({
   const [savingEventChecks, setSavingEventChecks] = useState(null);
   const [eventCheckNotice, setEventCheckNotice] = useState(null);
   const [healthLoadError, setHealthLoadError] = useState(null);
+  const [customScope, setCustomScope] = useState('global');
+  const [customEventId, setCustomEventId] = useState('');
+  const [customDimension, setCustomDimension] = useState(DIMENSIONS[0]?.id || 'event');
+  const [customDraftValue, setCustomDraftValue] = useState('');
   const [savedSettings, setSavedSettings] = useState(DEFAULT_HEALTH_NOTIFICATION_SETTINGS);
   const [savedDimensionDraft, setSavedDimensionDraft] = useState('');
   const [eventSearch, setEventSearch] = useState('');
@@ -457,6 +461,113 @@ export default function DataHealthAdmin({
     }
   };
 
+  const handleAcceptValue = async (dimension, value, eventId, scope) => {
+    setDimensionBusy(true);
+    setDimensionNotice(null);
+    try {
+      const response = await fetch('/api/admin/health-notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...await getAdminHeaders() },
+        body: JSON.stringify({ action: 'accept-dimension-value', dimension, value, eventId, scope })
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.error || 'Could not accept dimension value.');
+      if (result.dimensionSettings) {
+        setDimensionSettings(result.dimensionSettings);
+      }
+      setDimensionNotice({
+        type: 'success',
+        text: `Accepted "${value}" ${scope === 'event' && eventId ? `for event "${eventId}"` : 'globally'}. Refreshing sheet health…`
+      });
+      await reloadHealth(true);
+    } catch (acceptErr) {
+      console.error(acceptErr);
+      setDimensionNotice({ type: 'error', text: acceptErr.message });
+    } finally {
+      setDimensionBusy(false);
+    }
+  };
+
+  const handleRemoveCustomValue = async (dimension, value, eventId, scope) => {
+    setDimensionBusy(true);
+    setDimensionNotice(null);
+    try {
+      let body;
+      if (scope === 'event' && eventId) {
+        const currentList = dimensionSettings.eventCustomValues?.[eventId]?.[dimension] || [];
+        const nextList = currentList.filter(v => v !== value);
+        body = {
+          action: 'save-event-custom-values',
+          eventId,
+          eventCustomValues: {
+            ...(dimensionSettings.eventCustomValues?.[eventId] || {}),
+            [dimension]: nextList
+          }
+        };
+      } else {
+        const currentList = dimensionSettings.customValues?.[dimension] || [];
+        const nextList = currentList.filter(v => v !== value);
+        body = {
+          action: 'save-custom-values',
+          customValues: {
+            ...(dimensionSettings.customValues || {}),
+            [dimension]: nextList
+          }
+        };
+      }
+      const response = await fetch('/api/admin/health-notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...await getAdminHeaders() },
+        body: JSON.stringify(body)
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.error || 'Could not remove custom value.');
+      if (result.dimensionSettings) {
+        setDimensionSettings(result.dimensionSettings);
+      }
+      setDimensionNotice({ type: 'success', text: `Removed "${value}".` });
+      await reloadHealth(true);
+    } catch (removeErr) {
+      console.error(removeErr);
+      setDimensionNotice({ type: 'error', text: removeErr.message });
+    } finally {
+      setDimensionBusy(false);
+    }
+  };
+
+  const handleToggleExcludeStandard = async (dimension, value) => {
+    setDimensionBusy(true);
+    setDimensionNotice(null);
+    try {
+      const currentList = dimensionSettings.excludedValues?.[dimension] || [];
+      const isExcluded = currentList.includes(value);
+      const nextList = isExcluded ? currentList.filter(v => v !== value) : [...currentList, value];
+      const response = await fetch('/api/admin/health-notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...await getAdminHeaders() },
+        body: JSON.stringify({
+          action: 'save-excluded-values',
+          excludedValues: {
+            ...(dimensionSettings.excludedValues || {}),
+            [dimension]: nextList
+          }
+        })
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.error || 'Could not update excluded standard value.');
+      if (result.dimensionSettings) {
+        setDimensionSettings(result.dimensionSettings);
+      }
+      setDimensionNotice({ type: 'success', text: `${isExcluded ? 'Re-enabled' : 'Excluded'} "${value}".` });
+      await reloadHealth(true);
+    } catch (err) {
+      console.error(err);
+      setDimensionNotice({ type: 'error', text: err.message });
+    } finally {
+      setDimensionBusy(false);
+    }
+  };
+
   const saveEventChecks = async (eventId, checks) => {
     setSavingEventChecks(eventId);
     setEventCheckNotice(null);
@@ -573,7 +684,7 @@ export default function DataHealthAdmin({
             {visibleOverviewIssues.map(issue => <li key={issue.key} className="rounded-lg border border-white/10 bg-[#031120]/70 p-3">
               <div className="flex flex-wrap items-center gap-2"><strong className="text-sm text-white">{issue.eventName}</strong><span className="text-xs text-slate-300">{issue.kind} · {issue.category || 'feed'}</span><span className="rounded-full border border-amber-400/30 px-2 py-0.5 text-[10px] text-amber-200">{statusPresentation[issue.status]?.label || issue.status}</span></div>
               <p className="mt-1 text-xs leading-relaxed text-amber-100/90">{summarizeIssue(issue)}</p>
-              {historyCategory(issue) === 'dimensions' && issue.dimensionFindings?.length > 0 && <details className="mt-2 text-xs"><summary className="cursor-pointer text-[#6bd5f7]">View dimension findings</summary><div className="mt-2"><DimensionFindings findings={issue.dimensionFindings} standards={dimensionSettings.values} /></div></details>}
+              {historyCategory(issue) === 'dimensions' && issue.dimensionFindings?.length > 0 && <details className="mt-2 text-xs"><summary className="cursor-pointer text-[#6bd5f7]">View dimension findings</summary><div className="mt-2"><DimensionFindings findings={issue.dimensionFindings} standards={dimensionSettings.values} customValues={dimensionSettings.customValues} eventCustomValues={dimensionSettings.eventCustomValues} eventId={issue.eventId} eventName={issue.eventName} onAcceptValue={handleAcceptValue} /></div></details>}
             </li>)}
             </ul>
             <div className="mt-3 flex items-center justify-between text-[10px] text-slate-400">
@@ -657,7 +768,7 @@ export default function DataHealthAdmin({
                     {source.state === 'unavailable' && <p className="mt-2 text-[10px] text-red-200">Source unavailable; no current successful refresh. {source.lastError || ''}</p>}
                     {disabledReasons.length > 0 && <p className="mt-2 text-[10px] text-amber-200">Disabled checks: {disabledReasons.join(' ')} Data loading is unaffected.</p>}
                     <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-slate-400"><span>Last success: {formatTimestamp(source.lastSuccessAt)}</span>{source.lastFailureAt && <span className="text-amber-200">Last failure: {formatTimestamp(source.lastFailureAt)}{source.lastError ? ` · ${source.lastError}` : ''}</span>}<span>Rows: {(source.totalRows ?? source.rowCount ?? 0).toLocaleString()}</span>{source.kind === 'Actuals' && <span>Matching event rows: {(source.eventRows || 0).toLocaleString()} {source.eventDataStatus === 'unverified' ? '(event column not available)' : ''}</span>}<span>Date range: {source.firstDataDate || source.lastDataDate ? `${source.firstDataDate || 'Unknown'} – ${source.lastDataDate || 'Unknown'}` : 'No dated rows'}</span></div>
-                    {source.dimensionHealth && <details className="mt-3 rounded-lg border border-white/10 p-2 text-xs"><summary className="cursor-pointer font-semibold text-slate-200">Dimension checks · {source.dimensionHealth.status} · last run {formatTimestamp(source.dimensionHealth.checkedAt)}</summary>{source.dimensionHealth.error && <p className="mt-2 text-amber-200">{source.dimensionHealth.error}</p>}{source.dimensionHealth.findings?.length ? <div className="mt-2"><DimensionFindings findings={source.dimensionHealth.findings} standards={dimensionSettings.values} /></div> : <p className="mt-2 text-slate-400">No dimension findings.</p>}</details>}
+                    {source.dimensionHealth && <details className="mt-3 rounded-lg border border-white/10 p-2 text-xs"><summary className="cursor-pointer font-semibold text-slate-200">Dimension checks · {source.dimensionHealth.status} · last run {formatTimestamp(source.dimensionHealth.checkedAt)}</summary>{source.dimensionHealth.error && <p className="mt-2 text-amber-200">{source.dimensionHealth.error}</p>}{source.dimensionHealth.findings?.length ? <div className="mt-2"><DimensionFindings findings={source.dimensionHealth.findings} standards={dimensionSettings.values} customValues={dimensionSettings.customValues} eventCustomValues={dimensionSettings.eventCustomValues} eventId={source.eventId} eventName={source.eventName} onAcceptValue={handleAcceptValue} /></div> : <p className="mt-2 text-slate-400">No dimension findings.</p>}</details>}
                     {(source.metricDiscrepancies?.length > 0 || source.channelMetrics24h?.length > 0) && <details className="mt-2 rounded-lg border border-white/10 p-2 text-xs"><summary className="cursor-pointer font-semibold text-slate-200">24-hour channel metrics ({source.metricDiscrepancies?.length || 0} regression{source.metricDiscrepancies?.length === 1 ? '' : 's'})</summary>{source.metricDiscrepancies?.map(item => <p key={item.id} className="mt-2 text-amber-200">{item.channel} · {item.metric}: {item.previousValue} → {item.currentValue} (-{item.dropPercent}%) on {item.date}</p>)}{source.channelMetrics24h?.length > 0 && <p className="mt-2 text-slate-400">{source.channelMetrics24h.length} channel metrics available · latest date {source.latest24hDate || 'unknown'}.</p>}</details>}
                   </article>;
                 })}
@@ -680,7 +791,7 @@ export default function DataHealthAdmin({
             {visibleHistory.map(item => <article key={item.id} className="flex flex-wrap items-start justify-between gap-3 p-3">
               <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><strong className="text-sm text-white">{item.eventName}</strong><span className="text-xs text-slate-300">{item.kind} · {historyCategory(item)} · {item.status}</span></div>
                 <p className="mt-1 text-xs text-slate-300">{summarizeIssue(item)}</p>
-                {item.dimensionFindings?.length > 0 && <details className="mt-2 text-xs text-slate-300"><summary className="cursor-pointer text-[#6bd5f7]">View dimension findings</summary><div className="mt-2"><DimensionFindings findings={item.dimensionFindings} standards={dimensionSettings.values} /></div></details>}
+                {item.dimensionFindings?.length > 0 && <details className="mt-2 text-xs text-slate-300"><summary className="cursor-pointer text-[#6bd5f7]">View dimension findings</summary><div className="mt-2"><DimensionFindings findings={item.dimensionFindings} standards={dimensionSettings.values} customValues={dimensionSettings.customValues} eventCustomValues={dimensionSettings.eventCustomValues} eventId={item.eventId} eventName={item.eventName} onAcceptValue={handleAcceptValue} /></div></details>}
                 <p className="mt-2 text-[10px] text-slate-500">Detected {formatTimestamp(item.openedAt)}{item.resolvedAt && ` · Resolved ${formatTimestamp(item.resolvedAt)} (${formatDuration(item.openedAt, item.resolvedAt)})`}</p>
                 {item.resolutionEmailStatus && <p className="mt-1 text-[10px] text-slate-400">Resolution email: {item.resolutionEmailStatus === 'checks-disabled' ? 'not sent; checks disabled' : item.resolutionEmailStatus === 'accepted' ? `accepted by SMTP ${formatTimestamp(item.resolutionEmailSentAt)} (inbox delivery not verified)` : item.resolutionEmailStatus === 'failed' ? 'failed; retry on a health check after five minutes' : 'pending; requires email and resolution notifications enabled'}</p>}
                 {item.resolutionEmailError && <p role="alert" className="text-[10px] text-amber-300">{item.resolutionEmailError}</p>}
@@ -711,6 +822,235 @@ export default function DataHealthAdmin({
               <div className="flex flex-wrap gap-3"><button type="button" onClick={() => updateDimensions('save-dimensions')} className="text-xs text-[#6bd5f7]">Save dimension checks</button><button type="button" onClick={() => updateDimensions('refresh-standards')} className="text-xs text-[#6bd5f7]">Refresh standards</button></div>
             </fieldset>
             <details className="mt-3 text-[10px] text-slate-400"><summary className="cursor-pointer">View allowed standard values</summary>{DIMENSIONS.map(dimension => <p key={dimension.id} className="mt-2"><strong>{dimension.label}:</strong> {dimensionSettings.values?.[dimension.id]?.join(', ') || 'Standards not loaded'}</p>)}</details>
+
+            <div className="mt-4 rounded-xl border border-white/10 bg-[#041628]/90 p-4 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-3">
+                <div>
+                  <h4 className="text-xs font-bold text-white flex items-center gap-2">
+                    <span>Standards & Accepted Values Manager</span>
+                    <span className="rounded-full bg-[#14a6d9]/20 px-2 py-0.5 text-[10px] font-medium text-[#6bd5f7]">Custom Overrides</span>
+                  </h4>
+                  <p className="mt-0.5 text-[10px] text-slate-400">
+                    Values pulled from the standards sheet are automatically accepted. Add accepted values globally or for a specific event to prevent false-positive discrepancies.
+                  </p>
+                </div>
+              </div>
+
+              {/* Scope & Target Selector */}
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Target Scope</label>
+                  <div className="mt-1 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setCustomScope('global')}
+                      className={`flex-1 rounded-lg border px-3 py-2 text-xs font-medium transition ${
+                        customScope === 'global'
+                          ? 'border-[#14a6d9] bg-[#14a6d9]/20 text-[#6bd5f7]'
+                          : 'border-white/10 bg-[#031120] text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      Global (All Events)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCustomScope('event');
+                        if (!customEventId && eventGroups.length > 0) {
+                          setCustomEventId(eventGroups[0].eventId);
+                        }
+                      }}
+                      className={`flex-1 rounded-lg border px-3 py-2 text-xs font-medium transition ${
+                        customScope === 'event'
+                          ? 'border-[#14a6d9] bg-[#14a6d9]/20 text-[#6bd5f7]'
+                          : 'border-white/10 bg-[#031120] text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      Per Event Override
+                    </button>
+                  </div>
+                </div>
+
+                {customScope === 'event' && (
+                  <div>
+                    <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Select Event</label>
+                    <select
+                      value={customEventId}
+                      onChange={e => setCustomEventId(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-white/10 bg-[#031120] px-3 py-2 text-xs text-white"
+                    >
+                      {eventGroups.map(group => (
+                        <option key={group.eventId} value={group.eventId}>
+                          {group.eventName || group.eventId} ({group.eventId})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              {/* Dimension Selector Pills */}
+              <div>
+                <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Dimension</label>
+                <div className="mt-1 flex flex-wrap gap-1.5">
+                  {DIMENSIONS.map(dim => {
+                    const isSelected = customDimension === dim.id;
+                    const customList = customScope === 'event'
+                      ? (dimensionSettings.eventCustomValues?.[customEventId]?.[dim.id] || [])
+                      : (dimensionSettings.customValues?.[dim.id] || []);
+                    const customCount = customList.length;
+
+                    return (
+                      <button
+                        key={dim.id}
+                        type="button"
+                        onClick={() => setCustomDimension(dim.id)}
+                        className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition ${
+                          isSelected
+                            ? 'border-[#cedc28] bg-[#cedc28]/15 text-[#cedc28]'
+                            : 'border-white/10 bg-[#031120] text-slate-300 hover:border-white/20 hover:text-white'
+                        }`}
+                      >
+                        <span>{dim.label}</span>
+                        {customCount > 0 && (
+                          <span className="rounded-full bg-[#14a6d9]/30 px-1.5 py-0.2 text-[10px] font-bold text-[#6bd5f7]">
+                            +{customCount}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Active Dimension Values & Add Form */}
+              <div className="rounded-lg border border-white/10 bg-[#031120] p-3 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-xs font-semibold text-white">
+                    {DIMENSIONS.find(d => d.id === customDimension)?.label || customDimension}: Custom Accepted Values
+                    {customScope === 'event' && customEventId && (
+                      <span className="ml-1.5 font-normal text-amber-200">
+                        for {eventGroups.find(g => g.eventId === customEventId)?.eventName || customEventId}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* List of custom additions */}
+                {(() => {
+                  const customList = customScope === 'event'
+                    ? (dimensionSettings.eventCustomValues?.[customEventId]?.[customDimension] || [])
+                    : (dimensionSettings.customValues?.[customDimension] || []);
+
+                  return (
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap items-center gap-1.5 min-h-[32px]">
+                        {customList.length === 0 ? (
+                          <span className="text-[10px] text-slate-500 italic">
+                            No custom accepted values added yet for this dimension {customScope === 'event' ? 'and event' : 'globally'}.
+                          </span>
+                        ) : (
+                          customList.map(val => (
+                            <span
+                              key={val}
+                              className="inline-flex items-center gap-1.5 rounded-full border border-[#14a6d9]/40 bg-[#14a6d9]/10 px-2.5 py-1 text-xs text-white"
+                            >
+                              <span>{val}</span>
+                              <button
+                                type="button"
+                                disabled={dimensionBusy}
+                                onClick={() => handleRemoveCustomValue(customDimension, val, customScope === 'event' ? customEventId : null, customScope)}
+                                className="text-slate-400 hover:text-red-300 transition"
+                                title={`Remove "${val}"`}
+                              >
+                                ×
+                              </button>
+                            </span>
+                          ))
+                        )}
+                      </div>
+
+                      {/* Add new value input */}
+                      <div className="flex gap-2 pt-2 border-t border-white/5">
+                        <input
+                          type="text"
+                          value={customDraftValue}
+                          onChange={e => setCustomDraftValue(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              if (customDraftValue.trim()) {
+                                handleAcceptValue(
+                                  customDimension,
+                                  customDraftValue.trim(),
+                                  customScope === 'event' ? customEventId : null,
+                                  customScope
+                                );
+                                setCustomDraftValue('');
+                              }
+                            }
+                          }}
+                          placeholder={`Add accepted value for ${DIMENSIONS.find(d => d.id === customDimension)?.label || customDimension}...`}
+                          className="min-w-0 flex-1 rounded-lg border border-white/10 bg-[#041628] px-3 py-1.5 text-xs text-white placeholder:text-slate-500"
+                        />
+                        <button
+                          type="button"
+                          disabled={dimensionBusy || !customDraftValue.trim()}
+                          onClick={() => {
+                            if (customDraftValue.trim()) {
+                              handleAcceptValue(
+                                customDimension,
+                                customDraftValue.trim(),
+                                customScope === 'event' ? customEventId : null,
+                                customScope
+                              );
+                              setCustomDraftValue('');
+                            }
+                          }}
+                          className="rounded-lg border border-[#14a6d9]/40 bg-[#14a6d9]/10 px-3 py-1.5 text-xs font-semibold text-[#6bd5f7] hover:bg-[#14a6d9]/20 disabled:opacity-50 transition"
+                        >
+                          + Add Accepted Value
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Pulled Standard Values Reference & Exclude Toggle */}
+                {dimensionSettings.values?.[customDimension]?.length > 0 && (
+                  <details className="mt-2 text-[10px] text-slate-400">
+                    <summary className="cursor-pointer font-medium text-slate-300 hover:text-white">
+                      Sheet Standard Values ({dimensionSettings.values[customDimension].length})
+                    </summary>
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {dimensionSettings.values[customDimension].map(val => {
+                        const isExcluded = (dimensionSettings.excludedValues?.[customDimension] || []).includes(val);
+                        return (
+                          <span
+                            key={val}
+                            className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] ${
+                              isExcluded
+                                ? 'bg-red-500/10 text-red-300 line-through border border-red-500/30'
+                                : 'bg-white/5 text-slate-300 border border-white/10'
+                            }`}
+                          >
+                            <span>{val}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleToggleExcludeStandard(customDimension, val)}
+                              className="ml-1 text-[9px] text-slate-400 hover:text-white underline"
+                              title={isExcluded ? 'Re-enable this standard value' : 'Disallow / exclude this standard value'}
+                            >
+                              {isExcluded ? 'undo' : 'disallow'}
+                            </button>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </details>
+                )}
+              </div>
+            </div>
           </div>
         </section>
 

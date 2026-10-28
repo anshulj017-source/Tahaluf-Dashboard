@@ -1203,7 +1203,7 @@ export default function App() {
       // 1. Fetch dynamic event configurations from Admin API
       let configuredEvents = [];
       try {
-        const eventsRes = await fetch('/api/admin/events?configOnly=true');
+        const eventsRes = await fetch('/api/admin/events?configOnly=true', { cache: 'no-store' });
         if (eventsRes.ok) {
           const eventsData = await eventsRes.json();
           if (eventsData.config && Array.isArray(eventsData.config.events) && eventsData.config.events.length > 0) {
@@ -1217,14 +1217,15 @@ export default function App() {
       // Fallback defaults with guaranteed active public status
       if (!configuredEvents || configuredEvents.length === 0) {
         configuredEvents = [
-          { id: 'gsts-26', name: 'GSTS 26', sourceName: 'GSTS', portfolio: 'P1', business: 'B2B', enabled: true, status: 'active', visibility: 'public', sheetType: 'combined', gid: '', plannedGid: '2019892532', launchDate: '2026-12-18' },
+          { id: 'gsts-26', name: 'GSTS 26', sourceName: 'GSTS', portfolio: 'P1', business: 'B2B', enabled: true, status: 'active', visibility: 'public', sheetType: 'combined', gid: '120681662', plannedGid: '2019892532', launchDate: '2026-12-18' },
           { id: 'saif-26', name: 'SAIF 26', sourceName: 'SAIF 26', portfolio: 'P1', business: 'B2B', enabled: true, status: 'active', visibility: 'public', sheetType: 'combined', gid: '1196409184', plannedGid: '570639072', launchDate: '2026-11-24' },
           { id: 'kog-26', name: 'KoG 26', sourceName: 'KoG 26', portfolio: 'P1', business: 'derive', enabled: true, status: 'active', visibility: 'public', sheetType: 'combined', gid: '1486784585', plannedGid: '1766297835', launchDate: '2026-12-01' },
           { id: 'black-hat', name: 'Black Hat', sourceName: 'BLACK HAT', portfolio: 'P1', business: 'B2B', enabled: true, status: 'active', visibility: 'public', sheetType: 'combined', gid: '659941332', plannedGid: '277310277', plannedType: 'blackhat-text', launchDate: '2026-12-01' },
           { id: 'smlc-26', name: 'SMLC 26', sourceName: 'SMLC 26', portfolio: 'P3', business: 'B2B', enabled: true, status: 'active', visibility: 'public', sheetType: 'combined', gid: '1526538255', launchDate: '2026-10-21' },
           { id: 'idws-26', name: 'IDWS 26', sourceName: 'IDWS 26', portfolio: 'P3', business: 'B2B', enabled: true, status: 'active', visibility: 'public', sheetType: 'combined', gid: '1121987876', startDate: '2026-06-01', launchDate: '2026-12-14' },
           { id: 'bio-cphi-main', name: 'BIO 26 & CPHI 26', sourceName: 'BIO / CPHI', portfolio: 'P3', business: 'B2B', enabled: true, status: 'active', visibility: 'public', sheetType: 'combined', gid: '1728688512', dateFilterMode: 'year-2026', launchDate: '2026-12-14' },
-          { id: 'cphi-li', name: 'CPHI 26 (LinkedIn)', sourceName: 'CPHI 26', portfolio: 'P3', business: 'B2B', enabled: true, status: 'active', visibility: 'public', sheetType: 'combined', gid: '208497314', dateFilterMode: 'year-2026', launchDate: '2026-12-14' }
+          { id: 'cphi-li', name: 'CPHI 26 (LinkedIn)', sourceName: 'CPHI 26', portfolio: 'P3', business: 'B2B', enabled: true, status: 'active', visibility: 'public', sheetType: 'combined', gid: '208497314', dateFilterMode: 'year-2026', launchDate: '2026-12-14' },
+          { id: 'leap-east-26', name: 'Leap East 26', sourceName: 'Leap East 26', portfolio: 'P1', business: 'B2B', enabled: true, status: 'admin_only', visibility: 'admin_only', sheetType: 'combined', gid: '1617019591', launchDate: '2026-07-01' }
         ];
       }
 
@@ -1735,6 +1736,22 @@ export default function App() {
     views: d3.sum(vals, d => d.videoViews),
   })).sort((a,b) => b.cost - a.cost);
 
+  // Planned data scoped by Event Type master filter (rows with an eventType, e.g. Black Hat Exprom/Visprom,
+  // are kept only when their type is selected; with no filter, both types are summed).
+  const scopedPlannedData = useMemo(() => filterEventTypes.includes('All')
+    ? plannedData
+    : plannedData.filter(p => !p.eventType || filterEventTypes.includes(p.eventType)),
+    [plannedData, filterEventTypes]
+  );
+
+  const plannedEventNames = useMemo(() => Array.from(new Set([
+    ...eventsConfiguration.filter(ev => ev.plannedGid).map(ev => ev.name),
+    ...eventsConfiguration.filter(ev => ev.plannedGid).map(ev => ev.sourceName).filter(Boolean),
+    ...scopedPlannedData.map(p => p.event),
+    'KoG 26', 'SAIF 26', 'GSTS 26', 'Black Hat'
+  ])), [eventsConfiguration, scopedPlannedData]);
+  const PLANNED_EVENTS = plannedEventNames;
+
   const NAV_ITEMS = [
     { id: 'summary', label: 'Overview', icon: Grid },
     { id: 'campaign', label: 'Event View', icon: Activity },
@@ -1757,15 +1774,6 @@ export default function App() {
       />
     );
   }
-
-  // Removed unused getTotals
-
-  // Planned data scoped by Event Type master filter (rows with an eventType, e.g. Black Hat Exprom/Visprom,
-  // are kept only when their type is selected; with no filter, both types are summed).
-  const PLANNED_EVENTS = ['KoG 26', 'SAIF 26', 'GSTS 26', 'Black Hat'];
-  const scopedPlannedData = filterEventTypes.includes('All')
-    ? plannedData
-    : plannedData.filter(p => !p.eventType || filterEventTypes.includes(p.eventType));
 
   const generatePpt = async () => {
       if (!featureAllowed('exports')) return;
@@ -3264,6 +3272,7 @@ export default function App() {
             currentUserEmail={userEmail || (auth?.currentUser?.email) || 'admin@tahaluf.com'} 
             initialEvents={eventsConfiguration}
             onFeaturesSaved={setFeatureConfig}
+            onEventsSaved={setEventsConfiguration}
           />
           </div>
         )}

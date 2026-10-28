@@ -1005,6 +1005,85 @@ test('findings stay event-scoped, invalid unmapped event names remain visible an
   assert.match(large.error, /256 KiB/);
 });
 
+test('global custom accepted values, event-specific overrides, and excluded values in dimension checking', () => {
+  const baseRow = validDimensionRow();
+  const rows = [
+    { ...baseRow, 'Event Name DB': 'GSTS 2026', Channel: 'Custom Channel', Market: 'APAC' },
+    { ...baseRow, 'Event Name DB': 'SAIF 2026', Channel: 'Custom Channel', Market: 'APAC' }
+  ];
+  const context = dimensionContext();
+  context.values.event.push('SAIF 2026');
+
+  // 1. Without overrides: both rows have 'Channel: non-standard'
+  const unconfigured = dimensionRules.checkDimensionRows(d3.csvFormat(rows), context);
+  assert.equal(unconfigured.groups[0].findings.filter(f => f.dimension === 'channel').length, 1);
+  assert.equal(unconfigured.groups[1].findings.filter(f => f.dimension === 'channel').length, 1);
+
+  // 2. With event override for GSTS 2026: GSTS accepts 'Custom Channel', SAIF still flags it
+  context.eventCustomValues = {
+    'gsts-26': { channel: ['Custom Channel'] }
+  };
+  context.events = [{ id: 'gsts-26', name: 'GSTS 2026' }, { id: 'saif-26', name: 'SAIF 2026' }];
+  const eventOverridden = dimensionRules.checkDimensionRows(d3.csvFormat(rows), context);
+  const gstsFindings = eventOverridden.groups.find(g => g.eventName === 'GSTS 2026').findings;
+  const saifFindings = eventOverridden.groups.find(g => g.eventName === 'SAIF 2026').findings;
+  assert.equal(gstsFindings.filter(f => f.dimension === 'channel').length, 0, 'GSTS accepts custom channel');
+  assert.equal(saifFindings.filter(f => f.dimension === 'channel').length, 1, 'SAIF still flags custom channel');
+
+  // 3. With global custom addition: both events accept 'Custom Channel'
+  delete context.eventCustomValues;
+  context.customValues = { channel: ['Custom Channel'] };
+  const globalOverridden = dimensionRules.checkDimensionRows(d3.csvFormat(rows), context);
+  assert.equal(globalOverridden.groups[0].findings.filter(f => f.dimension === 'channel').length, 0);
+  assert.equal(globalOverridden.groups[1].findings.filter(f => f.dimension === 'channel').length, 0);
+
+  // 4. With excluded standard value: 'market standard' was standard, now excluded
+  context.excludedValues = { market: ['market standard'] };
+  const excluded = dimensionRules.checkDimensionRows(d3.csvFormat(rows), context);
+  assert.equal(excluded.groups[0].findings.filter(f => f.dimension === 'market').length, 1);
+});
+
+test('dimensionMonitoring manages custom values, per-event overrides, and 1-click accepts', async () => {
+  let state = {
+    ...dimensionRules.DEFAULT_DIMENSION_SETTINGS,
+    values: dimensionContext().values
+  };
+  const monitor = await loadInstrumentedModule('../lib/dimensionMonitoring.mjs', {
+    './adminSettingsStore.mjs': {
+      readAdminSetting: async () => state,
+      updateAdminSetting: async (key, fallback, update) => {
+        state = update(state);
+        return state;
+      }
+    },
+    './dimensionStandards.mjs': dimensionRules
+  });
+
+  // Save global custom values
+  await monitor.saveCustomValues({ channel: ['TikTok Ads', 'Twitch'] });
+  assert.deepEqual([...state.customValues.channel], ['TikTok Ads', 'Twitch']);
+
+  // Save event-specific custom values
+  await monitor.saveEventCustomValues('gsts-26', { campaignType: ['Special Transit'] });
+  assert.deepEqual([...state.eventCustomValues['gsts-26'].campaignType], ['Special Transit']);
+
+  // 1-click accept globally
+  await monitor.acceptDimensionValue({ dimension: 'market', value: 'MENA-Special', scope: 'global' });
+  assert.ok(state.customValues.market.includes('MENA-Special'));
+
+  // 1-click accept for event
+  await monitor.acceptDimensionValue({ dimension: 'market', value: 'Riyadh Metro', eventId: 'gsts-26', scope: 'event' });
+  assert.ok(state.eventCustomValues['gsts-26'].market.includes('Riyadh Metro'));
+
+  // Save excluded values
+  await monitor.saveExcludedValues({ channel: ['Display'] });
+  assert.deepEqual([...state.excludedValues.channel], ['Display']);
+
+  // Validation rejects invalid dimension or empty string
+  await assert.rejects(monitor.acceptDimensionValue({ dimension: 'invalid', value: 'test' }));
+  await assert.rejects(monitor.acceptDimensionValue({ dimension: 'channel', value: '' }));
+});
+
 test('feed, metric and dimension issues remain separate and missing or stale standards never pass', () => {
   const validation = dimensionRules.checkDimensionRows(d3.csvFormat([{ ...validDimensionRow(), Channel: 'bad' }]), dimensionContext());
   const source = {
@@ -1172,12 +1251,17 @@ test('dimension settings endpoints enforce admin auth and validate selections wi
     '../../../../lib/healthEmailTransport.mjs': {},
     '../../../../lib/dimensionMonitoring.mjs': {
       saveDimensionSelection: async ids => { const enabledDimensions = dimensionRules.validateDimensionSelection(ids); writes++; return { enabledDimensions }; },
-      loadDimensionStandards: async () => { writes++; return { error: 'Google unavailable' }; }
+      loadDimensionStandards: async () => { writes++; return { error: 'Google unavailable' }; },
+      saveCustomValues: async customValues => { writes++; return { customValues }; },
+      saveEventCustomValues: async (eventId, eventCustomValues) => { writes++; return { eventCustomValues: { [eventId]: eventCustomValues } }; },
+      saveExcludedValues: async excludedValues => { writes++; return { excludedValues }; },
+      acceptDimensionValue: async ({ dimension, value, eventId, scope }) => { writes++; return { accepted: { dimension, value, eventId, scope } }; }
     }
   }, { Response });
   const request = body => ({ json: async () => body });
   assert.equal((await route.POST(request({ action: 'save-dimensions', enabledDimensions: [] }))).status, 401);
   assert.equal((await route.POST(request({ action: 'refresh-standards' }))).status, 401);
+  assert.equal((await route.POST(request({ action: 'accept-dimension-value', dimension: 'channel', value: 'TikTok' }))).status, 401);
   assert.equal(writes, 0);
   authorized = true;
   assert.equal((await route.POST(request({ action: 'save-dimensions', enabledDimensions: ['bad'] }))).status, 400);
@@ -1185,6 +1269,12 @@ test('dimension settings endpoints enforce admin auth and validate selections wi
   const saved = await route.POST(request({ action: 'save-dimensions', enabledDimensions: ['language'] }));
   assert.deepEqual((await saved.json()).dimensionSettings.enabledDimensions, ['language']);
   assert.equal((await route.POST(request({ action: 'refresh-standards' }))).status, 502);
+  const accepted = await route.POST(request({ action: 'accept-dimension-value', dimension: 'channel', value: 'TikTok', scope: 'global' }));
+  assert.equal(accepted.status, 200);
+  assert.deepEqual((await accepted.json()).dimensionSettings.accepted, { dimension: 'channel', value: 'TikTok', scope: 'global' });
+  const eventAccepted = await route.POST(request({ action: 'accept-dimension-value', dimension: 'market', value: 'Riyadh', eventId: 'gsts-26', scope: 'event' }));
+  assert.equal(eventAccepted.status, 200);
+  assert.deepEqual((await eventAccepted.json()).dimensionSettings.accepted, { dimension: 'market', value: 'Riyadh', eventId: 'gsts-26', scope: 'event' });
 });
 
 test('sheet refresh validates Actuals once, stores findings and forwards all categories without rechecking cache hits or Planned', async () => {

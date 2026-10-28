@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { AdminDialog, useAdminDirtyGuard } from './AdminUI';
 
-export default function EventsAdmin({ currentUserEmail = 'admin@tahaluf.com', initialEvents = [] }) {
+export default function EventsAdmin({ currentUserEmail = 'admin@tahaluf.com', initialEvents = [], onEventsSaved }) {
   const currentAuthor = currentUserEmail || 'admin@tahaluf.com';
   const hasInitial = Array.isArray(initialEvents) && initialEvents.length > 0;
   const [config, setConfig] = useState(hasInitial ? { events: initialEvents, version: 'v1.0.0' } : null);
@@ -19,6 +19,15 @@ export default function EventsAdmin({ currentUserEmail = 'admin@tahaluf.com', in
   const [error, setError] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
   const [saving, setSaving] = useState(false);
+
+  const applyNewEvents = (newConfig, newHistory) => {
+    setConfig(newConfig || {});
+    setEvents(newConfig?.events || []);
+    if (newHistory) setHistory(newHistory);
+    if (typeof onEventsSaved === 'function' && Array.isArray(newConfig?.events)) {
+      onEventsSaved(newConfig.events);
+    }
+  };
 
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState('');
@@ -53,15 +62,13 @@ export default function EventsAdmin({ currentUserEmail = 'admin@tahaluf.com', in
     if (!isBackground) setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/admin/events');
+      const res = await fetch('/api/admin/events', { cache: 'no-store' });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || 'Failed to fetch events configuration');
       }
       const data = await res.json();
-      setConfig(data.config || {});
-      setEvents(data.config?.events || []);
-      setHistory(data.history || []);
+      applyNewEvents(data.config, data.history);
     } catch (err) {
       console.error(err);
       if (!isBackground) setError(err.message || 'Error connecting to events admin API');
@@ -118,9 +125,7 @@ export default function EventsAdmin({ currentUserEmail = 'admin@tahaluf.com', in
       });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || 'Failed to update event status');
-      setConfig(data.config);
-      setEvents(data.config.events);
-      setHistory(data.history);
+      applyNewEvents(data.config, data.history);
       
       const label = nextStatus === 'admin_only' 
         ? 'Admin Only (Testing - hidden from regular users)' 
@@ -159,9 +164,7 @@ export default function EventsAdmin({ currentUserEmail = 'admin@tahaluf.com', in
       });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || 'Failed to update date range');
-      setConfig(data.config);
-      setEvents(data.config.events);
-      setHistory(data.history);
+      applyNewEvents(data.config, data.history);
       setDateModalEvent(null);
       showNotification(`Date range updated for ${dateModalEvent.name}`);
     } catch (err) {
@@ -340,9 +343,7 @@ export default function EventsAdmin({ currentUserEmail = 'admin@tahaluf.com', in
       });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || 'Failed to save event');
-      setConfig(data.config);
-      setEvents(data.config.events);
-      setHistory(data.history);
+      applyNewEvents(data.config, data.history);
       setEditingEvent(null);
       setOriginalEventId(null);
       setIsAddingNew(false);
@@ -372,9 +373,7 @@ export default function EventsAdmin({ currentUserEmail = 'admin@tahaluf.com', in
       });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || 'Failed to delete event');
-      setConfig(data.config);
-      setEvents(data.config.events);
-      setHistory(data.history);
+      applyNewEvents(data.config, data.history);
       setConfirmDeleteEvent(null);
       showNotification(`Event "${eventName}" deleted`);
     } catch (err) {
@@ -423,9 +422,7 @@ export default function EventsAdmin({ currentUserEmail = 'admin@tahaluf.com', in
       });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || 'Failed to promote event');
-      setConfig(data.config);
-      setEvents(data.config.events);
-      setHistory(data.history);
+      applyNewEvents(data.config, data.history);
       setConfirmPromoteEvent(null);
       showNotification(`🚀 "${event.name}" is now live and visible to all dashboard users!`);
     } catch (err) {
@@ -451,9 +448,7 @@ export default function EventsAdmin({ currentUserEmail = 'admin@tahaluf.com', in
       });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || 'Failed to revert version');
-      setConfig(data.config);
-      setEvents(data.config.events);
-      setHistory(data.history);
+      applyNewEvents(data.config, data.history);
       setShowHistoryModal(false);
       setPendingRevert(null);
       showNotification(`Dashboard configuration successfully rolled back to ${versionId}`);
@@ -476,9 +471,7 @@ export default function EventsAdmin({ currentUserEmail = 'admin@tahaluf.com', in
       });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || 'Failed to reset defaults');
-      setConfig(data.config);
-      setEvents(data.config.events);
-      setHistory(data.history);
+      applyNewEvents(data.config, data.history);
       setConfirmResetModal(false);
       showNotification('Configuration reset to factory defaults (8 Tahaluf events)');
     } catch (err) {
@@ -539,9 +532,7 @@ export default function EventsAdmin({ currentUserEmail = 'admin@tahaluf.com', in
       });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || 'Failed to import JSON');
-      setConfig(data.config);
-      setEvents(data.config.events);
-      setHistory(data.history);
+      applyNewEvents(data.config, data.history);
       showNotification(`Imported ${pendingImport.events.length} events successfully!`);
       setPendingImport(null);
     } catch (err) {

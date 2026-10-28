@@ -81,7 +81,14 @@ async function getEvents(request) {
     const inspectOnly = request && new URL(request.url).searchParams.get('inspectOnly') === 'true';
     if (request && new URL(request.url).searchParams.get('configOnly') === 'true') {
       const config = await getEventsConfig();
-      return NextResponse.json({ success: true, config });
+      return NextResponse.json({ success: true, config }, {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+          'Surrogate-Control': 'no-store'
+        }
+      });
     }
     const [config, history] = await Promise.all([
       getEventsConfig(),
@@ -164,6 +171,13 @@ async function getEvents(request) {
       history,
       sheetHealth,
       defaults: DEFAULT_EVENTS
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+        'Surrogate-Control': 'no-store'
+      }
     });
   } catch (error) {
     console.error('Error loading events configuration:', error);

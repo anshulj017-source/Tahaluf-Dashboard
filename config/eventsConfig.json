@@ -1,7 +1,7 @@
 {
-  "version": "v1.0.174",
-  "lastUpdated": "2026-10-26T17:48:14.199Z",
-  "updatedBy": "recovery-admin@tahaluf.com",
+  "version": "v1.0.105",
+  "lastUpdated": "2026-10-28T14:09:31.849Z",
+  "updatedBy": "Automated Test Cleanup",
   "events": [
     {
       "id": "gsts-26",
@@ -10,8 +10,10 @@
       "portfolio": "P1",
       "business": "B2B",
       "enabled": true,
+      "status": "active",
+      "visibility": "public",
       "sheetType": "combined",
-      "gid": "",
+      "gid": "120681662",
       "plannedGid": "2019892532",
       "plannedType": "standard",
       "launchDate": "2026-12-18",
@@ -27,15 +29,14 @@
         "tiktok": true,
         "x": true
       },
-      "status": "active",
-      "visibility": "public"
+      "fieldAliases": {},
+      "autoPublishDate": ""
     },
     {
       "id": "saif-26",
       "name": "SAIF 26",
       "sourceName": "SAIF 26",
       "portfolio": "P1",
-      "business": "B2B",
       "enabled": true,
       "sheetType": "combined",
       "gid": "1196409184",
@@ -53,14 +54,16 @@
         "linkedin": true,
         "tiktok": true,
         "x": true
-      }
+      },
+      "business": "B2B",
+      "status": "active",
+      "visibility": "public"
     },
     {
       "id": "kog-26",
       "name": "KoG 26",
       "sourceName": "KoG 26",
       "portfolio": "P1",
-      "business": "derive",
       "enabled": true,
       "sheetType": "combined",
       "gid": "1486784585",
@@ -78,14 +81,16 @@
         "linkedin": true,
         "tiktok": true,
         "x": true
-      }
+      },
+      "business": "derive",
+      "status": "active",
+      "visibility": "public"
     },
     {
       "id": "black-hat",
       "name": "Black Hat",
       "sourceName": "BLACK HAT",
       "portfolio": "P1",
-      "business": "B2B",
       "enabled": true,
       "sheetType": "combined",
       "gid": "659941332",
@@ -103,14 +108,16 @@
         "linkedin": true,
         "tiktok": true,
         "x": true
-      }
+      },
+      "business": "B2B",
+      "status": "active",
+      "visibility": "public"
     },
     {
       "id": "smlc-26",
       "name": "SMLC 26",
       "sourceName": "SMLC 26",
       "portfolio": "P3",
-      "business": "B2B",
       "enabled": true,
       "sheetType": "combined",
       "gid": "1526538255",
@@ -130,14 +137,14 @@
         "x": true
       },
       "status": "active",
-      "visibility": "public"
+      "visibility": "public",
+      "business": "B2B"
     },
     {
       "id": "idws-26",
       "name": "IDWS 26",
       "sourceName": "IDWS 26",
       "portfolio": "P3",
-      "business": "B2B",
       "enabled": true,
       "sheetType": "combined",
       "gid": "1121987876",
@@ -155,14 +162,16 @@
         "linkedin": true,
         "tiktok": true,
         "x": true
-      }
+      },
+      "business": "B2B",
+      "status": "active",
+      "visibility": "public"
     },
     {
       "id": "bio-cphi-main",
       "name": "BIO 26 & CPHI 26",
       "sourceName": "BIO / CPHI",
       "portfolio": "P3",
-      "business": "B2B",
       "enabled": true,
       "sheetType": "combined",
       "gid": "1728688512",
@@ -180,14 +189,16 @@
         "linkedin": true,
         "tiktok": true,
         "x": true
-      }
+      },
+      "business": "B2B",
+      "status": "active",
+      "visibility": "public"
     },
     {
       "id": "cphi-li",
       "name": "CPHI 26 (LinkedIn)",
       "sourceName": "CPHI 26",
       "portfolio": "P3",
-      "business": "B2B",
       "enabled": true,
       "sheetType": "combined",
       "gid": "208497314",
@@ -205,8 +216,39 @@
         "linkedin": true,
         "tiktok": false,
         "x": false
-      }
+      },
+      "business": "B2B",
+      "status": "active",
+      "visibility": "public"
+    },
+    {
+      "id": "leap-east-26",
+      "name": "Leap East 26",
+      "sourceName": "Leap East 26",
+      "portfolio": "P1",
+      "enabled": true,
+      "status": "admin_only",
+      "visibility": "admin_only",
+      "sheetType": "combined",
+      "gid": "1617019591",
+      "plannedGid": "",
+      "plannedType": "standard",
+      "launchDate": "2026-07-01",
+      "startDate": "",
+      "endDate": "",
+      "dateFilterMode": "none",
+      "eventType": "Both",
+      "description": "",
+      "channelFilters": {
+        "meta": true,
+        "google": true,
+        "linkedin": true,
+        "tiktok": true,
+        "x": true
+      },
+      "fieldAliases": {},
+      "autoPublishDate": "",
+      "business": "B2B"
     }
-  ],
-  "revertedFrom": "v1.0.172"
+  ]
 }
