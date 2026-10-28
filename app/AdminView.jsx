@@ -17,7 +17,7 @@ const sections = [
   { id: 'users', label: 'User Access', icon: UsersIcon },
 ];
 
-export default function AdminView({ active = true, currentUserEmail = 'admin@tahaluf.com', initialEvents = [], onFeaturesSaved, onEventsSaved }) {
+export default function AdminView({ active = true, currentUserEmail = 'admin@tahaluf.com', initialEvents = [], onFeaturesSaved, onEventsSaved, onNavigate }) {
   const [activeSection, setActiveSection] = useAdminView('admin', 'users', sections.map(section => section.id));
   const [visited, setVisited] = useState({ events: true });
   const [dirtyScopes, setDirtyScopes] = useState({});
@@ -196,19 +196,32 @@ export default function AdminView({ active = true, currentUserEmail = 'admin@tah
     <div className="admin-workspace flex-1 p-4 md:p-6 overflow-auto pb-32">
       <div className="max-w-[1500px] mx-auto lg:grid lg:grid-cols-[190px_minmax(0,1fr)] lg:gap-6">
         <aside className="mb-5 lg:mb-0">
-          <label className="block lg:hidden text-sm font-semibold text-slate-300">
-            Admin section
-            <select aria-label="Admin section" value={activeSection} onChange={event => navigate(event.target.value)} className="mt-2 w-full rounded-lg border border-slate-600 bg-[#071b2e] p-3 text-white">
-              {sections.map(section => <option key={section.id} value={section.id}>{section.label}</option>)}
-            </select>
-          </label>
-          <nav aria-label="Admin sections" className="hidden lg:flex sticky top-0 flex-col gap-2">
-            <p className="mb-2 text-sm font-semibold text-slate-400">Administration</p>
-            {sections.map(({ id, label, icon: Icon }) => <button key={id} type="button" onClick={() => navigate(id)} aria-current={activeSection === id ? 'page' : undefined}
-              className={`flex items-center gap-2 rounded-lg px-3 py-3 text-left text-sm font-semibold ${activeSection === id ? 'bg-[#cedc28] text-[#041628]' : 'text-slate-300 hover:bg-white/10'}`}>
-              <Icon className="h-4 w-4 shrink-0" />{label}
-              {id === 'health' && dashboardAlertsEnabled && healthIssueCount > 0 && <span className="ml-auto rounded-full bg-red-600 px-2 text-xs text-white">{healthIssueCount}</span>}
-            </button>)}
+          <nav 
+            aria-label="Admin sections" 
+            className="flex flex-row lg:flex-col gap-2 overflow-x-auto lg:overflow-visible custom-scrollbar pb-2.5 lg:pb-0 lg:sticky lg:top-0 border-b border-white/10 lg:border-b-0"
+          >
+            <p className="hidden lg:block mb-2 text-xs font-bold uppercase tracking-wider text-slate-400">Administration</p>
+            {sections.map(({ id, label, icon: Icon }) => (
+              <button 
+                key={id} 
+                type="button" 
+                onClick={() => navigate(id)} 
+                aria-current={activeSection === id ? 'page' : undefined}
+                className={`flex items-center gap-2 rounded-xl px-3.5 py-2.5 lg:py-3 text-left text-xs sm:text-sm font-semibold shrink-0 whitespace-nowrap transition-all ${
+                  activeSection === id 
+                    ? 'bg-[#cedc28] text-[#041628] font-bold shadow-md shadow-[#cedc28]/20' 
+                    : 'text-slate-300 hover:bg-white/10 bg-white/5 lg:bg-transparent'
+                }`}
+              >
+                <Icon className="h-4 w-4 shrink-0" />
+                <span>{label}</span>
+                {id === 'health' && dashboardAlertsEnabled && healthIssueCount > 0 && (
+                  <span className="ml-1.5 lg:ml-auto rounded-full bg-red-600 px-2 py-0.5 text-[11px] font-bold text-white shadow-sm">
+                    {healthIssueCount}
+                  </span>
+                )}
+              </button>
+            ))}
           </nav>
         </aside>
         <main className="min-w-0" aria-label="Admin content">
@@ -235,7 +248,20 @@ export default function AdminView({ active = true, currentUserEmail = 'admin@tah
 
         {/* SECTION: API INFRASTRUCTURE & QUOTA HUB */}
         <ApiQuotasAdmin active={active && activeSection === 'quotas'} />
-        {visited.features && <div hidden={activeSection !== 'features'}><FeatureControlsAdmin onSaved={onFeaturesSaved} /></div>}
+        {visited.features && (
+          <div hidden={activeSection !== 'features'}>
+            <FeatureControlsAdmin
+              onSaved={onFeaturesSaved}
+              onNavigate={(featureId) => {
+                if (featureId === 'dimensionExport' || featureId === 'bulkDimensionImport') {
+                  setActiveSection('health');
+                } else if (onNavigate) {
+                  onNavigate(featureId);
+                }
+              }}
+            />
+          </div>
+        )}
 
         {/* SECTION 2: USER ACCESS MANAGEMENT */}
         {activeSection === 'users' && (

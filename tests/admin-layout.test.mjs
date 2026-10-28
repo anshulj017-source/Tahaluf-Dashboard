@@ -289,3 +289,29 @@ test('importing an event backup does not write until confirmation and surfaces p
   assert.match(error, /Failed to read configuration/);
   assert.equal(writes, 1);
 });
+
+test('Admin section navigation is responsive with horizontal orientation on smaller screens and vertical on desktop', async () => {
+  const harness = hookHarness();
+  const stub = () => null;
+  const component = await load('../app/AdminView.jsx', {
+    react: { ...harness.hooks, useEffect() {} },
+    './components/EventsAdmin': stub,
+    './components/DataHealthAdmin': stub,
+    './components/AnalyticsAdmin': stub,
+    './components/ApiQuotasAdmin': stub,
+    './components/FeatureControlsAdmin': stub,
+    './components/AdminUI': {
+      AdminDialog: stub, useAdminDirtyGuard() {},
+      useAdminView: (_, initial) => [initial, () => {}]
+    }
+  });
+  const tree = harness.render(component.default, {});
+  const nav = nodes(tree, node => node.props?.['aria-label'] === 'Admin sections')[0];
+  assert.ok(nav, 'Admin sections navigation must be present');
+  assert.match(nav.props.className, /flex-row/, 'must use horizontal flex-row orientation on smaller screens');
+  assert.match(nav.props.className, /lg:flex-col/, 'must switch to vertical flex-col orientation on desktop');
+  assert.match(nav.props.className, /overflow-x-auto/, 'must support horizontal scroll on narrow mobile viewports');
+
+  const buttons = nodes(nav, node => node.type === 'button');
+  assert.equal(buttons.length, 6, 'all 6 admin sections must be rendered as accessible buttons');
+});

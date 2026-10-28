@@ -12,7 +12,7 @@ export default function Login() {
   const router = useRouter();
 
   useEffect(() => {
-    if (process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true') {
+    if (String(process.env.NEXT_PUBLIC_BYPASS_AUTH || '').replace(/['"]/g, '') === 'true') {
       router.push('/');
       return;
     }

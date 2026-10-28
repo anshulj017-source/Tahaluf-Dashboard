@@ -7,14 +7,14 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --test tests/admin-controls.test.mjs tests/analytics-persistence.test.mjs tests/quota-monitoring.test.mjs tests/admin-layout.test.mjs tests/health-admin-layout.test.mjs tests/analytics-admin-layout.test.mjs && node tests/dashboard.test.mjs",
+    "test": "node --test tests/algorithmic-intelligence.test.mjs tests/admin-controls.test.mjs tests/analytics-persistence.test.mjs tests/quota-monitoring.test.mjs tests/admin-layout.test.mjs tests/health-admin-layout.test.mjs tests/analytics-admin-layout.test.mjs tests/e2e-browser-render.test.mjs && node tests/dashboard.test.mjs",
     "prepublish-check": "npm test && next build",
     "backup": "bash scripts/backup-to-mirror.sh",
     "setup-hooks": "cp scripts/pre-push.sh .git/hooks/pre-push && chmod +x .git/hooks/pre-push"
   },
   "dependencies": {
-    "@vercel/functions": "^2.0.0",
     "@clerk/themes": "^2.0.0",
+    "@vercel/functions": "^2.0.0",
     "d3": "^7.8.5",
     "d3-scale": "^4.0.2",
     "firebase": "^12.17.1",
@@ -38,6 +38,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
+    "puppeteer-core": "^24.43.1",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

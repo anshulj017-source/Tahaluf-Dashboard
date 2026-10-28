@@ -553,7 +553,7 @@ test('TV auto-cycle obeys its parent visibility', () => {
 test('audit enhancements features default to admin_only and obey permissions', async () => {
   const { extractChannelMetrics24h, checkMetricDiscrepancies } = await import('../lib/metricIntegrity.mjs');
   
-  const newFeatureIds = ['quickJump', 'dimensionExport', 'bulkDimensionImport', 'tvCustomization'];
+  const newFeatureIds = ['quickJump', 'dimensionExport', 'bulkDimensionImport', 'tvCustomization', 'budgetSimulator', 'channelQuadrant', 'launchForecaster', 'creativeFatigue'];
   for (const id of newFeatureIds) {
     const feature = DASHBOARD_FEATURES.find(f => f.id === id);
     assert.ok(feature, `Feature ${id} is registered in DASHBOARD_FEATURES`);

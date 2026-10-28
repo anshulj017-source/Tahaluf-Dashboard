@@ -1309,7 +1309,7 @@ function testFeatureControlsLogic() {
   const benchmarkFeature = DASHBOARD_FEATURES.find(f => f.id === 'benchmarkComparison');
   assert(benchmarkFeature?.defaultMode === 'admin_only', 'New feature benchmarkComparison defaults to admin_only');
 
-  const auditFeatures = ['quickJump', 'dimensionExport', 'bulkDimensionImport', 'tvCustomization'];
+  const auditFeatures = ['quickJump', 'dimensionExport', 'bulkDimensionImport', 'tvCustomization', 'budgetSimulator', 'channelQuadrant', 'launchForecaster', 'creativeFatigue'];
   for (const afId of auditFeatures) {
     const feat = DASHBOARD_FEATURES.find(f => f.id === afId);
     assert(feat?.defaultMode === 'admin_only', `New feature ${afId} defaults strictly to admin_only`);

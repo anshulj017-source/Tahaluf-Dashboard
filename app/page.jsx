@@ -38,6 +38,7 @@ import {
 import { getClientDashboardCache, setClientDashboardCache } from '../lib/clientCache.js';
 import { DASHBOARD_FEATURES, DEFAULT_FEATURE_CONFIG, isFeatureEnabled } from '../lib/dashboardFeatures.mjs';
 import { DashboardFeatureContext, ExportButton } from './components/DashboardFeatureContext';
+import AiStrategicIntelligence from './components/AiStrategicIntelligence';
 
 const GEO_URL = "https://unpkg.com/world-atlas@2.0.2/countries-110m.json";
 
@@ -127,18 +128,11 @@ const DateRangeFilter = DetailedDateFilter;
 const MultiSelect = ({ label, options, selected, onChange, widthClass, isHero = false, singleSelect = false, alignRight = false }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [optimisticSelected, setOptimisticSelected] = useState(null);
   const wrapperRef = useRef(null);
   const filtered = options.filter(o => o.toLowerCase().includes(searchTerm.toLowerCase()));
 
-  // Reset optimistic state when props update
-  useEffect(() => {
-    setOptimisticSelected(prev => (prev !== null ? null : prev));
-  }, [selected]);
-
-  const activeSelected = optimisticSelected || selected;
-  const isAll = activeSelected.includes('All');
-  const isActive = !isAll && activeSelected.length > 0;
+  const isAll = selected.includes('All');
+  const isActive = !isAll && selected.length > 0;
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -152,7 +146,7 @@ const MultiSelect = ({ label, options, selected, onChange, widthClass, isHero = 
   }, []);
 
   return (
-    <div ref={wrapperRef} className={`relative ${widthClass || 'w-[100px] xl:w-[110px]'} shrink-0 z-30`}>
+    <div ref={wrapperRef} className={`relative ${widthClass || 'w-[100px] xl:w-[110px]'} shrink-0 ${isOpen ? 'z-50' : 'z-30'}`}>
       <span className={`text-[10px] font-black uppercase tracking-widest mb-1 flex items-center justify-between ${isHero ? 'text-[#cedc28]' : 'text-[#14a6d9]'}`}>
         <span className="flex items-center gap-1">
           {isHero && <Sparkles className="w-3 h-3 text-[#cedc28]" />}
@@ -173,71 +167,66 @@ const MultiSelect = ({ label, options, selected, onChange, widthClass, isHero = 
         }`}
       >
         <span className="truncate pr-1 text-[10px] xl:text-[10.5px]">
-          {isAll ? (isHero ? 'All Events' : 'All') : activeSelected.join(', ')}
+          {isAll ? (isHero ? 'All Events' : 'All') : selected.join(', ')}
         </span>
         <ChevronDown className={`w-3.5 h-3.5 flex-shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''} ${isHero || isActive ? 'text-[#cedc28]' : ''}`} />
       </div>
       {isOpen && (
-        <>
-          {/* Backdrop to ensure immediate dismissal when clicking outside */}
-          <div className="fixed inset-0 z-40" onClick={() => { setIsOpen(false); setSearchTerm(''); }}></div>
-          <div className={`absolute top-full ${alignRight ? 'right-0' : 'left-0'} min-w-[200px] w-full h-0 z-50`}>
-            <div className="w-full mt-2 card-surface backdrop-blur-3xl bg-[#0a2442]/95 border border-[#cedc28]/40 rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.85)] flex flex-col max-h-64 overflow-hidden animate-in fade-in zoom-in-95 duration-70">
-              <div className="p-2 border-b border-[#cedc28]/10 relative">
-                <Search className="w-4 h-4 text-[#14a6d9] absolute left-4 top-1/2 -translate-y-1/2" />
-                <input type="text" placeholder="Search..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full bg-black/30 text-[#eef7f5] text-[10px] font-bold pl-9 pr-3 py-2 rounded-lg outline-none border border-transparent focus:border-[#cedc28]/50" />
+        <div className={`absolute top-full ${alignRight ? 'right-0' : 'left-0'} min-w-[200px] w-full z-50`}>
+          <div className="w-full mt-2 card-surface backdrop-blur-3xl bg-[#0a2442]/95 border border-[#cedc28]/40 rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.85)] flex flex-col max-h-64 overflow-hidden animate-in fade-in zoom-in-95 duration-70">
+            <div className="p-2 border-b border-[#cedc28]/10 relative">
+              <Search className="w-4 h-4 text-[#14a6d9] absolute left-4 top-1/2 -translate-y-1/2" />
+              <input 
+                type="text" 
+                placeholder="Search..." 
+                value={searchTerm} 
+                onChange={e => setSearchTerm(e.target.value)} 
+                className="w-full bg-black/30 text-[#eef7f5] text-[10px] font-bold pl-9 pr-3 py-2 rounded-lg outline-none border border-transparent focus:border-[#cedc28]/50" 
+              />
+            </div>
+            <div className="overflow-y-auto p-2 flex-1 custom-scrollbar">
+              <div 
+                onClick={() => { 
+                  setIsOpen(false); 
+                  setSearchTerm(''); 
+                  onChange(['All']); 
+                }} 
+                className={`px-3 py-2 rounded-lg text-[11px] font-bold cursor-pointer flex justify-between ${selected.includes('All') ? 'bg-[#cedc28]/20 text-[#cedc28]' : 'text-[#eef7f5] hover:bg-[#0a2442]'}`}
+              >
+                All <Check className={`w-3.5 h-3.5 ${selected.includes('All') ? 'opacity-100' : 'opacity-0'}`} />
               </div>
-              <div className="overflow-y-auto p-2 flex-1 custom-scrollbar">
-                <div 
-                  onClick={() => { 
-                    setOptimisticSelected(['All']);
-                    setIsOpen(false); 
-                    setSearchTerm(''); 
-                    React.startTransition(() => {
-                      onChange(['All']); 
-                    });
-                  }} 
-                  className={`px-3 py-2 rounded-lg text-[11px] font-bold cursor-pointer flex justify-between ${activeSelected.includes('All') ? 'bg-[#cedc28]/20 text-[#cedc28]' : 'text-[#eef7f5] hover:bg-[#0a2442]'}`}
-                >
-                  All <Check className={`w-3.5 h-3.5 ${activeSelected.includes('All') ? 'opacity-100' : 'opacity-0'}`} />
-                </div>
-                {filtered.map(opt => {
-                  const isSel = activeSelected.includes(opt);
-                  return (
-                    <div 
-                      key={opt} 
-                      onClick={() => {
-                        if (singleSelect) {
-                          setOptimisticSelected([opt]);
-                          setIsOpen(false);
-                          setSearchTerm('');
-                          React.startTransition(() => {
-                            onChange([opt]);
-                          });
-                        } else {
-                          let next = [...activeSelected];
-                          if (next.includes('All')) next = [];
-                          if (isSel) {
-                            next = next.filter(n => n !== opt);
-                            if (next.length === 0) next = ['All'];
-                          } else { next.push(opt); }
-                          setOptimisticSelected(next);
-                          React.startTransition(() => {
-                            onChange(next);
-                          });
+              {filtered.map(opt => {
+                const isSel = selected.includes(opt);
+                return (
+                  <div 
+                    key={opt} 
+                    onClick={() => {
+                      if (singleSelect) {
+                        setIsOpen(false);
+                        setSearchTerm('');
+                        onChange([opt]);
+                      } else {
+                        let next = [...selected];
+                        if (next.includes('All')) next = [];
+                        if (isSel) {
+                          next = next.filter(n => n !== opt);
+                          if (next.length === 0) next = ['All'];
+                        } else { 
+                          next.push(opt); 
                         }
-                      }} 
-                      className={`px-3 py-2 mt-1 rounded-lg text-[11px] font-bold cursor-pointer flex justify-between ${isSel ? 'bg-[#cedc28]/20 text-[#cedc28]' : 'text-[#eef7f5] hover:bg-[#0a2442]'}`}
-                    >
-                      <span className="truncate pr-2">{opt}</span> 
-                      <Check className={`w-3.5 h-3.5 flex-shrink-0 ${isSel ? 'opacity-100' : 'opacity-0'}`} />
-                    </div>
-                  )
-                })}
-              </div>
+                        onChange(next);
+                      }
+                    }} 
+                    className={`px-3 py-2 mt-1 rounded-lg text-[11px] font-bold cursor-pointer flex justify-between ${isSel ? 'bg-[#cedc28]/20 text-[#cedc28]' : 'text-[#eef7f5] hover:bg-[#0a2442]'}`}
+                  >
+                    <span className="truncate pr-2">{opt}</span> 
+                    <Check className={`w-3.5 h-3.5 flex-shrink-0 ${isSel ? 'opacity-100' : 'opacity-0'}`} />
+                  </div>
+                );
+              })}
             </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   );
@@ -668,7 +657,7 @@ const InitialLoadingScreen = ({ isAuthLoading, progress = 18, statusMessage = ''
 // --- MAIN APP ---
 export default function App() {
   const router = useRouter();
-  const isDevBypass = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
+  const isDevBypass = String(process.env.NEXT_PUBLIC_BYPASS_AUTH || '').replace(/['"]/g, '') === 'true';
   const [isAuthenticated, setIsAuthenticated] = useState(isDevBypass);
   const [userRole, setUserRole] = useState(isDevBypass ? 'admin' : 'standard');
   const [userEmail, setUserEmail] = useState(isDevBypass ? 'admin@tahaluf.com' : '');
@@ -703,7 +692,7 @@ export default function App() {
   const [featureConfig, setFeatureConfig] = useState(null);
   const [lowQuotaMode, setLowQuotaMode] = useState(false);
   const [featureError, setFeatureError] = useState('');
-  const featureAllowed = (id) => featureConfig !== null && isFeatureEnabled(featureConfig, id, userRole, simulatingStandardUser);
+  const featureAllowed = (id) => isFeatureEnabled(featureConfig || DEFAULT_FEATURE_CONFIG, id, userRole, simulatingStandardUser);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -881,7 +870,7 @@ export default function App() {
   }, [userRole, perfMetric]);
 
   useEffect(() => {
-    if (process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true') {
+    if (String(process.env.NEXT_PUBLIC_BYPASS_AUTH || '').replace(/['"]/g, '') === 'true') {
       setIsAuthenticated(true);
       setUserRole('admin');
       setIsAuthLoading(false);
@@ -897,6 +886,7 @@ export default function App() {
         const cachedRole = localStorage.getItem('tahaluf_cached_role');
         if (cachedEmail) {
           setUserEmail(cachedEmail);
+          setIsAuthenticated(true);
           if (cachedRole) setUserRole(cachedRole);
         }
       } catch (e) {}
@@ -1042,7 +1032,7 @@ export default function App() {
   }, [filterBusinesses, filterEvents, filterChannels, dateRange]);
 
   const handleSignOut = async () => {
-    if (process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true') {
+    if (String(process.env.NEXT_PUBLIC_BYPASS_AUTH || '').replace(/['"]/g, '') === 'true') {
       router.push('/login');
       return;
     }
@@ -2074,14 +2064,7 @@ export default function App() {
       const totalCPC = agg.clicks > 0 ? ((agg.cost * exRate) / agg.clicks) : 0;
       const totalCPA = agg.purchases > 0 ? ((agg.cost * exRate) / agg.purchases) : 0;
       const totalCVR = agg.clicks > 0 ? ((agg.purchases / agg.clicks) * 100) : 0;
-
-      // AI Insights generation from data
-      const topChannel = channelSpendData.length > 0 ? channelSpendData[0] : null;
-      const lowestCPMChannel = channelPerformance.length > 0 ? [...channelPerformance].sort((a, b) => a.cpm - b.cpm).find(d => d.cpm > 0) : null;
-      const highestCTRChannel = channelPerformance.length > 0 ? [...channelPerformance].sort((a, b) => b.ctr - a.ctr)[0] : null;
       const totalConversions = agg.purchases;
-      const avgDailySpend = dailySpendData.length > 0 ? d3.mean(dailySpendData, d => d.spend) : 0;
-      const peakSpendDay = dailySpendData.length > 0 ? dailySpendData.reduce((max, d) => d.spend > max.spend ? d : max, dailySpendData[0]) : null;
 
       const subTableAdData = selectedEvent ? filteredAdData.filter(d => d.eventNameDB === selectedEvent) : filteredAdData;
       const subTableTotals = getTotals(subTableAdData);
@@ -2090,6 +2073,55 @@ export default function App() {
       const phaseMetricsData = getMetricsData(subTableAdData, d => d.phase, 'phase');
       const channelMetricsData = getMetricsData(subTableAdData, d => d.channel, 'channel');
       const marketMetricsData = getMetricsData(subTableAdData, d => d.country, 'market');
+
+      // Determine active event and portfolio context cleanly
+      const activeEventContext = (filterEvents.length === 1 && !filterEvents.includes('All')) 
+        ? filterEvents[0] 
+        : (filterEvents.includes('All') ? selectedEvent : null);
+      const activePortfolioContext = filterPortfolios.length === 1 && !filterPortfolios.includes('All') ? filterPortfolios[0] : null;
+
+      // Scoped data for AI Strategic Briefing (independent event or portfolio)
+      const scopeAdData = activeEventContext ? filteredAdData.filter(d => d.eventNameDB === activeEventContext) : subTableAdData;
+      const scopeTotals = getTotals(scopeAdData);
+
+      // Scoped channel metrics for active event / portfolio
+      const scopeChannelSpend = d3.groups(scopeAdData, d => d.channel).map(([channel, vals]) => {
+        const spend = d3.sum(vals, d => d.cost) * exRate;
+        const imps = d3.sum(vals, d => d.impressions);
+        const clicks = d3.sum(vals, d => d.clicks);
+        const purchases = d3.sum(vals, d => d.purchases || 0);
+        return {
+          channel,
+          name: channel,
+          spend,
+          cost: d3.sum(vals, d => d.cost),
+          impressions: imps,
+          clicks,
+          purchases,
+          cpm: imps > 0 ? (spend / imps) * 1000 : 0,
+          cpc: clicks > 0 ? (spend / clicks) : 0,
+          ctr: imps > 0 ? (clicks / imps) * 100 : 0,
+          cpa: purchases > 0 ? (spend / purchases) : 0
+        };
+      }).filter(d => d.spend > 0).sort((a, b) => b.spend - a.spend);
+
+      const topChannel = scopeChannelSpend.length > 0 ? scopeChannelSpend[0] : null;
+      const lowestCPMChannel = scopeChannelSpend.length > 0 ? [...scopeChannelSpend].filter(d => d.cpm > 0).sort((a, b) => a.cpm - b.cpm)[0] : null;
+      const highestCTRChannel = scopeChannelSpend.length > 0 ? [...scopeChannelSpend].filter(d => d.impressions > 0).sort((a, b) => b.ctr - a.ctr)[0] : null;
+
+      const scopeDailySpend = d3.groups(scopeAdData.filter(d => d.dateObj && !isNaN(d.dateObj)), d => d3.timeFormat("%Y-%m-%d")(d.dateObj)).map(([key, vals]) => ({
+        date: d3.timeFormat("%b %d")(vals[0].dateObj),
+        day: d3.timeFormat("%b %d")(vals[0].dateObj),
+        spend: d3.sum(vals, d => d.cost) * exRate
+      })).filter(d => d.spend > 0);
+
+      const avgDailySpend = scopeDailySpend.length > 0 ? d3.mean(scopeDailySpend, d => d.spend) : 0;
+      const peakSpendDay = scopeDailySpend.length > 0 ? scopeDailySpend.reduce((max, d) => d.spend > max.spend ? d : max, scopeDailySpend[0]) : null;
+
+      const activeScope = {
+        type: activeEventContext ? 'event' : activePortfolioContext ? 'portfolio' : 'all',
+        name: activeEventContext || activePortfolioContext || 'All Events'
+      };
 
       const eventColumns = createColumns('eventName', 'Event');
       const phaseColumns = createColumns('phase', 'Funnel Stage');
@@ -2151,66 +2183,37 @@ export default function App() {
         <div className="space-y-6">
           {/* AI Strategic Intelligence Briefing Card (Admin Only by default in Feature Controls) */}
           {featureAllowed('aiSummary') && (
-            <div className="card-surface p-5 rounded-3xl border border-[#cedc28]/30 bg-gradient-to-r from-[#0a2442]/95 via-[#071b2e] to-[#041628] shadow-2xl relative overflow-hidden export-slide" data-title="AI Strategic Briefing">
-              <div className="pattern-overlay absolute inset-0 z-0 pointer-events-none opacity-20"></div>
-              <div className="relative z-10 flex flex-col gap-4">
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3">
-                  <div className="flex items-center gap-2.5">
-                    <div className="p-2 rounded-xl bg-[#cedc28]/15 border border-[#cedc28]/35 text-[#cedc28] shadow-sm">
-                      <Sparkles className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                        <span>AI Strategic Briefing</span>
-                        <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-[#14a6d9]/20 text-[#14a6d9] border border-[#14a6d9]/40">
-                          {userRole === 'admin' ? 'Executive Analysis' : 'Intelligence Brief'}
-                        </span>
-                      </h3>
-                      <p className="text-[11px] text-[#cedc28] font-medium">Real-time algorithmic synthesis across active paid channels and event pacing</p>
-                    </div>
-                  </div>
-                  <span className="text-[10px] text-slate-400 font-mono">
-                    Scoping {filteredAdData.length.toLocaleString()} delivered rows
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <div className="p-3.5 rounded-2xl bg-[#041628]/80 border border-white/10">
-                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Top Volume Driver</div>
-                    <div className="text-base font-extrabold text-white truncate">{topChannel?.name || 'Multi-Channel'}</div>
-                    <p className="text-[10px] text-[#14a6d9] mt-0.5 font-medium">
-                      {topChannel ? `${exSym}${formatShort(topChannel.cost * exRate)} delivered` : 'Awaiting spend'}
-                    </p>
-                  </div>
-
-                  <div className="p-3.5 rounded-2xl bg-[#041628]/80 border border-white/10">
-                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Efficiency Leader</div>
-                    <div className="text-base font-extrabold text-[#cedc28] truncate">{lowestCPMChannel?.channel || 'Dynamic'}</div>
-                    <p className="text-[10px] text-slate-300 mt-0.5 font-medium">
-                      {lowestCPMChannel ? `${exSym}${lowestCPMChannel.cpm.toFixed(2)} lowest CPM` : 'Analyzing CPM'}
-                    </p>
-                  </div>
-
-                  <div className="p-3.5 rounded-2xl bg-[#041628]/80 border border-white/10">
-                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Engagement Pace</div>
-                    <div className="text-base font-extrabold text-emerald-300 truncate">{highestCTRChannel?.channel || 'Optimal'}</div>
-                    <p className="text-[10px] text-slate-300 mt-0.5 font-medium">
-                      {highestCTRChannel ? `${highestCTRChannel.ctr.toFixed(2)}% peak CTR` : 'Analyzing CTR'}
-                    </p>
-                  </div>
-
-                  <div className="p-3.5 rounded-2xl bg-[#041628]/80 border border-white/10">
-                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Daily Spend Pace</div>
-                    <div className="text-base font-extrabold text-[#14a6d9] truncate">
-                      {avgDailySpend > 0 ? `${exSym}${formatShort(avgDailySpend * exRate)}/day` : '—'}
-                    </div>
-                    <p className="text-[10px] text-slate-300 mt-0.5 font-medium">
-                      {peakSpendDay ? `Peak: ${peakSpendDay.date}` : 'Across campaign dates'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <AiStrategicIntelligence 
+              allAdData={adData}
+              filteredAdData={scopeAdData}
+              channelData={scopeChannelSpend.length > 0 ? scopeChannelSpend : channelMetricsData}
+              totals={scopeTotals}
+              topChannel={topChannel}
+              lowestCPMChannel={lowestCPMChannel}
+              highestCTRChannel={highestCTRChannel}
+              avgDailySpend={avgDailySpend}
+              peakSpendDay={peakSpendDay}
+              activeScope={activeScope}
+              onSelectEvent={(evName) => {
+                setFilterEvents([evName]);
+                setSelectedEvent(evName);
+              }}
+              onSelectPortfolio={(portKey) => {
+                setFilterPortfolios([portKey]);
+                setFilterEvents(['All']);
+                setSelectedEvent(null);
+              }}
+              onResetScope={() => {
+                setFilterEvents(['All']);
+                setFilterPortfolios(['All']);
+                setSelectedEvent(null);
+              }}
+              exSym={exSym}
+              exRate={exRate}
+              formatShort={formatShort}
+              userRole={userRole}
+              featureAllowed={featureAllowed}
+            />
           )}
 
           {/* 1. Top Metric Cards */}
@@ -2984,11 +2987,11 @@ export default function App() {
               </div>
             </div>
 
-            {/* CENTER: FILTERS (scrollable horizontally if constrained, compact responsive widths) */}
-            <div className="px-3 xl:px-4 flex gap-1.5 xl:gap-2 flex-nowrap items-end flex-1 min-w-0 overflow-x-auto custom-scrollbar">
-              <DateRangeFilter label="DATE" dateRange={dateRange} onChange={setDateRange} widthClass="w-[115px] xl:w-[125px] 2xl:w-[135px]" />
-              <MultiSelect label="Week" options={uniqueWeeks} selected={filterWeeks} onChange={setFilterWeeks} widthClass="w-[76px] xl:w-[84px] 2xl:w-[90px]" />
-              <MultiSelect label="Portfolio" options={uniquePortfolios} selected={filterPortfolios} onChange={setFilterPortfolios} widthClass="w-[82px] xl:w-[90px] 2xl:w-[100px]" />
+            {/* CENTER: FILTERS (compact responsive widths, overflow-visible so dropdowns pop over content) */}
+            <div className="px-2 xl:px-4 flex gap-1 xl:gap-1.5 flex-nowrap items-end flex-1 min-w-0 overflow-visible">
+              <DateRangeFilter label="DATE" dateRange={dateRange} onChange={setDateRange} widthClass="w-[105px] xl:w-[120px] 2xl:w-[130px]" />
+              <MultiSelect label="Week" options={uniqueWeeks} selected={filterWeeks} onChange={setFilterWeeks} widthClass="w-[72px] xl:w-[82px] 2xl:w-[88px]" />
+              <MultiSelect label="Portfolio" options={uniquePortfolios} selected={filterPortfolios} onChange={setFilterPortfolios} widthClass="w-[78px] xl:w-[88px] 2xl:w-[96px]" />
               {/* HERO HIGHLIGHTED EVENT FILTER */}
               <MultiSelect 
                 label="Event" 
@@ -2998,23 +3001,23 @@ export default function App() {
                   setFilterEvents(next);
                   if (next.length === 1 && !next.includes('All')) {
                     setSelectedEvent(next[0]);
-                  } else if (next.includes('All') || next.length === 0) {
+                  } else {
                     setSelectedEvent(null);
                   }
                 }} 
                 isHero={true} 
-                widthClass="w-[130px] xl:w-[145px] 2xl:w-[170px]" 
+                widthClass="w-[125px] xl:w-[140px] 2xl:w-[160px]" 
               />
-              <MultiSelect label="Event Type" options={uniqueEventTypes} selected={filterEventTypes} onChange={setFilterEventTypes} widthClass="w-[86px] xl:w-[94px] 2xl:w-[104px]" />
-              <MultiSelect label="Funnel Stage" options={uniquePhases} selected={filterPhases} onChange={setFilterPhases} widthClass="w-[88px] xl:w-[96px] 2xl:w-[106px]" />
-              <MultiSelect label="Channel" options={uniqueChannels} selected={filterChannels} onChange={setFilterChannels} widthClass="w-[82px] xl:w-[90px] 2xl:w-[98px]" />
-              <MultiSelect label="Market" options={uniqueMarkets} selected={filterMarkets} onChange={setFilterMarkets} widthClass="w-[100px] xl:w-[112px] 2xl:w-[128px]" />
+              <MultiSelect label="Event Type" options={uniqueEventTypes} selected={filterEventTypes} onChange={setFilterEventTypes} widthClass="w-[82px] xl:w-[90px] 2xl:w-[100px]" />
+              <MultiSelect label="Funnel Stage" options={uniquePhases} selected={filterPhases} onChange={setFilterPhases} widthClass="w-[84px] xl:w-[92px] 2xl:w-[102px]" />
+              <MultiSelect label="Channel" options={uniqueChannels} selected={filterChannels} onChange={setFilterChannels} widthClass="w-[78px] xl:w-[86px] 2xl:w-[94px]" />
+              <MultiSelect label="Market" options={uniqueMarkets} selected={filterMarkets} onChange={setFilterMarkets} widthClass="w-[94px] xl:w-[106px] 2xl:w-[120px]" alignRight={true} />
               <MultiSelect 
                 label="Business" 
                 options={uniqueBusinesses} 
                 selected={filterBusinesses} 
                 onChange={setFilterBusinesses} 
-                widthClass="w-[78px] xl:w-[86px] 2xl:w-[94px]" 
+                widthClass="w-[74px] xl:w-[82px] 2xl:w-[90px]" 
                 singleSelect={true}
                 alignRight={true}
               />
@@ -3288,7 +3291,7 @@ export default function App() {
                       setFilterEvents(next);
                       if (next.length === 1 && !next.includes('All')) {
                         setSelectedEvent(next[0]);
-                      } else if (next.includes('All') || next.length === 0) {
+                      } else {
                         setSelectedEvent(null);
                       }
                     }} 
@@ -3419,6 +3422,31 @@ export default function App() {
             initialEvents={eventsConfiguration}
             onFeaturesSaved={setFeatureConfig}
             onEventsSaved={setEventsConfiguration}
+            onNavigate={(featureId) => {
+              if (['summary', 'campaign', 'weekly', 'channel', 'market', 'detailed', 'webtraffic', 'creative'].includes(featureId)) {
+                setActiveTab(featureId);
+              } else if (featureId === 'aiSummary' || featureId === 'budgetSimulator' || featureId === 'channelQuadrant') {
+                setActiveTab('summary');
+              } else if (featureId === 'launchForecaster') {
+                setActiveTab('weekly');
+              } else if (featureId === 'creativeFatigue') {
+                setActiveTab('creative');
+              } else if (featureId === 'tv' || featureId === 'tvAutoCycle') {
+                setActiveTab('summary');
+                setTvMode(true);
+              } else if (featureId === 'tvCustomization') {
+                setActiveTab('summary');
+                setTvMode(true);
+                setShowTvSettings(true);
+              } else if (featureId === 'quickJump') {
+                setActiveTab('summary');
+                setIsQuickJumpOpen(true);
+              } else if (featureId === 'currency' || featureId === 'exports' || featureId === 'healthBanner') {
+                setActiveTab('summary');
+              } else {
+                setActiveTab('summary');
+              }
+            }}
           />
           </div>
         )}

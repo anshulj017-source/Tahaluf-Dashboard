@@ -4,7 +4,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { 
   Shield, Eye, EyeOff, Save, RotateCcw, Search, CheckCircle2, 
   AlertTriangle, Filter, Sparkles, Tv, Layers, Wrench, Activity, 
-  Brain, BarChart2, Globe, Lock, Ban
+  Brain, BarChart2, Globe, Lock, Ban, ExternalLink
 } from 'lucide-react';
 import { auth } from '../../lib/firebase';
 import { DASHBOARD_FEATURES, DEFAULT_FEATURE_CONFIG, isFeatureEnabled } from '../../lib/dashboardFeatures.mjs';
@@ -19,7 +19,7 @@ const GROUP_ICONS = {
   'Advanced Analytics': BarChart2
 };
 
-export default function FeatureControlsAdmin({ onSaved }) {
+export default function FeatureControlsAdmin({ onSaved, onNavigate }) {
   const [config, setConfig] = useState(null);
   const [modes, setModes] = useState(DEFAULT_FEATURE_CONFIG.modes);
   const [previewRole, setPreviewRole] = useState('standard');
@@ -260,18 +260,21 @@ export default function FeatureControlsAdmin({ onSaved }) {
             {DASHBOARD_FEATURES.map(feature => {
               const visible = isFeatureEnabled({ modes }, feature.id, previewRole);
               return (
-                <div
+                <button
                   key={feature.id}
+                  type="button"
+                  onClick={() => onNavigate && onNavigate(feature.id)}
                   className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all border ${
                     visible
-                      ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300 shadow-sm'
-                      : 'bg-white/5 border-white/5 text-slate-500 line-through opacity-50'
+                      ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300 shadow-sm hover:border-[#cedc28] hover:text-[#cedc28] cursor-pointer'
+                      : 'bg-white/5 border-white/5 text-slate-500 line-through opacity-50 cursor-pointer hover:border-slate-500'
                   }`}
-                  title={`${feature.name}: ${visible ? 'Visible' : 'Hidden'} for ${previewRole}`}
+                  title={`${feature.name}: ${visible ? 'Visible' : 'Hidden'} for ${previewRole}. Click to jump to this feature.`}
                 >
                   <span className={`w-1.5 h-1.5 rounded-full ${visible ? 'bg-emerald-400' : 'bg-slate-600'}`}></span>
                   <span>{feature.name}</span>
-                </div>
+                  {onNavigate && <ExternalLink className="w-2.5 h-2.5 opacity-60" />}
+                </button>
               );
             })}
           </div>
@@ -382,7 +385,7 @@ export default function FeatureControlsAdmin({ onSaved }) {
                   return (
                     <div key={feature.id} className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-white/[0.02] transition-colors">
                       <div className="flex-1 min-w-[200px]">
-                        <div className="flex items-center gap-2 mb-1">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
                           <span className="text-sm font-bold text-white">{feature.name}</span>
                           {feature.adminOnly && (
                             <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30">
@@ -393,6 +396,17 @@ export default function FeatureControlsAdmin({ onSaved }) {
                             <span className="px-2 py-0.5 rounded text-[9px] font-medium bg-blue-500/15 text-blue-300 border border-blue-500/25">
                               Requires {feature.requires}
                             </span>
+                          )}
+                          {onNavigate && (
+                            <button
+                              type="button"
+                              onClick={() => onNavigate(feature.id)}
+                              className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#cedc28]/10 text-[#cedc28] border border-[#cedc28]/30 hover:bg-[#cedc28]/25 hover:border-[#cedc28] transition-all flex items-center gap-1 shadow-sm"
+                              title={`Jump directly to ${feature.name}`}
+                            >
+                              <span>Open View</span>
+                              <ExternalLink className="w-2.5 h-2.5" />
+                            </button>
                           )}
                         </div>
                         <p className="text-xs text-slate-400 leading-relaxed">{feature.description}</p>
