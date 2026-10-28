@@ -57,11 +57,11 @@ function getEventDataStats(source, health) {
 
   return {
     eventDataStatus: source.kind !== 'Actuals'
-      ? (health.rowCount > 0 ? (eventRows > 0 ? 'present' : 'unverified') : 'missing')
+      ? ((health.rowCount > 0 || health.hasCachedData) ? 'present' : 'missing')
       : !health.eventColumn
         ? (health.rowCount > 0 ? (eventRows > 0 ? 'present' : 'unverified') : 'missing')
         : eventRows > 0 ? 'present' : 'missing',
-    eventRows,
+    eventRows: source.kind !== 'Actuals' ? (eventRows > 0 ? eventRows : (health.rowCount || 0)) : eventRows,
     totalRows: health.rowCount || 0,
     firstDataDate: source.kind !== 'Actuals'
       ? health.firstDate || null

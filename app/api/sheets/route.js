@@ -36,11 +36,11 @@ function getEventDataStats(source, health) {
   const eventRows = eventMatches.reduce((sum, [, stats]) => sum + stats.rows, 0);
   return {
     eventDataStatus: source.kind !== 'Actuals'
-      ? (health.rowCount > 0 ? 'unverified' : 'missing')
+      ? ((health.rowCount > 0 || health.hasCachedData) ? 'present' : 'missing')
       : !health.eventColumn
         ? 'unverified'
         : eventRows > 0 ? 'present' : 'missing',
-    eventRows
+    eventRows: source.kind !== 'Actuals' ? (eventRows > 0 ? eventRows : (health.rowCount || 0)) : eventRows
   };
 }
 

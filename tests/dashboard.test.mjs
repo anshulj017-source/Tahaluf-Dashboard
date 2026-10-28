@@ -59,6 +59,12 @@ import {
   applyAnalyticsAction,
   SYSTEM_ACTIONS_CATALOG
 } from '../lib/analyticsService.mjs';
+import {
+  DASHBOARD_FEATURES,
+  DEFAULT_FEATURE_CONFIG,
+  isFeatureEnabled,
+  validateFeatureModes
+} from '../lib/dashboardFeatures.mjs';
 const { 
   formatYMD, 
   calculatePresetRange, 
@@ -1216,6 +1222,58 @@ async function testApiQuotasApi() {
   assert(pingData.success === true && pingData.result?.status === 'unknown' && pingData.result?.latencyMs === null, 'Live Vercel check does not invent a health status or latency');
 }
 
+function testFeatureControlsLogic() {
+  console.log('\n--- 11. Testing Dashboard Feature Controls & Role Permissions ---');
+  
+  // 1. Verify all managed features are declared
+  assert(Array.isArray(DASHBOARD_FEATURES) && DASHBOARD_FEATURES.length >= 14, 'DASHBOARD_FEATURES defines all managed modules');
+  const featureIds = DASHBOARD_FEATURES.map(f => f.id);
+  assert(featureIds.includes('tv'), 'Includes tv mode feature');
+  assert(featureIds.includes('aiSummary'), 'Includes aiSummary feature');
+  assert(featureIds.includes('granularTimeline'), 'Includes granularTimeline feature');
+  assert(featureIds.includes('benchmarkComparison'), 'Includes benchmarkComparison feature');
+
+  // 2. Verify all new features default strictly to admin_only (zero disruption to live standard users)
+  const aiFeature = DASHBOARD_FEATURES.find(f => f.id === 'aiSummary');
+  assert(aiFeature?.defaultMode === 'admin_only', 'New feature aiSummary defaults to admin_only');
+  const timelineFeature = DASHBOARD_FEATURES.find(f => f.id === 'granularTimeline');
+  assert(timelineFeature?.defaultMode === 'admin_only', 'New feature granularTimeline defaults to admin_only');
+  const benchmarkFeature = DASHBOARD_FEATURES.find(f => f.id === 'benchmarkComparison');
+  assert(benchmarkFeature?.defaultMode === 'admin_only', 'New feature benchmarkComparison defaults to admin_only');
+
+  // 3. Verify standard user role cannot access admin_only features
+  assert(isFeatureEnabled(DEFAULT_FEATURE_CONFIG, 'summary', 'standard') === true, 'Standard user can view Overview');
+  assert(isFeatureEnabled(DEFAULT_FEATURE_CONFIG, 'aiSummary', 'standard') === false, 'Standard user cannot view aiSummary');
+  assert(isFeatureEnabled(DEFAULT_FEATURE_CONFIG, 'granularTimeline', 'standard') === false, 'Standard user cannot view granularTimeline');
+  assert(isFeatureEnabled(DEFAULT_FEATURE_CONFIG, 'benchmarkComparison', 'standard') === false, 'Standard user cannot view benchmarkComparison');
+
+  // 4. Verify admin user role CAN access admin_only features
+  assert(isFeatureEnabled(DEFAULT_FEATURE_CONFIG, 'aiSummary', 'admin') === true, 'Admin user can access aiSummary');
+  assert(isFeatureEnabled(DEFAULT_FEATURE_CONFIG, 'granularTimeline', 'admin') === true, 'Admin user can access granularTimeline');
+  assert(isFeatureEnabled(DEFAULT_FEATURE_CONFIG, 'benchmarkComparison', 'admin') === true, 'Admin user can access benchmarkComparison');
+
+  // 5. Verify simulator preview mode: when admin previews as standard user, admin_only features are hidden
+  assert(isFeatureEnabled(DEFAULT_FEATURE_CONFIG, 'aiSummary', 'admin', true) === false, 'Persona preview hides aiSummary for standard view');
+
+  // 6. Verify cascading dependencies (tvAutoCycle requires tv)
+  const disabledTvConfig = {
+    revision: 1,
+    modes: { ...DEFAULT_FEATURE_CONFIG.modes, tv: 'disabled', tvAutoCycle: 'public' }
+  };
+  assert(isFeatureEnabled(disabledTvConfig, 'tvAutoCycle', 'admin') === false, 'tvAutoCycle is disabled when parent tv feature is disabled');
+
+  // 7. Verify validateFeatureModes validation
+  const validModes = validateFeatureModes({ aiSummary: 'public' });
+  assert(validModes.aiSummary === 'public', 'validateFeatureModes allows updating aiSummary');
+  let thrown = false;
+  try {
+    validateFeatureModes({ healthBanner: 'public' });
+  } catch (e) {
+    thrown = true;
+  }
+  assert(thrown === true, 'validateFeatureModes rejects public mode on system-restricted features');
+}
+
 // -------------------------------------------------------------
 // MAIN TEST RUNNER
 // -------------------------------------------------------------
@@ -1239,6 +1297,7 @@ async function runAllTests() {
   testEventViewContracts();
   await testAnalyticsLogic();
   await testApiQuotasLogic();
+  testFeatureControlsLogic();
 
   // Check if local dev server is running before attempting API integration tests
   try {
