@@ -2114,6 +2114,70 @@ export default function App() {
 
       return (
         <div className="space-y-6">
+          {/* AI Strategic Intelligence Briefing Card (Admin Only by default in Feature Controls) */}
+          {featureAllowed('aiSummary') && (
+            <div className="card-surface p-5 rounded-3xl border border-[#cedc28]/30 bg-gradient-to-r from-[#0a2442]/95 via-[#071b2e] to-[#041628] shadow-2xl relative overflow-hidden export-slide" data-title="AI Strategic Briefing">
+              <div className="pattern-overlay absolute inset-0 z-0 pointer-events-none opacity-20"></div>
+              <div className="relative z-10 flex flex-col gap-4">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-xl bg-[#cedc28]/15 border border-[#cedc28]/35 text-[#cedc28] shadow-sm">
+                      <Sparkles className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                        <span>AI Strategic Briefing</span>
+                        <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-[#14a6d9]/20 text-[#14a6d9] border border-[#14a6d9]/40">
+                          {userRole === 'admin' ? 'Executive Analysis' : 'Intelligence Brief'}
+                        </span>
+                      </h3>
+                      <p className="text-[11px] text-[#cedc28] font-medium">Real-time algorithmic synthesis across active paid channels and event pacing</p>
+                    </div>
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    Scoping {filteredAdData.length.toLocaleString()} delivered rows
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="p-3.5 rounded-2xl bg-[#041628]/80 border border-white/10">
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Top Volume Driver</div>
+                    <div className="text-base font-extrabold text-white truncate">{topChannel?.name || 'Multi-Channel'}</div>
+                    <p className="text-[10px] text-[#14a6d9] mt-0.5 font-medium">
+                      {topChannel ? `${exSym}${formatShort(topChannel.cost * exRate)} delivered` : 'Awaiting spend'}
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl bg-[#041628]/80 border border-white/10">
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Efficiency Leader</div>
+                    <div className="text-base font-extrabold text-[#cedc28] truncate">{lowestCPMChannel?.channel || 'Dynamic'}</div>
+                    <p className="text-[10px] text-slate-300 mt-0.5 font-medium">
+                      {lowestCPMChannel ? `${exSym}${lowestCPMChannel.cpm.toFixed(2)} lowest CPM` : 'Analyzing CPM'}
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl bg-[#041628]/80 border border-white/10">
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Engagement Pace</div>
+                    <div className="text-base font-extrabold text-emerald-300 truncate">{highestCTRChannel?.channel || 'Optimal'}</div>
+                    <p className="text-[10px] text-slate-300 mt-0.5 font-medium">
+                      {highestCTRChannel ? `${highestCTRChannel.ctr.toFixed(2)}% peak CTR` : 'Analyzing CTR'}
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl bg-[#041628]/80 border border-white/10">
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Daily Spend Pace</div>
+                    <div className="text-base font-extrabold text-[#14a6d9] truncate">
+                      {avgDailySpend > 0 ? `${exSym}${formatShort(avgDailySpend * exRate)}/day` : '—'}
+                    </div>
+                    <p className="text-[10px] text-slate-300 mt-0.5 font-medium">
+                      {peakSpendDay ? `Peak: ${peakSpendDay.date}` : 'Across campaign dates'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* 1. Top Metric Cards */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3 export-slide" data-title="Summary Metrics">
             {userRole !== 'non-finance' && (
@@ -2413,21 +2477,23 @@ export default function App() {
               Select an event from the hero filter in the top bar, or click any event card below to immediately load its full campaign performance, phase pacing, channels, and delivery metrics.
             </p>
 
-            <div className="flex items-center justify-center gap-3 mb-8">
-              <button
-                type="button"
-                onClick={() => {
-                  React.startTransition(() => {
-                    setFilterEvents(uniqueEvents);
-                    setSelectedEvent(null);
-                  });
-                }}
-                className="px-4 py-2 rounded-xl bg-[#cedc28]/15 hover:bg-[#cedc28] border border-[#cedc28]/30 hover:border-[#cedc28] text-[#cedc28] hover:text-[#1a302e] font-black text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-sm cursor-pointer"
-              >
-                <Activity className="w-3.5 h-3.5" />
-                <span>Compare All Events (Relative Timeline) →</span>
-              </button>
-            </div>
+            {featureAllowed('benchmarkComparison') && (
+              <div className="flex items-center justify-center gap-3 mb-8">
+                <button
+                  type="button"
+                  onClick={() => {
+                    React.startTransition(() => {
+                      setFilterEvents(uniqueEvents);
+                      setSelectedEvent(null);
+                    });
+                  }}
+                  className="px-4 py-2 rounded-xl bg-[#cedc28]/15 hover:bg-[#cedc28] border border-[#cedc28]/30 hover:border-[#cedc28] text-[#cedc28] hover:text-[#1a302e] font-black text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-sm cursor-pointer"
+                >
+                  <Activity className="w-3.5 h-3.5" />
+                  <span>Compare All Events (Relative Timeline) →</span>
+                </button>
+              </div>
+            )}
 
             <div className="w-full grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {uniqueEvents.map(evName => {

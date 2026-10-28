@@ -172,6 +172,17 @@ export default function ApiQuotasAdmin({ active = true, onPolicySaved }) {
     }
   };
 
+  const exportQuotaReport = () => {
+    if (!data) return;
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `tahaluf-api-quota-audit-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div hidden={!active} className="space-y-5">
       {/* HEADER SECTION */}
@@ -192,14 +203,26 @@ export default function ApiQuotasAdmin({ active = true, onPolicySaved }) {
           )}
         </div>
 
-        <button
-          onClick={() => fetchQuotas(true)}
-          disabled={loading || refreshing}
-          className="px-4 py-2 rounded-xl border border-[#14a6d9]/40 bg-[#14a6d9]/10 text-[#14a6d9] hover:text-white hover:bg-[#14a6d9]/20 disabled:opacity-50 text-xs font-bold uppercase tracking-wider flex items-center gap-2 self-start sm:self-auto transition-all"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
-          {refreshing ? 'Refreshing...' : 'Refresh report'}
-        </button>
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          {data && (
+            <button
+              onClick={exportQuotaReport}
+              className="px-3.5 py-2 rounded-xl border border-white/10 bg-white/5 text-slate-300 hover:text-white hover:bg-white/10 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all"
+              title="Download API quota audit snapshot"
+            >
+              <ArrowUpRight className="w-3.5 h-3.5 text-[#14a6d9]" />
+              <span>Export Audit</span>
+            </button>
+          )}
+          <button
+            onClick={() => fetchQuotas(true)}
+            disabled={loading || refreshing}
+            className="px-4 py-2 rounded-xl border border-[#14a6d9]/40 bg-[#14a6d9]/10 text-[#14a6d9] hover:text-white hover:bg-[#14a6d9]/20 disabled:opacity-50 text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-all"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+            {refreshing ? 'Refreshing...' : 'Refresh report'}
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -214,6 +237,34 @@ export default function ApiQuotasAdmin({ active = true, onPolicySaved }) {
         { id: 'alerts', label: 'Alerts & Limits' }, { id: 'diagnostics', label: 'Diagnostics' }
       ]} />
       {loading && !data && <p role="status" className="text-sm text-slate-300">Loading API report...</p>}
+      
+      {/* PROACTIVE RUNWAY & SAFEGUARD BANNER */}
+      {view === 'overview' && data?.burnRate && (
+        <div className="card-surface p-4 rounded-2xl border border-[#cedc28]/25 bg-gradient-to-r from-[#031120] to-[#041628] flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-[#cedc28]/10 border border-[#cedc28]/30 text-[#cedc28]">
+              <Zap className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-xs font-bold text-white flex items-center gap-2">
+                <span>Proactive Firestore Runway &amp; Safeguard</span>
+                <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
+                  data.burnRate.autoTripEngaged ? 'bg-amber-500/20 text-amber-300 border border-amber-400/40' : 'bg-emerald-500/15 text-emerald-300 border border-emerald-400/30'
+                }`}>
+                  {data.burnRate.autoTripEngaged ? '85% Shield Active' : 'Auto-Trip Armed (85%)'}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                Writes Today: <strong className="text-white">{data.burnRate.firestoreWritesToday.toLocaleString()}</strong> / 20,000 allowance • Velocity: <strong className="text-white">~{data.burnRate.writeBurnRatePerHour}/hr</strong> • Safety Runway: <strong className="text-emerald-400">{data.burnRate.estimatedRunwayHours}h remaining</strong>
+              </p>
+            </div>
+          </div>
+          <div className="text-right text-[10px] text-slate-400 font-mono">
+            Daily reset at <strong className="text-white">00:00 UTC</strong>
+          </div>
+        </div>
+      )}
+
       <div hidden={view !== 'overview'} className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="card-surface p-4 rounded-2xl border border-white/5 space-y-1">
           <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Services Monitored</div>

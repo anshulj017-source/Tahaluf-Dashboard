@@ -1190,6 +1190,12 @@ async function testApiQuotasLogic() {
   const sheetsService = analysis.services.find(s => s.id === 'sheets');
   assert(Boolean(sheetsService), 'Analysis includes Google Sheets Publishing API');
 
+  // Verify proactive burnRate & auto-trip threshold
+  assert(Boolean(analysis.burnRate), 'Analysis includes proactive burnRate metrics');
+  assert(analysis.burnRate.autoTripThreshold === 17000, 'Reports autoTripThreshold of 17,000 writes');
+  assert(typeof analysis.burnRate.writeBurnRatePerHour === 'number', 'Reports writeBurnRatePerHour');
+  assert(typeof analysis.burnRate.estimatedRunwayHours === 'number', 'Reports estimatedRunwayHours');
+
   // Test circuit breaker state toggle & restore
   const originalState = getCircuitBreakerState();
   const toggled = updateCircuitBreakerState({ forceMemoryCache: true });
