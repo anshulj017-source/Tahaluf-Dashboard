@@ -12,16 +12,19 @@ export default function Login() {
   const router = useRouter();
 
   useEffect(() => {
-    if (String(process.env.NEXT_PUBLIC_BYPASS_AUTH || '').replace(/['"]/g, '') === 'true') {
-      router.push('/');
-      return;
-    }
     let resolved = false;
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       resolved = true;
       if (user) {
         router.push('/');
       } else {
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.removeItem('tahaluf_cached_role');
+            localStorage.removeItem('tahaluf_cached_email');
+            localStorage.removeItem('tahaluf_feature_modes_draft');
+          } catch {}
+        }
         setLoading(false);
       }
     });
@@ -31,6 +34,13 @@ export default function Login() {
         if (auth.currentUser) {
           router.push('/');
         } else {
+          if (typeof window !== 'undefined') {
+            try {
+              localStorage.removeItem('tahaluf_cached_role');
+              localStorage.removeItem('tahaluf_cached_email');
+              localStorage.removeItem('tahaluf_feature_modes_draft');
+            } catch {}
+          }
           setLoading(false);
         }
       }
@@ -47,6 +57,13 @@ export default function Login() {
     setError('');
     setLoading(true);
     try {
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.removeItem('tahaluf_cached_role');
+          localStorage.removeItem('tahaluf_cached_email');
+          localStorage.removeItem('tahaluf_feature_modes_draft');
+        } catch {}
+      }
       await signInWithEmailAndPassword(auth, email, password);
       router.push('/');
     } catch (err) {
@@ -131,15 +148,6 @@ export default function Login() {
           >
             {loading ? 'Authenticating...' : 'Sign In'}
           </button>
-          {process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true' && (
-            <button 
-              type="button" 
-              onClick={() => router.push('/')}
-              className="w-full bg-[#14a6d9]/20 hover:bg-[#14a6d9]/30 text-[#14a6d9] border border-[#14a6d9]/40 rounded-xl py-2.5 text-xs font-bold uppercase tracking-wider transition-all"
-            >
-              ⚡ Bypass Login (Local Testing)
-            </button>
-          )}
         </form>
       </div>
     </div>

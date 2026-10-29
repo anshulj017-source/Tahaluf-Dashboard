@@ -691,33 +691,28 @@ const InitialLoadingScreen = ({ isAuthLoading, progress = 18, statusMessage = ''
 // --- MAIN APP ---
 export default function App() {
   const router = useRouter();
-  const isDevBypass = String(process.env.NEXT_PUBLIC_BYPASS_AUTH || '').replace(/['"]/g, '') === 'true';
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    if (isDevBypass) return true;
     if (typeof window !== 'undefined') {
       try { return Boolean(localStorage.getItem('tahaluf_cached_email')); } catch {}
     }
     return false;
   });
   const [userRole, setUserRole] = useState(() => {
-    if (isDevBypass) return 'super_admin';
     if (typeof window !== 'undefined') {
       try {
-        const cached = localStorage.getItem('tahaluf_cached_role') || 'standard';
-        return cached === 'admin' ? 'super_admin' : cached;
+        const cached = localStorage.getItem('tahaluf_cached_role');
+        if (cached) return cached === 'admin' ? 'super_admin' : cached;
       } catch {}
     }
     return 'standard';
   });
   const [userEmail, setUserEmail] = useState(() => {
-    if (isDevBypass) return 'admin@tahaluf.com';
     if (typeof window !== 'undefined') {
       try { return localStorage.getItem('tahaluf_cached_email') || ''; } catch {}
     }
     return '';
   });
   const [isAuthLoading, setIsAuthLoading] = useState(() => {
-    if (isDevBypass) return false;
     if (typeof window !== 'undefined') {
       try { return !Boolean(localStorage.getItem('tahaluf_cached_email')); } catch {}
     }
@@ -735,8 +730,13 @@ export default function App() {
   const [adminVisited, setAdminVisited] = useState(false);
   const isAdminRole = userRole === 'admin' || userRole === 'super_admin';
   useEffect(() => {
-    if (isAdminRole && new URLSearchParams(window.location.search).has('admin')) setActiveTab('admin');
-  }, [isAdminRole]);
+    if (!isAdminRole && activeTab === 'admin') {
+      setActiveTab('summary');
+    }
+    if (isAdminRole && new URLSearchParams(window.location.search).has('admin')) {
+      setActiveTab('admin');
+    }
+  }, [isAdminRole, activeTab]);
   useEffect(() => {
     if (activeTab === 'admin') setAdminVisited(true);
   }, [activeTab]);
@@ -932,13 +932,6 @@ export default function App() {
   }, [userRole, perfMetric]);
 
   useEffect(() => {
-    if (String(process.env.NEXT_PUBLIC_BYPASS_AUTH || '').replace(/['"]/g, '') === 'true') {
-      setIsAuthenticated(true);
-      setUserRole('super_admin');
-      setIsAuthLoading(false);
-      return;
-    }
-
     let isResolved = false;
 
     // Fast-path: Check localStorage for cached session to immediately warm user state
@@ -959,12 +952,9 @@ export default function App() {
       if (isResolved) return;
       isResolved = true;
 
-      const email = user.email || user.displayName || 'admin@tahaluf.com';
+      const email = (user.email || user.displayName || '').toLowerCase().trim();
       setIsAuthenticated(true);
       setUserEmail(email);
-      
-      // CRITICAL FIX: Unlock auth loading IMMEDIATELY.
-      // Do NOT block dashboard loading on Firestore network requests!
       setIsAuthLoading(false);
 
       if (typeof window !== 'undefined') {
@@ -973,33 +963,50 @@ export default function App() {
         } catch (e) {}
       }
 
-      // Non-blocking background sync of role and activity
-      try {
-        const fetchUserWithTimeout = Promise.race([
-          getDoc(doc(db, 'users', user.uid)),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2500))
-        ]);
+      // Root Tahaluf admin email
+      if (email === 'admin@tahaluf.com') {
+        setUserRole('super_admin');
+        if (typeof window !== 'undefined') {
+          try { localStorage.setItem('tahaluf_cached_role', 'super_admin'); } catch {}
+        }
+      } else {
+        // For non-root users, immediately ensure baseline standard role so no admin tabs bleed over
+        setUserRole(prev => (prev === 'admin' || prev === 'super_admin' ? 'standard' : prev));
+        if (typeof window !== 'undefined') {
+          try { localStorage.setItem('tahaluf_cached_role', 'standard'); } catch {}
+        }
+      }
 
-        const userDoc = await fetchUserWithTimeout;
-        if (userDoc && userDoc.exists()) {
-          const data = userDoc.data();
-          const rawRole = data.role || (data.isAdmin ? 'super_admin' : 'standard');
-          const resolvedRole = (rawRole === 'admin') ? 'super_admin' : rawRole;
-          setUserRole(resolvedRole);
-          if (typeof window !== 'undefined') {
-            try {
-              localStorage.setItem('tahaluf_cached_role', resolvedRole);
-            } catch (e) {}
+      // Fetch official verified role from secure /api/auth/me endpoint
+      try {
+        const token = user.getIdToken ? await user.getIdToken().catch(() => null) : null;
+        const authMeRes = await fetch('/api/auth/me', {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            'x-admin-email': email
+          }
+        });
+        if (authMeRes.ok) {
+          const authMeData = await authMeRes.json();
+          if (authMeData.role) {
+            setUserRole(authMeData.role);
+            if (typeof window !== 'undefined') {
+              try { localStorage.setItem('tahaluf_cached_role', authMeData.role); } catch {}
+            }
           }
         }
-        
-        // Touch lastActive in background without awaiting
-        setDoc(doc(db, 'users', user.uid), { 
-          lastActive: new Date().toISOString() 
-        }, { merge: true }).catch(() => {});
-      } catch (e) {
-        console.warn("User profile background sync bypassed:", e?.message || e);
+      } catch (err) {
+        console.warn('Role verification via API fallback failed:', err);
       }
+
+      // Touch lastActive in background without awaiting
+      try {
+        if (user.uid && user.uid !== 'cached-user') {
+          setDoc(doc(db, 'users', user.uid), { 
+            lastActive: new Date().toISOString() 
+          }, { merge: true }).catch(() => {});
+        }
+      } catch (e) {}
     };
 
     // Firebase Auth Listener
@@ -1008,34 +1015,52 @@ export default function App() {
         resolveUser(user);
       } else {
         if (!auth.currentUser) {
-          const hasCachedSession = typeof window !== 'undefined' && Boolean(localStorage.getItem('tahaluf_cached_email'));
-          if (hasCachedSession) {
-            isResolved = true;
-            setIsAuthLoading(false);
+          const cachedEmail = typeof window !== 'undefined' ? localStorage.getItem('tahaluf_cached_email') : null;
+          if (cachedEmail) {
+            resolveUser({ email: cachedEmail, displayName: cachedEmail, uid: 'cached-user' });
             return;
           }
           isResolved = true;
+          setIsAuthenticated(false);
+          setUserRole('standard');
+          setUserEmail('');
           setIsAuthLoading(false);
+          if (typeof window !== 'undefined') {
+            try {
+              localStorage.removeItem('tahaluf_cached_role');
+              localStorage.removeItem('tahaluf_cached_email');
+              localStorage.removeItem('tahaluf_feature_modes_draft');
+            } catch {}
+          }
           router.push('/login');
         }
       }
     });
 
     // SAFETY NET TIMEOUT: If onAuthStateChanged takes longer than 3500ms,
-    // evaluate currentUser or redirect to login to eliminate the "forever authenticating" freeze
+    // evaluate currentUser or redirect to login
     const authTimeoutTimer = setTimeout(() => {
       if (!isResolved) {
         if (auth.currentUser) {
           resolveUser(auth.currentUser);
         } else {
-          const hasCachedSession = typeof window !== 'undefined' && Boolean(localStorage.getItem('tahaluf_cached_email'));
-          if (hasCachedSession) {
-            isResolved = true;
-            setIsAuthLoading(false);
+          const cachedEmail = typeof window !== 'undefined' ? localStorage.getItem('tahaluf_cached_email') : null;
+          if (cachedEmail) {
+            resolveUser({ email: cachedEmail, displayName: cachedEmail, uid: 'cached-user' });
             return;
           }
           isResolved = true;
+          setIsAuthenticated(false);
+          setUserRole('standard');
+          setUserEmail('');
           setIsAuthLoading(false);
+          if (typeof window !== 'undefined') {
+            try {
+              localStorage.removeItem('tahaluf_cached_role');
+              localStorage.removeItem('tahaluf_cached_email');
+              localStorage.removeItem('tahaluf_feature_modes_draft');
+            } catch {}
+          }
           router.push('/login');
         }
       }
@@ -1108,11 +1133,21 @@ export default function App() {
   }, [filterBusinesses, filterEvents, filterChannels, dateRange]);
 
   const handleSignOut = async () => {
-    if (String(process.env.NEXT_PUBLIC_BYPASS_AUTH || '').replace(/['"]/g, '') === 'true') {
-      router.push('/login');
-      return;
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem('tahaluf_cached_role');
+        localStorage.removeItem('tahaluf_cached_email');
+        localStorage.removeItem('tahaluf_feature_modes_draft');
+        sessionStorage.clear();
+      } catch (e) {}
     }
-    await signOut(auth);
+    setUserRole('standard');
+    setUserEmail('');
+    setIsAuthenticated(false);
+    setActiveTab('summary');
+    try {
+      await signOut(auth);
+    } catch (e) {}
     router.push('/login');
   };
 

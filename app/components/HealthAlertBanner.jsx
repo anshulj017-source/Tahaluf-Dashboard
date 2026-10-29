@@ -12,10 +12,15 @@ export default function HealthAlertBanner({ onOpenHealthMonitor }) {
     let cancelled = false;
     const checkIssues = async () => {
       try {
-        const token = await auth.currentUser?.getIdToken();
+        if (!auth.currentUser) return;
+        const token = await auth.currentUser.getIdToken().catch(() => null);
+        if (!token) return;
         const response = await fetch('/api/admin/health-notifications?includeHealth=true', {
-          headers: token ? { Authorization: `Bearer ${token}` } : {}
+          headers: { Authorization: `Bearer ${token}` }
         });
+        if (response.status === 401 || response.status === 403) {
+          return;
+        }
         const result = await response.json();
         if (!response.ok || !result.success) {
           throw new Error(result.error || 'Could not check dashboard health alerts.');
@@ -25,7 +30,7 @@ export default function HealthAlertBanner({ onOpenHealthMonitor }) {
           setIssues(result.issues || []);
         }
       } catch (error) {
-        console.error('[HEALTH ALERT] Could not update dashboard alert:', error);
+        console.warn('[HEALTH ALERT] Could not update dashboard alert:', error.message || error);
       }
     };
 

@@ -251,6 +251,25 @@ export default function AdminView({
   const filteredUsers = users.filter(user => `${user.email} ${user.role}`.toLowerCase().includes(userSearch.toLowerCase()));
   const visibleUserPage = Math.min(userPage, Math.max(1, Math.ceil(filteredUsers.length / 20)));
 
+  const isAdmin = userRole === 'admin' || userRole === 'super_admin';
+  if (!isAdmin) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-[#061726] text-white min-h-[60vh]">
+        <Shield className="w-16 h-16 text-rose-400 mb-4 opacity-80" />
+        <h2 className="text-xl font-bold mb-2 text-white">Access Restricted</h2>
+        <p className="text-sm text-gray-400 max-w-md mb-6">
+          You do not have administrative privileges to access the Admin Center.
+        </p>
+        <button
+          onClick={() => (onNavigate ? onNavigate('summary') : (window.location.href = '/'))}
+          className="px-4 py-2 bg-[#cedc28] text-[#1a302e] font-bold text-xs uppercase tracking-wider rounded-lg hover:brightness-110 shadow-lg"
+        >
+          Return to Dashboard
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="admin-workspace flex-1 p-4 md:p-6 overflow-auto pb-32">
       <div className="max-w-[1500px] mx-auto lg:grid lg:grid-cols-[190px_minmax(0,1fr)] lg:gap-6">
