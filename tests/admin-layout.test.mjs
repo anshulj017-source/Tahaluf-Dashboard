@@ -290,7 +290,7 @@ test('importing an event backup does not write until confirmation and surfaces p
   assert.equal(writes, 1);
 });
 
-test('Admin section navigation is responsive with horizontal orientation on smaller screens and vertical on desktop', async () => {
+test('Admin section navigation is responsive with custom dropdown on mobile, 2-line layout on medium, and vertical on desktop', async () => {
   const harness = hookHarness();
   const stub = () => null;
   const component = await load('../app/AdminView.jsx', {
@@ -308,10 +308,26 @@ test('Admin section navigation is responsive with horizontal orientation on smal
   const tree = harness.render(component.default, {});
   const nav = nodes(tree, node => node.props?.['aria-label'] === 'Admin sections')[0];
   assert.ok(nav, 'Admin sections navigation must be present');
-  assert.match(nav.props.className, /flex-row/, 'must use horizontal flex-row orientation on smaller screens');
-  assert.match(nav.props.className, /lg:flex-col/, 'must switch to vertical flex-col orientation on desktop');
-  assert.match(nav.props.className, /overflow-x-auto/, 'must support horizontal scroll on narrow mobile viewports');
 
-  const buttons = nodes(nav, node => node.type === 'button');
-  assert.equal(buttons.length, 6, 'all 6 admin sections must be rendered as accessible buttons');
+  // Verify responsive tiers exist in navigation structure:
+  // 1. Mobile custom dropdown (< sm)
+  const mobileDropdownContainer = nodes(nav, node => node.props?.className?.includes('sm:hidden'))[0];
+  assert.ok(mobileDropdownContainer, 'Mobile custom dropdown container (< sm) must be present');
+  const dropdownTrigger = nodes(mobileDropdownContainer, node => node.type === 'button' && node.props?.['aria-label'] === 'Admin section selection')[0];
+  assert.ok(dropdownTrigger, 'Mobile custom dropdown trigger button must be present');
+
+  // 2. Medium 2-line grid layout (sm to lg)
+  const mediumGridContainer = nodes(nav, node => node.props?.className?.includes('grid-cols-3'))[0];
+  assert.ok(mediumGridContainer, 'Medium 2-line grid container (grid-cols-3) must be present for tablets without horizontal scrolling');
+
+  // 3. Desktop vertical column (>= lg)
+  const desktopSidebarContainer = nodes(nav, node => node.props?.className?.includes('flex-col'))[0];
+  assert.ok(desktopSidebarContainer, 'Desktop sidebar container (flex-col) must be present');
+
+  // All 6 sections exist as accessible buttons in the desktop and medium layouts
+  const mediumButtons = nodes(mediumGridContainer, node => node.type === 'button');
+  assert.equal(mediumButtons.length, 6, 'all 6 admin sections must be rendered as accessible buttons in medium 2-line layout');
+
+  const desktopButtons = nodes(desktopSidebarContainer, node => node.type === 'button');
+  assert.equal(desktopButtons.length, 6, 'all 6 admin sections must be rendered as accessible buttons in desktop layout');
 });

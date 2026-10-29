@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect } from 'react';
-import { Trash2, UserPlus, Shield, User, RefreshCw, CheckCircle2, Key, Layers, Activity, Users as UsersIcon, BarChart3, Gauge } from 'lucide-react';
+import { Trash2, UserPlus, Shield, User, RefreshCw, CheckCircle2, Key, Layers, Activity, Users as UsersIcon, BarChart3, Gauge, ChevronDown } from 'lucide-react';
 import EventsAdmin from './components/EventsAdmin';
 import DataHealthAdmin from './components/DataHealthAdmin';
 import AnalyticsAdmin from './components/AnalyticsAdmin';
@@ -8,19 +8,64 @@ import ApiQuotasAdmin from './components/ApiQuotasAdmin';
 import FeatureControlsAdmin from './components/FeatureControlsAdmin';
 import { AdminDialog, useAdminView, useAdminDirtyGuard } from './components/AdminUI';
 
-const sections = [
-  { id: 'events', label: 'Events & Data', icon: Layers },
-  { id: 'health', label: 'Health Monitor', icon: Activity },
-  { id: 'quotas', label: 'API & Quotas', icon: Gauge },
-  { id: 'analytics', label: 'Analytics & Activity', icon: BarChart3 },
-  { id: 'features', label: 'Feature Controls', icon: Shield },
+const ALL_ADMIN_SECTIONS = [
+  { id: 'events', featureId: 'adminEvents', label: 'Events & Data', icon: Layers },
+  { id: 'health', featureId: 'adminHealth', label: 'Health Monitor', icon: Activity },
+  { id: 'quotas', featureId: 'adminQuotas', label: 'API & Quotas', icon: Gauge },
+  { id: 'analytics', featureId: 'adminAnalytics', label: 'Analytics & Activity', icon: BarChart3 },
+  { id: 'features', label: 'Feature Controls', icon: Shield, superAdminOnly: true },
   { id: 'users', label: 'User Access', icon: UsersIcon },
 ];
 
-export default function AdminView({ active = true, currentUserEmail = 'admin@tahaluf.com', initialEvents = [], onFeaturesSaved, onEventsSaved, onNavigate }) {
-  const [activeSection, setActiveSection] = useAdminView('admin', 'users', sections.map(section => section.id));
+const sections = ALL_ADMIN_SECTIONS;
+
+export default function AdminView({ 
+  active = true, 
+  currentUserEmail = 'admin@tahaluf.com', 
+  userRole = 'super_admin',
+  featureConfig = null,
+  isFeatureAllowed = null,
+  initialEvents = [], 
+  onFeaturesSaved, 
+  onEventsSaved, 
+  onNavigate 
+}) {
+  const isSuperAdmin = userRole === 'super_admin';
+
+  // Filter sections dynamically based on role and feature controls
+  const visibleSections = ALL_ADMIN_SECTIONS.filter(section => {
+    // Feature Controls tab itself is restricted strictly to SUPER ADMIN
+    if (section.superAdminOnly && !isSuperAdmin) {
+      return false;
+    }
+    // User Access is always available (exempt from feature control)
+    if (section.id === 'users') {
+      return true;
+    }
+    // Other admin features obey feature control configuration
+    if (section.featureId) {
+      if (typeof isFeatureAllowed === 'function') {
+        return isFeatureAllowed(section.featureId);
+      }
+      if (featureConfig?.modes?.[section.featureId] === 'disabled') {
+        return false;
+      }
+    }
+    return true;
+  });
+
+  const [activeSection, setActiveSection] = useAdminView('admin', 'users', ALL_ADMIN_SECTIONS.map(section => section.id));
+
+  // If active section is hidden by feature controls or super admin check, fallback safely
+  useEffect(() => {
+    if (visibleSections && visibleSections.length > 0 && !visibleSections.some(s => s.id === activeSection)) {
+      setActiveSection(visibleSections[0].id);
+    }
+  }, [visibleSections, activeSection, setActiveSection]);
   const [visited, setVisited] = useState({ events: true });
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [dirtyScopes, setDirtyScopes] = useState({});
+  const [acknowledgedDraftSections, setAcknowledgedDraftSections] = useState(new Set());
   const [pendingSection, setPendingSection] = useState(null);
   const [userAction, setUserAction] = useState(null);
   const [actionPassword, setActionPassword] = useState('');
@@ -43,14 +88,28 @@ export default function AdminView({ active = true, currentUserEmail = 'admin@tah
   const [addSuccess, setAddSuccess] = useState(false);
   useAdminDirtyGuard('new-user', showAddForm && Boolean(newEmail || newPassword || newRole !== 'standard'));
   useEffect(() => {
-    const updateDirty = event => setDirtyScopes(current => ({ ...current, [event.detail.scope]: event.detail.dirty }));
+    const updateDirty = event => {
+      setDirtyScopes(current => ({ ...current, [event.detail.scope]: event.detail.dirty }));
+      // If marked clean again, remove from acknowledged set
+      if (!event.detail.dirty) {
+        setAcknowledgedDraftSections(prev => {
+          const next = new Set(prev);
+          next.delete(event.detail.scope);
+          return next;
+        });
+      }
+    };
     window.addEventListener('admin-dirty', updateDirty);
     return () => window.removeEventListener('admin-dirty', updateDirty);
   }, []);
   useEffect(() => { setVisited(current => ({ ...current, [activeSection]: true })); }, [activeSection]);
   const navigate = section => {
-    if (section !== activeSection && Object.values(dirtyScopes).some(Boolean)) setPendingSection(section);
-    else setActiveSection(section);
+    // Only prompt when navigating AWAY from the section that currently has unacknowledged dirty changes
+    if (section !== activeSection && dirtyScopes[activeSection] && !acknowledgedDraftSections.has(activeSection)) {
+      setPendingSection(section);
+    } else {
+      setActiveSection(section);
+    }
   };
 
   const [sortConfig, setSortConfig] = useState({ key: 'lastactive', direction: 'desc' });
@@ -196,32 +255,134 @@ export default function AdminView({ active = true, currentUserEmail = 'admin@tah
     <div className="admin-workspace flex-1 p-4 md:p-6 overflow-auto pb-32">
       <div className="max-w-[1500px] mx-auto lg:grid lg:grid-cols-[190px_minmax(0,1fr)] lg:gap-6">
         <aside className="mb-5 lg:mb-0">
-          <nav 
-            aria-label="Admin sections" 
-            className="flex flex-row lg:flex-col gap-2 overflow-x-auto lg:overflow-visible custom-scrollbar pb-2.5 lg:pb-0 lg:sticky lg:top-0 border-b border-white/10 lg:border-b-0"
-          >
-            <p className="hidden lg:block mb-2 text-xs font-bold uppercase tracking-wider text-slate-400">Administration</p>
-            {sections.map(({ id, label, icon: Icon }) => (
-              <button 
-                key={id} 
-                type="button" 
-                onClick={() => navigate(id)} 
-                aria-current={activeSection === id ? 'page' : undefined}
-                className={`flex items-center gap-2 rounded-xl px-3.5 py-2.5 lg:py-3 text-left text-xs sm:text-sm font-semibold shrink-0 whitespace-nowrap transition-all ${
-                  activeSection === id 
-                    ? 'bg-[#cedc28] text-[#041628] font-bold shadow-md shadow-[#cedc28]/20' 
-                    : 'text-slate-300 hover:bg-white/10 bg-white/5 lg:bg-transparent'
-                }`}
-              >
-                <Icon className="h-4 w-4 shrink-0" />
-                <span>{label}</span>
-                {id === 'health' && dashboardAlertsEnabled && healthIssueCount > 0 && (
-                  <span className="ml-1.5 lg:ml-auto rounded-full bg-red-600 px-2 py-0.5 text-[11px] font-bold text-white shadow-sm">
-                    {healthIssueCount}
-                  </span>
+          <nav aria-label="Admin sections" className="relative">
+            {/* 1. SMALL MOBILE SCREENS (< sm / < 640px): POLISHED CUSTOM DROPDOWN */}
+            <div className="block sm:hidden">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 flex items-center justify-between">
+                <span>Admin Section</span>
+                <span className="text-[10px] text-[#cedc28] font-mono">
+                  {visibleSections.findIndex(s => s.id === activeSection) + 1} of {visibleSections.length}
+                </span>
+              </label>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setMobileMenuOpen(prev => !prev)}
+                  aria-expanded={mobileMenuOpen}
+                  aria-label="Admin section selection"
+                  className="w-full flex items-center justify-between gap-3 px-3.5 py-3 rounded-xl bg-[#0a2442] border border-[#cedc28]/40 hover:border-[#cedc28] text-white shadow-lg transition-all"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-6 h-6 rounded-lg bg-[#cedc28]/20 flex items-center justify-center shrink-0">
+                      {React.createElement(visibleSections.find(s => s.id === activeSection)?.icon || Layers, {
+                        className: "h-3.5 w-3.5 text-[#cedc28]"
+                      })}
+                    </div>
+                    <span className="font-bold text-xs truncate">
+                      {visibleSections.find(s => s.id === activeSection)?.label || 'Select Section'}
+                    </span>
+                    {activeSection === 'health' && dashboardAlertsEnabled && healthIssueCount > 0 && (
+                      <span className="rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm">
+                        {healthIssueCount}
+                      </span>
+                    )}
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-[#cedc28] shrink-0 transition-transform duration-200 ${mobileMenuOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {mobileMenuOpen && (
+                  <>
+                    <div 
+                      className="fixed inset-0 z-40 bg-black/50 backdrop-blur-xs" 
+                      onClick={() => setMobileMenuOpen(false)} 
+                    />
+                    <div className="absolute top-full left-0 right-0 mt-2 z-50 rounded-2xl bg-[#0a2442] border border-[#cedc28]/40 p-2 shadow-2xl backdrop-blur-2xl flex flex-col gap-1 max-h-72 overflow-y-auto">
+                      {visibleSections.map(({ id, label, icon: Icon }) => {
+                        const isSelected = activeSection === id;
+                        return (
+                          <button
+                            key={id}
+                            type="button"
+                            onClick={() => {
+                              navigate(id);
+                              setMobileMenuOpen(false);
+                            }}
+                            className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left text-xs font-semibold transition-all ${
+                              isSelected
+                                ? 'bg-[#cedc28] text-[#041628] font-bold shadow-md shadow-[#cedc28]/20'
+                                : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <Icon className={`h-4 w-4 shrink-0 ${isSelected ? 'text-[#041628]' : 'text-[#cedc28]'}`} />
+                              <span className="truncate">{label}</span>
+                            </div>
+                            {id === 'health' && dashboardAlertsEnabled && healthIssueCount > 0 && (
+                              <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                                isSelected ? 'bg-red-700 text-white' : 'bg-red-600 text-white'
+                              }`}>
+                                {healthIssueCount}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
                 )}
-              </button>
-            ))}
+              </div>
+            </div>
+
+            {/* 2. MEDIUM TABLET SCREENS (sm to lg: 640px - 1023px): TWO-LINE GRID (NO HORIZONTAL SCROLL) */}
+            <div className="hidden sm:grid lg:hidden grid-cols-3 gap-2 pb-1 border-b border-white/10">
+              {visibleSections.map(({ id, label, icon: Icon }) => (
+                <button 
+                  key={id} 
+                  type="button" 
+                  onClick={() => navigate(id)} 
+                  aria-current={activeSection === id ? 'page' : undefined}
+                  className={`flex items-center gap-2 rounded-xl px-3 py-2.5 text-left text-xs font-semibold transition-all border ${
+                    activeSection === id 
+                      ? 'bg-[#cedc28] text-[#041628] border-[#cedc28] font-bold shadow-md shadow-[#cedc28]/20' 
+                      : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10 hover:border-white/20'
+                  }`}
+                >
+                  <Icon className="h-4 w-4 shrink-0" />
+                  <span className="truncate">{label}</span>
+                  {id === 'health' && dashboardAlertsEnabled && healthIssueCount > 0 && (
+                    <span className="ml-auto rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] font-bold text-white shadow-sm">
+                      {healthIssueCount}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            {/* 3. DESKTOP SCREENS (>= 1024px): VERTICAL SIDEBAR */}
+            <div className="hidden lg:flex sticky top-0 flex-col gap-2">
+              <p className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-400">Administration</p>
+              {visibleSections.map(({ id, label, icon: Icon }) => (
+                <button 
+                  key={id} 
+                  type="button" 
+                  onClick={() => navigate(id)} 
+                  aria-current={activeSection === id ? 'page' : undefined}
+                  className={`flex items-center gap-2 rounded-xl px-3.5 py-3 text-left text-sm font-semibold transition-all ${
+                    activeSection === id 
+                      ? 'bg-[#cedc28] text-[#041628] font-bold shadow-md shadow-[#cedc28]/20' 
+                      : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                  }`}
+                >
+                  <Icon className="h-4 w-4 shrink-0" />
+                  <span>{label}</span>
+                  {id === 'health' && dashboardAlertsEnabled && healthIssueCount > 0 && (
+                    <span className="ml-auto rounded-full bg-red-600 px-2 py-0.5 text-[11px] font-bold text-white shadow-sm">
+                      {healthIssueCount}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
           </nav>
         </aside>
         <main className="min-w-0" aria-label="Admin content">
@@ -251,6 +412,7 @@ export default function AdminView({ active = true, currentUserEmail = 'admin@tah
         {visited.features && (
           <div hidden={activeSection !== 'features'}>
             <FeatureControlsAdmin
+              currentUserEmail={currentUserEmail}
               onSaved={onFeaturesSaved}
               onNavigate={(featureId) => {
                 if (featureId === 'dimensionExport' || featureId === 'bulkDimensionImport') {
@@ -346,6 +508,7 @@ export default function AdminView({ active = true, currentUserEmail = 'admin@tah
                   onChange={(e) => setNewRole(e.target.value)}
                   className="w-full bg-[#0a2442] border border-gray-600/50 rounded-xl px-4 py-2.5 text-sm text-[#eef7f5] font-bold focus:outline-none focus:border-[#cedc28]/50 transition-all cursor-pointer appearance-none"
                 >
+                  <option value="super_admin">Super Admin</option>
                   <option value="admin">Admin</option>
                   <option value="standard">Standard</option>
                   <option value="non-finance">Non-Finance</option>
@@ -407,8 +570,12 @@ export default function AdminView({ active = true, currentUserEmail = 'admin@tah
                     <tr key={user.uid} className="hover:bg-[#0a2442]/30 transition-colors group">
                       <td className="py-4 px-6">
                         <div className="flex items-center gap-3">
-                          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${user.role === 'admin' ? 'bg-[#cedc28]/10 text-[#cedc28]' : 'bg-gray-800 text-gray-400'}`}>
-                            {user.role === 'admin' ? <Shield className="w-5 h-5" /> : <User className="w-5 h-5" />}
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                            user.role === 'super_admin' ? 'bg-[#cedc28]/20 text-[#cedc28] border border-[#cedc28]/50 shadow-[0_0_10px_rgba(206,220,40,0.3)]' :
+                            user.role === 'admin' ? 'bg-[#14a6d9]/15 text-[#14a6d9] border border-[#14a6d9]/30' : 
+                            'bg-gray-800 text-gray-400'
+                          }`}>
+                            {user.role === 'super_admin' || user.role === 'admin' ? <Shield className="w-5 h-5" /> : <User className="w-5 h-5" />}
                           </div>
                           <div>
                             <div className="font-bold text-white text-sm">{user.email}</div>
@@ -423,11 +590,13 @@ export default function AdminView({ active = true, currentUserEmail = 'admin@tah
                             value={user.role || 'standard'}
                             onChange={(e) => { setUserAction({ type: 'role', ...user, nextRole: e.target.value }); setError(null); }}
                             className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all outline-none cursor-pointer appearance-none text-center ${
-                              user.role === 'admin' ? 'bg-[#cedc28]/10 border border-[#cedc28]/30 text-[#cedc28]' : 
+                              user.role === 'super_admin' ? 'bg-[#cedc28]/25 border-2 border-[#cedc28] text-[#cedc28] shadow-[0_0_12px_rgba(206,220,40,0.35)]' :
+                              user.role === 'admin' ? 'bg-[#14a6d9]/15 border border-[#14a6d9]/40 text-[#14a6d9]' : 
                               user.role === 'non-finance' ? 'bg-purple-900/20 border border-purple-500/30 text-purple-400' : 
                               'bg-gray-800 border border-gray-600 text-gray-400'
                             }`}
                            >
+                            <option value="super_admin">Super Admin</option>
                             <option value="admin">Admin</option>
                             <option value="standard">Standard</option>
                             <option value="non-finance">Non-Finance</option>
@@ -481,10 +650,46 @@ export default function AdminView({ active = true, currentUserEmail = 'admin@tah
         </main>
       </div>
       {pendingSection && <AdminDialog title="Unsaved changes" onClose={() => setPendingSection(null)}>
-        <p className="text-sm text-slate-300">You have unsaved changes. Your drafts will remain here while you visit another admin section. Save before reloading or leaving the dashboard.</p>
-        <div className="mt-5 flex gap-3">
-          <button onClick={() => setPendingSection(null)} className="rounded border border-slate-500 px-4 py-2">Stay here</button>
-          <button onClick={() => { setActiveSection(pendingSection); setPendingSection(null); }} className="rounded bg-[#cedc28] px-4 py-2 text-[#041628]">Keep drafts & continue</button>
+        <p className="text-sm text-slate-300 leading-relaxed">
+          You have unsaved changes in <strong className="text-white">{sections.find(s => s.id === activeSection)?.label || activeSection}</strong>.
+          Choose how you would like to proceed:
+        </p>
+        <div className="mt-5 flex flex-wrap items-center gap-2.5">
+          <button 
+            type="button" 
+            onClick={() => setPendingSection(null)} 
+            className="rounded-lg border border-slate-500 hover:bg-white/10 px-3.5 py-2 text-xs font-semibold text-slate-300 transition-colors"
+          >
+            Stay here
+          </button>
+          <button 
+            type="button" 
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent('admin-discard-draft', { detail: { section: activeSection } }));
+              setDirtyScopes(current => ({ ...current, [activeSection]: false }));
+              setAcknowledgedDraftSections(prev => {
+                const next = new Set(prev);
+                next.delete(activeSection);
+                return next;
+              });
+              setActiveSection(pendingSection);
+              setPendingSection(null);
+            }} 
+            className="rounded-lg border border-red-500/40 bg-red-500/10 hover:bg-red-500/20 px-3.5 py-2 text-xs font-semibold text-red-300 transition-colors"
+          >
+            Discard changes
+          </button>
+          <button 
+            type="button" 
+            onClick={() => {
+              setAcknowledgedDraftSections(prev => new Set(prev).add(activeSection));
+              setActiveSection(pendingSection);
+              setPendingSection(null);
+            }} 
+            className="rounded-lg bg-[#cedc28] hover:bg-[#b5c222] px-4 py-2 text-xs font-bold text-[#041628] transition-colors shadow-sm ml-auto"
+          >
+            Keep drafts & continue
+          </button>
         </div>
       </AdminDialog>}
       {userAction && <AdminDialog title={userAction.type === 'delete' ? 'Delete user?' : userAction.type === 'role' ? 'Change access role?' : 'Change password'} onClose={() => { if (!actionBusy) setUserAction(null); }}>

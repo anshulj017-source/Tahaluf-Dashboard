@@ -11,12 +11,15 @@ import {
   simulateBudgetReallocation,
   computeEventsBreakdown,
   computePortfolioBreakdown,
-  computeDailyNextSteps
+  computeDailyNextSteps,
+  computePlannedBudgetAnalytics,
+  parseFeedbackText
 } from '../../lib/algorithmicIntelligence.mjs';
 
 export default function AiStrategicIntelligence({
   allAdData = [],
   filteredAdData = [],
+  plannedData = [],
   channelData = [],
   totals = {},
   topChannel = null,
@@ -42,6 +45,7 @@ export default function AiStrategicIntelligence({
 
   // Event-level Budget Simulator state
   const [simSelectedEvent, setSimSelectedEvent] = useState('All');
+  const [simBaselineMode, setSimBaselineMode] = useState('actual'); // 'actual' | 'planned'
   const [budgetShifts, setBudgetShifts] = useState({});
 
   // Ensure all calculations use filteredAdData so global filters (date, channel, market, etc.) strictly apply
@@ -49,10 +53,129 @@ export default function AiStrategicIntelligence({
     return filteredAdData && filteredAdData.length > 0 ? filteredAdData : allAdData;
   }, [filteredAdData, allAdData]);
 
+  // AI Feedback & Dynamic Calibration State
+  const [feedbackRules, setFeedbackRules] = useState(() => {
+    if (typeof window === 'undefined') return {};
+    try {
+      const saved = localStorage.getItem('tahaluf_ai_feedback');
+      return saved ? JSON.parse(saved).rules || {} : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const [feedbackRatings, setFeedbackRatings] = useState(() => {
+    if (typeof window === 'undefined') return {};
+    try {
+      const saved = localStorage.getItem('tahaluf_ai_feedback');
+      return saved ? JSON.parse(saved).ratings || {} : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const [showTuningPanel, setShowTuningPanel] = useState(false);
+  const [feedbackInputText, setFeedbackInputText] = useState('');
+  const [feedbackSuccessMsg, setFeedbackSuccessMsg] = useState('');
+
+  const handleRating = (id, rating) => {
+    const nextRatings = { ...feedbackRatings, [id]: rating };
+    setFeedbackRatings(nextRatings);
+    try {
+      localStorage.setItem('tahaluf_ai_feedback', JSON.stringify({ rules: feedbackRules, ratings: nextRatings }));
+      fetch('/api/analytics/track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'ai_feedback', category: 'intelligence', details: { id, rating } })
+      }).catch(() => {});
+    } catch {}
+  };
+
+  const handleApplyTuning = (key, value) => {
+    const nextRules = { ...feedbackRules, [key]: value };
+    setFeedbackRules(nextRules);
+    try {
+      localStorage.setItem('tahaluf_ai_feedback', JSON.stringify({ rules: nextRules, ratings: feedbackRatings }));
+      fetch('/api/analytics/track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'ai_tuning_applied', category: 'intelligence', details: { key, value } })
+      }).catch(() => {});
+    } catch {}
+  };
+
+  const handleDismiss = (id) => {
+    const nextDismissed = Array.from(new Set([...(feedbackRules.dismissedIds || []), id]));
+    handleApplyTuning('dismissedIds', nextDismissed);
+  };
+
+  const handleDeprioritizeChannel = (channelName) => {
+    const nextDep = Array.from(new Set([...(feedbackRules.deprioritizedChannels || []), channelName]));
+    handleApplyTuning('deprioritizedChannels', nextDep);
+  };
+
+  const handleTextFeedbackSubmit = (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (!feedbackInputText.trim()) return;
+
+    const parsed = parseFeedbackText(feedbackInputText);
+    const updatedRules = { ...feedbackRules, ...parsed };
+    if (parsed.deprioritizeChannel) {
+      updatedRules.deprioritizedChannels = Array.from(new Set([...(updatedRules.deprioritizedChannels || []), parsed.deprioritizeChannel]));
+      delete updatedRules.deprioritizeChannel;
+    }
+    
+    setFeedbackRules(updatedRules);
+    try {
+      localStorage.setItem('tahaluf_ai_feedback', JSON.stringify({ rules: updatedRules, ratings: feedbackRatings }));
+      fetch('/api/analytics/track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'ai_text_feedback', category: 'intelligence', details: { text: feedbackInputText, appliedRules: parsed } })
+      }).catch(() => {});
+    } catch {}
+
+    const appliedChanges = Object.keys(parsed).map(k => {
+      if (k === 'preferChannel') return `Boosted ${parsed[k]}`;
+      if (k === 'deprioritizeChannel') return `Deprioritized ${parsed[k]}`;
+      if (k === 'targetStrictness') return `CPA sensitivity: ${parsed[k]}`;
+      if (k === 'riskTolerance') return `Risk tolerance: ${parsed[k]}`;
+      if (k === 'lowerFunnelFocus') return 'Lower-funnel conversion priority';
+      if (k === 'scaleFocus') return 'Reach & awareness scale priority';
+      return k;
+    }).join(', ');
+
+    setFeedbackSuccessMsg(appliedChanges ? `AI Calibrated: ${appliedChanges}` : 'Feedback actioned and calibrated into AI heuristics.');
+    setFeedbackInputText('');
+    setTimeout(() => setFeedbackSuccessMsg(''), 5000);
+  };
+
+  const handleResetFeedback = () => {
+    setFeedbackRules({});
+    setFeedbackRatings({});
+    try {
+      localStorage.removeItem('tahaluf_ai_feedback');
+    } catch {}
+    setFeedbackSuccessMsg('AI Calibration reset to system defaults.');
+    setTimeout(() => setFeedbackSuccessMsg(''), 4000);
+  };
+
+  const activeRuleCount = useMemo(() => {
+    let count = 0;
+    if (feedbackRules.riskTolerance && feedbackRules.riskTolerance !== 'balanced') count++;
+    if (feedbackRules.targetStrictness && feedbackRules.targetStrictness !== 'balanced') count++;
+    if (feedbackRules.preferChannel) count++;
+    if (feedbackRules.deprioritizedChannels?.length) count += feedbackRules.deprioritizedChannels.length;
+    if (feedbackRules.lowerFunnelFocus) count++;
+    if (feedbackRules.scaleFocus) count++;
+    if (feedbackRules.dismissedIds?.length) count += feedbackRules.dismissedIds.length;
+    return count;
+  }, [feedbackRules]);
+
   // 1. Strategic Commentary for current scope
   const commentaryInsights = useMemo(() => {
-    return generateStrategicCommentary(effectiveData, channelData, totals, exSym, exRate, formatShort);
-  }, [effectiveData, channelData, totals, exSym, exRate, formatShort]);
+    return generateStrategicCommentary(effectiveData, channelData, totals, exSym, exRate, formatShort, feedbackRules);
+  }, [effectiveData, channelData, totals, exSym, exRate, formatShort, feedbackRules]);
 
   // 2. Events Strategic Breakdown
   const eventsBreakdown = useMemo(() => {
@@ -66,15 +189,48 @@ export default function AiStrategicIntelligence({
 
   // 4. Daily Next Steps (by Event, Channel, and Event Type)
   const allDailyNextSteps = useMemo(() => {
-    return computeDailyNextSteps(effectiveData, exRate, exSym, formatShort);
-  }, [effectiveData, exRate, exSym, formatShort]);
+    return computeDailyNextSteps(effectiveData, exRate, exSym, formatShort, feedbackRules);
+  }, [effectiveData, exRate, exSym, formatShort, feedbackRules]);
 
   // 5. Channel Quadrant Matrix
-  const { quadrants, benchmarks } = useMemo(() => {
-    return computeChannelQuadrants(channelData);
+  const { quadrants = { star: [], niche: [], cost_sink: [], observation: [] }, benchmarks = { medianSpend: 0, medianCPA: 0, channelCount: 0 } } = useMemo(() => {
+    return computeChannelQuadrants(channelData) || {
+      quadrants: { star: [], niche: [], cost_sink: [], observation: [] },
+      benchmarks: { medianSpend: 0, medianCPA: 0, channelCount: 0 }
+    };
   }, [channelData]);
 
-  // 6. Event-Level Channel Data for Budget Simulator
+  const starChannels = quadrants?.star || [];
+  const nicheChannels = quadrants?.niche || [];
+  const costSinkChannels = quadrants?.cost_sink || [];
+  const observationChannels = quadrants?.observation || [];
+
+  // 6. Planned Budget Analytics (from planning sheets)
+  const plannedAnalytics = useMemo(() => {
+    return computePlannedBudgetAnalytics(effectiveData, plannedData, exRate, exSym, formatShort) || {
+      hasPlannedData: false,
+      events: [],
+      eventAnalytics: [],
+      availableEvents: [],
+      totalPlannedSpend: 0,
+      totalActualSpend: 0,
+      overallPacingPercent: 0,
+      overallRemaining: 0
+    };
+  }, [effectiveData, plannedData, exRate, exSym, formatShort]);
+
+  const availableEventsList = plannedAnalytics?.availableEvents || [];
+  const eventAnalyticsList = plannedAnalytics?.eventAnalytics || plannedAnalytics?.events || [];
+
+  // Selected event planned media budget info
+  const selectedEventPlannedInfo = useMemo(() => {
+    if (simSelectedEvent === 'All') return null;
+    return eventAnalyticsList.find(
+      e => (e.eventName || '').toLowerCase() === simSelectedEvent.toLowerCase()
+    ) || null;
+  }, [simSelectedEvent, eventAnalyticsList]);
+
+  // 7. Event-Level Channel Data for Budget Simulator
   const simChannelData = useMemo(() => {
     if (simSelectedEvent === 'All') {
       return channelData;
@@ -104,10 +260,11 @@ export default function AiStrategicIntelligence({
     return Array.from(map.values()).sort((a, b) => b.spend - a.spend);
   }, [simSelectedEvent, effectiveData, channelData, exRate]);
 
-  // 7. Budget Simulation (Event-aware)
+  // 8. Budget Simulation (Event-aware + Planned Budget baseline support)
   const simulationResults = useMemo(() => {
-    return simulateBudgetReallocation(simChannelData, budgetShifts);
-  }, [simChannelData, budgetShifts]);
+    const plannedBudgetByChannel = selectedEventPlannedInfo?.plannedBudgetByChannel || null;
+    return simulateBudgetReallocation(simChannelData, budgetShifts, plannedBudgetByChannel, simBaselineMode);
+  }, [simChannelData, budgetShifts, selectedEventPlannedInfo, simBaselineMode]);
 
   const handleShiftChange = (channelName, percent) => {
     setBudgetShifts(prev => ({
@@ -209,6 +366,14 @@ export default function AiStrategicIntelligence({
                 <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
                   100% Deterministic Engine
                 </span>
+
+                {Object.keys(feedbackRules).length > 0 && (
+                  <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-[#14a6d9]/20 text-[#14a6d9] border border-[#14a6d9]/40 flex items-center gap-1.5 shadow-[0_0_8px_rgba(20,166,217,0.3)]">
+                    <Sparkles className="w-2.5 h-2.5 text-[#14a6d9]" />
+                    <span>AI Model Calibrated ({Object.keys(feedbackRules).length} active rule{Object.keys(feedbackRules).length > 1 ? 's' : ''})</span>
+                    <button onClick={handleResetFeedback} className="ml-1 text-slate-400 hover:text-white" title="Reset feedback calibration">×</button>
+                  </span>
+                )}
               </div>
               <p className="text-[11px] text-[#cedc28] font-medium mt-0.5">
                 Real-time algorithmic synthesis across active paid channels and independent event pacing
@@ -217,6 +382,26 @@ export default function AiStrategicIntelligence({
           </div>
 
           <div className="flex items-center gap-3">
+            {/* AI Feedback & Tuning Toggle Button */}
+            <button
+              type="button"
+              onClick={() => setShowTuningPanel(!showTuningPanel)}
+              className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all border flex items-center gap-1.5 shrink-0 ${
+                showTuningPanel || activeRuleCount > 0
+                  ? 'bg-[#14a6d9]/25 text-[#14a6d9] border-[#14a6d9]/60 shadow-[0_0_12px_rgba(20,166,217,0.35)]'
+                  : 'bg-white/5 text-slate-300 border-white/15 hover:text-white hover:bg-white/10'
+              }`}
+              title="Calibrate AI intelligence algorithms with your feedback"
+            >
+              <Sliders className="w-3.5 h-3.5 text-[#14a6d9]" />
+              <span className="hidden sm:inline">AI Tuning</span>
+              {activeRuleCount > 0 && (
+                <span className="w-4 h-4 rounded-full bg-[#14a6d9] text-[#041628] text-[9px] font-black flex items-center justify-center">
+                  {activeRuleCount}
+                </span>
+              )}
+            </button>
+
             {/* View Switcher Tabs */}
             <div className="flex items-center bg-[#041628] p-1 rounded-xl border border-white/10 shadow-inner flex-wrap gap-1">
               <button
@@ -309,6 +494,167 @@ export default function AiStrategicIntelligence({
           </div>
         </div>
 
+        {/* MODEL CALIBRATION & INTERACTIVE FEEDBACK PANEL */}
+        {showTuningPanel && (
+          <div className="p-4 sm:p-5 rounded-2xl bg-[#041628]/95 border border-[#14a6d9]/40 shadow-2xl flex flex-col gap-4 animate-in fade-in duration-300">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div className="flex items-center gap-2">
+                <Sliders className="w-4 h-4 text-[#14a6d9]" />
+                <h4 className="text-xs font-black uppercase text-white tracking-wider">
+                  AI Model Feedback &amp; Heuristics Calibration
+                </h4>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#14a6d9]/20 text-[#14a6d9] border border-[#14a6d9]/40 font-mono">
+                  {activeRuleCount} Rule{activeRuleCount === 1 ? '' : 's'} Active
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleResetFeedback}
+                  className="text-[10px] font-bold text-slate-400 hover:text-white px-2 py-1 rounded bg-white/5 border border-white/10 hover:bg-white/10 transition-colors"
+                >
+                  Reset AI Defaults
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowTuningPanel(false)}
+                  className="text-slate-400 hover:text-white p-1 rounded hover:bg-white/10 transition-colors"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            {feedbackSuccessMsg && (
+              <div className="p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center gap-2 animate-in fade-in">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>{feedbackSuccessMsg}</span>
+              </div>
+            )}
+
+            {/* Quick Calibration Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {/* 1. Target CPA Sensitivity */}
+              <div className="p-3 rounded-xl bg-white/[0.03] border border-white/10 flex flex-col justify-between">
+                <div>
+                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Target CPA Strictness</div>
+                  <p className="text-[11px] text-slate-300 mb-2.5">Controls when high CPA anomaly warnings trigger on paid channels.</p>
+                </div>
+                <div className="grid grid-cols-3 gap-1">
+                  {[
+                    ['strict', 'Strict ($50)'],
+                    ['balanced', 'Normal ($65)'],
+                    ['relaxed', 'Relaxed ($85+)']
+                  ].map(([val, lbl]) => {
+                    const isActive = (feedbackRules.targetStrictness || 'balanced') === val;
+                    return (
+                      <button
+                        key={val}
+                        type="button"
+                        onClick={() => handleApplyTuning('targetStrictness', val)}
+                        className={`py-1 text-[10px] rounded font-bold border transition-all ${
+                          isActive
+                            ? 'bg-[#cedc28] text-[#041628] border-[#cedc28] shadow-sm'
+                            : 'bg-white/5 text-slate-300 border-white/10 hover:bg-white/10'
+                        }`}
+                      >
+                        {lbl}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 2. Pacing Risk Profile */}
+              <div className="p-3 rounded-xl bg-white/[0.03] border border-white/10 flex flex-col justify-between">
+                <div>
+                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Pacing Risk Profile</div>
+                  <p className="text-[11px] text-slate-300 mb-2.5">Determines budget shift aggressiveness and pacing warning margins.</p>
+                </div>
+                <div className="grid grid-cols-3 gap-1">
+                  {[
+                    ['conservative', 'Careful (+10%)'],
+                    ['balanced', 'Balanced'],
+                    ['aggressive', 'Aggressive']
+                  ].map(([val, lbl]) => {
+                    const isActive = (feedbackRules.riskTolerance || 'balanced') === val;
+                    return (
+                      <button
+                        key={val}
+                        type="button"
+                        onClick={() => handleApplyTuning('riskTolerance', val)}
+                        className={`py-1 text-[10px] rounded font-bold border transition-all ${
+                          isActive
+                            ? 'bg-[#cedc28] text-[#041628] border-[#cedc28] shadow-sm'
+                            : 'bg-white/5 text-slate-300 border-white/10 hover:bg-white/10'
+                        }`}
+                      >
+                        {lbl}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 3. Strategic Objective Priority */}
+              <div className="p-3 rounded-xl bg-white/[0.03] border border-white/10 flex flex-col justify-between">
+                <div>
+                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Strategic Objective</div>
+                  <p className="text-[11px] text-slate-300 mb-2.5">Ranks tactical recommendations towards registrations vs top-of-funnel reach.</p>
+                </div>
+                <div className="grid grid-cols-2 gap-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleApplyTuning('lowerFunnelFocus', !feedbackRules.lowerFunnelFocus);
+                      if (!feedbackRules.lowerFunnelFocus) handleApplyTuning('scaleFocus', false);
+                    }}
+                    className={`py-1 text-[10px] rounded font-bold border transition-all ${
+                      feedbackRules.lowerFunnelFocus
+                        ? 'bg-[#14a6d9] text-[#041628] border-[#14a6d9] shadow-sm'
+                        : 'bg-white/5 text-slate-300 border-white/10 hover:bg-white/10'
+                    }`}
+                  >
+                    🎯 Lower Funnel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleApplyTuning('scaleFocus', !feedbackRules.scaleFocus);
+                      if (!feedbackRules.scaleFocus) handleApplyTuning('lowerFunnelFocus', false);
+                    }}
+                    className={`py-1 text-[10px] rounded font-bold border transition-all ${
+                      feedbackRules.scaleFocus
+                        ? 'bg-[#14a6d9] text-[#041628] border-[#14a6d9] shadow-sm'
+                        : 'bg-white/5 text-slate-300 border-white/10 hover:bg-white/10'
+                    }`}
+                  >
+                    📢 Reach &amp; Scale
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Natural Language Feedback Input Box */}
+            <form onSubmit={handleTextFeedbackSubmit} className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-white/10">
+              <input
+                type="text"
+                value={feedbackInputText}
+                onChange={(e) => setFeedbackInputText(e.target.value)}
+                placeholder="Type instructions to improve AI (e.g., 'focus more on Google Search', 'relax CPA', 'conservative pacing')..."
+                className="flex-1 px-3 py-2 rounded-xl bg-[#0a2442] border border-white/15 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-[#cedc28]"
+              />
+              <button
+                type="submit"
+                disabled={!feedbackInputText.trim()}
+                className="px-4 py-2 rounded-xl bg-[#cedc28] text-[#041628] font-bold text-xs uppercase tracking-wider hover:bg-[#e0f030] transition-colors disabled:opacity-40 shrink-0 shadow-md cursor-pointer"
+              >
+                Action Feedback
+              </button>
+            </form>
+          </div>
+        )}
+
         {/* 4 PROVEN STRATEGIC KPI CARDS - ALWAYS PRESENT & SCOPED */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="p-3.5 rounded-2xl bg-[#041628]/80 border border-white/10 shadow-sm">
@@ -399,9 +745,140 @@ export default function AiStrategicIntelligence({
                           {insight.detail}
                         </p>
                       </div>
+
+                      {/* AI Feedback & Interactive Tuning */}
+                      <div className="mt-3 pt-2 border-t border-white/5 flex items-center justify-between text-[10px]">
+                        <span className="text-slate-400">Feedback:</span>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleRating(insight.id, 'helpful')}
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${
+                              feedbackRatings[insight.id] === 'helpful'
+                                ? 'bg-emerald-500/30 text-emerald-300 border border-emerald-500/50'
+                                : 'text-slate-400 hover:text-white hover:bg-white/10'
+                            }`}
+                            title="Mark as helpful & accurate"
+                          >
+                            👍 {feedbackRatings[insight.id] === 'helpful' ? 'Accurate' : 'Helpful'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRating(insight.id, 'tune')}
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${
+                              feedbackRatings[insight.id] === 'tune'
+                                ? 'bg-amber-500/30 text-amber-300 border border-amber-500/50'
+                                : 'text-slate-400 hover:text-white hover:bg-white/10'
+                            }`}
+                            title="Tune algorithmic calibration"
+                          >
+                            👎 {feedbackRatings[insight.id] === 'tune' ? 'Tuned' : 'Tune'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDismiss(insight.id)}
+                            className="text-slate-400 hover:text-rose-400 transition-colors ml-1 p-0.5 rounded text-[11px]"
+                            title="Dismiss recommendation (code will not repeat this insight)"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      </div>
+
+                      {feedbackRatings[insight.id] === 'tune' && (
+                        <div className="mt-2 pt-2 border-t border-amber-500/20 flex flex-wrap gap-1 animate-in fade-in">
+                          <span className="text-[9px] text-amber-300 w-full mb-0.5">Tune AI calibration for next recommendations:</span>
+                          <button 
+                            type="button"
+                            onClick={() => handleApplyTuning('riskTolerance', 'conservative')} 
+                            className={`text-[9px] px-2 py-0.5 rounded border transition-colors ${
+                              feedbackRules.riskTolerance === 'conservative'
+                                ? 'bg-[#cedc28] text-[#1a302e] border-[#cedc28] font-bold'
+                                : 'bg-amber-500/20 text-amber-200 border-amber-500/30 hover:bg-amber-500/30'
+                            }`}
+                          >
+                            Conservative pacing (+10%)
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => handleApplyTuning('targetStrictness', 'relaxed')} 
+                            className={`text-[9px] px-2 py-0.5 rounded border transition-colors ${
+                              feedbackRules.targetStrictness === 'relaxed'
+                                ? 'bg-[#cedc28] text-[#1a302e] border-[#cedc28] font-bold'
+                                : 'bg-amber-500/20 text-amber-200 border-amber-500/30 hover:bg-amber-500/30'
+                            }`}
+                          >
+                            Relax CPA threshold ($85)
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => handleApplyTuning('lowerFunnelFocus', true)} 
+                            className={`text-[9px] px-2 py-0.5 rounded border transition-colors ${
+                              feedbackRules.lowerFunnelFocus === true
+                                ? 'bg-[#cedc28] text-[#1a302e] border-[#cedc28] font-bold'
+                                : 'bg-amber-500/20 text-amber-200 border-amber-500/30 hover:bg-amber-500/30'
+                            }`}
+                          >
+                            Prioritize conversion steps
+                          </button>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
+              </div>
+            )}
+
+            {/* Planned Media Plan Pacing Section (when available) */}
+            {plannedAnalytics.hasPlannedData && eventAnalyticsList.length > 0 && (
+              <div className="mt-4 p-4 rounded-2xl bg-gradient-to-r from-[#0a2442] via-[#041628] to-[#0a2442] border border-cyan-500/30 space-y-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <Target className="w-4 h-4 text-cyan-400" />
+                    <span className="text-xs font-bold text-white uppercase tracking-wider">
+                      Media Plan Budget Pacing Intelligence
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      ({availableEventsList.length} events with planned budgets)
+                    </span>
+                  </div>
+                  <div className="text-[11px] font-mono text-cyan-300">
+                    Total Plan: {exSym}{formatShort(plannedAnalytics.totalPlannedSpend)} | Overall Pacing: {plannedAnalytics.overallPacingPercent}%
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                  {eventAnalyticsList.map(ep => (
+                    <div key={ep.eventName} className="p-3 rounded-xl bg-black/40 border border-white/10 flex flex-col justify-between">
+                      <div className="flex items-center justify-between gap-1 mb-1">
+                        <span className="text-xs font-bold text-white truncate">{ep.eventName}</span>
+                        <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded ${
+                          ep.pacingPercent > 100 
+                            ? 'bg-rose-500/20 text-rose-300' 
+                            : ep.pacingPercent >= 75 
+                              ? 'bg-amber-500/20 text-amber-300' 
+                              : 'bg-emerald-500/20 text-emerald-300'
+                        }`}>
+                          {ep.pacingPercent}%
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-slate-400 font-mono space-y-0.5">
+                        <div className="flex justify-between">
+                          <span>Target:</span>
+                          <span className="text-slate-200">{exSym}{formatShort(ep.plannedSpend)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Delivered:</span>
+                          <span className="text-slate-200">{exSym}{formatShort(ep.actualSpend)}</span>
+                        </div>
+                        <div className="flex justify-between border-t border-white/10 pt-0.5">
+                          <span>Runway:</span>
+                          <span className="text-emerald-400 font-bold">{exSym}{formatShort(ep.remainingBudget)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -508,15 +985,79 @@ export default function AiStrategicIntelligence({
                     </p>
                   </div>
 
-                  {/* 1-click Filter Button */}
-                  {onSelectEvent && (
-                    <div className="pt-2.5 mt-2.5 border-t border-white/10 flex justify-end">
+                  {/* 1-click Filter Button and Tactical Feedback */}
+                  <div className="pt-2.5 mt-2.5 border-t border-white/10 flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-[10px]">
+                      <button
+                        type="button"
+                        onClick={() => handleRating(step.id, 'helpful')}
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${
+                          feedbackRatings[step.id] === 'helpful'
+                            ? 'bg-emerald-500/30 text-emerald-300 border border-emerald-500/50'
+                            : 'text-slate-400 hover:text-white hover:bg-white/10'
+                        }`}
+                        title="Mark step as high relevance"
+                      >
+                        👍 {feedbackRatings[step.id] === 'helpful' ? 'Actioned' : 'Helpful'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRating(step.id, 'tune')}
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${
+                          feedbackRatings[step.id] === 'tune'
+                            ? 'bg-amber-500/30 text-amber-300 border border-amber-500/50'
+                            : 'text-slate-400 hover:text-white hover:bg-white/10'
+                        }`}
+                        title="Tune AI weighting for this channel"
+                      >
+                        👎 {feedbackRatings[step.id] === 'tune' ? 'Adjusted' : 'Tune'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDismiss(step.id)}
+                        className="text-slate-400 hover:text-rose-400 transition-colors ml-1 p-0.5 rounded text-[11px]"
+                        title="Dismiss action item (code will not repeat this item)"
+                      >
+                        ✕
+                      </button>
+                    </div>
+
+                    {onSelectEvent && (
                       <button
                         onClick={() => onSelectEvent(step.event)}
                         className="text-[11px] font-bold text-[#14a6d9] hover:text-[#cedc28] transition-colors flex items-center gap-1"
                       >
                         <span>Focus on {step.event}</span>
                         <ArrowRight className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+
+                  {feedbackRatings[step.id] === 'tune' && (
+                    <div className="mt-2 pt-2 border-t border-amber-500/20 flex flex-wrap gap-1 animate-in fade-in">
+                      <span className="text-[9px] text-amber-300 w-full mb-0.5">Adjust heuristics for {step.channel}:</span>
+                      <button 
+                        type="button"
+                        onClick={() => handleDeprioritizeChannel(step.channel)} 
+                        className="text-[9px] px-2 py-0.5 rounded border border-amber-500/30 bg-amber-500/20 text-amber-200 hover:bg-amber-500/30 transition-colors"
+                      >
+                        Deprioritize {step.channel}
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => handleApplyTuning('lowerFunnelFocus', true)} 
+                        className={`text-[9px] px-2 py-0.5 rounded border transition-colors ${
+                          feedbackRules.lowerFunnelFocus ? 'bg-[#cedc28] text-[#1a302e] font-bold border-[#cedc28]' : 'bg-amber-500/20 text-amber-200 border-amber-500/30'
+                        }`}
+                      >
+                        Prioritize Conversions
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => handleApplyTuning('targetStrictness', 'relaxed')} 
+                        className="text-[9px] px-2 py-0.5 rounded border border-amber-500/30 bg-amber-500/20 text-amber-200 hover:bg-amber-500/30 transition-colors"
+                      >
+                        Relax CPA
                       </button>
                     </div>
                   )}
@@ -791,13 +1332,13 @@ export default function AiStrategicIntelligence({
                     <span>🌟 Star Performers</span>
                     <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-200">Scale</span>
                   </div>
-                  <span className="text-[10px] font-mono text-emerald-400">{quadrants.star.length} channels</span>
+                  <span className="text-[10px] font-mono text-emerald-400">{starChannels.length} channels</span>
                 </div>
-                {quadrants.star.length === 0 ? (
+                {starChannels.length === 0 ? (
                   <p className="text-[11px] text-slate-400 italic">No channels qualifying in top volume &amp; high efficiency.</p>
                 ) : (
                   <div className="space-y-2">
-                    {quadrants.star.map(c => (
+                    {starChannels.map(c => (
                       <div key={c.id} className="p-2.5 rounded-xl bg-black/40 border border-emerald-500/20 flex items-center justify-between">
                         <div>
                           <div className="text-xs font-bold text-white">{c.name}</div>
@@ -819,13 +1360,13 @@ export default function AiStrategicIntelligence({
                     <span>💎 Niche Drivers</span>
                     <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#cedc28]/20 text-[#cedc28]">Invest</span>
                   </div>
-                  <span className="text-[10px] font-mono text-[#cedc28]">{quadrants.niche.length} channels</span>
+                  <span className="text-[10px] font-mono text-[#cedc28]">{nicheChannels.length} channels</span>
                 </div>
-                {quadrants.niche.length === 0 ? (
+                {nicheChannels.length === 0 ? (
                   <p className="text-[11px] text-slate-400 italic">No low-spend/high-efficiency channels found.</p>
                 ) : (
                   <div className="space-y-2">
-                    {quadrants.niche.map(c => (
+                    {nicheChannels.map(c => (
                       <div key={c.id} className="p-2.5 rounded-xl bg-black/40 border border-[#cedc28]/20 flex items-center justify-between">
                         <div>
                           <div className="text-xs font-bold text-white">{c.name}</div>
@@ -847,13 +1388,13 @@ export default function AiStrategicIntelligence({
                     <span>⚠️ Cost Sinks</span>
                     <span className="text-[9px] px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-200">Refine</span>
                   </div>
-                  <span className="text-[10px] font-mono text-rose-400">{quadrants.cost_sink.length} channels</span>
+                  <span className="text-[10px] font-mono text-rose-400">{costSinkChannels.length} channels</span>
                 </div>
-                {quadrants.cost_sink.length === 0 ? (
+                {costSinkChannels.length === 0 ? (
                   <p className="text-[11px] text-slate-400 italic">Zero channels with high cost and low conversion efficiency.</p>
                 ) : (
                   <div className="space-y-2">
-                    {quadrants.cost_sink.map(c => (
+                    {costSinkChannels.map(c => (
                       <div key={c.id} className="p-2.5 rounded-xl bg-black/40 border border-rose-500/20 flex items-center justify-between">
                         <div>
                           <div className="text-xs font-bold text-white">{c.name}</div>
@@ -875,13 +1416,13 @@ export default function AiStrategicIntelligence({
                     <span>🔍 Under Observation</span>
                     <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/10 text-slate-300">Audit</span>
                   </div>
-                  <span className="text-[10px] font-mono text-slate-400">{quadrants.observation.length} channels</span>
+                  <span className="text-[10px] font-mono text-slate-400">{observationChannels.length} channels</span>
                 </div>
-                {quadrants.observation.length === 0 ? (
+                {observationChannels.length === 0 ? (
                   <p className="text-[11px] text-slate-400 italic">No low-volume channels under observation.</p>
                 ) : (
                   <div className="space-y-2">
-                    {quadrants.observation.map(c => (
+                    {observationChannels.map(c => (
                       <div key={c.id} className="p-2.5 rounded-xl bg-black/40 border border-white/10 flex items-center justify-between">
                         <div>
                           <div className="text-xs font-bold text-white">{c.name}</div>
@@ -934,6 +1475,56 @@ export default function AiStrategicIntelligence({
                 </button>
               )}
             </div>
+
+            {/* Planned Media Plan Intelligence Banner for Selected Event */}
+            {selectedEventPlannedInfo && (
+              <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-500/10 via-[#0a2442] to-[#cedc28]/10 border border-emerald-500/30 flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-300">
+                    <Target className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-white uppercase tracking-wider">Approved Media Plan Budget</span>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                        {selectedEventPlannedInfo.pacingPercent}% Paced
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-slate-300 flex items-center gap-3 mt-0.5">
+                      <span>Target: <strong className="text-white">{exSym}{formatShort(selectedEventPlannedInfo.plannedSpend)}</strong></span>
+                      <span>Delivered: <strong className="text-slate-200">{exSym}{formatShort(selectedEventPlannedInfo.actualSpend)}</strong></span>
+                      <span>Runway: <strong className="text-emerald-400">{exSym}{formatShort(selectedEventPlannedInfo.remainingBudget)}</strong></span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Baseline Mode Toggle */}
+                <div className="flex items-center gap-1.5 p-1 rounded-xl bg-black/40 border border-white/10 text-[11px]">
+                  <button
+                    type="button"
+                    onClick={() => setSimBaselineMode('actual')}
+                    className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
+                      simBaselineMode === 'actual' 
+                        ? 'bg-[#cedc28] text-[#041628] shadow-sm' 
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Delivered Spend Baseline
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSimBaselineMode('planned')}
+                    className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
+                      simBaselineMode === 'planned' 
+                        ? 'bg-emerald-400 text-[#041628] shadow-sm' 
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Media Plan Target Baseline
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Projection Summary Bar */}
             <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl bg-black/40 border border-white/10 font-mono text-xs">

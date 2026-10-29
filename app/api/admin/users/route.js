@@ -20,10 +20,12 @@ export async function GET(req) {
 
     const users = listUsersResult.users.map(userRecord => {
       const userData = userRolesMap.get(userRecord.uid) || {};
+      const rawRole = userData.role || (userData.isAdmin ? 'super_admin' : 'standard');
+      const role = rawRole === 'admin' ? 'super_admin' : rawRole;
       return {
         uid: userRecord.uid,
         email: userRecord.email,
-        role: userData.role || (userData.isAdmin ? 'admin' : 'standard'),
+        role,
         lastSignInTime: userData.lastActive || userRecord.metadata.lastSignInTime || null,
         creationTime: userRecord.metadata.creationTime || null,
       };

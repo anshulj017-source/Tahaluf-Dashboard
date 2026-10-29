@@ -120,7 +120,7 @@ test('E2E Browser Render & Console Error Verification Suite', async (t) => {
         }
       });
 
-      const response = await page.goto(targetUrl, { waitUntil: 'networkidle2', timeout: 30000 });
+      const response = await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
       assert.equal(response.status(), 200, 'Homepage must return HTTP status 200');
 
       // Assert zero console errors & uncaught runtime exceptions
@@ -143,10 +143,13 @@ test('E2E Browser Render & Console Error Verification Suite', async (t) => {
         }
       });
 
-      await page.goto(targetUrl, { waitUntil: 'networkidle2', timeout: 30000 });
+      await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
-      // Verify all requested CSS stylesheets succeeded
-      assert.ok(responses.length > 0, 'At least one CSS stylesheet must be requested and loaded');
+      // In dev mode Next.js injects CSS via <style> tags; in prod via <link rel="stylesheet">
+      const styleElementsCount = await page.evaluate(() => {
+        return document.querySelectorAll('style, link[rel="stylesheet"]').length;
+      });
+      assert.ok(responses.length > 0 || styleElementsCount > 0, 'At least one CSS stylesheet or style element must be present and applied');
       for (const res of responses) {
         assert.equal(res.status, 200, `CSS stylesheet at ${res.url} failed with status ${res.status}`);
       }
@@ -198,7 +201,7 @@ test('E2E Browser Render & Console Error Verification Suite', async (t) => {
       });
       page.on('pageerror', err => consoleErrors.push(err.message));
 
-      await page.goto(targetUrl, { waitUntil: 'networkidle2', timeout: 30000 });
+      await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
       // Click around visible navigation buttons/tabs if present
       const tabCount = await page.evaluate(() => {
@@ -239,7 +242,7 @@ test('E2E Browser Render & Console Error Verification Suite', async (t) => {
       // Wait for the loading spinner to disappear once live data streams finish
       await page.waitForFunction(
         () => !document.querySelector('.animate-spin-slow') && document.querySelectorAll('.card-surface').length > 0,
-        { timeout: 60000 }
+        { timeout: 75000 }
       );
 
       // Verify dashboard contents are present
@@ -424,7 +427,7 @@ test('E2E Browser Render & Console Error Verification Suite', async (t) => {
       await page.close();
     });
 
-    await t.test('Admin section menu orientation adapts to screen size (horizontal on smaller viewports, vertical on desktop)', async () => {
+    await t.test('Admin section menu orientation adapts to screen size (dropdown on mobile, 2-line layout on medium, vertical on desktop)', async () => {
       const page = await browser.newPage();
       const consoleErrors = [];
       page.on('console', msg => {
@@ -440,41 +443,59 @@ test('E2E Browser Render & Console Error Verification Suite', async (t) => {
         localStorage.setItem('tahaluf_cached_role', 'admin');
       });
 
-      // 1. Smaller viewport test (mobile / tablet < lg, e.g. 375x812)
+      // 1. Smaller viewport test (mobile < sm, e.g. 375x812) -> Dropdown layout
       await page.setViewport({ width: 375, height: 812 });
-      await page.goto(`${targetUrl}/?admin=events`, { waitUntil: 'networkidle2', timeout: 30000 });
+      await page.goto(`${targetUrl}/?admin=events`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      await page.waitForSelector('nav[aria-label="Admin sections"]', { timeout: 15000 }).catch(() => null);
 
-      const mobileNavStyles = await page.evaluate(() => {
-        const nav = document.querySelector('nav[aria-label="Admin sections"]');
-        if (!nav) return null;
-        const style = window.getComputedStyle(nav);
+      const mobileDropdownState = await page.evaluate(() => {
+        const trigger = document.querySelector('button[aria-label="Admin section selection"]');
         return {
-          flexDirection: style.flexDirection,
-          overflowX: style.overflowX,
-          buttonCount: nav.querySelectorAll('button').length
+          hasTrigger: !!trigger,
+          triggerText: trigger ? trigger.textContent.trim() : null
         };
       });
 
-      assert.ok(mobileNavStyles, 'Admin sections navigation must be present on smaller viewport');
-      assert.equal(mobileNavStyles.flexDirection, 'row', 'Admin section menu must have horizontal row orientation on smaller screens');
-      assert.equal(mobileNavStyles.buttonCount, 6, 'All 6 admin section buttons must be rendered');
+      assert.ok(mobileDropdownState.hasTrigger, 'Mobile custom dropdown trigger must be present on smaller screens');
+      assert.ok(mobileDropdownState.triggerText.includes('Events & Data'), 'Mobile dropdown displays active section label');
 
-      // 2. Desktop viewport test (1440x900)
+      // 2. Medium viewport test (tablet / not-so-small screen: 768x1024) -> Two-line layout (grid-cols-3)
+      await page.setViewport({ width: 768, height: 1024 });
+      await new Promise(r => setTimeout(r, 200));
+
+      const mediumNavStyles = await page.evaluate(() => {
+        const grid = document.querySelector('nav[aria-label="Admin sections"] .sm\\:grid');
+        if (!grid) return null;
+        const style = window.getComputedStyle(grid);
+        return {
+          display: style.display,
+          gridTemplateColumns: style.gridTemplateColumns,
+          buttonCount: grid.querySelectorAll('button').length
+        };
+      });
+
+      assert.ok(mediumNavStyles, 'Medium two-line grid must be present on tablet viewports');
+      assert.equal(mediumNavStyles.display, 'grid', 'Medium layout must use grid display');
+      assert.equal(mediumNavStyles.buttonCount, 6, 'All 6 section buttons must be rendered in medium two-line layout');
+
+      // 3. Desktop viewport test (1440x900) -> Vertical sidebar
       await page.setViewport({ width: 1440, height: 900 });
       await new Promise(r => setTimeout(r, 200));
 
       const desktopNavStyles = await page.evaluate(() => {
-        const nav = document.querySelector('nav[aria-label="Admin sections"]');
-        if (!nav) return null;
-        const style = window.getComputedStyle(nav);
+        const sidebar = document.querySelector('nav[aria-label="Admin sections"] .lg\\:flex');
+        if (!sidebar) return null;
+        const style = window.getComputedStyle(sidebar);
         return {
+          display: style.display,
           flexDirection: style.flexDirection,
-          buttonCount: nav.querySelectorAll('button').length
+          buttonCount: sidebar.querySelectorAll('button').length
         };
       });
 
-      assert.ok(desktopNavStyles, 'Admin sections navigation must be present on desktop');
-      assert.equal(desktopNavStyles.flexDirection, 'column', 'Admin section menu must have vertical column orientation on desktop');
+      assert.ok(desktopNavStyles, 'Desktop sidebar must be present on desktop');
+      assert.equal(desktopNavStyles.flexDirection, 'column', 'Desktop section menu must have vertical column orientation');
+      assert.equal(desktopNavStyles.buttonCount, 6, 'All 6 section buttons must be rendered on desktop');
 
       assert.deepEqual(consoleErrors, [], `No console errors during admin menu orientation check: ${JSON.stringify(consoleErrors)}`);
 

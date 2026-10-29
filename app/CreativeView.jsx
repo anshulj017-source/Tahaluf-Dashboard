@@ -1,4 +1,5 @@
-import { ExportButton } from './components/DashboardFeatureContext';
+import { ExportButton, useDashboardFeature } from './components/DashboardFeatureContext';
+import CreativeFatigueRadar from './components/CreativeFatigueRadar';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import * as d3 from 'd3';
 import { 
@@ -107,6 +108,7 @@ const MultiSelectDropdown = ({
 };
 
 export default function CreativeView({ data, exRate = 1, exSym = '$', formatShort = (v) => v, userRole }) {
+  const creativeFatigueAllowed = useDashboardFeature('creativeFatigue');
   const CREATIVES_PER_PAGE = 24;
   const [creativePage, setCreativePage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
@@ -417,6 +419,18 @@ export default function CreativeView({ data, exRate = 1, exSym = '$', formatShor
 
   return (
     <div className="animate-in fade-in duration-500">
+      {/* CREATIVE FATIGUE RADAR */}
+      {creativeFatigueAllowed && (
+        <div className="mb-4">
+          <CreativeFatigueRadar 
+            creatives={creativeTabData}
+            exSym={exSym}
+            exRate={exRate}
+            formatShort={formatShort}
+          />
+        </div>
+      )}
+
       {/* HEADER WITH SCREEN-FIT CONTROLS */}
       <div className="mb-4 flex flex-wrap justify-between items-center gap-3">
         <div>

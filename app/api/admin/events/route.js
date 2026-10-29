@@ -95,7 +95,12 @@ async function getEvents(request) {
       inspectOnly ? Promise.resolve([]) : getEventsHistory()
     ]);
     const sheetBaseUrl = process.env.COMBINED_COUNTRY_CSV_URL;
-    const checkSettings = await getDimensionSettings();
+    let checkSettings = null;
+    try {
+      checkSettings = await getDimensionSettings();
+    } catch (err) {
+      console.warn('[ADMIN EVENTS] Failed to get dimension settings, using defaults:', err?.message || err);
+    }
     const dataSources = config.events.flatMap(event => [
       { eventId: event.id, eventName: event.name, sourceName: event.sourceName || event.name, kind: 'Actuals', gid: event.gid || '' },
       ...(event.plannedGid

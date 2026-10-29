@@ -1112,6 +1112,19 @@ async function testAnalyticsApi() {
     });
     assert(metricClickRes.status === 200, 'POST /api/analytics/track (metric_card_click) returns HTTP 200');
 
+    // Test POST Admin Event to verify role indexing
+    await fetch(trackUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        eventType: 'dashboard_open',
+        userEmail: 'admin@tahaluf.com',
+        userRole: 'admin',
+        tab: 'summary',
+        filters: { business: 'All' },
+      }),
+    });
+
     // Test GET Admin Analytics
     const adminRes = await fetch(`${adminAnalyticsUrl}?email=admin@tahaluf.com`);
     const adminJson = await adminRes.json();

@@ -16,10 +16,28 @@ const GROUP_ICONS = {
   'Tools': Wrench,
   'Monitoring': Activity,
   'Intelligence': Brain,
-  'Advanced Analytics': BarChart2
+  'Advanced Analytics': BarChart2,
+  'Admin Center': Shield
 };
 
-export default function FeatureControlsAdmin({ onSaved, onNavigate }) {
+export default function FeatureControlsAdmin({ currentUserEmail = 'admin@tahaluf.com', userRole = 'super_admin', onSaved, onNavigate }) {
+  if (userRole !== 'super_admin') {
+    return (
+      <div className="card-surface p-8 rounded-3xl border border-amber-500/30 bg-[#0a2442]/80 text-center max-w-xl mx-auto my-12 shadow-2xl">
+        <div className="w-16 h-16 rounded-full bg-amber-500/15 border border-amber-500/40 text-amber-300 flex items-center justify-center mx-auto mb-4">
+          <Lock className="w-8 h-8" />
+        </div>
+        <h3 className="text-xl font-bold text-white mb-2">Super Admin Access Required</h3>
+        <p className="text-xs text-slate-300 mb-6 leading-relaxed">
+          Feature Controls is strictly restricted to <span className="text-[#cedc28] font-bold">Super Administrators</span>. 
+          Standard administrators can manage Events, Health, Quotas, and User Access, but cannot modify global feature deployments.
+        </p>
+        <span className="text-[11px] font-mono px-3 py-1 rounded-full bg-black/40 text-slate-400 border border-white/10">
+          Current Role: {userRole}
+        </span>
+      </div>
+    );
+  }
   const [config, setConfig] = useState(null);
   const [modes, setModes] = useState(DEFAULT_FEATURE_CONFIG.modes);
   const [previewRole, setPreviewRole] = useState('standard');
@@ -38,7 +56,20 @@ export default function FeatureControlsAdmin({ onSaved, onNavigate }) {
       const json = await response.json();
       if (!response.ok || !json.success) throw new Error(json.error || 'Could not load feature controls.');
       setConfig(json.config);
-      setModes({ ...DEFAULT_FEATURE_CONFIG.modes, ...json.config.modes });
+      
+      // Check for preserved draft in localStorage
+      let effectiveModes = { ...DEFAULT_FEATURE_CONFIG.modes, ...json.config.modes };
+      try {
+        const savedDraft = localStorage.getItem('tahaluf_feature_modes_draft');
+        if (savedDraft) {
+          const parsed = JSON.parse(savedDraft);
+          if (parsed && typeof parsed === 'object') {
+            effectiveModes = { ...effectiveModes, ...parsed };
+          }
+        }
+      } catch {}
+
+      setModes(effectiveModes);
       setNotice('');
     } catch (err) {
       setError(err.message || 'Error loading feature controls.');
@@ -49,21 +80,62 @@ export default function FeatureControlsAdmin({ onSaved, onNavigate }) {
 
   useEffect(() => { load(); }, []);
 
+  // Listen for global discard events from AdminView
+  useEffect(() => {
+    const handleDiscard = (e) => {
+      if (!e.detail || e.detail.section === 'features') {
+        discardDraft();
+      }
+    };
+    window.addEventListener('admin-discard-draft', handleDiscard);
+    return () => window.removeEventListener('admin-discard-draft', handleDiscard);
+  }, [config]);
+
+  const setFeatureMode = (featureId, newMode) => {
+    setModes(prev => {
+      const updated = { ...prev, [featureId]: newMode };
+      try {
+        localStorage.setItem('tahaluf_feature_modes_draft', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+    setNotice('');
+  };
+
+  const discardDraft = () => {
+    try {
+      localStorage.removeItem('tahaluf_feature_modes_draft');
+    } catch {}
+    if (config) {
+      setModes({ ...DEFAULT_FEATURE_CONFIG.modes, ...config.modes });
+      setNotice('Draft changes discarded. Reverted to active database configuration.');
+    }
+  };
+
   const save = async () => {
     setBusy(true);
     setError('');
     setNotice('');
     try {
       const token = await auth.currentUser?.getIdToken();
+      const headers = {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        'x-admin-email': currentUserEmail || 'admin@tahaluf.com',
+        'x-admin-role': 'admin'
+      };
       const response = await fetch('/api/admin/features', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        headers,
         body: JSON.stringify({ modes, revision: config?.revision ?? 0 })
       });
       const json = await response.json();
       if (!response.ok || !json.success) throw new Error(json.error || 'Could not save feature controls.');
       setConfig(json.config);
       setModes(json.config.modes);
+      try {
+        localStorage.removeItem('tahaluf_feature_modes_draft');
+      } catch {}
       onSaved?.(json.config);
       setNotice('Feature controls saved successfully. Connected dashboard sessions update automatically within 60 seconds or on window focus.');
     } catch (err) {
@@ -174,6 +246,42 @@ export default function FeatureControlsAdmin({ onSaved, onNavigate }) {
           </button>
         </div>
       </div>
+
+      {/* PENDING DRAFT NOTICE BANNER */}
+      {dirty && (
+        <div className="rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4 shadow-lg flex flex-wrap items-center justify-between gap-3 text-amber-200 animate-fadeIn">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-amber-500/20 text-amber-300">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-sm text-white">Unsaved Draft Changes ({changedFeatures.length})</span>
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 uppercase tracking-wider">Draft Mode</span>
+              </div>
+              <p className="text-xs text-amber-200/90 mt-0.5">
+                Pending: {changedFeatures.map(f => `${f.name} → ${modes[f.id]}`).join(', ')}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 ml-auto">
+            <button
+              onClick={discardDraft}
+              className="px-3.5 py-1.5 rounded-xl border border-slate-600 hover:border-red-400/50 bg-[#071b2e] text-xs font-semibold text-slate-300 hover:text-red-300 transition-all"
+            >
+              Discard Draft
+            </button>
+            <button
+              onClick={save}
+              disabled={busy}
+              className="px-4 py-1.5 rounded-xl bg-[#cedc28] text-[#041628] text-xs font-bold hover:bg-[#b5c222] transition-all shadow-md shadow-[#cedc28]/20 flex items-center gap-1.5"
+            >
+              <Save className="w-3.5 h-3.5" />
+              <span>{busy ? 'Saving...' : 'Save Draft Changes'}</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* KPI METRIC TILES */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -387,6 +495,13 @@ export default function FeatureControlsAdmin({ onSaved, onNavigate }) {
                       <div className="flex-1 min-w-[200px]">
                         <div className="flex items-center gap-2 mb-1 flex-wrap">
                           <span className="text-sm font-bold text-white">{feature.name}</span>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 flex items-center gap-1">
+                            <span>📍</span>
+                            <span>{feature.section || feature.group}</span>
+                          </span>
+                          <span className="px-2 py-0.5 rounded text-[9.5px] font-mono text-slate-400 bg-white/5 border border-white/10 hidden sm:inline-block">
+                            {feature.targetLocation}
+                          </span>
                           {feature.adminOnly && (
                             <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30">
                               System Restricted
@@ -401,10 +516,10 @@ export default function FeatureControlsAdmin({ onSaved, onNavigate }) {
                             <button
                               type="button"
                               onClick={() => onNavigate(feature.id)}
-                              className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#cedc28]/10 text-[#cedc28] border border-[#cedc28]/30 hover:bg-[#cedc28]/25 hover:border-[#cedc28] transition-all flex items-center gap-1 shadow-sm"
-                              title={`Jump directly to ${feature.name}`}
+                              className="px-2.5 py-0.5 rounded text-[10px] font-bold bg-[#cedc28]/15 text-[#cedc28] border border-[#cedc28]/35 hover:bg-[#cedc28] hover:text-[#041628] transition-all flex items-center gap-1 shadow-sm"
+                              title={`Jump directly to ${feature.name} (${feature.targetLocation})`}
                             >
-                              <span>Open View</span>
+                              <span>Go to Section</span>
                               <ExternalLink className="w-2.5 h-2.5" />
                             </button>
                           )}
@@ -425,10 +540,7 @@ export default function FeatureControlsAdmin({ onSaved, onNavigate }) {
                           {!feature.adminOnly && (
                             <button
                               disabled={busy}
-                              onClick={() => {
-                                setModes(m => ({ ...m, [feature.id]: 'public' }));
-                                setNotice('');
-                              }}
+                              onClick={() => setFeatureMode(feature.id, 'public')}
                               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
                                 currentMode === 'public'
                                   ? 'bg-[#cedc28] text-[#1a302e] shadow-[0_0_12px_rgba(206,220,40,0.35)]'
@@ -444,10 +556,7 @@ export default function FeatureControlsAdmin({ onSaved, onNavigate }) {
                           {/* Option 2: Admin Only */}
                           <button
                             disabled={busy}
-                            onClick={() => {
-                              setModes(m => ({ ...m, [feature.id]: 'admin_only' }));
-                              setNotice('');
-                            }}
+                            onClick={() => setFeatureMode(feature.id, 'admin_only')}
                             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
                               currentMode === 'admin_only'
                                 ? 'bg-[#14a6d9] text-white shadow-[0_0_12px_rgba(20,166,217,0.35)]'
@@ -462,10 +571,7 @@ export default function FeatureControlsAdmin({ onSaved, onNavigate }) {
                           {/* Option 3: Disabled */}
                           <button
                             disabled={busy}
-                            onClick={() => {
-                              setModes(m => ({ ...m, [feature.id]: 'disabled' }));
-                              setNotice('');
-                            }}
+                            onClick={() => setFeatureMode(feature.id, 'disabled')}
                             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
                               currentMode === 'disabled'
                                 ? 'bg-rose-500 text-white shadow-[0_0_12px_rgba(244,63,94,0.35)]'

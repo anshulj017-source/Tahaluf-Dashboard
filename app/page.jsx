@@ -39,6 +39,8 @@ import { getClientDashboardCache, setClientDashboardCache } from '../lib/clientC
 import { DASHBOARD_FEATURES, DEFAULT_FEATURE_CONFIG, isFeatureEnabled } from '../lib/dashboardFeatures.mjs';
 import { DashboardFeatureContext, ExportButton } from './components/DashboardFeatureContext';
 import AiStrategicIntelligence from './components/AiStrategicIntelligence';
+import GranularWeeklyPacing from './components/GranularWeeklyPacing';
+import TargetPacingForecaster from './components/TargetPacingForecaster';
 
 const GEO_URL = "https://unpkg.com/world-atlas@2.0.2/countries-110m.json";
 
@@ -129,12 +131,16 @@ const MultiSelect = ({ label, options, selected, onChange, widthClass, isHero = 
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const wrapperRef = useRef(null);
-  const filtered = options.filter(o => o.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filtered = useMemo(() => {
+    if (!searchTerm.trim()) return options;
+    return options.filter(o => o.toLowerCase().includes(searchTerm.toLowerCase()));
+  }, [options, searchTerm]);
 
   const isAll = selected.includes('All');
   const isActive = !isAll && selected.length > 0;
 
   useEffect(() => {
+    if (!isOpen) return;
     function handleClickOutside(event) {
       if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
         setIsOpen(false);
@@ -143,90 +149,118 @@ const MultiSelect = ({ label, options, selected, onChange, widthClass, isHero = 
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  }, [isOpen]);
+
+  const handleSelect = (opt) => {
+    if (singleSelect) {
+      setIsOpen(false);
+      setSearchTerm('');
+      React.startTransition(() => {
+        onChange([opt]);
+      });
+    } else {
+      let next = [...selected];
+      if (next.includes('All')) next = [];
+      if (selected.includes(opt)) {
+        next = next.filter(n => n !== opt);
+        if (next.length === 0) next = ['All'];
+      } else { 
+        next.push(opt); 
+      }
+      React.startTransition(() => {
+        onChange(next);
+      });
+    }
+  };
+
+  const handleSelectAll = () => {
+    setIsOpen(false);
+    setSearchTerm('');
+    React.startTransition(() => {
+      onChange(['All']);
+    });
+  };
 
   return (
-    <div ref={wrapperRef} className={`relative ${widthClass || 'w-[100px] xl:w-[110px]'} shrink-0 ${isOpen ? 'z-50' : 'z-30'}`}>
-      <span className={`text-[10px] font-black uppercase tracking-widest mb-1 flex items-center justify-between ${isHero ? 'text-[#cedc28]' : 'text-[#14a6d9]'}`}>
-        <span className="flex items-center gap-1">
-          {isHero && <Sparkles className="w-3 h-3 text-[#cedc28]" />}
-          {label}
+    <div ref={wrapperRef} className={`relative ${widthClass || 'w-[50px] xl:w-[62px] 2xl:w-[78px]'} shrink-0 ${isOpen ? 'z-50' : 'z-20'}`}>
+      <span className={`text-[8.5px] xl:text-[9.5px] font-black uppercase tracking-wider mb-1 flex items-center justify-between whitespace-nowrap overflow-hidden text-ellipsis ${isHero ? 'text-[#cedc28]' : 'text-[#14a6d9]'}`}>
+        <span className="flex items-center gap-0.5 truncate">
+          {isHero && <Sparkles className="w-2.5 h-2.5 xl:w-3 xl:h-3 text-[#cedc28] shrink-0" />}
+          <span className="truncate">{label}</span>
         </span>
-        {isActive && <span className="w-1.5 h-1.5 rounded-full bg-[#cedc28] animate-pulse"></span>}
+        {isActive && <span className="w-1.5 h-1.5 rounded-full bg-[#cedc28] animate-pulse shrink-0 ml-0.5"></span>}
       </span>
       <div 
         onClick={() => setIsOpen(!isOpen)}
-        className={`px-2 py-1.5 rounded-xl cursor-pointer flex justify-between items-center transition-all ${
+        className={`px-1.5 xl:px-2 py-1 xl:py-1.5 rounded-lg cursor-pointer flex justify-between items-center transition-all ${
           isHero
             ? isActive
               ? 'bg-[#cedc28]/20 border-2 border-[#cedc28] text-white font-black shadow-[0_0_15px_rgba(206,220,40,0.35)] hover:shadow-[0_0_20px_rgba(206,220,40,0.5)]'
               : 'bg-gradient-to-r from-[#cedc28]/15 via-[#0a2442] to-[#14a6d9]/15 border-2 border-[#cedc28]/70 text-[#eef7f5] font-bold hover:border-[#cedc28] shadow-[0_0_10px_rgba(206,220,40,0.2)]'
             : isActive
               ? 'bg-[#cedc28]/15 border border-[#cedc28] text-white font-black shadow-[0_0_10px_rgba(206,220,40,0.25)]'
-              : 'surface-inset border border-[#cedc28]/30 rounded-lg text-[10px] font-bold text-[#eef7f5] hover:border-[#cedc28]'
+              : 'surface-inset border border-[#cedc28]/30 text-[9px] xl:text-[10px] font-bold text-[#eef7f5] hover:border-[#cedc28]'
         }`}
       >
-        <span className="truncate pr-1 text-[10px] xl:text-[10.5px]">
+        <span className="truncate pr-0.5 text-[9px] xl:text-[10px]">
           {isAll ? (isHero ? 'All Events' : 'All') : selected.join(', ')}
         </span>
-        <ChevronDown className={`w-3.5 h-3.5 flex-shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''} ${isHero || isActive ? 'text-[#cedc28]' : ''}`} />
+        <ChevronDown className={`w-3 h-3 flex-shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''} ${isHero || isActive ? 'text-[#cedc28]' : 'text-gray-400'}`} />
       </div>
       {isOpen && (
-        <div className={`absolute top-full ${alignRight ? 'right-0' : 'left-0'} min-w-[200px] w-full z-50`}>
-          <div className="w-full mt-2 card-surface backdrop-blur-3xl bg-[#0a2442]/95 border border-[#cedc28]/40 rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.85)] flex flex-col max-h-64 overflow-hidden animate-in fade-in zoom-in-95 duration-70">
-            <div className="p-2 border-b border-[#cedc28]/10 relative">
-              <Search className="w-4 h-4 text-[#14a6d9] absolute left-4 top-1/2 -translate-y-1/2" />
-              <input 
-                type="text" 
-                placeholder="Search..." 
-                value={searchTerm} 
-                onChange={e => setSearchTerm(e.target.value)} 
-                className="w-full bg-black/30 text-[#eef7f5] text-[10px] font-bold pl-9 pr-3 py-2 rounded-lg outline-none border border-transparent focus:border-[#cedc28]/50" 
-              />
-            </div>
-            <div className="overflow-y-auto p-2 flex-1 custom-scrollbar">
-              <div 
-                onClick={() => { 
-                  setIsOpen(false); 
-                  setSearchTerm(''); 
-                  onChange(['All']); 
-                }} 
-                className={`px-3 py-2 rounded-lg text-[11px] font-bold cursor-pointer flex justify-between ${selected.includes('All') ? 'bg-[#cedc28]/20 text-[#cedc28]' : 'text-[#eef7f5] hover:bg-[#0a2442]'}`}
-              >
-                All <Check className={`w-3.5 h-3.5 ${selected.includes('All') ? 'opacity-100' : 'opacity-0'}`} />
+        <>
+          {/* Backdrop shield below header to absorb misclicks and prevent click penetration to underlying banners */}
+          <div 
+            className="fixed inset-x-0 bottom-0 top-[52px] sm:top-[56px] xl:top-[64px] z-40 bg-transparent cursor-default"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setIsOpen(false);
+              setSearchTerm('');
+            }}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+          />
+          <div className={`absolute top-full ${alignRight ? 'right-0' : 'left-0'} ${options.length <= 4 ? 'min-w-[140px]' : 'min-w-[200px]'} w-full z-50`}>
+            <div className="w-full mt-2 card-surface backdrop-blur-3xl bg-[#0a2442]/95 border border-[#cedc28]/40 rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.85)] flex flex-col max-h-64 overflow-hidden animate-in fade-in zoom-in-95 duration-70">
+              {options.length > 4 && (
+                <div className="p-2 border-b border-[#cedc28]/10 relative">
+                  <Search className="w-4 h-4 text-[#14a6d9] absolute left-4 top-1/2 -translate-y-1/2" />
+                  <input 
+                    type="text" 
+                    placeholder="Search..." 
+                    value={searchTerm} 
+                    onChange={e => setSearchTerm(e.target.value)} 
+                    className="w-full bg-black/30 text-[#eef7f5] text-[10px] font-bold pl-9 pr-3 py-2 rounded-lg outline-none border border-transparent focus:border-[#cedc28]/50" 
+                  />
+                </div>
+              )}
+              <div className="overflow-y-auto p-2 flex-1 custom-scrollbar">
+                <div 
+                  onClick={handleSelectAll} 
+                  className={`px-3 py-2 rounded-lg text-[11px] font-bold cursor-pointer flex justify-between ${selected.includes('All') ? 'bg-[#cedc28]/20 text-[#cedc28]' : 'text-[#eef7f5] hover:bg-[#0a2442]'}`}
+                >
+                  All <Check className={`w-3.5 h-3.5 ${selected.includes('All') ? 'opacity-100' : 'opacity-0'}`} />
+                </div>
+                {filtered.map(opt => {
+                  const isSel = selected.includes(opt);
+                  return (
+                    <div 
+                      key={opt} 
+                      onClick={() => handleSelect(opt)} 
+                      className={`px-3 py-2 mt-1 rounded-lg text-[11px] font-bold cursor-pointer flex justify-between ${isSel ? 'bg-[#cedc28]/20 text-[#cedc28]' : 'text-[#eef7f5] hover:bg-[#0a2442]'}`}
+                    >
+                      <span className="truncate pr-2">{opt}</span> 
+                      <Check className={`w-3.5 h-3.5 flex-shrink-0 ${isSel ? 'opacity-100' : 'opacity-0'}`} />
+                    </div>
+                  );
+                })}
               </div>
-              {filtered.map(opt => {
-                const isSel = selected.includes(opt);
-                return (
-                  <div 
-                    key={opt} 
-                    onClick={() => {
-                      if (singleSelect) {
-                        setIsOpen(false);
-                        setSearchTerm('');
-                        onChange([opt]);
-                      } else {
-                        let next = [...selected];
-                        if (next.includes('All')) next = [];
-                        if (isSel) {
-                          next = next.filter(n => n !== opt);
-                          if (next.length === 0) next = ['All'];
-                        } else { 
-                          next.push(opt); 
-                        }
-                        onChange(next);
-                      }
-                    }} 
-                    className={`px-3 py-2 mt-1 rounded-lg text-[11px] font-bold cursor-pointer flex justify-between ${isSel ? 'bg-[#cedc28]/20 text-[#cedc28]' : 'text-[#eef7f5] hover:bg-[#0a2442]'}`}
-                  >
-                    <span className="truncate pr-2">{opt}</span> 
-                    <Check className={`w-3.5 h-3.5 flex-shrink-0 ${isSel ? 'opacity-100' : 'opacity-0'}`} />
-                  </div>
-                );
-              })}
             </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );
@@ -658,10 +692,37 @@ const InitialLoadingScreen = ({ isAuthLoading, progress = 18, statusMessage = ''
 export default function App() {
   const router = useRouter();
   const isDevBypass = String(process.env.NEXT_PUBLIC_BYPASS_AUTH || '').replace(/['"]/g, '') === 'true';
-  const [isAuthenticated, setIsAuthenticated] = useState(isDevBypass);
-  const [userRole, setUserRole] = useState(isDevBypass ? 'admin' : 'standard');
-  const [userEmail, setUserEmail] = useState(isDevBypass ? 'admin@tahaluf.com' : '');
-  const [isAuthLoading, setIsAuthLoading] = useState(!isDevBypass);
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    if (isDevBypass) return true;
+    if (typeof window !== 'undefined') {
+      try { return Boolean(localStorage.getItem('tahaluf_cached_email')); } catch {}
+    }
+    return false;
+  });
+  const [userRole, setUserRole] = useState(() => {
+    if (isDevBypass) return 'super_admin';
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem('tahaluf_cached_role') || 'standard';
+        return cached === 'admin' ? 'super_admin' : cached;
+      } catch {}
+    }
+    return 'standard';
+  });
+  const [userEmail, setUserEmail] = useState(() => {
+    if (isDevBypass) return 'admin@tahaluf.com';
+    if (typeof window !== 'undefined') {
+      try { return localStorage.getItem('tahaluf_cached_email') || ''; } catch {}
+    }
+    return '';
+  });
+  const [isAuthLoading, setIsAuthLoading] = useState(() => {
+    if (isDevBypass) return false;
+    if (typeof window !== 'undefined') {
+      try { return !Boolean(localStorage.getItem('tahaluf_cached_email')); } catch {}
+    }
+    return true;
+  });
   const [adData, setAdData] = useState([]);
   const [gaData, setGaData] = useState([]);
   const [creativeData, setCreativeData] = useState([]);
@@ -672,9 +733,10 @@ export default function App() {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [activeTab, setActiveTab] = useState('summary');
   const [adminVisited, setAdminVisited] = useState(false);
+  const isAdminRole = userRole === 'admin' || userRole === 'super_admin';
   useEffect(() => {
-    if (userRole === 'admin' && new URLSearchParams(window.location.search).has('admin')) setActiveTab('admin');
-  }, [userRole]);
+    if (isAdminRole && new URLSearchParams(window.location.search).has('admin')) setActiveTab('admin');
+  }, [isAdminRole]);
   useEffect(() => {
     if (activeTab === 'admin') setAdminVisited(true);
   }, [activeTab]);
@@ -728,7 +790,7 @@ export default function App() {
   useEffect(() => {
     if (!featureConfig) return;
     const enabled = id => isFeatureEnabled(featureConfig, id, userRole, simulatingStandardUser);
-    if (activeTab === 'admin' && userRole === 'admin') return;
+    if (activeTab === 'admin' && isAdminRole) return;
     if (!enabled(activeTab)) {
       const firstView = DASHBOARD_FEATURES.find(feature => feature.group === 'Dashboard views' && enabled(feature.id));
       setActiveTab(firstView?.id || 'summary');
@@ -872,7 +934,7 @@ export default function App() {
   useEffect(() => {
     if (String(process.env.NEXT_PUBLIC_BYPASS_AUTH || '').replace(/['"]/g, '') === 'true') {
       setIsAuthenticated(true);
-      setUserRole('admin');
+      setUserRole('super_admin');
       setIsAuthLoading(false);
       return;
     }
@@ -887,7 +949,8 @@ export default function App() {
         if (cachedEmail) {
           setUserEmail(cachedEmail);
           setIsAuthenticated(true);
-          if (cachedRole) setUserRole(cachedRole);
+          if (cachedRole) setUserRole(cachedRole === 'admin' ? 'super_admin' : cachedRole);
+          setIsAuthLoading(false);
         }
       } catch (e) {}
     }
@@ -920,7 +983,8 @@ export default function App() {
         const userDoc = await fetchUserWithTimeout;
         if (userDoc && userDoc.exists()) {
           const data = userDoc.data();
-          const resolvedRole = data.role || (data.isAdmin ? 'admin' : 'standard');
+          const rawRole = data.role || (data.isAdmin ? 'super_admin' : 'standard');
+          const resolvedRole = (rawRole === 'admin') ? 'super_admin' : rawRole;
           setUserRole(resolvedRole);
           if (typeof window !== 'undefined') {
             try {
@@ -944,6 +1008,12 @@ export default function App() {
         resolveUser(user);
       } else {
         if (!auth.currentUser) {
+          const hasCachedSession = typeof window !== 'undefined' && Boolean(localStorage.getItem('tahaluf_cached_email'));
+          if (hasCachedSession) {
+            isResolved = true;
+            setIsAuthLoading(false);
+            return;
+          }
           isResolved = true;
           setIsAuthLoading(false);
           router.push('/login');
@@ -958,6 +1028,12 @@ export default function App() {
         if (auth.currentUser) {
           resolveUser(auth.currentUser);
         } else {
+          const hasCachedSession = typeof window !== 'undefined' && Boolean(localStorage.getItem('tahaluf_cached_email'));
+          if (hasCachedSession) {
+            isResolved = true;
+            setIsAuthLoading(false);
+            return;
+          }
           isResolved = true;
           setIsAuthLoading(false);
           router.push('/login');
@@ -1246,7 +1322,7 @@ export default function App() {
 
       setEventsConfiguration(configuredEvents);
 
-      const effectiveRole = (userRole === 'admin' && !simulatingStandardUser) ? 'admin' : 'standard';
+      const effectiveRole = (isAdminRole && !simulatingStandardUser) ? 'admin' : 'standard';
 
       // Filter for active events based on effectiveRole & auto-publish
       const activeEvents = configuredEvents.filter(ev => {
@@ -1481,8 +1557,8 @@ export default function App() {
   const uniqueGa4Properties = useMemo(() => Array.from(new Set(gaData.map(d => d.ga4Property))).filter(Boolean).sort(), [gaData]);
   const uniquePortfolios = useMemo(() => Array.from(new Set(adData.map(d => d.portfolio))).filter(Boolean).sort(), [adData]);
   const uniqueBusinesses = useMemo(() => {
-    const vals = Array.from(new Set(adData.map(d => d.business))).filter(Boolean).sort();
-    return vals.length ? vals : ['B2B', 'B2C'];
+    const vals = Array.from(new Set(adData.map(d => d.business))).filter(Boolean);
+    return Array.from(new Set([...vals, 'B2B', 'B2C'])).sort();
   }, [adData]);
   const eventsData = useMemo(() => filterPortfolios.includes('All') ? adData : adData.filter(d => filterPortfolios.includes(d.portfolio)), [adData, filterPortfolios]);
   const uniqueEvents = useMemo(() => Array.from(new Set(eventsData.map(d => d.eventNameDB))).filter(e => e && e !== 'Unknown').sort(), [eventsData]);
@@ -2186,6 +2262,7 @@ export default function App() {
             <AiStrategicIntelligence 
               allAdData={adData}
               filteredAdData={scopeAdData}
+              plannedData={plannedData}
               channelData={scopeChannelSpend.length > 0 ? scopeChannelSpend : channelMetricsData}
               totals={scopeTotals}
               topChannel={topChannel}
@@ -2298,7 +2375,7 @@ export default function App() {
     }
 
     if (activeTab === 'weekly') {
-      const activeEventContext = selectedEvent || (filterEvents.length === 1 && !filterEvents.includes('All') ? filterEvents[0] : null);
+      const activeEventContext = selectedEvent || (filterEvents.length === 1 && !filterEvents.includes('All') ? filterEvents[0] : (uniqueEvents.length > 0 ? uniqueEvents[0] : null));
 
       if (!activeEventContext) {
          return (
@@ -2474,6 +2551,33 @@ export default function App() {
             </div>
           </div>
           
+          {featureAllowed('launchForecaster') && (
+            <TargetPacingForecaster 
+              eventName={activeEventContext}
+              deliveredCost={weekTotals.spend || 0}
+              plannedBudget={plannedData.filter(p => p.eventName === activeEventContext || p.event === activeEventContext || (p.sourceName && p.sourceName.toLowerCase().includes(activeEventContext.toLowerCase()))).reduce((sum, p) => sum + (Number(p.budget || p.Budget || p.spend || p.Spend || 0)), 0)}
+              launchDateStr={eventsConfiguration?.find(e => e.name === activeEventContext || e.id === activeEventContext)?.launchDate || ''}
+              startDateStr={eventsConfiguration?.find(e => e.name === activeEventContext || e.id === activeEventContext)?.startDate || ''}
+              exSym={exSym}
+              exRate={exRate}
+              formatShort={formatShort}
+            />
+          )}
+
+          {featureAllowed('granularTimeline') && (
+            <GranularWeeklyPacing 
+              eventName={activeEventContext}
+              eventTimeline={eventWeekTimelines[activeEventContext] || eventWeekTimelines[activeEventContext.toUpperCase()] || []}
+              weeklyData={weeklyMetricsData}
+              plannedData={plannedData.filter(p => p.eventName === activeEventContext || p.event === activeEventContext || (p.sourceName && p.sourceName.toLowerCase().includes(activeEventContext.toLowerCase())))}
+              selectedWeeks={localWeeklyViewWeeks}
+              onSelectWeek={(w) => setLocalWeeklyViewWeeks(w === 'All' ? ['All'] : [w])}
+              currency={currency}
+              exRate={exRate}
+              exSym={exSym}
+            />
+          )}
+
           <div className="card-surface p-6 rounded-3xl border border-[#cedc28]/10 shadow-lg relative z-20 overflow-visible">
             <DataTable 
               title={`Weekly Breakdown - ${activeEventContext}`} 
@@ -2499,7 +2603,7 @@ export default function App() {
     }
     
     if (activeTab === 'campaign') {
-      const activeEventContext = selectedEvent || (filterEvents.length === 1 && !filterEvents.includes('All') ? filterEvents[0] : null);
+      const activeEventContext = selectedEvent || (filterEvents.length === 1 && !filterEvents.includes('All') ? filterEvents[0] : (uniqueEvents.length > 0 ? uniqueEvents[0] : null));
       const isMultiEventComparison = filterEvents.length > 1 && !filterEvents.includes('All');
 
       if (!activeEventContext && !isMultiEventComparison) {
@@ -2848,7 +2952,14 @@ export default function App() {
       {/* HEADER: TV Mode or Standard Header */}
       {tvMode ? (
         <header className="sticky top-0 z-50 bg-[#071a30]/95 backdrop-blur-xl border-b-2 border-[#cedc28]/40 px-3 sm:px-6 py-2.5 shadow-2xl relative flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <div 
+            onClick={() => {
+              setTvMode(false);
+              setActiveTab('summary');
+            }}
+            className="flex items-center gap-2 sm:gap-3 min-w-0 cursor-pointer hover:opacity-85 transition-opacity"
+            title="Exit TV Mode & Return to Overview"
+          >
             <img src="/tahaluf-logo.svg" alt="Tahaluf Logo" className="h-6 sm:h-7 object-contain shrink-0" onError={(e) => e.target.style.display = 'none'} />
             <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
               <span className="text-[10px] sm:text-xs font-black text-[#cedc28] uppercase tracking-wider bg-[#cedc28]/10 px-2 sm:px-2.5 py-1 rounded-lg border border-[#cedc28]/30 truncate">
@@ -2965,9 +3076,13 @@ export default function App() {
             </button>
           </div>
         </header>
-      ) : activeTab === 'admin' && userRole === 'admin' ? (
+      ) : activeTab === 'admin' && isAdminRole ? (
         <header className="flex items-center justify-between gap-3 border-b border-[#cedc28]/20 bg-[#0a2442] px-4 py-3 text-white">
-          <div className="flex items-center gap-3">
+          <div 
+            onClick={() => setActiveTab('summary')}
+            className="flex items-center gap-3 cursor-pointer hover:opacity-85 transition-opacity"
+            title="Return to Overview"
+          >
             <img src="/tahaluf-logo.svg" alt="Tahaluf Logo" className="h-7" />
             <span className="text-sm font-semibold">Admin workspace</span>
           </div>
@@ -2977,21 +3092,28 @@ export default function App() {
         <header className="sticky top-0 z-50 bg-[#0a2442]/95 backdrop-blur-xl border-b border-[#cedc28]/20 px-0 py-2 sm:py-2.5 shadow-2xl relative">
           <div className="pattern-overlay absolute inset-0 z-0 pointer-events-none"></div>
 
-          {/* DESKTOP HEADER (Screens >= lg / 1024px) */}
-          <div className="hidden lg:flex items-center justify-between relative z-10 w-full px-4 xl:px-6">
-            {/* LEFT: Logo - Exactly matches sidebar width w-52 (208px) */}
-            <div className="w-52 pr-4 flex items-center justify-between shrink-0 border-r border-[#cedc28]/15">
+          {/* DESKTOP HEADER: WIDE VIEWPORTS (>= 1280px / xl) - All 9 filters in a single elegant row */}
+          <div className="hidden xl:flex items-center justify-between relative z-10 w-full px-3 2xl:px-6">
+            {/* LEFT: Logo */}
+            <div 
+              onClick={() => {
+                setActiveTab('summary');
+                if (tvMode) setTvMode(false);
+              }}
+              className="w-36 2xl:w-48 pr-2.5 flex items-center justify-between shrink-0 border-r border-[#cedc28]/15 cursor-pointer hover:opacity-85 transition-opacity"
+              title="Return to Overview"
+            >
               <div className="flex flex-col items-start gap-0.5">
-                <img src="/tahaluf-logo.svg" alt="Tahaluf Logo" className="h-7 object-contain" onError={(e) => e.target.style.display = 'none'} />
-                <p className="text-[8.5px] font-bold text-[#cedc28] uppercase tracking-[0.08em] whitespace-nowrap">Performance Dashboard</p>
+                <img src="/tahaluf-logo.svg" alt="Tahaluf Logo" className="h-6 2xl:h-7 object-contain" onError={(e) => e.target.style.display = 'none'} />
+                <p className="text-[7.5px] 2xl:text-[8px] font-bold text-[#cedc28] uppercase tracking-[0.08em] whitespace-nowrap">Performance Dashboard</p>
               </div>
             </div>
 
-            {/* CENTER: FILTERS (compact responsive widths, overflow-visible so dropdowns pop over content) */}
-            <div className="px-2 xl:px-4 flex gap-1 xl:gap-1.5 flex-nowrap items-end flex-1 min-w-0 overflow-visible">
-              <DateRangeFilter label="DATE" dateRange={dateRange} onChange={setDateRange} widthClass="w-[105px] xl:w-[120px] 2xl:w-[130px]" />
-              <MultiSelect label="Week" options={uniqueWeeks} selected={filterWeeks} onChange={setFilterWeeks} widthClass="w-[72px] xl:w-[82px] 2xl:w-[88px]" />
-              <MultiSelect label="Portfolio" options={uniquePortfolios} selected={filterPortfolios} onChange={setFilterPortfolios} widthClass="w-[78px] xl:w-[88px] 2xl:w-[96px]" />
+            {/* CENTER: ALL 9 FILTERS */}
+            <div className="px-2 flex gap-1 2xl:gap-1.5 flex-nowrap items-end flex-1 min-w-0 overflow-visible justify-center">
+              <DateRangeFilter label="DATE" dateRange={dateRange} onChange={setDateRange} widthClass="w-[92px] 2xl:w-[110px]" />
+              <MultiSelect label="Week" options={uniqueWeeks} selected={filterWeeks} onChange={setFilterWeeks} widthClass="w-[58px] 2xl:w-[68px]" />
+              <MultiSelect label="Portfolio" options={uniquePortfolios} selected={filterPortfolios} onChange={setFilterPortfolios} widthClass="w-[66px] 2xl:w-[76px]" />
               {/* HERO HIGHLIGHTED EVENT FILTER */}
               <MultiSelect 
                 label="Event" 
@@ -3006,25 +3128,25 @@ export default function App() {
                   }
                 }} 
                 isHero={true} 
-                widthClass="w-[125px] xl:w-[140px] 2xl:w-[160px]" 
+                widthClass="w-[105px] 2xl:w-[125px]" 
               />
-              <MultiSelect label="Event Type" options={uniqueEventTypes} selected={filterEventTypes} onChange={setFilterEventTypes} widthClass="w-[82px] xl:w-[90px] 2xl:w-[100px]" />
-              <MultiSelect label="Funnel Stage" options={uniquePhases} selected={filterPhases} onChange={setFilterPhases} widthClass="w-[84px] xl:w-[92px] 2xl:w-[102px]" />
-              <MultiSelect label="Channel" options={uniqueChannels} selected={filterChannels} onChange={setFilterChannels} widthClass="w-[78px] xl:w-[86px] 2xl:w-[94px]" />
-              <MultiSelect label="Market" options={uniqueMarkets} selected={filterMarkets} onChange={setFilterMarkets} widthClass="w-[94px] xl:w-[106px] 2xl:w-[120px]" alignRight={true} />
+              <MultiSelect label="Event Type" options={uniqueEventTypes} selected={filterEventTypes} onChange={setFilterEventTypes} widthClass="w-[74px] 2xl:w-[82px]" />
+              <MultiSelect label="Funnel Stage" options={uniquePhases} selected={filterPhases} onChange={setFilterPhases} widthClass="w-[78px] 2xl:w-[84px]" />
+              <MultiSelect label="Channel" options={uniqueChannels} selected={filterChannels} onChange={setFilterChannels} widthClass="w-[66px] 2xl:w-[74px]" />
+              <MultiSelect label="Market" options={uniqueMarkets} selected={filterMarkets} onChange={setFilterMarkets} widthClass="w-[72px] 2xl:w-[82px]" alignRight={true} />
               <MultiSelect 
                 label="Business" 
                 options={uniqueBusinesses} 
                 selected={filterBusinesses} 
                 onChange={setFilterBusinesses} 
-                widthClass="w-[74px] xl:w-[82px] 2xl:w-[90px]" 
+                widthClass="w-[68px] 2xl:w-[76px]" 
                 singleSelect={true}
                 alignRight={true}
               />
             </div>
 
-            {/* RIGHT: PINNED ACTIONS (ALWAYS VISIBLE & ACCESSIBLE ACROSS DYNAMIC SCREEN SIZES) */}
-            <div className="pl-3 shrink-0 flex items-center gap-1.5 border-l border-[#cedc28]/15">
+            {/* RIGHT: PINNED ACTIONS (ALWAYS VISIBLE & PROTECTED FROM OVERLAP) */}
+            <div className="pl-3 shrink-0 flex items-center gap-1.5 border-l border-[#cedc28]/15 bg-[#0a2442] relative z-30 shadow-[-16px_0_20px_#0a2442]">
               {featureAllowed('quickJump') && (
                 <button
                   onClick={() => setIsQuickJumpOpen(true)}
@@ -3056,6 +3178,96 @@ export default function App() {
             </div>
           </div>
 
+          {/* MEDIUM DESKTOP / LAPTOP (Screens 1024px to 1279px / lg to xl-1) - 2-tier layout, zero collision */}
+          <div className="hidden lg:flex xl:hidden flex-col gap-2 relative z-10 w-full px-3 py-1">
+            {/* Top Tier: Logo + Primary Scope Filters + Pinned Actions */}
+            <div className="flex items-center justify-between w-full">
+              <div 
+                onClick={() => {
+                  setActiveTab('summary');
+                  if (tvMode) setTvMode(false);
+                }}
+                className="pr-3 flex items-center shrink-0 border-r border-[#cedc28]/15 cursor-pointer hover:opacity-85 transition-opacity"
+                title="Return to Overview"
+              >
+                <div className="flex flex-col items-start gap-0.5">
+                  <img src="/tahaluf-logo.svg" alt="Tahaluf Logo" className="h-6 object-contain" onError={(e) => e.target.style.display = 'none'} />
+                  <p className="text-[7px] font-bold text-[#cedc28] uppercase tracking-[0.08em] whitespace-nowrap">Performance Dashboard</p>
+                </div>
+              </div>
+
+              {/* Core Scope Filters */}
+              <div className="flex items-end gap-2 flex-1 justify-center px-2">
+                <DateRangeFilter label="DATE" dateRange={dateRange} onChange={setDateRange} widthClass="w-[105px]" />
+                <MultiSelect label="Week" options={uniqueWeeks} selected={filterWeeks} onChange={setFilterWeeks} widthClass="w-[65px]" />
+                <MultiSelect label="Portfolio" options={uniquePortfolios} selected={filterPortfolios} onChange={setFilterPortfolios} widthClass="w-[75px]" />
+                <MultiSelect 
+                  label="Event" 
+                  options={uniqueEvents} 
+                  selected={filterEvents} 
+                  onChange={(next) => {
+                    setFilterEvents(next);
+                    if (next.length === 1 && !next.includes('All')) {
+                      setSelectedEvent(next[0]);
+                    } else {
+                      setSelectedEvent(null);
+                    }
+                  }} 
+                  isHero={true} 
+                  widthClass="w-[125px]" 
+                />
+              </div>
+
+              {/* Actions */}
+              <div className="pl-3 shrink-0 flex items-center gap-1.5 border-l border-[#cedc28]/15">
+                {featureAllowed('quickJump') && (
+                  <button
+                    onClick={() => setIsQuickJumpOpen(true)}
+                    title="Search & Quick Jump (Cmd+K)"
+                    className="h-[28px] px-2 bg-white/5 border border-white/15 text-slate-300 rounded-lg hover:bg-white/10 hover:text-white transition-colors flex items-center gap-1.5 text-[10px] font-semibold shrink-0"
+                  >
+                    <Search className="w-3 h-3 text-[#14a6d9]" />
+                  </button>
+                )}
+                {featureAllowed('tv') && (
+                  <button
+                    onClick={() => setTvMode(true)} 
+                    title="TV Wallboard Presentation Mode" 
+                    className="h-[28px] px-2 bg-[#14a6d9]/15 border border-[#14a6d9]/50 text-[#14a6d9] rounded-lg hover:bg-[#14a6d9]/25 hover:text-white transition-colors flex items-center gap-1 text-[10px] font-bold shadow-sm shrink-0"
+                  >
+                    <Tv className="w-3 h-3"/>
+                    <span className="inline font-bold">TV</span>
+                  </button>
+                )}
+                <button 
+                  onClick={resetFilters} 
+                  title="Reset Filters" 
+                  className="h-[28px] w-[28px] bg-[#cedc28]/10 border border-[#cedc28]/50 text-[#cedc28] rounded-lg hover:bg-[#cedc28]/20 hover:text-white transition-colors flex items-center justify-center shrink-0"
+                >
+                  <RefreshCw className="w-3 h-3"/>
+                </button>
+              </div>
+            </div>
+
+            {/* Bottom Tier: Marketing Dimension Filters */}
+            <div className="flex items-center justify-center gap-2 pt-1 border-t border-[#cedc28]/10 bg-[#071a30]/60 rounded-xl py-1 px-3">
+              <span className="text-[8.5px] font-black uppercase text-[#14a6d9] tracking-wider pr-1">Dimensions:</span>
+              <MultiSelect label="Event Type" options={uniqueEventTypes} selected={filterEventTypes} onChange={setFilterEventTypes} widthClass="w-[95px]" />
+              <MultiSelect label="Funnel Stage" options={uniquePhases} selected={filterPhases} onChange={setFilterPhases} widthClass="w-[100px]" />
+              <MultiSelect label="Channel" options={uniqueChannels} selected={filterChannels} onChange={setFilterChannels} widthClass="w-[85px]" />
+              <MultiSelect label="Market" options={uniqueMarkets} selected={filterMarkets} onChange={setFilterMarkets} widthClass="w-[95px]" alignRight={true} />
+              <MultiSelect 
+                label="Business" 
+                options={uniqueBusinesses} 
+                selected={filterBusinesses} 
+                onChange={setFilterBusinesses} 
+                widthClass="w-[85px]" 
+                singleSelect={true}
+                alignRight={true}
+              />
+            </div>
+          </div>
+
           {/* MOBILE / TABLET HEADER (Screens < lg / 1024px) */}
           <div className="lg:hidden flex items-center justify-between px-3 relative z-10 w-full gap-2">
             <div className="flex items-center gap-2 min-w-0">
@@ -3066,7 +3278,14 @@ export default function App() {
               >
                 <Menu className="w-5 h-5" />
               </button>
-              <div className="flex flex-col items-start shrink-0">
+              <div 
+                onClick={() => {
+                  setActiveTab('summary');
+                  if (tvMode) setTvMode(false);
+                }}
+                className="flex flex-col items-start shrink-0 cursor-pointer hover:opacity-85 transition-opacity"
+                title="Return to Overview"
+              >
                 <img src="/tahaluf-logo.svg" alt="Tahaluf Logo" className="h-6 object-contain" onError={(e) => e.target.style.display = 'none'} />
                 <p className="text-[7.5px] font-bold text-[#cedc28] uppercase tracking-[0.08em]">Dashboard</p>
               </div>
@@ -3134,7 +3353,15 @@ export default function App() {
           />
           <div className="relative z-10 w-72 max-w-[85vw] h-full bg-[#0a2442] border-r border-[#cedc28]/30 shadow-2xl flex flex-col p-5 overflow-y-auto custom-scrollbar animate-in slide-in-from-left duration-300">
             <div className="flex items-center justify-between pb-4 border-b border-[#cedc28]/20 mb-4">
-              <div className="flex flex-col items-start gap-0.5">
+              <div 
+                onClick={() => {
+                  setActiveTab('summary');
+                  setMobileMenuOpen(false);
+                  if (tvMode) setTvMode(false);
+                }}
+                className="flex flex-col items-start gap-0.5 cursor-pointer hover:opacity-85 transition-opacity"
+                title="Return to Overview"
+              >
                 <img src="/tahaluf-logo.svg" alt="Tahaluf Logo" className="h-7 object-contain" />
                 <p className="text-[8px] font-bold text-[#cedc28] uppercase tracking-[0.08em]">Performance Dashboard</p>
               </div>
@@ -3181,7 +3408,7 @@ export default function App() {
             </div>
 
             <div className="mt-auto pt-4 border-t border-[#cedc28]/20 flex flex-col gap-3">
-              {userRole === 'admin' && (
+              {isAdminRole && (
                 <div className="flex flex-col gap-1.5">
                   <button 
                     onClick={() => {
@@ -3360,7 +3587,7 @@ export default function App() {
             <div className="flex-1 min-h-[50px] mt-4"></div>
             
             <div className="flex flex-col gap-2 px-6 pb-6 mt-auto z-30">
-              {userRole === 'admin' && (
+              {isAdminRole && (
                 <div className="flex flex-col gap-1.5 px-3 mb-1">
                   <button 
                     onClick={() => setActiveTab('admin')}
@@ -3406,7 +3633,7 @@ export default function App() {
               </div>
             </div>
             {lastUpdated && (
-              <div className={`px-6 pb-6 text-[9px] font-bold text-[#14a6d9] uppercase tracking-wider opacity-60 text-left ${userRole === 'admin' ? 'mt-0' : 'mt-auto'}`}>
+              <div className={`px-6 pb-6 text-[9px] font-bold text-[#14a6d9] uppercase tracking-wider opacity-60 text-left ${isAdminRole ? 'mt-0' : 'mt-auto'}`}>
                 Data up to: {lastUpdated.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
               </div>
             )}
@@ -3414,11 +3641,14 @@ export default function App() {
         )}
         
         {/* TABS CONTENT */}
-        {(adminVisited || activeTab === 'admin') && userRole === 'admin' && (
+        {(adminVisited || activeTab === 'admin') && isAdminRole && (
           <div className="min-w-0 flex-1 flex overflow-hidden" style={{ display: activeTab === 'admin' ? undefined : 'none' }}>
           <AdminView 
             active={activeTab === 'admin'}
             currentUserEmail={userEmail || (auth?.currentUser?.email) || 'admin@tahaluf.com'} 
+            userRole={userRole}
+            featureConfig={featureConfig}
+            isFeatureAllowed={featureAllowed}
             initialEvents={eventsConfiguration}
             onFeaturesSaved={setFeatureConfig}
             onEventsSaved={setEventsConfiguration}
@@ -3450,7 +3680,7 @@ export default function App() {
           />
           </div>
         )}
-        {!(activeTab === 'admin' && userRole === 'admin') && (
+        {!(activeTab === 'admin' && isAdminRole) && (
         <main className="flex-1 overflow-y-auto p-3 sm:p-5 md:p-6 lg:p-8 pb-24 lg:pb-8 custom-scrollbar touch-scroll relative z-10">
           <ReactTooltip id="market-tooltip" className="z-50" style={{ backgroundColor: '#0a2442', color: '#eef7f5', border: '1px solid #cedc2830', borderRadius: '8px', zIndex: 1000 }} />
           <div className="absolute top-0 right-0 w-full h-[500px] bg-gradient-to-br from-[#062f2e]/20 via-transparent to-transparent pointer-events-none -z-10"></div>

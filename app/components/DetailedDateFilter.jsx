@@ -234,18 +234,18 @@ export default function DetailedDateFilter({
   ];
 
   return (
-    <div ref={wrapperRef} className={`relative ${widthClass || 'w-[108px] xl:w-[116px]'} shrink-0 z-40`}>
-      <span className="text-[10px] font-bold text-[#14a6d9] uppercase tracking-widest mb-1 flex items-center justify-between">
-        <span>{label}</span>
+    <div ref={wrapperRef} className={`relative ${widthClass || 'w-[72px] xl:w-[88px] 2xl:w-[110px]'} shrink-0 ${isOpen ? 'z-50' : 'z-20'}`}>
+      <span className="text-[8.5px] xl:text-[9.5px] font-bold text-[#14a6d9] uppercase tracking-wider mb-1 flex items-center justify-between whitespace-nowrap overflow-hidden text-ellipsis">
+        <span className="truncate">{label}</span>
         {isActiveFilter && (
-          <span className="w-1.5 h-1.5 rounded-full bg-[#cedc28] animate-pulse"></span>
+          <span className="w-1.5 h-1.5 rounded-full bg-[#cedc28] animate-pulse shrink-0 ml-0.5"></span>
         )}
       </span>
 
       {/* TRIGGER BUTTON: Compact, matching MultiSelect height */}
       <div 
         onClick={() => setIsOpen(!isOpen)}
-        className={`px-2 py-1.5 surface-inset border rounded-lg text-[10px] font-bold cursor-pointer flex justify-between items-center transition-all ${
+        className={`px-1.5 xl:px-2 py-1 xl:py-1.5 surface-inset border rounded-lg text-[9px] xl:text-[10px] font-bold cursor-pointer flex justify-between items-center transition-all ${
           isOpen 
             ? 'border-[#cedc28] ring-1 ring-[#cedc28]/30 bg-[#0a2442]' 
             : isActiveFilter 
@@ -254,11 +254,11 @@ export default function DetailedDateFilter({
         }`}
         title="Open Date Range Selector"
       >
-        <div className="flex items-center gap-1 truncate pr-1">
+        <div className="flex items-center gap-1 truncate pr-0.5">
           <Calendar className={`w-3 h-3 flex-shrink-0 ${isActiveFilter ? 'text-[#cedc28]' : 'text-[#14a6d9]'}`} />
-          <span className="truncate text-[10px] xl:text-[10.5px]">{formatButtonLabel()}</span>
+          <span className="truncate">{formatButtonLabel()}</span>
         </div>
-        <ChevronDown className={`w-3.5 h-3.5 flex-shrink-0 text-gray-400 transition-transform ${isOpen ? 'rotate-180 text-[#cedc28]' : ''}`} />
+        <ChevronDown className={`w-3 h-3 flex-shrink-0 text-gray-400 transition-transform ${isOpen ? 'rotate-180 text-[#cedc28]' : ''}`} />
       </div>
 
       {/* FLOATING DROPDOWN: Uses w-0 h-0 anchor so it NEVER pulls or shifts dashboard layout */}

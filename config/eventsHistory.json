@@ -1,14 +1,14 @@
 [
   {
-    "versionId": "v1.0.205",
-    "timestamp": "2026-10-28T20:39:54.533Z",
+    "versionId": "v1.0.306",
+    "timestamp": "2026-10-29T05:36:20.682Z",
     "author": "Automated Test Cleanup",
     "action": "EDIT_EVENT",
     "description": "Test cleanup: restore verified baseline configuration",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.205",
-      "lastUpdated": "2026-10-28T20:39:54.533Z",
+      "version": "v1.0.306",
+      "lastUpdated": "2026-10-29T05:36:20.682Z",
       "updatedBy": "Automated Test Cleanup",
       "events": [
         {
@@ -262,15 +262,15 @@
     }
   },
   {
-    "versionId": "v1.0.204",
-    "timestamp": "2026-10-28T20:39:52.996Z",
+    "versionId": "v1.0.305",
+    "timestamp": "2026-10-29T05:36:20.676Z",
     "author": "recovery-admin@tahaluf.com",
     "action": "REVERT",
-    "description": "Reverted to version v1.0.202 (\"Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active\")",
+    "description": "Reverted to version v1.0.303 (\"Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active\")",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.204",
-      "lastUpdated": "2026-10-28T20:39:52.996Z",
+      "version": "v1.0.305",
+      "lastUpdated": "2026-10-29T05:36:20.676Z",
       "updatedBy": "recovery-admin@tahaluf.com",
       "events": [
         {
@@ -521,19 +521,19 @@
           "business": "B2B"
         }
       ],
-      "revertedFrom": "v1.0.202"
+      "revertedFrom": "v1.0.303"
     }
   },
   {
-    "versionId": "v1.0.203",
-    "timestamp": "2026-10-28T20:39:51.440Z",
+    "versionId": "v1.0.304",
+    "timestamp": "2026-10-29T05:36:20.664Z",
     "author": "admin@tahaluf.com",
     "action": "STATUS_CHANGE",
     "description": "Changed status of event \"smlc-26\" to Admin Only (Testing)",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.203",
-      "lastUpdated": "2026-10-28T20:39:51.440Z",
+      "version": "v1.0.304",
+      "lastUpdated": "2026-10-29T05:36:20.664Z",
       "updatedBy": "admin@tahaluf.com",
       "events": [
         {
@@ -787,15 +787,15 @@
     }
   },
   {
-    "versionId": "v1.0.202",
-    "timestamp": "2026-10-28T20:39:49.603Z",
+    "versionId": "v1.0.303",
+    "timestamp": "2026-10-29T05:36:20.650Z",
     "author": "Automated Test",
     "action": "PROMOTE_LIVE",
     "description": "Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.202",
-      "lastUpdated": "2026-10-28T20:39:49.603Z",
+      "version": "v1.0.303",
+      "lastUpdated": "2026-10-29T05:36:20.650Z",
       "updatedBy": "Automated Test",
       "events": [
         {
@@ -1049,15 +1049,15 @@
     }
   },
   {
-    "versionId": "v1.0.201",
-    "timestamp": "2026-10-28T20:39:47.752Z",
+    "versionId": "v1.0.302",
+    "timestamp": "2026-10-29T05:36:20.596Z",
     "author": "Automated Test",
     "action": "TOGGLE",
     "description": "Enabled event \"gsts-26\"",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.201",
-      "lastUpdated": "2026-10-28T20:39:47.752Z",
+      "version": "v1.0.302",
+      "lastUpdated": "2026-10-29T05:36:20.596Z",
       "updatedBy": "Automated Test",
       "events": [
         {
@@ -1311,15 +1311,15 @@
     }
   },
   {
-    "versionId": "v1.0.200",
-    "timestamp": "2026-10-28T20:10:49.808Z",
+    "versionId": "v1.0.301",
+    "timestamp": "2026-10-29T05:33:43.691Z",
     "author": "Automated Test Cleanup",
     "action": "EDIT_EVENT",
     "description": "Test cleanup: restore verified baseline configuration",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.200",
-      "lastUpdated": "2026-10-28T20:10:49.808Z",
+      "version": "v1.0.301",
+      "lastUpdated": "2026-10-29T05:33:43.691Z",
       "updatedBy": "Automated Test Cleanup",
       "events": [
         {
@@ -1573,15 +1573,15 @@
     }
   },
   {
-    "versionId": "v1.0.199",
-    "timestamp": "2026-10-28T20:10:48.222Z",
+    "versionId": "v1.0.300",
+    "timestamp": "2026-10-29T05:33:43.686Z",
     "author": "recovery-admin@tahaluf.com",
     "action": "REVERT",
-    "description": "Reverted to version v1.0.197 (\"Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active\")",
+    "description": "Reverted to version v1.0.298 (\"Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active\")",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.199",
-      "lastUpdated": "2026-10-28T20:10:48.222Z",
+      "version": "v1.0.300",
+      "lastUpdated": "2026-10-29T05:33:43.686Z",
       "updatedBy": "recovery-admin@tahaluf.com",
       "events": [
         {
@@ -1832,19 +1832,19 @@
           "business": "B2B"
         }
       ],
-      "revertedFrom": "v1.0.197"
+      "revertedFrom": "v1.0.298"
     }
   },
   {
-    "versionId": "v1.0.198",
-    "timestamp": "2026-10-28T20:10:46.272Z",
+    "versionId": "v1.0.299",
+    "timestamp": "2026-10-29T05:33:43.677Z",
     "author": "admin@tahaluf.com",
     "action": "STATUS_CHANGE",
     "description": "Changed status of event \"smlc-26\" to Admin Only (Testing)",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.198",
-      "lastUpdated": "2026-10-28T20:10:46.272Z",
+      "version": "v1.0.299",
+      "lastUpdated": "2026-10-29T05:33:43.677Z",
       "updatedBy": "admin@tahaluf.com",
       "events": [
         {
@@ -2098,15 +2098,15 @@
     }
   },
   {
-    "versionId": "v1.0.197",
-    "timestamp": "2026-10-28T20:10:44.693Z",
+    "versionId": "v1.0.298",
+    "timestamp": "2026-10-29T05:33:43.665Z",
     "author": "Automated Test",
     "action": "PROMOTE_LIVE",
     "description": "Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.197",
-      "lastUpdated": "2026-10-28T20:10:44.693Z",
+      "version": "v1.0.298",
+      "lastUpdated": "2026-10-29T05:33:43.665Z",
       "updatedBy": "Automated Test",
       "events": [
         {
@@ -2360,15 +2360,15 @@
     }
   },
   {
-    "versionId": "v1.0.196",
-    "timestamp": "2026-10-28T20:10:42.896Z",
+    "versionId": "v1.0.297",
+    "timestamp": "2026-10-29T05:33:43.562Z",
     "author": "Automated Test",
     "action": "TOGGLE",
     "description": "Enabled event \"gsts-26\"",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.196",
-      "lastUpdated": "2026-10-28T20:10:42.896Z",
+      "version": "v1.0.297",
+      "lastUpdated": "2026-10-29T05:33:43.562Z",
       "updatedBy": "Automated Test",
       "events": [
         {
@@ -2622,15 +2622,15 @@
     }
   },
   {
-    "versionId": "v1.0.195",
-    "timestamp": "2026-10-28T19:06:54.512Z",
+    "versionId": "v1.0.296",
+    "timestamp": "2026-10-29T05:29:56.804Z",
     "author": "Automated Test Cleanup",
     "action": "EDIT_EVENT",
     "description": "Test cleanup: restore verified baseline configuration",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.195",
-      "lastUpdated": "2026-10-28T19:06:54.512Z",
+      "version": "v1.0.296",
+      "lastUpdated": "2026-10-29T05:29:56.804Z",
       "updatedBy": "Automated Test Cleanup",
       "events": [
         {
@@ -2884,15 +2884,15 @@
     }
   },
   {
-    "versionId": "v1.0.194",
-    "timestamp": "2026-10-28T19:06:53.017Z",
+    "versionId": "v1.0.295",
+    "timestamp": "2026-10-29T05:29:56.798Z",
     "author": "recovery-admin@tahaluf.com",
     "action": "REVERT",
-    "description": "Reverted to version v1.0.192 (\"Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active\")",
+    "description": "Reverted to version v1.0.293 (\"Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active\")",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.194",
-      "lastUpdated": "2026-10-28T19:06:53.017Z",
+      "version": "v1.0.295",
+      "lastUpdated": "2026-10-29T05:29:56.798Z",
       "updatedBy": "recovery-admin@tahaluf.com",
       "events": [
         {
@@ -3143,19 +3143,19 @@
           "business": "B2B"
         }
       ],
-      "revertedFrom": "v1.0.192"
+      "revertedFrom": "v1.0.293"
     }
   },
   {
-    "versionId": "v1.0.193",
-    "timestamp": "2026-10-28T19:06:51.345Z",
+    "versionId": "v1.0.294",
+    "timestamp": "2026-10-29T05:29:56.791Z",
     "author": "admin@tahaluf.com",
     "action": "STATUS_CHANGE",
     "description": "Changed status of event \"smlc-26\" to Admin Only (Testing)",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.193",
-      "lastUpdated": "2026-10-28T19:06:51.345Z",
+      "version": "v1.0.294",
+      "lastUpdated": "2026-10-29T05:29:56.791Z",
       "updatedBy": "admin@tahaluf.com",
       "events": [
         {
@@ -3409,15 +3409,15 @@
     }
   },
   {
-    "versionId": "v1.0.192",
-    "timestamp": "2026-10-28T19:06:49.839Z",
+    "versionId": "v1.0.293",
+    "timestamp": "2026-10-29T05:29:56.779Z",
     "author": "Automated Test",
     "action": "PROMOTE_LIVE",
     "description": "Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.192",
-      "lastUpdated": "2026-10-28T19:06:49.839Z",
+      "version": "v1.0.293",
+      "lastUpdated": "2026-10-29T05:29:56.779Z",
       "updatedBy": "Automated Test",
       "events": [
         {
@@ -3671,15 +3671,15 @@
     }
   },
   {
-    "versionId": "v1.0.191",
-    "timestamp": "2026-10-28T19:06:48.034Z",
+    "versionId": "v1.0.292",
+    "timestamp": "2026-10-29T05:29:56.725Z",
     "author": "Automated Test",
     "action": "TOGGLE",
     "description": "Enabled event \"gsts-26\"",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.191",
-      "lastUpdated": "2026-10-28T19:06:48.034Z",
+      "version": "v1.0.292",
+      "lastUpdated": "2026-10-29T05:29:56.725Z",
       "updatedBy": "Automated Test",
       "events": [
         {
@@ -3933,15 +3933,15 @@
     }
   },
   {
-    "versionId": "v1.0.190",
-    "timestamp": "2026-10-28T19:05:11.596Z",
+    "versionId": "v1.0.291",
+    "timestamp": "2026-10-29T05:28:33.190Z",
     "author": "Automated Test Cleanup",
     "action": "EDIT_EVENT",
     "description": "Test cleanup: restore verified baseline configuration",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.190",
-      "lastUpdated": "2026-10-28T19:05:11.596Z",
+      "version": "v1.0.291",
+      "lastUpdated": "2026-10-29T05:28:33.190Z",
       "updatedBy": "Automated Test Cleanup",
       "events": [
         {
@@ -4195,15 +4195,15 @@
     }
   },
   {
-    "versionId": "v1.0.189",
-    "timestamp": "2026-10-28T19:05:09.947Z",
+    "versionId": "v1.0.290",
+    "timestamp": "2026-10-29T05:28:33.184Z",
     "author": "recovery-admin@tahaluf.com",
     "action": "REVERT",
-    "description": "Reverted to version v1.0.187 (\"Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active\")",
+    "description": "Reverted to version v1.0.288 (\"Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active\")",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.189",
-      "lastUpdated": "2026-10-28T19:05:09.947Z",
+      "version": "v1.0.290",
+      "lastUpdated": "2026-10-29T05:28:33.184Z",
       "updatedBy": "recovery-admin@tahaluf.com",
       "events": [
         {
@@ -4454,19 +4454,19 @@
           "business": "B2B"
         }
       ],
-      "revertedFrom": "v1.0.187"
+      "revertedFrom": "v1.0.288"
     }
   },
   {
-    "versionId": "v1.0.188",
-    "timestamp": "2026-10-28T19:05:08.288Z",
+    "versionId": "v1.0.289",
+    "timestamp": "2026-10-29T05:28:33.176Z",
     "author": "admin@tahaluf.com",
     "action": "STATUS_CHANGE",
     "description": "Changed status of event \"smlc-26\" to Admin Only (Testing)",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.188",
-      "lastUpdated": "2026-10-28T19:05:08.288Z",
+      "version": "v1.0.289",
+      "lastUpdated": "2026-10-29T05:28:33.176Z",
       "updatedBy": "admin@tahaluf.com",
       "events": [
         {
@@ -4720,15 +4720,15 @@
     }
   },
   {
-    "versionId": "v1.0.187",
-    "timestamp": "2026-10-28T19:05:06.817Z",
+    "versionId": "v1.0.288",
+    "timestamp": "2026-10-29T05:28:33.170Z",
     "author": "Automated Test",
     "action": "PROMOTE_LIVE",
     "description": "Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.187",
-      "lastUpdated": "2026-10-28T19:05:06.817Z",
+      "version": "v1.0.288",
+      "lastUpdated": "2026-10-29T05:28:33.170Z",
       "updatedBy": "Automated Test",
       "events": [
         {
@@ -4982,15 +4982,15 @@
     }
   },
   {
-    "versionId": "v1.0.186",
-    "timestamp": "2026-10-28T19:05:04.936Z",
+    "versionId": "v1.0.287",
+    "timestamp": "2026-10-29T05:28:33.116Z",
     "author": "Automated Test",
     "action": "TOGGLE",
     "description": "Enabled event \"gsts-26\"",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.186",
-      "lastUpdated": "2026-10-28T19:05:04.936Z",
+      "version": "v1.0.287",
+      "lastUpdated": "2026-10-29T05:28:33.116Z",
       "updatedBy": "Automated Test",
       "events": [
         {
@@ -5244,15 +5244,15 @@
     }
   },
   {
-    "versionId": "v1.0.185",
-    "timestamp": "2026-10-28T18:42:32.767Z",
+    "versionId": "v1.0.286",
+    "timestamp": "2026-10-29T05:27:03.737Z",
     "author": "Automated Test Cleanup",
     "action": "EDIT_EVENT",
     "description": "Test cleanup: restore verified baseline configuration",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.185",
-      "lastUpdated": "2026-10-28T18:42:32.767Z",
+      "version": "v1.0.286",
+      "lastUpdated": "2026-10-29T05:27:03.737Z",
       "updatedBy": "Automated Test Cleanup",
       "events": [
         {
@@ -5506,15 +5506,15 @@
     }
   },
   {
-    "versionId": "v1.0.184",
-    "timestamp": "2026-10-28T18:42:30.530Z",
+    "versionId": "v1.0.285",
+    "timestamp": "2026-10-29T05:27:03.727Z",
     "author": "recovery-admin@tahaluf.com",
     "action": "REVERT",
-    "description": "Reverted to version v1.0.182 (\"Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active\")",
+    "description": "Reverted to version v1.0.283 (\"Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active\")",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.184",
-      "lastUpdated": "2026-10-28T18:42:30.530Z",
+      "version": "v1.0.285",
+      "lastUpdated": "2026-10-29T05:27:03.727Z",
       "updatedBy": "recovery-admin@tahaluf.com",
       "events": [
         {
@@ -5765,19 +5765,19 @@
           "business": "B2B"
         }
       ],
-      "revertedFrom": "v1.0.182"
+      "revertedFrom": "v1.0.283"
     }
   },
   {
-    "versionId": "v1.0.183",
-    "timestamp": "2026-10-28T18:42:20.474Z",
+    "versionId": "v1.0.284",
+    "timestamp": "2026-10-29T05:27:03.721Z",
     "author": "admin@tahaluf.com",
     "action": "STATUS_CHANGE",
     "description": "Changed status of event \"smlc-26\" to Admin Only (Testing)",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.183",
-      "lastUpdated": "2026-10-28T18:42:20.474Z",
+      "version": "v1.0.284",
+      "lastUpdated": "2026-10-29T05:27:03.721Z",
       "updatedBy": "admin@tahaluf.com",
       "events": [
         {
@@ -6031,15 +6031,15 @@
     }
   },
   {
-    "versionId": "v1.0.182",
-    "timestamp": "2026-10-28T18:42:12.004Z",
+    "versionId": "v1.0.283",
+    "timestamp": "2026-10-29T05:27:03.713Z",
     "author": "Automated Test",
     "action": "PROMOTE_LIVE",
     "description": "Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.182",
-      "lastUpdated": "2026-10-28T18:42:12.004Z",
+      "version": "v1.0.283",
+      "lastUpdated": "2026-10-29T05:27:03.713Z",
       "updatedBy": "Automated Test",
       "events": [
         {
@@ -6293,15 +6293,15 @@
     }
   },
   {
-    "versionId": "v1.0.181",
-    "timestamp": "2026-10-28T18:42:10.005Z",
+    "versionId": "v1.0.282",
+    "timestamp": "2026-10-29T05:27:03.648Z",
     "author": "Automated Test",
     "action": "TOGGLE",
     "description": "Enabled event \"gsts-26\"",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.181",
-      "lastUpdated": "2026-10-28T18:42:10.005Z",
+      "version": "v1.0.282",
+      "lastUpdated": "2026-10-29T05:27:03.648Z",
       "updatedBy": "Automated Test",
       "events": [
         {
@@ -6555,15 +6555,15 @@
     }
   },
   {
-    "versionId": "v1.0.180",
-    "timestamp": "2026-10-28T17:33:25.170Z",
+    "versionId": "v1.0.281",
+    "timestamp": "2026-10-29T05:23:24.826Z",
     "author": "Automated Test Cleanup",
     "action": "EDIT_EVENT",
     "description": "Test cleanup: restore verified baseline configuration",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.180",
-      "lastUpdated": "2026-10-28T17:33:25.170Z",
+      "version": "v1.0.281",
+      "lastUpdated": "2026-10-29T05:23:24.826Z",
       "updatedBy": "Automated Test Cleanup",
       "events": [
         {
@@ -6817,15 +6817,15 @@
     }
   },
   {
-    "versionId": "v1.0.179",
-    "timestamp": "2026-10-28T17:33:23.599Z",
+    "versionId": "v1.0.280",
+    "timestamp": "2026-10-29T05:23:24.812Z",
     "author": "recovery-admin@tahaluf.com",
     "action": "REVERT",
-    "description": "Reverted to version v1.0.177 (\"Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active\")",
+    "description": "Reverted to version v1.0.278 (\"Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active\")",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.179",
-      "lastUpdated": "2026-10-28T17:33:23.599Z",
+      "version": "v1.0.280",
+      "lastUpdated": "2026-10-29T05:23:24.812Z",
       "updatedBy": "recovery-admin@tahaluf.com",
       "events": [
         {
@@ -7076,19 +7076,19 @@
           "business": "B2B"
         }
       ],
-      "revertedFrom": "v1.0.177"
+      "revertedFrom": "v1.0.278"
     }
   },
   {
-    "versionId": "v1.0.178",
-    "timestamp": "2026-10-28T17:33:21.984Z",
+    "versionId": "v1.0.279",
+    "timestamp": "2026-10-29T05:23:24.799Z",
     "author": "admin@tahaluf.com",
     "action": "STATUS_CHANGE",
     "description": "Changed status of event \"smlc-26\" to Admin Only (Testing)",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.178",
-      "lastUpdated": "2026-10-28T17:33:21.984Z",
+      "version": "v1.0.279",
+      "lastUpdated": "2026-10-29T05:23:24.799Z",
       "updatedBy": "admin@tahaluf.com",
       "events": [
         {
@@ -7342,15 +7342,15 @@
     }
   },
   {
-    "versionId": "v1.0.177",
-    "timestamp": "2026-10-28T17:33:20.364Z",
+    "versionId": "v1.0.278",
+    "timestamp": "2026-10-29T05:23:24.786Z",
     "author": "Automated Test",
     "action": "PROMOTE_LIVE",
     "description": "Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.177",
-      "lastUpdated": "2026-10-28T17:33:20.364Z",
+      "version": "v1.0.278",
+      "lastUpdated": "2026-10-29T05:23:24.786Z",
       "updatedBy": "Automated Test",
       "events": [
         {
@@ -7604,15 +7604,15 @@
     }
   },
   {
-    "versionId": "v1.0.176",
-    "timestamp": "2026-10-28T17:33:18.494Z",
+    "versionId": "v1.0.277",
+    "timestamp": "2026-10-29T05:23:24.705Z",
     "author": "Automated Test",
     "action": "TOGGLE",
     "description": "Enabled event \"gsts-26\"",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.176",
-      "lastUpdated": "2026-10-28T17:33:18.494Z",
+      "version": "v1.0.277",
+      "lastUpdated": "2026-10-29T05:23:24.705Z",
       "updatedBy": "Automated Test",
       "events": [
         {
@@ -7866,15 +7866,15 @@
     }
   },
   {
-    "versionId": "v1.0.175",
-    "timestamp": "2026-10-28T17:13:32.282Z",
+    "versionId": "v1.0.276",
+    "timestamp": "2026-10-29T04:46:26.632Z",
     "author": "Automated Test Cleanup",
     "action": "EDIT_EVENT",
     "description": "Test cleanup: restore verified baseline configuration",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.175",
-      "lastUpdated": "2026-10-28T17:13:32.282Z",
+      "version": "v1.0.276",
+      "lastUpdated": "2026-10-29T04:46:26.632Z",
       "updatedBy": "Automated Test Cleanup",
       "events": [
         {
@@ -8128,15 +8128,15 @@
     }
   },
   {
-    "versionId": "v1.0.174",
-    "timestamp": "2026-10-28T17:13:30.683Z",
+    "versionId": "v1.0.275",
+    "timestamp": "2026-10-29T04:46:26.623Z",
     "author": "recovery-admin@tahaluf.com",
     "action": "REVERT",
-    "description": "Reverted to version v1.0.172 (\"Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active\")",
+    "description": "Reverted to version v1.0.273 (\"Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active\")",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.174",
-      "lastUpdated": "2026-10-28T17:13:30.683Z",
+      "version": "v1.0.275",
+      "lastUpdated": "2026-10-29T04:46:26.623Z",
       "updatedBy": "recovery-admin@tahaluf.com",
       "events": [
         {
@@ -8387,19 +8387,19 @@
           "business": "B2B"
         }
       ],
-      "revertedFrom": "v1.0.172"
+      "revertedFrom": "v1.0.273"
     }
   },
   {
-    "versionId": "v1.0.173",
-    "timestamp": "2026-10-28T17:13:28.619Z",
+    "versionId": "v1.0.274",
+    "timestamp": "2026-10-29T04:46:26.615Z",
     "author": "admin@tahaluf.com",
     "action": "STATUS_CHANGE",
     "description": "Changed status of event \"smlc-26\" to Admin Only (Testing)",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.173",
-      "lastUpdated": "2026-10-28T17:13:28.619Z",
+      "version": "v1.0.274",
+      "lastUpdated": "2026-10-29T04:46:26.615Z",
       "updatedBy": "admin@tahaluf.com",
       "events": [
         {
@@ -8653,15 +8653,15 @@
     }
   },
   {
-    "versionId": "v1.0.172",
-    "timestamp": "2026-10-28T17:13:26.873Z",
+    "versionId": "v1.0.273",
+    "timestamp": "2026-10-29T04:46:26.605Z",
     "author": "Automated Test",
     "action": "PROMOTE_LIVE",
     "description": "Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.172",
-      "lastUpdated": "2026-10-28T17:13:26.873Z",
+      "version": "v1.0.273",
+      "lastUpdated": "2026-10-29T04:46:26.605Z",
       "updatedBy": "Automated Test",
       "events": [
         {
@@ -8915,15 +8915,15 @@
     }
   },
   {
-    "versionId": "v1.0.171",
-    "timestamp": "2026-10-28T17:13:24.571Z",
+    "versionId": "v1.0.272",
+    "timestamp": "2026-10-29T04:46:26.541Z",
     "author": "Automated Test",
     "action": "TOGGLE",
     "description": "Enabled event \"gsts-26\"",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.171",
-      "lastUpdated": "2026-10-28T17:13:24.571Z",
+      "version": "v1.0.272",
+      "lastUpdated": "2026-10-29T04:46:26.541Z",
       "updatedBy": "Automated Test",
       "events": [
         {
@@ -9177,15 +9177,15 @@
     }
   },
   {
-    "versionId": "v1.0.170",
-    "timestamp": "2026-10-28T17:12:03.518Z",
+    "versionId": "v1.0.271",
+    "timestamp": "2026-10-29T04:45:24.205Z",
     "author": "Automated Test Cleanup",
     "action": "EDIT_EVENT",
     "description": "Test cleanup: restore verified baseline configuration",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.170",
-      "lastUpdated": "2026-10-28T17:12:03.518Z",
+      "version": "v1.0.271",
+      "lastUpdated": "2026-10-29T04:45:24.205Z",
       "updatedBy": "Automated Test Cleanup",
       "events": [
         {
@@ -9439,15 +9439,15 @@
     }
   },
   {
-    "versionId": "v1.0.169",
-    "timestamp": "2026-10-28T17:12:01.910Z",
+    "versionId": "v1.0.270",
+    "timestamp": "2026-10-29T04:45:24.199Z",
     "author": "recovery-admin@tahaluf.com",
     "action": "REVERT",
-    "description": "Reverted to version v1.0.167 (\"Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active\")",
+    "description": "Reverted to version v1.0.268 (\"Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active\")",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.169",
-      "lastUpdated": "2026-10-28T17:12:01.910Z",
+      "version": "v1.0.270",
+      "lastUpdated": "2026-10-29T04:45:24.199Z",
       "updatedBy": "recovery-admin@tahaluf.com",
       "events": [
         {
@@ -9698,19 +9698,19 @@
           "business": "B2B"
         }
       ],
-      "revertedFrom": "v1.0.167"
+      "revertedFrom": "v1.0.268"
     }
   },
   {
-    "versionId": "v1.0.168",
-    "timestamp": "2026-10-28T17:12:00.095Z",
+    "versionId": "v1.0.269",
+    "timestamp": "2026-10-29T04:45:24.191Z",
     "author": "admin@tahaluf.com",
     "action": "STATUS_CHANGE",
     "description": "Changed status of event \"smlc-26\" to Admin Only (Testing)",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.168",
-      "lastUpdated": "2026-10-28T17:12:00.095Z",
+      "version": "v1.0.269",
+      "lastUpdated": "2026-10-29T04:45:24.191Z",
       "updatedBy": "admin@tahaluf.com",
       "events": [
         {
@@ -9964,15 +9964,15 @@
     }
   },
   {
-    "versionId": "v1.0.167",
-    "timestamp": "2026-10-28T17:11:58.578Z",
+    "versionId": "v1.0.268",
+    "timestamp": "2026-10-29T04:45:24.184Z",
     "author": "Automated Test",
     "action": "PROMOTE_LIVE",
     "description": "Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.167",
-      "lastUpdated": "2026-10-28T17:11:58.578Z",
+      "version": "v1.0.268",
+      "lastUpdated": "2026-10-29T04:45:24.184Z",
       "updatedBy": "Automated Test",
       "events": [
         {
@@ -10226,15 +10226,15 @@
     }
   },
   {
-    "versionId": "v1.0.166",
-    "timestamp": "2026-10-28T17:11:56.632Z",
+    "versionId": "v1.0.267",
+    "timestamp": "2026-10-29T04:45:24.128Z",
     "author": "Automated Test",
     "action": "TOGGLE",
     "description": "Enabled event \"gsts-26\"",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.166",
-      "lastUpdated": "2026-10-28T17:11:56.632Z",
+      "version": "v1.0.267",
+      "lastUpdated": "2026-10-29T04:45:24.128Z",
       "updatedBy": "Automated Test",
       "events": [
         {
@@ -10488,15 +10488,15 @@
     }
   },
   {
-    "versionId": "v1.0.165",
-    "timestamp": "2026-10-28T16:31:15.106Z",
+    "versionId": "v1.0.266",
+    "timestamp": "2026-10-29T04:38:48.707Z",
     "author": "Automated Test Cleanup",
     "action": "EDIT_EVENT",
     "description": "Test cleanup: restore verified baseline configuration",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.165",
-      "lastUpdated": "2026-10-28T16:31:15.106Z",
+      "version": "v1.0.266",
+      "lastUpdated": "2026-10-29T04:38:48.707Z",
       "updatedBy": "Automated Test Cleanup",
       "events": [
         {
@@ -10750,15 +10750,15 @@
     }
   },
   {
-    "versionId": "v1.0.164",
-    "timestamp": "2026-10-28T16:31:13.246Z",
+    "versionId": "v1.0.265",
+    "timestamp": "2026-10-29T04:38:48.700Z",
     "author": "recovery-admin@tahaluf.com",
     "action": "REVERT",
-    "description": "Reverted to version v1.0.162 (\"Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active\")",
+    "description": "Reverted to version v1.0.263 (\"Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active\")",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.164",
-      "lastUpdated": "2026-10-28T16:31:13.246Z",
+      "version": "v1.0.265",
+      "lastUpdated": "2026-10-29T04:38:48.700Z",
       "updatedBy": "recovery-admin@tahaluf.com",
       "events": [
         {
@@ -11009,19 +11009,19 @@
           "business": "B2B"
         }
       ],
-      "revertedFrom": "v1.0.162"
+      "revertedFrom": "v1.0.263"
     }
   },
   {
-    "versionId": "v1.0.163",
-    "timestamp": "2026-10-28T16:31:10.927Z",
+    "versionId": "v1.0.264",
+    "timestamp": "2026-10-29T04:38:48.693Z",
     "author": "admin@tahaluf.com",
     "action": "STATUS_CHANGE",
     "description": "Changed status of event \"smlc-26\" to Admin Only (Testing)",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.163",
-      "lastUpdated": "2026-10-28T16:31:10.927Z",
+      "version": "v1.0.264",
+      "lastUpdated": "2026-10-29T04:38:48.693Z",
       "updatedBy": "admin@tahaluf.com",
       "events": [
         {
@@ -11275,15 +11275,15 @@
     }
   },
   {
-    "versionId": "v1.0.162",
-    "timestamp": "2026-10-28T16:31:09.210Z",
+    "versionId": "v1.0.263",
+    "timestamp": "2026-10-29T04:38:48.687Z",
     "author": "Automated Test",
     "action": "PROMOTE_LIVE",
     "description": "Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.162",
-      "lastUpdated": "2026-10-28T16:31:09.210Z",
+      "version": "v1.0.263",
+      "lastUpdated": "2026-10-29T04:38:48.687Z",
       "updatedBy": "Automated Test",
       "events": [
         {
@@ -11537,15 +11537,15 @@
     }
   },
   {
-    "versionId": "v1.0.161",
-    "timestamp": "2026-10-28T16:31:07.096Z",
+    "versionId": "v1.0.262",
+    "timestamp": "2026-10-29T04:38:48.624Z",
     "author": "Automated Test",
     "action": "TOGGLE",
     "description": "Enabled event \"gsts-26\"",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.161",
-      "lastUpdated": "2026-10-28T16:31:07.096Z",
+      "version": "v1.0.262",
+      "lastUpdated": "2026-10-29T04:38:48.624Z",
       "updatedBy": "Automated Test",
       "events": [
         {
@@ -11799,15 +11799,15 @@
     }
   },
   {
-    "versionId": "v1.0.160",
-    "timestamp": "2026-10-28T16:18:41.525Z",
+    "versionId": "v1.0.261",
+    "timestamp": "2026-10-29T04:38:06.858Z",
     "author": "Automated Test Cleanup",
     "action": "EDIT_EVENT",
     "description": "Test cleanup: restore verified baseline configuration",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.160",
-      "lastUpdated": "2026-10-28T16:18:41.525Z",
+      "version": "v1.0.261",
+      "lastUpdated": "2026-10-29T04:38:06.858Z",
       "updatedBy": "Automated Test Cleanup",
       "events": [
         {
@@ -12061,15 +12061,15 @@
     }
   },
   {
-    "versionId": "v1.0.159",
-    "timestamp": "2026-10-28T16:18:39.793Z",
+    "versionId": "v1.0.260",
+    "timestamp": "2026-10-29T04:38:06.836Z",
     "author": "recovery-admin@tahaluf.com",
     "action": "REVERT",
-    "description": "Reverted to version v1.0.157 (\"Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active\")",
+    "description": "Reverted to version v1.0.258 (\"Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active\")",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.159",
-      "lastUpdated": "2026-10-28T16:18:39.793Z",
+      "version": "v1.0.260",
+      "lastUpdated": "2026-10-29T04:38:06.836Z",
       "updatedBy": "recovery-admin@tahaluf.com",
       "events": [
         {
@@ -12320,19 +12320,19 @@
           "business": "B2B"
         }
       ],
-      "revertedFrom": "v1.0.157"
+      "revertedFrom": "v1.0.258"
     }
   },
   {
-    "versionId": "v1.0.158",
-    "timestamp": "2026-10-28T16:18:37.277Z",
+    "versionId": "v1.0.259",
+    "timestamp": "2026-10-29T04:38:06.823Z",
     "author": "admin@tahaluf.com",
     "action": "STATUS_CHANGE",
     "description": "Changed status of event \"smlc-26\" to Admin Only (Testing)",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.158",
-      "lastUpdated": "2026-10-28T16:18:37.277Z",
+      "version": "v1.0.259",
+      "lastUpdated": "2026-10-29T04:38:06.823Z",
       "updatedBy": "admin@tahaluf.com",
       "events": [
         {
@@ -12586,15 +12586,15 @@
     }
   },
   {
-    "versionId": "v1.0.157",
-    "timestamp": "2026-10-28T16:18:35.482Z",
+    "versionId": "v1.0.258",
+    "timestamp": "2026-10-29T04:38:06.795Z",
     "author": "Automated Test",
     "action": "PROMOTE_LIVE",
     "description": "Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.157",
-      "lastUpdated": "2026-10-28T16:18:35.482Z",
+      "version": "v1.0.258",
+      "lastUpdated": "2026-10-29T04:38:06.795Z",
       "updatedBy": "Automated Test",
       "events": [
         {
@@ -12848,15 +12848,15 @@
     }
   },
   {
-    "versionId": "v1.0.156",
-    "timestamp": "2026-10-28T16:18:33.661Z",
+    "versionId": "v1.0.257",
+    "timestamp": "2026-10-29T04:38:06.616Z",
     "author": "Automated Test",
     "action": "TOGGLE",
     "description": "Enabled event \"gsts-26\"",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.156",
-      "lastUpdated": "2026-10-28T16:18:33.661Z",
+      "version": "v1.0.257",
+      "lastUpdated": "2026-10-29T04:38:06.616Z",
       "updatedBy": "Automated Test",
       "events": [
         {

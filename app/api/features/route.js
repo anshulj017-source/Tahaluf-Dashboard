@@ -13,7 +13,15 @@ export async function GET() {
     ]);
     return NextResponse.json({ success: true, config, policy: { lowQuotaMode: budgets.policy?.lowQuotaMode === true } }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
-    console.error('[FEATURES] Read failed:', error);
-    return NextResponse.json({ success: false, error: 'Could not load dashboard feature controls.' }, { status: 503 });
+    console.error('[FEATURES] Read failed, falling back to local defaults:', error.message || error);
+    try {
+      const fs = await import('node:fs/promises');
+      const path = await import('node:path');
+      const file = path.join(process.cwd(), 'config', 'dashboardFeatures.json');
+      const diskConfig = JSON.parse(await fs.readFile(file, 'utf8'));
+      return NextResponse.json({ success: true, config: diskConfig, policy: { lowQuotaMode: false } }, { headers: { 'Cache-Control': 'no-store' } });
+    } catch {
+      return NextResponse.json({ success: true, config: DEFAULT_FEATURE_CONFIG, policy: { lowQuotaMode: false } }, { headers: { 'Cache-Control': 'no-store' } });
+    }
   }
 }
