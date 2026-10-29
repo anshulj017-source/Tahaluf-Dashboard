@@ -1233,6 +1233,21 @@ function testEventViewContracts() {
   assert(!pageContent.includes('title="Return to Event Selection Hub"'), 'All Events Selection button is removed from header when event is selected');
   assert(pageContent.includes('Comparing {filterEvents.length} Events (Relative Timeline)'), 'Event View supports multi-event comparison indicator');
 
+  // Verify Weekly & Event View In-View event filters omit "All" option to avoid sticking
+  assert(pageContent.includes('allowAll = true'), 'MultiSelect supports allowAll prop');
+  assert(pageContent.includes('{allowAll && ('), 'MultiSelect conditionally renders All item only when allowAll is true');
+  assert(/Weekly View:[\s\S]*?allowAll=\{false\}/.test(pageContent), 'Weekly View in-view Event filter specifies allowAll={false}');
+  assert(/Event View:[\s\S]*?allowAll=\{false\}/.test(pageContent), 'Event View in-view Event filter specifies allowAll={false}');
+  assert(/Weekly View:[\s\S]*?singleSelect=\{true\}/.test(pageContent), 'Weekly View in-view Event filter has singleSelect={true}');
+  assert(/Event View:[\s\S]*?singleSelect=\{true\}/.test(pageContent), 'Event View in-view Event filter has singleSelect={true}');
+
+  // Verify Main hero filter retains All Events capability
+  assert(/HERO HIGHLIGHTED EVENT FILTER[\s\S]*?label="Event"[\s\S]*?isHero=\{true\}/.test(pageContent), 'Main hero filter retains full event multi-selection with All');
+
+  // Verify Clock interval is isolated in TvClock to prevent full dashboard re-renders every 1s
+  assert(pageContent.includes('const TvClock = React.memo('), 'TvClock is isolated as a memoized leaf component');
+  assert(!pageContent.includes('setCurrentTime(now.toLocaleTimeString'), 'Root Dashboard component no longer has 1s clock interval re-rendering');
+
   // Verify CampaignView onSelectEvent support
   assert(campaignContent.includes('onSelectEvent'), 'CampaignView signature supports onSelectEvent callback');
   assert(campaignContent.includes("Select an Event to View Performance Details"), 'CampaignView includes upgraded All Events selection layout');

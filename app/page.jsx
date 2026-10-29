@@ -127,7 +127,17 @@ const MetricCard = ({ label, value, color, icon: Icon, definition, subContent, o
 
 const DateRangeFilter = DetailedDateFilter;
 
-const MultiSelect = ({ label, options, selected, onChange, widthClass, isHero = false, singleSelect = false, alignRight = false }) => {
+const MultiSelect = React.memo(({ 
+  label, 
+  options, 
+  selected = [], 
+  onChange, 
+  widthClass, 
+  isHero = false, 
+  singleSelect = false, 
+  alignRight = false,
+  allowAll = true 
+}) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const wrapperRef = useRef(null);
@@ -136,7 +146,7 @@ const MultiSelect = ({ label, options, selected, onChange, widthClass, isHero = 
     return options.filter(o => o.toLowerCase().includes(searchTerm.toLowerCase()));
   }, [options, searchTerm]);
 
-  const isAll = selected.includes('All');
+  const isAll = allowAll && selected.includes('All');
   const isActive = !isAll && selected.length > 0;
 
   useEffect(() => {
@@ -163,7 +173,9 @@ const MultiSelect = ({ label, options, selected, onChange, widthClass, isHero = 
       if (next.includes('All')) next = [];
       if (selected.includes(opt)) {
         next = next.filter(n => n !== opt);
-        if (next.length === 0) next = ['All'];
+        if (next.length === 0) {
+          next = allowAll ? ['All'] : [opt];
+        }
       } else { 
         next.push(opt); 
       }
@@ -174,12 +186,23 @@ const MultiSelect = ({ label, options, selected, onChange, widthClass, isHero = 
   };
 
   const handleSelectAll = () => {
+    if (!allowAll) return;
     setIsOpen(false);
     setSearchTerm('');
     React.startTransition(() => {
       onChange(['All']);
     });
   };
+
+  let displayLabel = 'Select...';
+  if (isAll) {
+    displayLabel = isHero ? 'All Events' : 'All';
+  } else if (selected && selected.length > 0) {
+    const cleanSelected = selected.filter(s => s !== 'All');
+    displayLabel = cleanSelected.length > 0 ? cleanSelected.join(', ') : (options[0] || 'Select...');
+  } else if (!allowAll && options.length > 0) {
+    displayLabel = options[0];
+  }
 
   return (
     <div ref={wrapperRef} className={`relative ${widthClass || 'w-[50px] xl:w-[62px] 2xl:w-[78px]'} shrink-0 ${isOpen ? 'z-50' : 'z-20'}`}>
@@ -203,7 +226,7 @@ const MultiSelect = ({ label, options, selected, onChange, widthClass, isHero = 
         }`}
       >
         <span className="truncate pr-0.5 text-[9px] xl:text-[10px]">
-          {isAll ? (isHero ? 'All Events' : 'All') : selected.join(', ')}
+          {displayLabel}
         </span>
         <ChevronDown className={`w-3 h-3 flex-shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''} ${isHero || isActive ? 'text-[#cedc28]' : 'text-gray-400'}`} />
       </div>
@@ -238,12 +261,14 @@ const MultiSelect = ({ label, options, selected, onChange, widthClass, isHero = 
                 </div>
               )}
               <div className="overflow-y-auto p-2 flex-1 custom-scrollbar">
-                <div 
-                  onClick={handleSelectAll} 
-                  className={`px-3 py-2 rounded-lg text-[11px] font-bold cursor-pointer flex justify-between ${selected.includes('All') ? 'bg-[#cedc28]/20 text-[#cedc28]' : 'text-[#eef7f5] hover:bg-[#0a2442]'}`}
-                >
-                  All <Check className={`w-3.5 h-3.5 ${selected.includes('All') ? 'opacity-100' : 'opacity-0'}`} />
-                </div>
+                {allowAll && (
+                  <div 
+                    onClick={handleSelectAll} 
+                    className={`px-3 py-2 rounded-lg text-[11px] font-bold cursor-pointer flex justify-between ${selected.includes('All') ? 'bg-[#cedc28]/20 text-[#cedc28]' : 'text-[#eef7f5] hover:bg-[#0a2442]'}`}
+                  >
+                    All <Check className={`w-3.5 h-3.5 ${selected.includes('All') ? 'opacity-100' : 'opacity-0'}`} />
+                  </div>
+                )}
                 {filtered.map(opt => {
                   const isSel = selected.includes(opt);
                   return (
@@ -264,9 +289,23 @@ const MultiSelect = ({ label, options, selected, onChange, widthClass, isHero = 
       )}
     </div>
   );
-};
+});
 
-const DataTable = ({ title, data, columns, totals, onRowClick, selectedRowId, rowKey, showBars = false, allowColumnSelect = false }) => {
+const TvClock = React.memo(() => {
+  const [time, setTime] = useState(() => {
+    return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  });
+  useEffect(() => {
+    const update = () => {
+      setTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+    };
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, []);
+  return <div className="text-sm font-black text-white font-mono tracking-wider">{time}</div>;
+});
+
+const DataTable = React.memo(({ title, data, columns, totals, onRowClick, selectedRowId, rowKey, showBars = false, allowColumnSelect = false }) => {
   const [selectedLabels, setSelectedLabels] = useState(['All']);
 
   useEffect(() => {
@@ -274,18 +313,23 @@ const DataTable = ({ title, data, columns, totals, onRowClick, selectedRowId, ro
     setSelectedLabels(prev => (prev.length === 1 && prev[0] === 'All' ? prev : ['All']));
   }, [columns.length]);
   
-  const activeColumns = allowColumnSelect 
-    ? columns.filter((c, i) => i === 0 || selectedLabels.includes(c.label) || selectedLabels.includes('All'))
-    : columns;
+  const activeColumns = useMemo(() => {
+    return allowColumnSelect 
+      ? columns.filter((c, i) => i === 0 || selectedLabels.includes(c.label) || selectedLabels.includes('All'))
+      : columns;
+  }, [allowColumnSelect, columns, selectedLabels]);
 
-  const maxValues = {};
-  if (showBars && data.length > 0) {
-    activeColumns.forEach(col => {
-      if (col.key !== columns[0].key) {
-        maxValues[col.key] = Math.max(...data.map(r => r[col.key] || 0));
-      }
-    });
-  }
+  const maxValues = useMemo(() => {
+    const vals = {};
+    if (showBars && data.length > 0) {
+      activeColumns.forEach(col => {
+        if (col.key !== columns[0].key) {
+          vals[col.key] = Math.max(...data.map(r => r[col.key] || 0));
+        }
+      });
+    }
+    return vals;
+  }, [showBars, data, activeColumns, columns]);
 
   const exportCSV = () => {
     let csvContent = "";
@@ -432,7 +476,7 @@ const DataTable = ({ title, data, columns, totals, onRowClick, selectedRowId, ro
       </div>
     </div>
   );
-};
+});
 
 const MetricTrendChart = ({ data, dataKey, name, format, color }) => (
   <div className="card-surface p-4 rounded-xl border border-[#cedc28]/10 h-[200px] flex flex-col">
@@ -455,7 +499,7 @@ const MetricTrendChart = ({ data, dataKey, name, format, color }) => (
   </div>
 );
 
-const TrendSection = ({ title, trendData, currentTrendView, setViewFn, userRole, exSym, formatShort, userEmail = 'admin@tahaluf.com' }) => {
+const TrendSection = React.memo(({ title, trendData, currentTrendView, setViewFn, userRole, exSym, formatShort, userEmail = 'admin@tahaluf.com' }) => {
   const [showInsights, setShowInsights] = useState(false);
 
   if (!trendData || trendData.length === 0) return null;
@@ -567,7 +611,7 @@ const TrendSection = ({ title, trendData, currentTrendView, setViewFn, userRole,
       </div>
     </div>
   );
-};
+});
 
 // --- INITIAL LOADING SCREEN (Engaging Animation & Fast Feedback) ---
 // --- INITIAL LOADING SCREEN (Engaging Animation & Gradual Feedback) ---
@@ -844,7 +888,6 @@ export default function App() {
   const [showTvSettings, setShowTvSettings] = useState(false);
   const [isQuickJumpOpen, setIsQuickJumpOpen] = useState(false);
   const [quickJumpSearch, setQuickJumpSearch] = useState('');
-  const [currentTime, setCurrentTime] = useState('');
 
   useEffect(() => {
     if (!featureConfig) return;
@@ -869,17 +912,6 @@ export default function App() {
     if (filterBusinesses?.length && !filterBusinesses.includes('All')) count++;
     return count;
   }, [dateRange, filterWeeks, filterPortfolios, filterEvents, filterEventTypes, filterPhases, filterChannels, filterMarkets, filterBusinesses]);
-
-  // TV Wallboard Clock
-  useEffect(() => {
-    const updateClock = () => {
-      const now = new Date();
-      setCurrentTime(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
-    };
-    updateClock();
-    const interval = setInterval(updateClock, 1000);
-    return () => clearInterval(interval);
-  }, []);
 
   // Instant Client Cache Warmup (<30ms load time from IndexedDB)
   useEffect(() => {
@@ -2576,7 +2608,7 @@ export default function App() {
               <MultiSelect 
                 label="Event" 
                 options={uniqueEvents} 
-                selected={activeEventContext ? [activeEventContext] : []} 
+                selected={activeEventContext ? [activeEventContext] : (uniqueEvents.length > 0 ? [uniqueEvents[0]] : [])} 
                 onChange={(next) => {
                   const ev = next[0];
                   if (ev && ev !== 'All') {
@@ -2589,6 +2621,7 @@ export default function App() {
                 isHero={true} 
                 widthClass="w-[155px] xl:w-[185px]" 
                 singleSelect={true} 
+                allowAll={false}
               />
             </div>
             <div className="w-64">
@@ -2738,24 +2771,20 @@ export default function App() {
               <MultiSelect 
                 label="Event" 
                 options={uniqueEvents} 
-                selected={activeEventContext ? [activeEventContext] : (filterEvents.includes('All') ? ['All'] : filterEvents)} 
+                selected={activeEventContext ? [activeEventContext] : (uniqueEvents.length > 0 ? [uniqueEvents[0]] : [])} 
                 onChange={(next) => {
-                  React.startTransition(() => {
-                    if (next.includes('All') || next.length === 0) {
-                      setFilterEvents(['All']);
-                      setSelectedEvent(null);
-                    } else if (next.length === 1) {
-                      setFilterEvents(next);
-                      setSelectedEvent(next[0]);
-                    } else {
-                      setFilterEvents(next);
-                      setSelectedEvent(null);
-                    }
-                  });
+                  const ev = next[0];
+                  if (ev && ev !== 'All') {
+                    React.startTransition(() => {
+                      setSelectedEvent(ev);
+                      setFilterEvents([ev]);
+                    });
+                  }
                 }} 
                 isHero={true} 
                 widthClass="w-[165px] xl:w-[200px]" 
-                singleSelect={false} 
+                singleSelect={true} 
+                allowAll={false}
               />
             </div>
             {isMultiEventComparison && (
@@ -3018,7 +3047,7 @@ export default function App() {
 
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <div className="text-right hidden sm:block shrink-0">
-              <div className="text-sm font-black text-white font-mono tracking-wider">{currentTime}</div>
+              <TvClock />
               <div className="text-[9px] font-bold text-[#14a6d9] uppercase tracking-widest">
                 {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
               </div>
