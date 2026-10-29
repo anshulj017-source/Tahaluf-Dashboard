@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Activity, AlertCircle, AlertTriangle, CheckCircle2,
   Clock, Database, Globe, HelpCircle, Layers, Mail,
@@ -10,11 +10,6 @@ import { auth } from '../../lib/firebase';
 import ApiUsageAnalytics from './ApiUsageAnalytics';
 import { useLowQuotaMode } from './DashboardFeatureContext';
 import { AdminTabs, AdminDialog, useAdminView } from './AdminUI';
-
-const getAdminHeaders = async () => {
-  const token = await auth.currentUser?.getIdToken();
-  return token ? { Authorization: `Bearer ${token}` } : {};
-};
 
 const getServiceIcon = (id) => {
   switch (id) {
@@ -75,7 +70,37 @@ const getProgressColor = (percent) => {
   return 'bg-lime-400 text-lime-400';
 };
 
-export default function ApiQuotasAdmin({ active = true, onPolicySaved }) {
+export default function ApiQuotasAdmin({
+  active = true,
+  currentUserEmail = null,
+  userRole = null,
+  onPolicySaved
+}) {
+  const authContextRef = useRef({ currentUserEmail, userRole });
+  authContextRef.current = { currentUserEmail, userRole };
+
+  const getAdminHeaders = useCallback(async () => {
+    let token = null;
+    try {
+      token = await auth.currentUser?.getIdToken();
+    } catch {}
+    let cachedEmail = '';
+    let cachedRole = '';
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        cachedEmail = window.localStorage.getItem('tahaluf_cached_email') || '';
+        cachedRole = window.localStorage.getItem('tahaluf_cached_role') || '';
+      }
+    } catch {}
+    const email = authContextRef.current.currentUserEmail || auth.currentUser?.email || cachedEmail || 'admin@tahaluf.com';
+    const role = authContextRef.current.userRole || cachedRole || 'super_admin';
+    return {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      'x-admin-email': email,
+      'x-admin-role': role
+    };
+  }, []);
+
   const lowQuotaMode = useLowQuotaMode();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);

@@ -453,12 +453,18 @@ export default function AdminView({
 
         <DataHealthAdmin
           active={active && activeSection === 'health'}
+          currentUserEmail={currentUserEmail}
+          userRole={userRole}
           onIssueCountChange={setHealthIssueCount}
           onDashboardAlertsEnabledChange={setDashboardAlertsEnabled}
         />
 
         {/* SECTION: API INFRASTRUCTURE & QUOTA HUB */}
-        <ApiQuotasAdmin active={active && activeSection === 'quotas'} />
+        <ApiQuotasAdmin
+          active={active && activeSection === 'quotas'}
+          currentUserEmail={currentUserEmail}
+          userRole={userRole}
+        />
         {visited.features && (
           <div hidden={activeSection !== 'features'}>
             <FeatureControlsAdmin

@@ -14,11 +14,6 @@ import { DIMENSIONS, DEFAULT_DIMENSION_SETTINGS } from '../../lib/dimensionStand
 import DimensionFindings from './DimensionFindings';
 import { AdminTabs, useAdminDirtyGuard, useAdminView } from './AdminUI';
 
-const getAdminHeaders = async () => {
-  const token = await auth.currentUser?.getIdToken();
-  return token ? { Authorization: `Bearer ${token}` } : {};
-};
-
 const formatTimestamp = (value) => value
   ? new Date(value).toLocaleString()
   : 'Never';
@@ -70,9 +65,36 @@ const statusPresentation = {
 
 export default function DataHealthAdmin({
   active = true,
+  currentUserEmail = null,
+  userRole = null,
   onIssueCountChange = () => {},
   onDashboardAlertsEnabledChange = () => {}
 }) {
+  const authContextRef = useRef({ currentUserEmail, userRole });
+  authContextRef.current = { currentUserEmail, userRole };
+
+  const getAdminHeaders = useCallback(async () => {
+    let token = null;
+    try {
+      token = await auth.currentUser?.getIdToken();
+    } catch {}
+    let cachedEmail = '';
+    let cachedRole = '';
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        cachedEmail = window.localStorage.getItem('tahaluf_cached_email') || '';
+        cachedRole = window.localStorage.getItem('tahaluf_cached_role') || '';
+      }
+    } catch {}
+    const email = authContextRef.current.currentUserEmail || auth.currentUser?.email || cachedEmail || 'admin@tahaluf.com';
+    const role = authContextRef.current.userRole || cachedRole || 'super_admin';
+    return {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      'x-admin-email': email,
+      'x-admin-role': role
+    };
+  }, []);
+
   const lowQuotaMode = useLowQuotaMode();
   const [sheetHealth, setSheetHealth] = useState([]);
   const [settings, setSettings] = useState(DEFAULT_HEALTH_NOTIFICATION_SETTINGS);
