@@ -3118,37 +3118,53 @@ export default function App() {
             className="flex items-center gap-3 cursor-pointer hover:opacity-85 transition-opacity"
             title="Return to Overview"
           >
-            <img src="/tahaluf-logo.svg" alt="Tahaluf Logo" className="h-7" />
-            <span className="text-sm font-semibold">Admin workspace</span>
+            <img src="/tahaluf-logo.svg" alt="Tahaluf Logo" className="h-7 object-contain" />
+            <span className="text-sm font-semibold tracking-wide">Admin Workspace</span>
           </div>
-          <button onClick={() => setActiveTab('summary')} className="rounded-lg border border-slate-500 px-3 py-2 text-sm font-semibold">Back to dashboard</button>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-slate-300 hidden sm:inline font-mono">{userEmail}</span>
+            <button 
+              onClick={() => setActiveTab('summary')} 
+              className="rounded-lg border border-[#cedc28]/40 hover:bg-[#cedc28]/10 text-[#cedc28] px-3 py-1.5 text-xs font-bold transition-all"
+            >
+              Back to dashboard
+            </button>
+            <button 
+              onClick={handleSignOut}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg font-bold transition-all text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 hover:text-red-300"
+              title="Sign Out"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span>Sign Out</span>
+            </button>
+          </div>
         </header>
       ) : (
         <header className="sticky top-0 z-50 bg-[#0a2442]/95 backdrop-blur-xl border-b border-[#cedc28]/20 px-0 py-2 sm:py-2.5 shadow-2xl relative">
           <div className="pattern-overlay absolute inset-0 z-0 pointer-events-none"></div>
 
-          {/* DESKTOP HEADER: WIDE VIEWPORTS (>= 1536px / 2xl) - All 9 filters in a single elegant row */}
-          <div className="hidden 2xl:flex items-center justify-between relative z-10 w-full px-4 2xl:px-6">
+          {/* DESKTOP HEADER (Screens >= lg / 1024px, including all 13-inch and larger screens) */}
+          <div className="hidden lg:flex items-center justify-between relative z-10 w-full px-2 xl:px-4 2xl:px-6">
             {/* LEFT: Logo */}
             <div 
               onClick={() => {
                 setActiveTab('summary');
                 if (tvMode) setTvMode(false);
               }}
-              className="w-40 2xl:w-48 pr-3 flex items-center justify-between shrink-0 border-r border-[#cedc28]/15 cursor-pointer hover:opacity-85 transition-opacity"
+              className="w-36 xl:w-44 pr-2 xl:pr-3 flex items-center justify-between shrink-0 border-r border-[#cedc28]/15 cursor-pointer hover:opacity-85 transition-opacity"
               title="Return to Overview"
             >
               <div className="flex flex-col items-start gap-0.5">
-                <img src="/tahaluf-logo.svg" alt="Tahaluf Logo" className="h-6 2xl:h-7 object-contain" onError={(e) => e.target.style.display = 'none'} />
-                <p className="text-[7.5px] 2xl:text-[8px] font-bold text-[#cedc28] uppercase tracking-[0.08em] whitespace-nowrap">Performance Dashboard</p>
+                <img src="/tahaluf-logo.svg" alt="Tahaluf Logo" className="h-6 xl:h-7 object-contain" onError={(e) => e.target.style.display = 'none'} />
+                <p className="text-[7.5px] xl:text-[8px] font-bold text-[#cedc28] uppercase tracking-[0.08em] whitespace-nowrap">Performance Dashboard</p>
               </div>
             </div>
 
-            {/* CENTER: ALL 9 FILTERS (NON-SHRINKING, PROTECTED AGAINST SQUEEZE) */}
-            <div className="px-3 flex gap-2 flex-nowrap items-end justify-center shrink-0">
-              <DateRangeFilter label="DATE" dateRange={dateRange} onChange={setDateRange} widthClass="w-[100px] 2xl:w-[115px]" />
-              <MultiSelect label="Week" options={uniqueWeeks} selected={filterWeeks} onChange={setFilterWeeks} widthClass="w-[62px] 2xl:w-[70px]" />
-              <MultiSelect label="Portfolio" options={uniquePortfolios} selected={filterPortfolios} onChange={setFilterPortfolios} widthClass="w-[70px] 2xl:w-[78px]" />
+            {/* CENTER: ALL 9 FILTERS IN A SINGLE SLEEK ROW (ZERO OVERLAP, CALIBRATED FOR 13-INCH SCREENS) */}
+            <div className="px-1.5 xl:px-3 flex gap-1 xl:gap-1.5 flex-nowrap items-end justify-center">
+              <DateRangeFilter label="DATE" dateRange={dateRange} onChange={setDateRange} widthClass="w-[96px] xl:w-[108px] 2xl:w-[118px]" />
+              <MultiSelect label="Week" options={uniqueWeeks} selected={filterWeeks} onChange={setFilterWeeks} widthClass="w-[58px] xl:w-[64px] 2xl:w-[70px]" />
+              <MultiSelect label="Portfolio" options={uniquePortfolios} selected={filterPortfolios} onChange={setFilterPortfolios} widthClass="w-[64px] xl:w-[72px] 2xl:w-[78px]" />
               {/* HERO HIGHLIGHTED EVENT FILTER */}
               <MultiSelect 
                 label="Event" 
@@ -3163,30 +3179,30 @@ export default function App() {
                   }
                 }} 
                 isHero={true} 
-                widthClass="w-[115px] 2xl:w-[130px]" 
+                widthClass="w-[115px] xl:w-[128px] 2xl:w-[140px]" 
               />
-              <MultiSelect label="Event Type" options={uniqueEventTypes} selected={filterEventTypes} onChange={setFilterEventTypes} widthClass="w-[78px] 2xl:w-[84px]" />
-              <MultiSelect label="Funnel Stage" options={uniquePhases} selected={filterPhases} onChange={setFilterPhases} widthClass="w-[82px] 2xl:w-[88px]" />
-              <MultiSelect label="Channel" options={uniqueChannels} selected={filterChannels} onChange={setFilterChannels} widthClass="w-[70px] 2xl:w-[76px]" />
-              <MultiSelect label="Market" options={uniqueMarkets} selected={filterMarkets} onChange={setFilterMarkets} widthClass="w-[76px] 2xl:w-[84px]" alignRight={true} />
+              <MultiSelect label="Event Type" options={uniqueEventTypes} selected={filterEventTypes} onChange={setFilterEventTypes} widthClass="w-[72px] xl:w-[80px] 2xl:w-[86px]" />
+              <MultiSelect label="Funnel Stage" options={uniquePhases} selected={filterPhases} onChange={setFilterPhases} widthClass="w-[74px] xl:w-[82px] 2xl:w-[88px]" />
+              <MultiSelect label="Channel" options={uniqueChannels} selected={filterChannels} onChange={setFilterChannels} widthClass="w-[68px] xl:w-[74px] 2xl:w-[80px]" />
+              <MultiSelect label="Market" options={uniqueMarkets} selected={filterMarkets} onChange={setFilterMarkets} widthClass="w-[74px] xl:w-[82px] 2xl:w-[88px]" alignRight={true} />
               <MultiSelect 
                 label="Business" 
                 options={uniqueBusinesses} 
                 selected={filterBusinesses} 
                 onChange={setFilterBusinesses} 
-                widthClass="w-[72px] 2xl:w-[78px]" 
+                widthClass="w-[68px] xl:w-[74px] 2xl:w-[80px]" 
                 singleSelect={true}
                 alignRight={true}
               />
             </div>
 
             {/* RIGHT: PINNED ACTIONS (ALWAYS VISIBLE & PROTECTED FROM OVERLAP) */}
-            <div className="pl-3.5 shrink-0 flex items-center gap-2 border-l border-[#cedc28]/15 bg-[#0a2442] relative z-30">
+            <div className="pl-2 xl:pl-3.5 shrink-0 flex items-center gap-1 xl:gap-2 border-l border-[#cedc28]/15 bg-[#0a2442] relative z-30">
               {featureAllowed('quickJump') && (
                 <button
                   onClick={() => setIsQuickJumpOpen(true)}
                   title="Search & Quick Jump (Cmd+K)"
-                  className="h-[30px] px-2.5 bg-white/5 border border-white/15 text-slate-300 rounded-lg hover:bg-white/10 hover:text-white transition-colors flex items-center gap-1.5 text-[10px] font-semibold shrink-0"
+                  className="h-[28px] xl:h-[30px] px-2 bg-white/5 border border-white/15 text-slate-300 rounded-lg hover:bg-white/10 hover:text-white transition-colors flex items-center gap-1.5 text-[10px] font-semibold shrink-0"
                 >
                   <Search className="w-3 h-3 text-[#14a6d9]" />
                   <span className="hidden 2xl:inline">Search</span>
@@ -3197,7 +3213,7 @@ export default function App() {
                 <button
                   onClick={() => setTvMode(true)} 
                   title="TV Wallboard Presentation Mode" 
-                  className="h-[30px] px-2.5 bg-[#14a6d9]/15 border border-[#14a6d9]/50 text-[#14a6d9] rounded-lg hover:bg-[#14a6d9]/25 hover:text-white transition-colors flex items-center gap-1.5 text-[10px] font-bold shadow-sm shrink-0"
+                  className="h-[28px] xl:h-[30px] px-2.5 bg-[#14a6d9]/15 border border-[#14a6d9]/50 text-[#14a6d9] rounded-lg hover:bg-[#14a6d9]/25 hover:text-white transition-colors flex items-center gap-1.5 text-[10px] font-bold shadow-sm shrink-0"
                 >
                   <Tv className="w-3.5 h-3.5"/>
                   <span className="inline font-bold">TV</span>
@@ -3206,100 +3222,10 @@ export default function App() {
               <button 
                 onClick={resetFilters} 
                 title="Reset Filters" 
-                className="h-[30px] w-[30px] bg-[#cedc28]/10 border border-[#cedc28]/50 text-[#cedc28] rounded-lg hover:bg-[#cedc28]/20 hover:text-white transition-colors flex items-center justify-center shrink-0"
+                className="h-[28px] xl:h-[30px] w-[28px] xl:w-[30px] bg-[#cedc28]/10 border border-[#cedc28]/50 text-[#cedc28] rounded-lg hover:bg-[#cedc28]/20 hover:text-white transition-colors flex items-center justify-center shrink-0"
               >
                 <RefreshCw className="w-3.5 h-3.5"/>
               </button>
-            </div>
-          </div>
-
-          {/* MEDIUM DESKTOP / LAPTOP (Screens 1024px to 1535px / lg to 2xl-1) - 2-tier layout, zero collision */}
-          <div className="hidden lg:flex 2xl:hidden flex-col gap-2 relative z-10 w-full px-3 py-1">
-            {/* Top Tier: Logo + Primary Scope Filters + Pinned Actions */}
-            <div className="flex items-center justify-between w-full">
-              <div 
-                onClick={() => {
-                  setActiveTab('summary');
-                  if (tvMode) setTvMode(false);
-                }}
-                className="pr-3 flex items-center shrink-0 border-r border-[#cedc28]/15 cursor-pointer hover:opacity-85 transition-opacity"
-                title="Return to Overview"
-              >
-                <div className="flex flex-col items-start gap-0.5">
-                  <img src="/tahaluf-logo.svg" alt="Tahaluf Logo" className="h-6 object-contain" onError={(e) => e.target.style.display = 'none'} />
-                  <p className="text-[7px] font-bold text-[#cedc28] uppercase tracking-[0.08em] whitespace-nowrap">Performance Dashboard</p>
-                </div>
-              </div>
-
-              {/* Core Scope Filters */}
-              <div className="flex items-end gap-2 flex-1 justify-center px-2">
-                <DateRangeFilter label="DATE" dateRange={dateRange} onChange={setDateRange} widthClass="w-[105px]" />
-                <MultiSelect label="Week" options={uniqueWeeks} selected={filterWeeks} onChange={setFilterWeeks} widthClass="w-[65px]" />
-                <MultiSelect label="Portfolio" options={uniquePortfolios} selected={filterPortfolios} onChange={setFilterPortfolios} widthClass="w-[75px]" />
-                <MultiSelect 
-                  label="Event" 
-                  options={uniqueEvents} 
-                  selected={filterEvents} 
-                  onChange={(next) => {
-                    setFilterEvents(next);
-                    if (next.length === 1 && !next.includes('All')) {
-                      setSelectedEvent(next[0]);
-                    } else {
-                      setSelectedEvent(null);
-                    }
-                  }} 
-                  isHero={true} 
-                  widthClass="w-[125px]" 
-                />
-              </div>
-
-              {/* Actions */}
-              <div className="pl-3 shrink-0 flex items-center gap-1.5 border-l border-[#cedc28]/15">
-                {featureAllowed('quickJump') && (
-                  <button
-                    onClick={() => setIsQuickJumpOpen(true)}
-                    title="Search & Quick Jump (Cmd+K)"
-                    className="h-[28px] px-2 bg-white/5 border border-white/15 text-slate-300 rounded-lg hover:bg-white/10 hover:text-white transition-colors flex items-center gap-1.5 text-[10px] font-semibold shrink-0"
-                  >
-                    <Search className="w-3 h-3 text-[#14a6d9]" />
-                  </button>
-                )}
-                {featureAllowed('tv') && (
-                  <button
-                    onClick={() => setTvMode(true)} 
-                    title="TV Wallboard Presentation Mode" 
-                    className="h-[28px] px-2 bg-[#14a6d9]/15 border border-[#14a6d9]/50 text-[#14a6d9] rounded-lg hover:bg-[#14a6d9]/25 hover:text-white transition-colors flex items-center gap-1 text-[10px] font-bold shadow-sm shrink-0"
-                  >
-                    <Tv className="w-3 h-3"/>
-                    <span className="inline font-bold">TV</span>
-                  </button>
-                )}
-                <button 
-                  onClick={resetFilters} 
-                  title="Reset Filters" 
-                  className="h-[28px] w-[28px] bg-[#cedc28]/10 border border-[#cedc28]/50 text-[#cedc28] rounded-lg hover:bg-[#cedc28]/20 hover:text-white transition-colors flex items-center justify-center shrink-0"
-                >
-                  <RefreshCw className="w-3 h-3"/>
-                </button>
-              </div>
-            </div>
-
-            {/* Bottom Tier: Marketing Dimension Filters */}
-            <div className="flex items-center justify-center gap-2 pt-1 border-t border-[#cedc28]/10 bg-[#071a30]/60 rounded-xl py-1 px-3">
-              <span className="text-[8.5px] font-black uppercase text-[#14a6d9] tracking-wider pr-1">Dimensions:</span>
-              <MultiSelect label="Event Type" options={uniqueEventTypes} selected={filterEventTypes} onChange={setFilterEventTypes} widthClass="w-[95px]" />
-              <MultiSelect label="Funnel Stage" options={uniquePhases} selected={filterPhases} onChange={setFilterPhases} widthClass="w-[100px]" />
-              <MultiSelect label="Channel" options={uniqueChannels} selected={filterChannels} onChange={setFilterChannels} widthClass="w-[85px]" />
-              <MultiSelect label="Market" options={uniqueMarkets} selected={filterMarkets} onChange={setFilterMarkets} widthClass="w-[95px]" alignRight={true} />
-              <MultiSelect 
-                label="Business" 
-                options={uniqueBusinesses} 
-                selected={filterBusinesses} 
-                onChange={setFilterBusinesses} 
-                widthClass="w-[85px]" 
-                singleSelect={true}
-                alignRight={true}
-              />
             </div>
           </div>
 
@@ -3687,6 +3613,7 @@ export default function App() {
             initialEvents={eventsConfiguration}
             onFeaturesSaved={setFeatureConfig}
             onEventsSaved={setEventsConfiguration}
+            onSignOut={handleSignOut}
             onNavigate={(featureId) => {
               if (['summary', 'campaign', 'weekly', 'channel', 'market', 'detailed', 'webtraffic', 'creative'].includes(featureId)) {
                 setActiveTab(featureId);

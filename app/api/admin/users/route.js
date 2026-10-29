@@ -47,16 +47,28 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Email and password are required' }, { status: 400 });
     }
 
+    const normalizedEmail = email.toLowerCase().trim();
+    const assignedRole = role || 'standard';
+
     const userRecord = await adminAuth.createUser({
-      email,
+      email: normalizedEmail,
       password,
     });
 
     await adminDb.collection('users').doc(userRecord.uid).set({
-      role: role || 'standard',
+      email: normalizedEmail,
+      role: assignedRole,
+      createdAt: new Date().toISOString()
     });
 
-    return NextResponse.json({ success: true, uid: userRecord.uid });
+    // Set custom claims so role is embedded into Firebase ID tokens
+    await adminAuth.setCustomUserClaims(userRecord.uid, {
+      role: assignedRole,
+      admin: assignedRole === 'super_admin' || assignedRole === 'admin',
+      super_admin: assignedRole === 'super_admin'
+    }).catch(() => {});
+
+    return NextResponse.json({ success: true, uid: userRecord.uid, role: assignedRole });
   } catch (error) {
     console.error('Error creating user:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -75,14 +87,22 @@ export async function PUT(req) {
     if (role) {
       await adminDb.collection('users').doc(uid).set({
         role: role,
+        updatedAt: new Date().toISOString()
       }, { merge: true });
+
+      // Synchronize custom user claims on Firebase Auth
+      await adminAuth.setCustomUserClaims(uid, {
+        role: role,
+        admin: role === 'super_admin' || role === 'admin',
+        super_admin: role === 'super_admin'
+      }).catch(() => {});
     }
 
     if (password) {
       await adminAuth.updateUser(uid, { password });
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, role });
   } catch (error) {
     console.error('Error updating user:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });

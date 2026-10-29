@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect } from 'react';
-import { Trash2, UserPlus, Shield, User, RefreshCw, CheckCircle2, Key, Layers, Activity, Users as UsersIcon, BarChart3, Gauge, ChevronDown } from 'lucide-react';
+import { Trash2, UserPlus, Shield, User, RefreshCw, CheckCircle2, Key, Layers, Activity, Users as UsersIcon, BarChart3, Gauge, ChevronDown, LogOut, ArrowLeft } from 'lucide-react';
 import EventsAdmin from './components/EventsAdmin';
 import DataHealthAdmin from './components/DataHealthAdmin';
 import AnalyticsAdmin from './components/AnalyticsAdmin';
@@ -28,7 +28,8 @@ export default function AdminView({
   initialEvents = [], 
   onFeaturesSaved, 
   onEventsSaved, 
-  onNavigate 
+  onNavigate,
+  onSignOut
 }) {
   const isSuperAdmin = userRole === 'super_admin';
 
@@ -403,6 +404,27 @@ export default function AdminView({
               ))}
             </div>
           </nav>
+
+          <div className="hidden lg:flex mt-6 pt-4 border-t border-white/10 flex-col gap-2">
+            <button 
+              type="button" 
+              onClick={() => onNavigate ? onNavigate('summary') : (window.location.href = '/')}
+              className="flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-left text-xs font-bold text-slate-300 hover:text-white hover:bg-white/10 transition-all border border-white/10"
+            >
+              <ArrowLeft className="h-4 w-4 text-[#cedc28] shrink-0" />
+              <span>Back to Dashboard</span>
+            </button>
+            {onSignOut && (
+              <button 
+                type="button" 
+                onClick={onSignOut}
+                className="flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-left text-xs font-bold text-red-400 hover:text-red-300 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-all"
+              >
+                <LogOut className="h-4 w-4 shrink-0" />
+                <span>Sign Out</span>
+              </button>
+            )}
+          </div>
         </aside>
         <main className="min-w-0" aria-label="Admin content">
         {activeSection !== 'health' && dashboardAlertsEnabled && healthIssueCount > 0 && (

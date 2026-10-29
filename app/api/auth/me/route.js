@@ -64,6 +64,14 @@ export async function GET(request) {
     }
 
     // Default: any authenticated user without explicit admin role in Firestore is standard
+    if (uid && email) {
+      await adminDb.collection('users').doc(uid).set({
+        email,
+        role: 'standard',
+        createdAt: new Date().toISOString()
+      }, { merge: true }).catch(() => {});
+    }
+
     return NextResponse.json({ role: 'standard', email, authenticated: true });
   } catch (error) {
     console.warn('[AUTH ME] Error resolving role:', error.message);
