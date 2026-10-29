@@ -413,6 +413,7 @@ export default function AdminView({
           <div hidden={activeSection !== 'features'}>
             <FeatureControlsAdmin
               currentUserEmail={currentUserEmail}
+              userRole={userRole}
               onSaved={onFeaturesSaved}
               onNavigate={(featureId) => {
                 if (featureId === 'dimensionExport' || featureId === 'bulkDimensionImport') {

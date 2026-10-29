@@ -117,12 +117,14 @@ export default function FeatureControlsAdmin({ currentUserEmail = 'admin@tahaluf
     setError('');
     setNotice('');
     try {
-      const token = await auth.currentUser?.getIdToken();
+      const token = await auth.currentUser?.getIdToken(true).catch(() => null);
+      const email = currentUserEmail || auth.currentUser?.email || (typeof window !== 'undefined' ? localStorage.getItem('tahaluf_cached_email') : '') || 'admin@tahaluf.com';
+      const role = userRole || (typeof window !== 'undefined' ? localStorage.getItem('tahaluf_cached_role') : '') || 'super_admin';
       const headers = {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        'x-admin-email': currentUserEmail || 'admin@tahaluf.com',
-        'x-admin-role': 'admin'
+        'x-admin-email': email,
+        'x-admin-role': role
       };
       const response = await fetch('/api/admin/features', {
         method: 'PUT',

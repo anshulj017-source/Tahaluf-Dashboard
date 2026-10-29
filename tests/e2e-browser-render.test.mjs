@@ -234,10 +234,11 @@ test('E2E Browser Render & Console Error Verification Suite', async (t) => {
 
       await page.evaluateOnNewDocument(() => {
         localStorage.setItem('tahaluf_cached_email', 'admin@tahaluf.com');
-        localStorage.setItem('tahaluf_cached_role', 'admin');
+        localStorage.setItem('tahaluf_cached_role', 'super_admin');
       });
 
-      await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      await page.goto(targetUrl, { waitUntil: 'load', timeout: 30000 });
+      await new Promise(r => setTimeout(r, 600));
 
       // Wait for the loading spinner to disappear once live data streams finish
       await page.waitForFunction(
@@ -277,10 +278,11 @@ test('E2E Browser Render & Console Error Verification Suite', async (t) => {
 
       await page.evaluateOnNewDocument(() => {
         localStorage.setItem('tahaluf_cached_email', 'admin@tahaluf.com');
-        localStorage.setItem('tahaluf_cached_role', 'admin');
+        localStorage.setItem('tahaluf_cached_role', 'super_admin');
       });
 
-      await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      await page.goto(targetUrl, { waitUntil: 'load', timeout: 30000 });
+      await new Promise(r => setTimeout(r, 600));
 
       // Wait for loading spinner to finish
       await page.waitForFunction(
@@ -290,8 +292,8 @@ test('E2E Browser Render & Console Error Verification Suite', async (t) => {
 
       // Verify that MultiSelect dropdowns can open, switch to another dropdown, and close cleanly
       const filterInteractions = await page.evaluate(async () => {
-        // Find filter labels: Event, Channel, Portfolio
-        const filterContainers = Array.from(document.querySelectorAll('.shrink-0'));
+        // Find visible filter labels: Event, Channel, Portfolio
+        const filterContainers = Array.from(document.querySelectorAll('.shrink-0')).filter(c => c.offsetParent !== null || c.getClientRects().length > 0);
         const eventDropdown = filterContainers.find(c => c.textContent && c.textContent.includes('Event'));
         const channelDropdown = filterContainers.find(c => c.textContent && c.textContent.includes('Channel'));
         
@@ -354,10 +356,11 @@ test('E2E Browser Render & Console Error Verification Suite', async (t) => {
 
       await page.evaluateOnNewDocument(() => {
         localStorage.setItem('tahaluf_cached_email', 'admin@tahaluf.com');
-        localStorage.setItem('tahaluf_cached_role', 'admin');
+        localStorage.setItem('tahaluf_cached_role', 'super_admin');
       });
 
-      await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      await page.goto(targetUrl, { waitUntil: 'load', timeout: 30000 });
+      await new Promise(r => setTimeout(r, 600));
 
       // Wait for loading spinner to finish
       await page.waitForFunction(

@@ -1,14 +1,14 @@
 [
   {
-    "versionId": "v1.0.306",
-    "timestamp": "2026-10-29T05:36:20.682Z",
+    "versionId": "v1.0.250",
+    "timestamp": "2026-10-29T09:01:16.426Z",
     "author": "Automated Test Cleanup",
     "action": "EDIT_EVENT",
     "description": "Test cleanup: restore verified baseline configuration",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.306",
-      "lastUpdated": "2026-10-29T05:36:20.682Z",
+      "version": "v1.0.250",
+      "lastUpdated": "2026-10-29T09:01:16.426Z",
       "updatedBy": "Automated Test Cleanup",
       "events": [
         {
@@ -262,15 +262,15 @@
     }
   },
   {
-    "versionId": "v1.0.305",
-    "timestamp": "2026-10-29T05:36:20.676Z",
+    "versionId": "v1.0.249",
+    "timestamp": "2026-10-29T09:01:14.382Z",
     "author": "recovery-admin@tahaluf.com",
     "action": "REVERT",
-    "description": "Reverted to version v1.0.303 (\"Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active\")",
+    "description": "Reverted to version v1.0.247 (\"Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active\")",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.305",
-      "lastUpdated": "2026-10-29T05:36:20.676Z",
+      "version": "v1.0.249",
+      "lastUpdated": "2026-10-29T09:01:14.382Z",
       "updatedBy": "recovery-admin@tahaluf.com",
       "events": [
         {
@@ -521,19 +521,19 @@
           "business": "B2B"
         }
       ],
-      "revertedFrom": "v1.0.303"
+      "revertedFrom": "v1.0.247"
     }
   },
   {
-    "versionId": "v1.0.304",
-    "timestamp": "2026-10-29T05:36:20.664Z",
+    "versionId": "v1.0.248",
+    "timestamp": "2026-10-29T09:01:12.351Z",
     "author": "admin@tahaluf.com",
     "action": "STATUS_CHANGE",
     "description": "Changed status of event \"smlc-26\" to Admin Only (Testing)",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.304",
-      "lastUpdated": "2026-10-29T05:36:20.664Z",
+      "version": "v1.0.248",
+      "lastUpdated": "2026-10-29T09:01:12.351Z",
       "updatedBy": "admin@tahaluf.com",
       "events": [
         {
@@ -787,15 +787,15 @@
     }
   },
   {
-    "versionId": "v1.0.303",
-    "timestamp": "2026-10-29T05:36:20.650Z",
+    "versionId": "v1.0.247",
+    "timestamp": "2026-10-29T09:01:10.210Z",
     "author": "Automated Test",
     "action": "PROMOTE_LIVE",
     "description": "Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.303",
-      "lastUpdated": "2026-10-29T05:36:20.650Z",
+      "version": "v1.0.247",
+      "lastUpdated": "2026-10-29T09:01:10.210Z",
       "updatedBy": "Automated Test",
       "events": [
         {
@@ -1049,15 +1049,15 @@
     }
   },
   {
-    "versionId": "v1.0.302",
-    "timestamp": "2026-10-29T05:36:20.596Z",
+    "versionId": "v1.0.246",
+    "timestamp": "2026-10-29T09:01:07.369Z",
     "author": "Automated Test",
     "action": "TOGGLE",
     "description": "Enabled event \"gsts-26\"",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.302",
-      "lastUpdated": "2026-10-29T05:36:20.596Z",
+      "version": "v1.0.246",
+      "lastUpdated": "2026-10-29T09:01:07.369Z",
       "updatedBy": "Automated Test",
       "events": [
         {
@@ -1311,15 +1311,15 @@
     }
   },
   {
-    "versionId": "v1.0.301",
-    "timestamp": "2026-10-29T05:33:43.691Z",
+    "versionId": "v1.0.245",
+    "timestamp": "2026-10-29T08:03:00.585Z",
     "author": "Automated Test Cleanup",
     "action": "EDIT_EVENT",
     "description": "Test cleanup: restore verified baseline configuration",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.301",
-      "lastUpdated": "2026-10-29T05:33:43.691Z",
+      "version": "v1.0.245",
+      "lastUpdated": "2026-10-29T08:03:00.585Z",
       "updatedBy": "Automated Test Cleanup",
       "events": [
         {
@@ -1573,15 +1573,15 @@
     }
   },
   {
-    "versionId": "v1.0.300",
-    "timestamp": "2026-10-29T05:33:43.686Z",
+    "versionId": "v1.0.244",
+    "timestamp": "2026-10-29T08:02:57.505Z",
     "author": "recovery-admin@tahaluf.com",
     "action": "REVERT",
-    "description": "Reverted to version v1.0.298 (\"Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active\")",
+    "description": "Reverted to version v1.0.242 (\"Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active\")",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.300",
-      "lastUpdated": "2026-10-29T05:33:43.686Z",
+      "version": "v1.0.244",
+      "lastUpdated": "2026-10-29T08:02:57.505Z",
       "updatedBy": "recovery-admin@tahaluf.com",
       "events": [
         {
@@ -1832,19 +1832,19 @@
           "business": "B2B"
         }
       ],
-      "revertedFrom": "v1.0.298"
+      "revertedFrom": "v1.0.242"
     }
   },
   {
-    "versionId": "v1.0.299",
-    "timestamp": "2026-10-29T05:33:43.677Z",
+    "versionId": "v1.0.243",
+    "timestamp": "2026-10-29T08:02:53.878Z",
     "author": "admin@tahaluf.com",
     "action": "STATUS_CHANGE",
     "description": "Changed status of event \"smlc-26\" to Admin Only (Testing)",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.299",
-      "lastUpdated": "2026-10-29T05:33:43.677Z",
+      "version": "v1.0.243",
+      "lastUpdated": "2026-10-29T08:02:53.878Z",
       "updatedBy": "admin@tahaluf.com",
       "events": [
         {
@@ -2098,15 +2098,15 @@
     }
   },
   {
-    "versionId": "v1.0.298",
-    "timestamp": "2026-10-29T05:33:43.665Z",
+    "versionId": "v1.0.242",
+    "timestamp": "2026-10-29T08:02:50.409Z",
     "author": "Automated Test",
     "action": "PROMOTE_LIVE",
     "description": "Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.298",
-      "lastUpdated": "2026-10-29T05:33:43.665Z",
+      "version": "v1.0.242",
+      "lastUpdated": "2026-10-29T08:02:50.409Z",
       "updatedBy": "Automated Test",
       "events": [
         {
@@ -2360,15 +2360,15 @@
     }
   },
   {
-    "versionId": "v1.0.297",
-    "timestamp": "2026-10-29T05:33:43.562Z",
+    "versionId": "v1.0.241",
+    "timestamp": "2026-10-29T08:02:47.022Z",
     "author": "Automated Test",
     "action": "TOGGLE",
     "description": "Enabled event \"gsts-26\"",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.297",
-      "lastUpdated": "2026-10-29T05:33:43.562Z",
+      "version": "v1.0.241",
+      "lastUpdated": "2026-10-29T08:02:47.022Z",
       "updatedBy": "Automated Test",
       "events": [
         {
@@ -2622,15 +2622,15 @@
     }
   },
   {
-    "versionId": "v1.0.296",
-    "timestamp": "2026-10-29T05:29:56.804Z",
+    "versionId": "v1.0.240",
+    "timestamp": "2026-10-28T21:50:55.526Z",
     "author": "Automated Test Cleanup",
     "action": "EDIT_EVENT",
     "description": "Test cleanup: restore verified baseline configuration",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.296",
-      "lastUpdated": "2026-10-29T05:29:56.804Z",
+      "version": "v1.0.240",
+      "lastUpdated": "2026-10-28T21:50:55.526Z",
       "updatedBy": "Automated Test Cleanup",
       "events": [
         {
@@ -2884,15 +2884,15 @@
     }
   },
   {
-    "versionId": "v1.0.295",
-    "timestamp": "2026-10-29T05:29:56.798Z",
+    "versionId": "v1.0.239",
+    "timestamp": "2026-10-28T21:50:53.408Z",
     "author": "recovery-admin@tahaluf.com",
     "action": "REVERT",
-    "description": "Reverted to version v1.0.293 (\"Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active\")",
+    "description": "Reverted to version v1.0.237 (\"Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active\")",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.295",
-      "lastUpdated": "2026-10-29T05:29:56.798Z",
+      "version": "v1.0.239",
+      "lastUpdated": "2026-10-28T21:50:53.408Z",
       "updatedBy": "recovery-admin@tahaluf.com",
       "events": [
         {
@@ -3143,19 +3143,19 @@
           "business": "B2B"
         }
       ],
-      "revertedFrom": "v1.0.293"
+      "revertedFrom": "v1.0.237"
     }
   },
   {
-    "versionId": "v1.0.294",
-    "timestamp": "2026-10-29T05:29:56.791Z",
+    "versionId": "v1.0.238",
+    "timestamp": "2026-10-28T21:50:51.694Z",
     "author": "admin@tahaluf.com",
     "action": "STATUS_CHANGE",
     "description": "Changed status of event \"smlc-26\" to Admin Only (Testing)",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.294",
-      "lastUpdated": "2026-10-29T05:29:56.791Z",
+      "version": "v1.0.238",
+      "lastUpdated": "2026-10-28T21:50:51.694Z",
       "updatedBy": "admin@tahaluf.com",
       "events": [
         {
@@ -3409,15 +3409,15 @@
     }
   },
   {
-    "versionId": "v1.0.293",
-    "timestamp": "2026-10-29T05:29:56.779Z",
+    "versionId": "v1.0.237",
+    "timestamp": "2026-10-28T21:50:50.094Z",
     "author": "Automated Test",
     "action": "PROMOTE_LIVE",
     "description": "Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.293",
-      "lastUpdated": "2026-10-29T05:29:56.779Z",
+      "version": "v1.0.237",
+      "lastUpdated": "2026-10-28T21:50:50.094Z",
       "updatedBy": "Automated Test",
       "events": [
         {
@@ -3671,15 +3671,15 @@
     }
   },
   {
-    "versionId": "v1.0.292",
-    "timestamp": "2026-10-29T05:29:56.725Z",
+    "versionId": "v1.0.236",
+    "timestamp": "2026-10-28T21:50:48.300Z",
     "author": "Automated Test",
     "action": "TOGGLE",
     "description": "Enabled event \"gsts-26\"",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.292",
-      "lastUpdated": "2026-10-29T05:29:56.725Z",
+      "version": "v1.0.236",
+      "lastUpdated": "2026-10-28T21:50:48.300Z",
       "updatedBy": "Automated Test",
       "events": [
         {
@@ -3933,15 +3933,15 @@
     }
   },
   {
-    "versionId": "v1.0.291",
-    "timestamp": "2026-10-29T05:28:33.190Z",
+    "versionId": "v1.0.235",
+    "timestamp": "2026-10-28T21:44:09.492Z",
     "author": "Automated Test Cleanup",
     "action": "EDIT_EVENT",
     "description": "Test cleanup: restore verified baseline configuration",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.291",
-      "lastUpdated": "2026-10-29T05:28:33.190Z",
+      "version": "v1.0.235",
+      "lastUpdated": "2026-10-28T21:44:09.492Z",
       "updatedBy": "Automated Test Cleanup",
       "events": [
         {
@@ -4195,15 +4195,15 @@
     }
   },
   {
-    "versionId": "v1.0.290",
-    "timestamp": "2026-10-29T05:28:33.184Z",
+    "versionId": "v1.0.234",
+    "timestamp": "2026-10-28T21:44:07.654Z",
     "author": "recovery-admin@tahaluf.com",
     "action": "REVERT",
-    "description": "Reverted to version v1.0.288 (\"Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active\")",
+    "description": "Reverted to version v1.0.232 (\"Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active\")",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.290",
-      "lastUpdated": "2026-10-29T05:28:33.184Z",
+      "version": "v1.0.234",
+      "lastUpdated": "2026-10-28T21:44:07.654Z",
       "updatedBy": "recovery-admin@tahaluf.com",
       "events": [
         {
@@ -4454,19 +4454,19 @@
           "business": "B2B"
         }
       ],
-      "revertedFrom": "v1.0.288"
+      "revertedFrom": "v1.0.232"
     }
   },
   {
-    "versionId": "v1.0.289",
-    "timestamp": "2026-10-29T05:28:33.176Z",
+    "versionId": "v1.0.233",
+    "timestamp": "2026-10-28T21:44:06.011Z",
     "author": "admin@tahaluf.com",
     "action": "STATUS_CHANGE",
     "description": "Changed status of event \"smlc-26\" to Admin Only (Testing)",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.289",
-      "lastUpdated": "2026-10-29T05:28:33.176Z",
+      "version": "v1.0.233",
+      "lastUpdated": "2026-10-28T21:44:06.011Z",
       "updatedBy": "admin@tahaluf.com",
       "events": [
         {
@@ -4720,15 +4720,15 @@
     }
   },
   {
-    "versionId": "v1.0.288",
-    "timestamp": "2026-10-29T05:28:33.170Z",
+    "versionId": "v1.0.232",
+    "timestamp": "2026-10-28T21:44:04.384Z",
     "author": "Automated Test",
     "action": "PROMOTE_LIVE",
     "description": "Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.288",
-      "lastUpdated": "2026-10-29T05:28:33.170Z",
+      "version": "v1.0.232",
+      "lastUpdated": "2026-10-28T21:44:04.384Z",
       "updatedBy": "Automated Test",
       "events": [
         {
@@ -4982,15 +4982,15 @@
     }
   },
   {
-    "versionId": "v1.0.287",
-    "timestamp": "2026-10-29T05:28:33.116Z",
+    "versionId": "v1.0.231",
+    "timestamp": "2026-10-28T21:44:02.479Z",
     "author": "Automated Test",
     "action": "TOGGLE",
     "description": "Enabled event \"gsts-26\"",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.287",
-      "lastUpdated": "2026-10-29T05:28:33.116Z",
+      "version": "v1.0.231",
+      "lastUpdated": "2026-10-28T21:44:02.479Z",
       "updatedBy": "Automated Test",
       "events": [
         {
@@ -5244,15 +5244,15 @@
     }
   },
   {
-    "versionId": "v1.0.286",
-    "timestamp": "2026-10-29T05:27:03.737Z",
+    "versionId": "v1.0.230",
+    "timestamp": "2026-10-28T21:39:40.825Z",
     "author": "Automated Test Cleanup",
     "action": "EDIT_EVENT",
     "description": "Test cleanup: restore verified baseline configuration",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.286",
-      "lastUpdated": "2026-10-29T05:27:03.737Z",
+      "version": "v1.0.230",
+      "lastUpdated": "2026-10-28T21:39:40.825Z",
       "updatedBy": "Automated Test Cleanup",
       "events": [
         {
@@ -5506,15 +5506,15 @@
     }
   },
   {
-    "versionId": "v1.0.285",
-    "timestamp": "2026-10-29T05:27:03.727Z",
+    "versionId": "v1.0.229",
+    "timestamp": "2026-10-28T21:39:39.356Z",
     "author": "recovery-admin@tahaluf.com",
     "action": "REVERT",
-    "description": "Reverted to version v1.0.283 (\"Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active\")",
+    "description": "Reverted to version v1.0.227 (\"Test cleanup: restore verified baseline configuration\")",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.285",
-      "lastUpdated": "2026-10-29T05:27:03.727Z",
+      "version": "v1.0.229",
+      "lastUpdated": "2026-10-28T21:39:39.356Z",
       "updatedBy": "recovery-admin@tahaluf.com",
       "events": [
         {
@@ -5765,19 +5765,19 @@
           "business": "B2B"
         }
       ],
-      "revertedFrom": "v1.0.283"
+      "revertedFrom": "v1.0.227"
     }
   },
   {
-    "versionId": "v1.0.284",
-    "timestamp": "2026-10-29T05:27:03.721Z",
+    "versionId": "v1.0.228",
+    "timestamp": "2026-10-28T21:39:37.923Z",
     "author": "admin@tahaluf.com",
     "action": "STATUS_CHANGE",
     "description": "Changed status of event \"smlc-26\" to Admin Only (Testing)",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.284",
-      "lastUpdated": "2026-10-29T05:27:03.721Z",
+      "version": "v1.0.228",
+      "lastUpdated": "2026-10-28T21:39:37.923Z",
       "updatedBy": "admin@tahaluf.com",
       "events": [
         {
@@ -6031,539 +6031,15 @@
     }
   },
   {
-    "versionId": "v1.0.283",
-    "timestamp": "2026-10-29T05:27:03.713Z",
-    "author": "Automated Test",
-    "action": "PROMOTE_LIVE",
-    "description": "Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active",
-    "eventsCount": 9,
-    "snapshot": {
-      "version": "v1.0.283",
-      "lastUpdated": "2026-10-29T05:27:03.713Z",
-      "updatedBy": "Automated Test",
-      "events": [
-        {
-          "id": "gsts-26",
-          "name": "GSTS 26",
-          "sourceName": "GSTS",
-          "portfolio": "P1",
-          "business": "B2B",
-          "enabled": true,
-          "status": "active",
-          "visibility": "public",
-          "sheetType": "combined",
-          "gid": "120681662",
-          "plannedGid": "2019892532",
-          "plannedType": "standard",
-          "launchDate": "2026-12-18",
-          "startDate": "",
-          "endDate": "",
-          "dateFilterMode": "none",
-          "eventType": "Exhibition",
-          "description": "Global Smart Transport Summit 2026",
-          "channelFilters": {
-            "meta": true,
-            "google": true,
-            "linkedin": true,
-            "tiktok": true,
-            "x": true
-          },
-          "fieldAliases": {},
-          "autoPublishDate": ""
-        },
-        {
-          "id": "saif-26",
-          "name": "SAIF 26",
-          "sourceName": "SAIF 26",
-          "portfolio": "P1",
-          "enabled": true,
-          "sheetType": "combined",
-          "gid": "1196409184",
-          "plannedGid": "570639072",
-          "plannedType": "standard",
-          "launchDate": "2026-11-24",
-          "startDate": "",
-          "endDate": "",
-          "dateFilterMode": "none",
-          "eventType": "Conference",
-          "description": "Saudi Artificial Intelligence Forum 2026",
-          "channelFilters": {
-            "meta": true,
-            "google": true,
-            "linkedin": true,
-            "tiktok": true,
-            "x": true
-          },
-          "business": "B2B",
-          "status": "active",
-          "visibility": "public"
-        },
-        {
-          "id": "kog-26",
-          "name": "KoG 26",
-          "sourceName": "KoG 26",
-          "portfolio": "P1",
-          "enabled": true,
-          "sheetType": "combined",
-          "gid": "1486784585",
-          "plannedGid": "1766297835",
-          "plannedType": "standard",
-          "launchDate": "2026-12-01",
-          "startDate": "",
-          "endDate": "",
-          "dateFilterMode": "none",
-          "eventType": "Exhibition",
-          "description": "Kingdom of Gaming 2026",
-          "channelFilters": {
-            "meta": true,
-            "google": true,
-            "linkedin": true,
-            "tiktok": true,
-            "x": true
-          },
-          "business": "derive",
-          "status": "active",
-          "visibility": "public"
-        },
-        {
-          "id": "black-hat",
-          "name": "Black Hat",
-          "sourceName": "BLACK HAT",
-          "portfolio": "P1",
-          "enabled": true,
-          "sheetType": "combined",
-          "gid": "659941332",
-          "plannedGid": "277310277",
-          "plannedType": "blackhat-text",
-          "launchDate": "2026-12-01",
-          "startDate": "",
-          "endDate": "",
-          "dateFilterMode": "none",
-          "eventType": "Exhibition",
-          "description": "Black Hat MEA 2026",
-          "channelFilters": {
-            "meta": true,
-            "google": true,
-            "linkedin": true,
-            "tiktok": true,
-            "x": true
-          },
-          "business": "B2B",
-          "status": "active",
-          "visibility": "public"
-        },
-        {
-          "id": "smlc-26",
-          "name": "SMLC 26",
-          "sourceName": "SMLC 26",
-          "portfolio": "P3",
-          "enabled": true,
-          "sheetType": "combined",
-          "gid": "1526538255",
-          "plannedGid": "",
-          "plannedType": "standard",
-          "launchDate": "2026-10-21",
-          "startDate": "",
-          "endDate": "",
-          "dateFilterMode": "none",
-          "eventType": "Exhibition",
-          "description": "Saudi Maritime Logistics Congress 2026",
-          "channelFilters": {
-            "meta": true,
-            "google": true,
-            "linkedin": true,
-            "tiktok": true,
-            "x": true
-          },
-          "status": "active",
-          "visibility": "public",
-          "business": "B2B"
-        },
-        {
-          "id": "idws-26",
-          "name": "IDWS 26",
-          "sourceName": "IDWS 26",
-          "portfolio": "P3",
-          "enabled": true,
-          "sheetType": "combined",
-          "gid": "1121987876",
-          "plannedGid": "",
-          "plannedType": "standard",
-          "launchDate": "2026-12-14",
-          "startDate": "2026-06-01",
-          "endDate": "",
-          "dateFilterMode": "min-date",
-          "eventType": "Exhibition",
-          "description": "International Digital Workplace Summit 2026 (Active from June 2026)",
-          "channelFilters": {
-            "meta": true,
-            "google": true,
-            "linkedin": true,
-            "tiktok": true,
-            "x": true
-          },
-          "business": "B2B",
-          "status": "active",
-          "visibility": "public"
-        },
-        {
-          "id": "bio-cphi-main",
-          "name": "BIO 26 & CPHI 26",
-          "sourceName": "BIO / CPHI",
-          "portfolio": "P3",
-          "enabled": true,
-          "sheetType": "combined",
-          "gid": "1728688512",
-          "plannedGid": "",
-          "plannedType": "standard",
-          "launchDate": "2026-12-14",
-          "startDate": "2026-01-01",
-          "endDate": "2026-12-31",
-          "dateFilterMode": "year-2026",
-          "eventType": "Both",
-          "description": "BIO 26 & CPHI 26 Main Campaigns (Meta, Google Ads, LinkedIn)",
-          "channelFilters": {
-            "meta": true,
-            "google": true,
-            "linkedin": true,
-            "tiktok": true,
-            "x": true
-          },
-          "business": "B2B",
-          "status": "active",
-          "visibility": "public"
-        },
-        {
-          "id": "cphi-li",
-          "name": "CPHI 26 (LinkedIn)",
-          "sourceName": "CPHI 26",
-          "portfolio": "P3",
-          "enabled": true,
-          "sheetType": "combined",
-          "gid": "208497314",
-          "plannedGid": "",
-          "plannedType": "standard",
-          "launchDate": "2026-12-14",
-          "startDate": "2026-01-01",
-          "endDate": "2026-12-31",
-          "dateFilterMode": "year-2026",
-          "eventType": "Exhibition",
-          "description": "CPHI 26 Dedicated LinkedIn Performance Sheet",
-          "channelFilters": {
-            "meta": false,
-            "google": false,
-            "linkedin": true,
-            "tiktok": false,
-            "x": false
-          },
-          "business": "B2B",
-          "status": "active",
-          "visibility": "public"
-        },
-        {
-          "id": "leap-east-26",
-          "name": "Leap East 26",
-          "sourceName": "Leap East 26",
-          "portfolio": "P1",
-          "enabled": true,
-          "status": "admin_only",
-          "visibility": "admin_only",
-          "sheetType": "combined",
-          "gid": "1617019591",
-          "plannedGid": "",
-          "plannedType": "standard",
-          "launchDate": "2026-07-01",
-          "startDate": "",
-          "endDate": "",
-          "dateFilterMode": "none",
-          "eventType": "Both",
-          "description": "",
-          "channelFilters": {
-            "meta": true,
-            "google": true,
-            "linkedin": true,
-            "tiktok": true,
-            "x": true
-          },
-          "fieldAliases": {},
-          "autoPublishDate": "",
-          "business": "B2B"
-        }
-      ]
-    }
-  },
-  {
-    "versionId": "v1.0.282",
-    "timestamp": "2026-10-29T05:27:03.648Z",
-    "author": "Automated Test",
-    "action": "TOGGLE",
-    "description": "Enabled event \"gsts-26\"",
-    "eventsCount": 9,
-    "snapshot": {
-      "version": "v1.0.282",
-      "lastUpdated": "2026-10-29T05:27:03.648Z",
-      "updatedBy": "Automated Test",
-      "events": [
-        {
-          "id": "gsts-26",
-          "name": "GSTS 26",
-          "sourceName": "GSTS",
-          "portfolio": "P1",
-          "business": "B2B",
-          "enabled": true,
-          "status": "active",
-          "visibility": "public",
-          "sheetType": "combined",
-          "gid": "120681662",
-          "plannedGid": "2019892532",
-          "plannedType": "standard",
-          "launchDate": "2026-12-18",
-          "startDate": "",
-          "endDate": "",
-          "dateFilterMode": "none",
-          "eventType": "Exhibition",
-          "description": "Global Smart Transport Summit 2026",
-          "channelFilters": {
-            "meta": true,
-            "google": true,
-            "linkedin": true,
-            "tiktok": true,
-            "x": true
-          },
-          "fieldAliases": {},
-          "autoPublishDate": ""
-        },
-        {
-          "id": "saif-26",
-          "name": "SAIF 26",
-          "sourceName": "SAIF 26",
-          "portfolio": "P1",
-          "enabled": true,
-          "sheetType": "combined",
-          "gid": "1196409184",
-          "plannedGid": "570639072",
-          "plannedType": "standard",
-          "launchDate": "2026-11-24",
-          "startDate": "",
-          "endDate": "",
-          "dateFilterMode": "none",
-          "eventType": "Conference",
-          "description": "Saudi Artificial Intelligence Forum 2026",
-          "channelFilters": {
-            "meta": true,
-            "google": true,
-            "linkedin": true,
-            "tiktok": true,
-            "x": true
-          },
-          "business": "B2B",
-          "status": "active",
-          "visibility": "public"
-        },
-        {
-          "id": "kog-26",
-          "name": "KoG 26",
-          "sourceName": "KoG 26",
-          "portfolio": "P1",
-          "enabled": true,
-          "sheetType": "combined",
-          "gid": "1486784585",
-          "plannedGid": "1766297835",
-          "plannedType": "standard",
-          "launchDate": "2026-12-01",
-          "startDate": "",
-          "endDate": "",
-          "dateFilterMode": "none",
-          "eventType": "Exhibition",
-          "description": "Kingdom of Gaming 2026",
-          "channelFilters": {
-            "meta": true,
-            "google": true,
-            "linkedin": true,
-            "tiktok": true,
-            "x": true
-          },
-          "business": "derive",
-          "status": "active",
-          "visibility": "public"
-        },
-        {
-          "id": "black-hat",
-          "name": "Black Hat",
-          "sourceName": "BLACK HAT",
-          "portfolio": "P1",
-          "enabled": true,
-          "sheetType": "combined",
-          "gid": "659941332",
-          "plannedGid": "277310277",
-          "plannedType": "blackhat-text",
-          "launchDate": "2026-12-01",
-          "startDate": "",
-          "endDate": "",
-          "dateFilterMode": "none",
-          "eventType": "Exhibition",
-          "description": "Black Hat MEA 2026",
-          "channelFilters": {
-            "meta": true,
-            "google": true,
-            "linkedin": true,
-            "tiktok": true,
-            "x": true
-          },
-          "business": "B2B",
-          "status": "active",
-          "visibility": "public"
-        },
-        {
-          "id": "smlc-26",
-          "name": "SMLC 26",
-          "sourceName": "SMLC 26",
-          "portfolio": "P3",
-          "enabled": true,
-          "sheetType": "combined",
-          "gid": "1526538255",
-          "plannedGid": "",
-          "plannedType": "standard",
-          "launchDate": "2026-10-21",
-          "startDate": "",
-          "endDate": "",
-          "dateFilterMode": "none",
-          "eventType": "Exhibition",
-          "description": "Saudi Maritime Logistics Congress 2026",
-          "channelFilters": {
-            "meta": true,
-            "google": true,
-            "linkedin": true,
-            "tiktok": true,
-            "x": true
-          },
-          "status": "active",
-          "visibility": "public",
-          "business": "B2B"
-        },
-        {
-          "id": "idws-26",
-          "name": "IDWS 26",
-          "sourceName": "IDWS 26",
-          "portfolio": "P3",
-          "enabled": true,
-          "sheetType": "combined",
-          "gid": "1121987876",
-          "plannedGid": "",
-          "plannedType": "standard",
-          "launchDate": "2026-12-14",
-          "startDate": "2026-06-01",
-          "endDate": "",
-          "dateFilterMode": "min-date",
-          "eventType": "Exhibition",
-          "description": "International Digital Workplace Summit 2026 (Active from June 2026)",
-          "channelFilters": {
-            "meta": true,
-            "google": true,
-            "linkedin": true,
-            "tiktok": true,
-            "x": true
-          },
-          "business": "B2B",
-          "status": "active",
-          "visibility": "public"
-        },
-        {
-          "id": "bio-cphi-main",
-          "name": "BIO 26 & CPHI 26",
-          "sourceName": "BIO / CPHI",
-          "portfolio": "P3",
-          "enabled": true,
-          "sheetType": "combined",
-          "gid": "1728688512",
-          "plannedGid": "",
-          "plannedType": "standard",
-          "launchDate": "2026-12-14",
-          "startDate": "2026-01-01",
-          "endDate": "2026-12-31",
-          "dateFilterMode": "year-2026",
-          "eventType": "Both",
-          "description": "BIO 26 & CPHI 26 Main Campaigns (Meta, Google Ads, LinkedIn)",
-          "channelFilters": {
-            "meta": true,
-            "google": true,
-            "linkedin": true,
-            "tiktok": true,
-            "x": true
-          },
-          "business": "B2B",
-          "status": "active",
-          "visibility": "public"
-        },
-        {
-          "id": "cphi-li",
-          "name": "CPHI 26 (LinkedIn)",
-          "sourceName": "CPHI 26",
-          "portfolio": "P3",
-          "enabled": true,
-          "sheetType": "combined",
-          "gid": "208497314",
-          "plannedGid": "",
-          "plannedType": "standard",
-          "launchDate": "2026-12-14",
-          "startDate": "2026-01-01",
-          "endDate": "2026-12-31",
-          "dateFilterMode": "year-2026",
-          "eventType": "Exhibition",
-          "description": "CPHI 26 Dedicated LinkedIn Performance Sheet",
-          "channelFilters": {
-            "meta": false,
-            "google": false,
-            "linkedin": true,
-            "tiktok": false,
-            "x": false
-          },
-          "business": "B2B",
-          "status": "active",
-          "visibility": "public"
-        },
-        {
-          "id": "leap-east-26",
-          "name": "Leap East 26",
-          "sourceName": "Leap East 26",
-          "portfolio": "P1",
-          "enabled": true,
-          "status": "admin_only",
-          "visibility": "admin_only",
-          "sheetType": "combined",
-          "gid": "1617019591",
-          "plannedGid": "",
-          "plannedType": "standard",
-          "launchDate": "2026-07-01",
-          "startDate": "",
-          "endDate": "",
-          "dateFilterMode": "none",
-          "eventType": "Both",
-          "description": "",
-          "channelFilters": {
-            "meta": true,
-            "google": true,
-            "linkedin": true,
-            "tiktok": true,
-            "x": true
-          },
-          "fieldAliases": {},
-          "autoPublishDate": "",
-          "business": "B2B"
-        }
-      ]
-    }
-  },
-  {
-    "versionId": "v1.0.281",
-    "timestamp": "2026-10-29T05:23:24.826Z",
+    "versionId": "v1.0.227",
+    "timestamp": "2026-10-28T21:39:35.024Z",
     "author": "Automated Test Cleanup",
     "action": "EDIT_EVENT",
     "description": "Test cleanup: restore verified baseline configuration",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.281",
-      "lastUpdated": "2026-10-29T05:23:24.826Z",
+      "version": "v1.0.227",
+      "lastUpdated": "2026-10-28T21:39:35.024Z",
       "updatedBy": "Automated Test Cleanup",
       "events": [
         {
@@ -6817,15 +6293,277 @@
     }
   },
   {
-    "versionId": "v1.0.280",
-    "timestamp": "2026-10-29T05:23:24.812Z",
-    "author": "recovery-admin@tahaluf.com",
-    "action": "REVERT",
-    "description": "Reverted to version v1.0.278 (\"Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active\")",
+    "versionId": "v1.0.226",
+    "timestamp": "2026-10-28T21:39:32.341Z",
+    "author": "Automated Test",
+    "action": "PROMOTE_LIVE",
+    "description": "Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.280",
-      "lastUpdated": "2026-10-29T05:23:24.812Z",
+      "version": "v1.0.226",
+      "lastUpdated": "2026-10-28T21:39:32.341Z",
+      "updatedBy": "Automated Test",
+      "events": [
+        {
+          "id": "gsts-26",
+          "name": "GSTS 26",
+          "sourceName": "GSTS",
+          "portfolio": "P1",
+          "business": "B2B",
+          "enabled": true,
+          "status": "active",
+          "visibility": "public",
+          "sheetType": "combined",
+          "gid": "120681662",
+          "plannedGid": "2019892532",
+          "plannedType": "standard",
+          "launchDate": "2026-12-18",
+          "startDate": "",
+          "endDate": "",
+          "dateFilterMode": "none",
+          "eventType": "Exhibition",
+          "description": "Global Smart Transport Summit 2026",
+          "channelFilters": {
+            "meta": true,
+            "google": true,
+            "linkedin": true,
+            "tiktok": true,
+            "x": true
+          },
+          "fieldAliases": {},
+          "autoPublishDate": ""
+        },
+        {
+          "id": "saif-26",
+          "name": "SAIF 26",
+          "sourceName": "SAIF 26",
+          "portfolio": "P1",
+          "enabled": true,
+          "sheetType": "combined",
+          "gid": "1196409184",
+          "plannedGid": "570639072",
+          "plannedType": "standard",
+          "launchDate": "2026-11-24",
+          "startDate": "",
+          "endDate": "",
+          "dateFilterMode": "none",
+          "eventType": "Conference",
+          "description": "Saudi Artificial Intelligence Forum 2026",
+          "channelFilters": {
+            "meta": true,
+            "google": true,
+            "linkedin": true,
+            "tiktok": true,
+            "x": true
+          },
+          "business": "B2B",
+          "status": "active",
+          "visibility": "public"
+        },
+        {
+          "id": "kog-26",
+          "name": "KoG 26",
+          "sourceName": "KoG 26",
+          "portfolio": "P1",
+          "enabled": true,
+          "sheetType": "combined",
+          "gid": "1486784585",
+          "plannedGid": "1766297835",
+          "plannedType": "standard",
+          "launchDate": "2026-12-01",
+          "startDate": "",
+          "endDate": "",
+          "dateFilterMode": "none",
+          "eventType": "Exhibition",
+          "description": "Kingdom of Gaming 2026",
+          "channelFilters": {
+            "meta": true,
+            "google": true,
+            "linkedin": true,
+            "tiktok": true,
+            "x": true
+          },
+          "business": "derive",
+          "status": "active",
+          "visibility": "public"
+        },
+        {
+          "id": "black-hat",
+          "name": "Black Hat",
+          "sourceName": "BLACK HAT",
+          "portfolio": "P1",
+          "enabled": true,
+          "sheetType": "combined",
+          "gid": "659941332",
+          "plannedGid": "277310277",
+          "plannedType": "blackhat-text",
+          "launchDate": "2026-12-01",
+          "startDate": "",
+          "endDate": "",
+          "dateFilterMode": "none",
+          "eventType": "Exhibition",
+          "description": "Black Hat MEA 2026",
+          "channelFilters": {
+            "meta": true,
+            "google": true,
+            "linkedin": true,
+            "tiktok": true,
+            "x": true
+          },
+          "business": "B2B",
+          "status": "active",
+          "visibility": "public"
+        },
+        {
+          "id": "smlc-26",
+          "name": "SMLC 26",
+          "sourceName": "SMLC 26",
+          "portfolio": "P3",
+          "enabled": true,
+          "sheetType": "combined",
+          "gid": "1526538255",
+          "plannedGid": "",
+          "plannedType": "standard",
+          "launchDate": "2026-10-21",
+          "startDate": "",
+          "endDate": "",
+          "dateFilterMode": "none",
+          "eventType": "Exhibition",
+          "description": "Saudi Maritime Logistics Congress 2026",
+          "channelFilters": {
+            "meta": true,
+            "google": true,
+            "linkedin": true,
+            "tiktok": true,
+            "x": true
+          },
+          "status": "active",
+          "visibility": "public",
+          "business": "B2B"
+        },
+        {
+          "id": "idws-26",
+          "name": "IDWS 26",
+          "sourceName": "IDWS 26",
+          "portfolio": "P3",
+          "enabled": true,
+          "sheetType": "combined",
+          "gid": "1121987876",
+          "plannedGid": "",
+          "plannedType": "standard",
+          "launchDate": "2026-12-14",
+          "startDate": "2026-06-01",
+          "endDate": "",
+          "dateFilterMode": "min-date",
+          "eventType": "Exhibition",
+          "description": "International Digital Workplace Summit 2026 (Active from June 2026)",
+          "channelFilters": {
+            "meta": true,
+            "google": true,
+            "linkedin": true,
+            "tiktok": true,
+            "x": true
+          },
+          "business": "B2B",
+          "status": "active",
+          "visibility": "public"
+        },
+        {
+          "id": "bio-cphi-main",
+          "name": "BIO 26 & CPHI 26",
+          "sourceName": "BIO / CPHI",
+          "portfolio": "P3",
+          "enabled": true,
+          "sheetType": "combined",
+          "gid": "1728688512",
+          "plannedGid": "",
+          "plannedType": "standard",
+          "launchDate": "2026-12-14",
+          "startDate": "2026-01-01",
+          "endDate": "2026-12-31",
+          "dateFilterMode": "year-2026",
+          "eventType": "Both",
+          "description": "BIO 26 & CPHI 26 Main Campaigns (Meta, Google Ads, LinkedIn)",
+          "channelFilters": {
+            "meta": true,
+            "google": true,
+            "linkedin": true,
+            "tiktok": true,
+            "x": true
+          },
+          "business": "B2B",
+          "status": "active",
+          "visibility": "public"
+        },
+        {
+          "id": "cphi-li",
+          "name": "CPHI 26 (LinkedIn)",
+          "sourceName": "CPHI 26",
+          "portfolio": "P3",
+          "enabled": true,
+          "sheetType": "combined",
+          "gid": "208497314",
+          "plannedGid": "",
+          "plannedType": "standard",
+          "launchDate": "2026-12-14",
+          "startDate": "2026-01-01",
+          "endDate": "2026-12-31",
+          "dateFilterMode": "year-2026",
+          "eventType": "Exhibition",
+          "description": "CPHI 26 Dedicated LinkedIn Performance Sheet",
+          "channelFilters": {
+            "meta": false,
+            "google": false,
+            "linkedin": true,
+            "tiktok": false,
+            "x": false
+          },
+          "business": "B2B",
+          "status": "active",
+          "visibility": "public"
+        },
+        {
+          "id": "leap-east-26",
+          "name": "Leap East 26",
+          "sourceName": "Leap East 26",
+          "portfolio": "P1",
+          "enabled": true,
+          "status": "admin_only",
+          "visibility": "admin_only",
+          "sheetType": "combined",
+          "gid": "1617019591",
+          "plannedGid": "",
+          "plannedType": "standard",
+          "launchDate": "2026-07-01",
+          "startDate": "",
+          "endDate": "",
+          "dateFilterMode": "none",
+          "eventType": "Both",
+          "description": "",
+          "channelFilters": {
+            "meta": true,
+            "google": true,
+            "linkedin": true,
+            "tiktok": true,
+            "x": true
+          },
+          "fieldAliases": {},
+          "autoPublishDate": "",
+          "business": "B2B"
+        }
+      ]
+    }
+  },
+  {
+    "versionId": "v1.0.225",
+    "timestamp": "2026-10-28T21:39:30.121Z",
+    "author": "recovery-admin@tahaluf.com",
+    "action": "REVERT",
+    "description": "Reverted to version v1.0.222 (\"Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active\")",
+    "eventsCount": 9,
+    "snapshot": {
+      "version": "v1.0.225",
+      "lastUpdated": "2026-10-28T21:39:30.121Z",
       "updatedBy": "recovery-admin@tahaluf.com",
       "events": [
         {
@@ -7076,19 +6814,281 @@
           "business": "B2B"
         }
       ],
-      "revertedFrom": "v1.0.278"
+      "revertedFrom": "v1.0.222"
     }
   },
   {
-    "versionId": "v1.0.279",
-    "timestamp": "2026-10-29T05:23:24.799Z",
+    "versionId": "v1.0.224",
+    "timestamp": "2026-10-28T21:39:27.981Z",
+    "author": "Automated Test",
+    "action": "TOGGLE",
+    "description": "Enabled event \"gsts-26\"",
+    "eventsCount": 9,
+    "snapshot": {
+      "version": "v1.0.224",
+      "lastUpdated": "2026-10-28T21:39:27.981Z",
+      "updatedBy": "Automated Test",
+      "events": [
+        {
+          "id": "gsts-26",
+          "name": "GSTS 26",
+          "sourceName": "GSTS",
+          "portfolio": "P1",
+          "business": "B2B",
+          "enabled": true,
+          "status": "active",
+          "visibility": "public",
+          "sheetType": "combined",
+          "gid": "120681662",
+          "plannedGid": "2019892532",
+          "plannedType": "standard",
+          "launchDate": "2026-12-18",
+          "startDate": "",
+          "endDate": "",
+          "dateFilterMode": "none",
+          "eventType": "Exhibition",
+          "description": "Global Smart Transport Summit 2026",
+          "channelFilters": {
+            "meta": true,
+            "google": true,
+            "linkedin": true,
+            "tiktok": true,
+            "x": true
+          },
+          "fieldAliases": {},
+          "autoPublishDate": ""
+        },
+        {
+          "id": "saif-26",
+          "name": "SAIF 26",
+          "sourceName": "SAIF 26",
+          "portfolio": "P1",
+          "enabled": true,
+          "sheetType": "combined",
+          "gid": "1196409184",
+          "plannedGid": "570639072",
+          "plannedType": "standard",
+          "launchDate": "2026-11-24",
+          "startDate": "",
+          "endDate": "",
+          "dateFilterMode": "none",
+          "eventType": "Conference",
+          "description": "Saudi Artificial Intelligence Forum 2026",
+          "channelFilters": {
+            "meta": true,
+            "google": true,
+            "linkedin": true,
+            "tiktok": true,
+            "x": true
+          },
+          "business": "B2B",
+          "status": "active",
+          "visibility": "public"
+        },
+        {
+          "id": "kog-26",
+          "name": "KoG 26",
+          "sourceName": "KoG 26",
+          "portfolio": "P1",
+          "enabled": true,
+          "sheetType": "combined",
+          "gid": "1486784585",
+          "plannedGid": "1766297835",
+          "plannedType": "standard",
+          "launchDate": "2026-12-01",
+          "startDate": "",
+          "endDate": "",
+          "dateFilterMode": "none",
+          "eventType": "Exhibition",
+          "description": "Kingdom of Gaming 2026",
+          "channelFilters": {
+            "meta": true,
+            "google": true,
+            "linkedin": true,
+            "tiktok": true,
+            "x": true
+          },
+          "business": "derive",
+          "status": "active",
+          "visibility": "public"
+        },
+        {
+          "id": "black-hat",
+          "name": "Black Hat",
+          "sourceName": "BLACK HAT",
+          "portfolio": "P1",
+          "enabled": true,
+          "sheetType": "combined",
+          "gid": "659941332",
+          "plannedGid": "277310277",
+          "plannedType": "blackhat-text",
+          "launchDate": "2026-12-01",
+          "startDate": "",
+          "endDate": "",
+          "dateFilterMode": "none",
+          "eventType": "Exhibition",
+          "description": "Black Hat MEA 2026",
+          "channelFilters": {
+            "meta": true,
+            "google": true,
+            "linkedin": true,
+            "tiktok": true,
+            "x": true
+          },
+          "business": "B2B",
+          "status": "active",
+          "visibility": "public"
+        },
+        {
+          "id": "smlc-26",
+          "name": "SMLC 26",
+          "sourceName": "SMLC 26",
+          "portfolio": "P3",
+          "enabled": true,
+          "sheetType": "combined",
+          "gid": "1526538255",
+          "plannedGid": "",
+          "plannedType": "standard",
+          "launchDate": "2026-10-21",
+          "startDate": "",
+          "endDate": "",
+          "dateFilterMode": "none",
+          "eventType": "Exhibition",
+          "description": "Saudi Maritime Logistics Congress 2026",
+          "channelFilters": {
+            "meta": true,
+            "google": true,
+            "linkedin": true,
+            "tiktok": true,
+            "x": true
+          },
+          "status": "active",
+          "visibility": "public",
+          "business": "B2B"
+        },
+        {
+          "id": "idws-26",
+          "name": "IDWS 26",
+          "sourceName": "IDWS 26",
+          "portfolio": "P3",
+          "enabled": true,
+          "sheetType": "combined",
+          "gid": "1121987876",
+          "plannedGid": "",
+          "plannedType": "standard",
+          "launchDate": "2026-12-14",
+          "startDate": "2026-06-01",
+          "endDate": "",
+          "dateFilterMode": "min-date",
+          "eventType": "Exhibition",
+          "description": "International Digital Workplace Summit 2026 (Active from June 2026)",
+          "channelFilters": {
+            "meta": true,
+            "google": true,
+            "linkedin": true,
+            "tiktok": true,
+            "x": true
+          },
+          "business": "B2B",
+          "status": "active",
+          "visibility": "public"
+        },
+        {
+          "id": "bio-cphi-main",
+          "name": "BIO 26 & CPHI 26",
+          "sourceName": "BIO / CPHI",
+          "portfolio": "P3",
+          "enabled": true,
+          "sheetType": "combined",
+          "gid": "1728688512",
+          "plannedGid": "",
+          "plannedType": "standard",
+          "launchDate": "2026-12-14",
+          "startDate": "2026-01-01",
+          "endDate": "2026-12-31",
+          "dateFilterMode": "year-2026",
+          "eventType": "Both",
+          "description": "BIO 26 & CPHI 26 Main Campaigns (Meta, Google Ads, LinkedIn)",
+          "channelFilters": {
+            "meta": true,
+            "google": true,
+            "linkedin": true,
+            "tiktok": true,
+            "x": true
+          },
+          "business": "B2B",
+          "status": "active",
+          "visibility": "public"
+        },
+        {
+          "id": "cphi-li",
+          "name": "CPHI 26 (LinkedIn)",
+          "sourceName": "CPHI 26",
+          "portfolio": "P3",
+          "enabled": true,
+          "sheetType": "combined",
+          "gid": "208497314",
+          "plannedGid": "",
+          "plannedType": "standard",
+          "launchDate": "2026-12-14",
+          "startDate": "2026-01-01",
+          "endDate": "2026-12-31",
+          "dateFilterMode": "year-2026",
+          "eventType": "Exhibition",
+          "description": "CPHI 26 Dedicated LinkedIn Performance Sheet",
+          "channelFilters": {
+            "meta": false,
+            "google": false,
+            "linkedin": true,
+            "tiktok": false,
+            "x": false
+          },
+          "business": "B2B",
+          "status": "active",
+          "visibility": "public"
+        },
+        {
+          "id": "leap-east-26",
+          "name": "Leap East 26",
+          "sourceName": "Leap East 26",
+          "portfolio": "P1",
+          "enabled": true,
+          "status": "admin_only",
+          "visibility": "admin_only",
+          "sheetType": "combined",
+          "gid": "1617019591",
+          "plannedGid": "",
+          "plannedType": "standard",
+          "launchDate": "2026-07-01",
+          "startDate": "",
+          "endDate": "",
+          "dateFilterMode": "none",
+          "eventType": "Both",
+          "description": "",
+          "channelFilters": {
+            "meta": true,
+            "google": true,
+            "linkedin": true,
+            "tiktok": true,
+            "x": true
+          },
+          "fieldAliases": {},
+          "autoPublishDate": "",
+          "business": "B2B"
+        }
+      ]
+    }
+  },
+  {
+    "versionId": "v1.0.223",
+    "timestamp": "2026-10-28T21:39:24.709Z",
     "author": "admin@tahaluf.com",
     "action": "STATUS_CHANGE",
     "description": "Changed status of event \"smlc-26\" to Admin Only (Testing)",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.279",
-      "lastUpdated": "2026-10-29T05:23:24.799Z",
+      "version": "v1.0.223",
+      "lastUpdated": "2026-10-28T21:39:24.709Z",
       "updatedBy": "admin@tahaluf.com",
       "events": [
         {
@@ -7342,15 +7342,15 @@
     }
   },
   {
-    "versionId": "v1.0.278",
-    "timestamp": "2026-10-29T05:23:24.786Z",
+    "versionId": "v1.0.222",
+    "timestamp": "2026-10-28T21:39:22.186Z",
     "author": "Automated Test",
     "action": "PROMOTE_LIVE",
     "description": "Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.278",
-      "lastUpdated": "2026-10-29T05:23:24.786Z",
+      "version": "v1.0.222",
+      "lastUpdated": "2026-10-28T21:39:22.186Z",
       "updatedBy": "Automated Test",
       "events": [
         {
@@ -7604,15 +7604,15 @@
     }
   },
   {
-    "versionId": "v1.0.277",
-    "timestamp": "2026-10-29T05:23:24.705Z",
+    "versionId": "v1.0.221",
+    "timestamp": "2026-10-28T21:39:20.023Z",
     "author": "Automated Test",
     "action": "TOGGLE",
     "description": "Enabled event \"gsts-26\"",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.277",
-      "lastUpdated": "2026-10-29T05:23:24.705Z",
+      "version": "v1.0.221",
+      "lastUpdated": "2026-10-28T21:39:20.023Z",
       "updatedBy": "Automated Test",
       "events": [
         {
@@ -7866,15 +7866,15 @@
     }
   },
   {
-    "versionId": "v1.0.276",
-    "timestamp": "2026-10-29T04:46:26.632Z",
+    "versionId": "v1.0.220",
+    "timestamp": "2026-10-28T21:38:25.345Z",
     "author": "Automated Test Cleanup",
     "action": "EDIT_EVENT",
     "description": "Test cleanup: restore verified baseline configuration",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.276",
-      "lastUpdated": "2026-10-29T04:46:26.632Z",
+      "version": "v1.0.220",
+      "lastUpdated": "2026-10-28T21:38:25.345Z",
       "updatedBy": "Automated Test Cleanup",
       "events": [
         {
@@ -8128,15 +8128,15 @@
     }
   },
   {
-    "versionId": "v1.0.275",
-    "timestamp": "2026-10-29T04:46:26.623Z",
+    "versionId": "v1.0.219",
+    "timestamp": "2026-10-28T21:38:23.654Z",
     "author": "recovery-admin@tahaluf.com",
     "action": "REVERT",
-    "description": "Reverted to version v1.0.273 (\"Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active\")",
+    "description": "Reverted to version v1.0.217 (\"Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active\")",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.275",
-      "lastUpdated": "2026-10-29T04:46:26.623Z",
+      "version": "v1.0.219",
+      "lastUpdated": "2026-10-28T21:38:23.654Z",
       "updatedBy": "recovery-admin@tahaluf.com",
       "events": [
         {
@@ -8387,19 +8387,19 @@
           "business": "B2B"
         }
       ],
-      "revertedFrom": "v1.0.273"
+      "revertedFrom": "v1.0.217"
     }
   },
   {
-    "versionId": "v1.0.274",
-    "timestamp": "2026-10-29T04:46:26.615Z",
+    "versionId": "v1.0.218",
+    "timestamp": "2026-10-28T21:38:21.931Z",
     "author": "admin@tahaluf.com",
     "action": "STATUS_CHANGE",
     "description": "Changed status of event \"smlc-26\" to Admin Only (Testing)",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.274",
-      "lastUpdated": "2026-10-29T04:46:26.615Z",
+      "version": "v1.0.218",
+      "lastUpdated": "2026-10-28T21:38:21.931Z",
       "updatedBy": "admin@tahaluf.com",
       "events": [
         {
@@ -8653,15 +8653,15 @@
     }
   },
   {
-    "versionId": "v1.0.273",
-    "timestamp": "2026-10-29T04:46:26.605Z",
+    "versionId": "v1.0.217",
+    "timestamp": "2026-10-28T21:38:20.062Z",
     "author": "Automated Test",
     "action": "PROMOTE_LIVE",
     "description": "Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.273",
-      "lastUpdated": "2026-10-29T04:46:26.605Z",
+      "version": "v1.0.217",
+      "lastUpdated": "2026-10-28T21:38:20.062Z",
       "updatedBy": "Automated Test",
       "events": [
         {
@@ -8915,15 +8915,15 @@
     }
   },
   {
-    "versionId": "v1.0.272",
-    "timestamp": "2026-10-29T04:46:26.541Z",
+    "versionId": "v1.0.216",
+    "timestamp": "2026-10-28T21:38:18.178Z",
     "author": "Automated Test",
     "action": "TOGGLE",
     "description": "Enabled event \"gsts-26\"",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.272",
-      "lastUpdated": "2026-10-29T04:46:26.541Z",
+      "version": "v1.0.216",
+      "lastUpdated": "2026-10-28T21:38:18.178Z",
       "updatedBy": "Automated Test",
       "events": [
         {
@@ -9177,15 +9177,15 @@
     }
   },
   {
-    "versionId": "v1.0.271",
-    "timestamp": "2026-10-29T04:45:24.205Z",
+    "versionId": "v1.0.215",
+    "timestamp": "2026-10-28T21:15:41.229Z",
     "author": "Automated Test Cleanup",
     "action": "EDIT_EVENT",
     "description": "Test cleanup: restore verified baseline configuration",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.271",
-      "lastUpdated": "2026-10-29T04:45:24.205Z",
+      "version": "v1.0.215",
+      "lastUpdated": "2026-10-28T21:15:41.229Z",
       "updatedBy": "Automated Test Cleanup",
       "events": [
         {
@@ -9439,15 +9439,15 @@
     }
   },
   {
-    "versionId": "v1.0.270",
-    "timestamp": "2026-10-29T04:45:24.199Z",
+    "versionId": "v1.0.214",
+    "timestamp": "2026-10-28T21:15:39.677Z",
     "author": "recovery-admin@tahaluf.com",
     "action": "REVERT",
-    "description": "Reverted to version v1.0.268 (\"Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active\")",
+    "description": "Reverted to version v1.0.212 (\"Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active\")",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.270",
-      "lastUpdated": "2026-10-29T04:45:24.199Z",
+      "version": "v1.0.214",
+      "lastUpdated": "2026-10-28T21:15:39.677Z",
       "updatedBy": "recovery-admin@tahaluf.com",
       "events": [
         {
@@ -9698,19 +9698,19 @@
           "business": "B2B"
         }
       ],
-      "revertedFrom": "v1.0.268"
+      "revertedFrom": "v1.0.212"
     }
   },
   {
-    "versionId": "v1.0.269",
-    "timestamp": "2026-10-29T04:45:24.191Z",
+    "versionId": "v1.0.213",
+    "timestamp": "2026-10-28T21:15:37.761Z",
     "author": "admin@tahaluf.com",
     "action": "STATUS_CHANGE",
     "description": "Changed status of event \"smlc-26\" to Admin Only (Testing)",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.269",
-      "lastUpdated": "2026-10-29T04:45:24.191Z",
+      "version": "v1.0.213",
+      "lastUpdated": "2026-10-28T21:15:37.761Z",
       "updatedBy": "admin@tahaluf.com",
       "events": [
         {
@@ -9964,15 +9964,15 @@
     }
   },
   {
-    "versionId": "v1.0.268",
-    "timestamp": "2026-10-29T04:45:24.184Z",
+    "versionId": "v1.0.212",
+    "timestamp": "2026-10-28T21:15:36.198Z",
     "author": "Automated Test",
     "action": "PROMOTE_LIVE",
     "description": "Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.268",
-      "lastUpdated": "2026-10-29T04:45:24.184Z",
+      "version": "v1.0.212",
+      "lastUpdated": "2026-10-28T21:15:36.198Z",
       "updatedBy": "Automated Test",
       "events": [
         {
@@ -10226,15 +10226,15 @@
     }
   },
   {
-    "versionId": "v1.0.267",
-    "timestamp": "2026-10-29T04:45:24.128Z",
+    "versionId": "v1.0.211",
+    "timestamp": "2026-10-28T21:15:34.416Z",
     "author": "Automated Test",
     "action": "TOGGLE",
     "description": "Enabled event \"gsts-26\"",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.267",
-      "lastUpdated": "2026-10-29T04:45:24.128Z",
+      "version": "v1.0.211",
+      "lastUpdated": "2026-10-28T21:15:34.416Z",
       "updatedBy": "Automated Test",
       "events": [
         {
@@ -10488,15 +10488,15 @@
     }
   },
   {
-    "versionId": "v1.0.266",
-    "timestamp": "2026-10-29T04:38:48.707Z",
+    "versionId": "v1.0.210",
+    "timestamp": "2026-10-28T21:14:26.050Z",
     "author": "Automated Test Cleanup",
     "action": "EDIT_EVENT",
     "description": "Test cleanup: restore verified baseline configuration",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.266",
-      "lastUpdated": "2026-10-29T04:38:48.707Z",
+      "version": "v1.0.210",
+      "lastUpdated": "2026-10-28T21:14:26.050Z",
       "updatedBy": "Automated Test Cleanup",
       "events": [
         {
@@ -10750,15 +10750,15 @@
     }
   },
   {
-    "versionId": "v1.0.265",
-    "timestamp": "2026-10-29T04:38:48.700Z",
+    "versionId": "v1.0.209",
+    "timestamp": "2026-10-28T21:14:24.585Z",
     "author": "recovery-admin@tahaluf.com",
     "action": "REVERT",
-    "description": "Reverted to version v1.0.263 (\"Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active\")",
+    "description": "Reverted to version v1.0.207 (\"Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active\")",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.265",
-      "lastUpdated": "2026-10-29T04:38:48.700Z",
+      "version": "v1.0.209",
+      "lastUpdated": "2026-10-28T21:14:24.585Z",
       "updatedBy": "recovery-admin@tahaluf.com",
       "events": [
         {
@@ -11009,19 +11009,19 @@
           "business": "B2B"
         }
       ],
-      "revertedFrom": "v1.0.263"
+      "revertedFrom": "v1.0.207"
     }
   },
   {
-    "versionId": "v1.0.264",
-    "timestamp": "2026-10-29T04:38:48.693Z",
+    "versionId": "v1.0.208",
+    "timestamp": "2026-10-28T21:14:23.112Z",
     "author": "admin@tahaluf.com",
     "action": "STATUS_CHANGE",
     "description": "Changed status of event \"smlc-26\" to Admin Only (Testing)",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.264",
-      "lastUpdated": "2026-10-29T04:38:48.693Z",
+      "version": "v1.0.208",
+      "lastUpdated": "2026-10-28T21:14:23.112Z",
       "updatedBy": "admin@tahaluf.com",
       "events": [
         {
@@ -11275,15 +11275,15 @@
     }
   },
   {
-    "versionId": "v1.0.263",
-    "timestamp": "2026-10-29T04:38:48.687Z",
+    "versionId": "v1.0.207",
+    "timestamp": "2026-10-28T21:14:21.580Z",
     "author": "Automated Test",
     "action": "PROMOTE_LIVE",
     "description": "Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.263",
-      "lastUpdated": "2026-10-29T04:38:48.687Z",
+      "version": "v1.0.207",
+      "lastUpdated": "2026-10-28T21:14:21.580Z",
       "updatedBy": "Automated Test",
       "events": [
         {
@@ -11537,15 +11537,15 @@
     }
   },
   {
-    "versionId": "v1.0.262",
-    "timestamp": "2026-10-29T04:38:48.624Z",
+    "versionId": "v1.0.206",
+    "timestamp": "2026-10-28T21:14:18.528Z",
     "author": "Automated Test",
     "action": "TOGGLE",
     "description": "Enabled event \"gsts-26\"",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.262",
-      "lastUpdated": "2026-10-29T04:38:48.624Z",
+      "version": "v1.0.206",
+      "lastUpdated": "2026-10-28T21:14:18.528Z",
       "updatedBy": "Automated Test",
       "events": [
         {
@@ -11799,15 +11799,15 @@
     }
   },
   {
-    "versionId": "v1.0.261",
-    "timestamp": "2026-10-29T04:38:06.858Z",
+    "versionId": "v1.0.205",
+    "timestamp": "2026-10-28T20:39:54.533Z",
     "author": "Automated Test Cleanup",
     "action": "EDIT_EVENT",
     "description": "Test cleanup: restore verified baseline configuration",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.261",
-      "lastUpdated": "2026-10-29T04:38:06.858Z",
+      "version": "v1.0.205",
+      "lastUpdated": "2026-10-28T20:39:54.533Z",
       "updatedBy": "Automated Test Cleanup",
       "events": [
         {
@@ -12061,15 +12061,15 @@
     }
   },
   {
-    "versionId": "v1.0.260",
-    "timestamp": "2026-10-29T04:38:06.836Z",
+    "versionId": "v1.0.204",
+    "timestamp": "2026-10-28T20:39:52.996Z",
     "author": "recovery-admin@tahaluf.com",
     "action": "REVERT",
-    "description": "Reverted to version v1.0.258 (\"Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active\")",
+    "description": "Reverted to version v1.0.202 (\"Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active\")",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.260",
-      "lastUpdated": "2026-10-29T04:38:06.836Z",
+      "version": "v1.0.204",
+      "lastUpdated": "2026-10-28T20:39:52.996Z",
       "updatedBy": "recovery-admin@tahaluf.com",
       "events": [
         {
@@ -12320,19 +12320,19 @@
           "business": "B2B"
         }
       ],
-      "revertedFrom": "v1.0.258"
+      "revertedFrom": "v1.0.202"
     }
   },
   {
-    "versionId": "v1.0.259",
-    "timestamp": "2026-10-29T04:38:06.823Z",
+    "versionId": "v1.0.203",
+    "timestamp": "2026-10-28T20:39:51.440Z",
     "author": "admin@tahaluf.com",
     "action": "STATUS_CHANGE",
     "description": "Changed status of event \"smlc-26\" to Admin Only (Testing)",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.259",
-      "lastUpdated": "2026-10-29T04:38:06.823Z",
+      "version": "v1.0.203",
+      "lastUpdated": "2026-10-28T20:39:51.440Z",
       "updatedBy": "admin@tahaluf.com",
       "events": [
         {
@@ -12586,15 +12586,15 @@
     }
   },
   {
-    "versionId": "v1.0.258",
-    "timestamp": "2026-10-29T04:38:06.795Z",
+    "versionId": "v1.0.202",
+    "timestamp": "2026-10-28T20:39:49.603Z",
     "author": "Automated Test",
     "action": "PROMOTE_LIVE",
     "description": "Promoted event \"SMLC 26\" (P3) from Admin Staging to Public Active",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.258",
-      "lastUpdated": "2026-10-29T04:38:06.795Z",
+      "version": "v1.0.202",
+      "lastUpdated": "2026-10-28T20:39:49.603Z",
       "updatedBy": "Automated Test",
       "events": [
         {
@@ -12848,15 +12848,15 @@
     }
   },
   {
-    "versionId": "v1.0.257",
-    "timestamp": "2026-10-29T04:38:06.616Z",
+    "versionId": "v1.0.201",
+    "timestamp": "2026-10-28T20:39:47.752Z",
     "author": "Automated Test",
     "action": "TOGGLE",
     "description": "Enabled event \"gsts-26\"",
     "eventsCount": 9,
     "snapshot": {
-      "version": "v1.0.257",
-      "lastUpdated": "2026-10-29T04:38:06.616Z",
+      "version": "v1.0.201",
+      "lastUpdated": "2026-10-28T20:39:47.752Z",
       "updatedBy": "Automated Test",
       "events": [
         {

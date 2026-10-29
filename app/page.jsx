@@ -3092,15 +3092,15 @@ export default function App() {
         <header className="sticky top-0 z-50 bg-[#0a2442]/95 backdrop-blur-xl border-b border-[#cedc28]/20 px-0 py-2 sm:py-2.5 shadow-2xl relative">
           <div className="pattern-overlay absolute inset-0 z-0 pointer-events-none"></div>
 
-          {/* DESKTOP HEADER: WIDE VIEWPORTS (>= 1280px / xl) - All 9 filters in a single elegant row */}
-          <div className="hidden xl:flex items-center justify-between relative z-10 w-full px-3 2xl:px-6">
+          {/* DESKTOP HEADER: WIDE VIEWPORTS (>= 1536px / 2xl) - All 9 filters in a single elegant row */}
+          <div className="hidden 2xl:flex items-center justify-between relative z-10 w-full px-4 2xl:px-6">
             {/* LEFT: Logo */}
             <div 
               onClick={() => {
                 setActiveTab('summary');
                 if (tvMode) setTvMode(false);
               }}
-              className="w-36 2xl:w-48 pr-2.5 flex items-center justify-between shrink-0 border-r border-[#cedc28]/15 cursor-pointer hover:opacity-85 transition-opacity"
+              className="w-40 2xl:w-48 pr-3 flex items-center justify-between shrink-0 border-r border-[#cedc28]/15 cursor-pointer hover:opacity-85 transition-opacity"
               title="Return to Overview"
             >
               <div className="flex flex-col items-start gap-0.5">
@@ -3109,11 +3109,11 @@ export default function App() {
               </div>
             </div>
 
-            {/* CENTER: ALL 9 FILTERS */}
-            <div className="px-2 flex gap-1 2xl:gap-1.5 flex-nowrap items-end flex-1 min-w-0 overflow-visible justify-center">
-              <DateRangeFilter label="DATE" dateRange={dateRange} onChange={setDateRange} widthClass="w-[92px] 2xl:w-[110px]" />
-              <MultiSelect label="Week" options={uniqueWeeks} selected={filterWeeks} onChange={setFilterWeeks} widthClass="w-[58px] 2xl:w-[68px]" />
-              <MultiSelect label="Portfolio" options={uniquePortfolios} selected={filterPortfolios} onChange={setFilterPortfolios} widthClass="w-[66px] 2xl:w-[76px]" />
+            {/* CENTER: ALL 9 FILTERS (NON-SHRINKING, PROTECTED AGAINST SQUEEZE) */}
+            <div className="px-3 flex gap-2 flex-nowrap items-end justify-center shrink-0">
+              <DateRangeFilter label="DATE" dateRange={dateRange} onChange={setDateRange} widthClass="w-[100px] 2xl:w-[115px]" />
+              <MultiSelect label="Week" options={uniqueWeeks} selected={filterWeeks} onChange={setFilterWeeks} widthClass="w-[62px] 2xl:w-[70px]" />
+              <MultiSelect label="Portfolio" options={uniquePortfolios} selected={filterPortfolios} onChange={setFilterPortfolios} widthClass="w-[70px] 2xl:w-[78px]" />
               {/* HERO HIGHLIGHTED EVENT FILTER */}
               <MultiSelect 
                 label="Event" 
@@ -3128,30 +3128,30 @@ export default function App() {
                   }
                 }} 
                 isHero={true} 
-                widthClass="w-[105px] 2xl:w-[125px]" 
+                widthClass="w-[115px] 2xl:w-[130px]" 
               />
-              <MultiSelect label="Event Type" options={uniqueEventTypes} selected={filterEventTypes} onChange={setFilterEventTypes} widthClass="w-[74px] 2xl:w-[82px]" />
-              <MultiSelect label="Funnel Stage" options={uniquePhases} selected={filterPhases} onChange={setFilterPhases} widthClass="w-[78px] 2xl:w-[84px]" />
-              <MultiSelect label="Channel" options={uniqueChannels} selected={filterChannels} onChange={setFilterChannels} widthClass="w-[66px] 2xl:w-[74px]" />
-              <MultiSelect label="Market" options={uniqueMarkets} selected={filterMarkets} onChange={setFilterMarkets} widthClass="w-[72px] 2xl:w-[82px]" alignRight={true} />
+              <MultiSelect label="Event Type" options={uniqueEventTypes} selected={filterEventTypes} onChange={setFilterEventTypes} widthClass="w-[78px] 2xl:w-[84px]" />
+              <MultiSelect label="Funnel Stage" options={uniquePhases} selected={filterPhases} onChange={setFilterPhases} widthClass="w-[82px] 2xl:w-[88px]" />
+              <MultiSelect label="Channel" options={uniqueChannels} selected={filterChannels} onChange={setFilterChannels} widthClass="w-[70px] 2xl:w-[76px]" />
+              <MultiSelect label="Market" options={uniqueMarkets} selected={filterMarkets} onChange={setFilterMarkets} widthClass="w-[76px] 2xl:w-[84px]" alignRight={true} />
               <MultiSelect 
                 label="Business" 
                 options={uniqueBusinesses} 
                 selected={filterBusinesses} 
                 onChange={setFilterBusinesses} 
-                widthClass="w-[68px] 2xl:w-[76px]" 
+                widthClass="w-[72px] 2xl:w-[78px]" 
                 singleSelect={true}
                 alignRight={true}
               />
             </div>
 
             {/* RIGHT: PINNED ACTIONS (ALWAYS VISIBLE & PROTECTED FROM OVERLAP) */}
-            <div className="pl-3 shrink-0 flex items-center gap-1.5 border-l border-[#cedc28]/15 bg-[#0a2442] relative z-30 shadow-[-16px_0_20px_#0a2442]">
+            <div className="pl-3.5 shrink-0 flex items-center gap-2 border-l border-[#cedc28]/15 bg-[#0a2442] relative z-30">
               {featureAllowed('quickJump') && (
                 <button
                   onClick={() => setIsQuickJumpOpen(true)}
                   title="Search & Quick Jump (Cmd+K)"
-                  className="h-[30px] px-2 bg-white/5 border border-white/15 text-slate-300 rounded-lg hover:bg-white/10 hover:text-white transition-colors flex items-center gap-1.5 text-[10px] font-semibold shrink-0"
+                  className="h-[30px] px-2.5 bg-white/5 border border-white/15 text-slate-300 rounded-lg hover:bg-white/10 hover:text-white transition-colors flex items-center gap-1.5 text-[10px] font-semibold shrink-0"
                 >
                   <Search className="w-3 h-3 text-[#14a6d9]" />
                   <span className="hidden 2xl:inline">Search</span>
@@ -3178,8 +3178,8 @@ export default function App() {
             </div>
           </div>
 
-          {/* MEDIUM DESKTOP / LAPTOP (Screens 1024px to 1279px / lg to xl-1) - 2-tier layout, zero collision */}
-          <div className="hidden lg:flex xl:hidden flex-col gap-2 relative z-10 w-full px-3 py-1">
+          {/* MEDIUM DESKTOP / LAPTOP (Screens 1024px to 1535px / lg to 2xl-1) - 2-tier layout, zero collision */}
+          <div className="hidden lg:flex 2xl:hidden flex-col gap-2 relative z-10 w-full px-3 py-1">
             {/* Top Tier: Logo + Primary Scope Filters + Pinned Actions */}
             <div className="flex items-center justify-between w-full">
               <div 
