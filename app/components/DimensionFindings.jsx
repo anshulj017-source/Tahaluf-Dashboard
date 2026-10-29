@@ -95,7 +95,11 @@ export default function DimensionFindings({
                   const targetId = finding.eventId || eventId;
                   const isEventAccepting = acceptingKey === `${id}:${value}:event`;
                   const isGlobalAccepting = acceptingKey === `${id}:${value}:global`;
-                  const bestSuggestion = finding.type === 'non-standard'
+                  const normVal = String(value || '').trim().toLowerCase();
+                  const isAcceptedGlobally = (customValues[id] || []).some(v => String(v || '').trim().toLowerCase() === normVal);
+                  const isAcceptedEvent = Boolean(targetId && (eventCustomValues[targetId]?.[id] || []).some(v => String(v || '').trim().toLowerCase() === normVal));
+                  const isAccepted = isAcceptedGlobally || isAcceptedEvent;
+                  const bestSuggestion = finding.type === 'non-standard' && !isAccepted
                     ? findBestSuggestion(value, [standards[id] || [], customValues[id] || [], eventCustomValues[targetId]?.[id] || []])
                     : null;
 
@@ -105,26 +109,38 @@ export default function DimensionFindings({
                         <code className="max-w-full break-all font-mono text-xs text-white">{value}</code>
                         {onAcceptValue && finding.type === 'non-standard' && (
                           <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
-                            {targetId && (
-                              <button
-                                type="button"
-                                disabled={Boolean(acceptingKey)}
-                                onClick={() => handleAccept(id, value, targetId, 'event')}
-                                className="rounded border border-amber-400/40 bg-amber-500/10 px-2 py-1 font-medium text-amber-200 hover:bg-amber-500/20 disabled:opacity-50"
-                                title={`Accept "${value}" for ${eventName || targetId}`}
-                              >
-                                {isEventAccepting ? 'Accepting…' : `+ Accept for ${eventName || targetId}`}
-                              </button>
+                            {isAcceptedGlobally ? (
+                              <span className="inline-flex items-center gap-1 rounded bg-emerald-500/20 border border-emerald-400/40 px-2 py-0.5 font-semibold text-emerald-300">
+                                ✓ Accepted globally
+                              </span>
+                            ) : isAcceptedEvent ? (
+                              <span className="inline-flex items-center gap-1 rounded bg-emerald-500/20 border border-emerald-400/40 px-2 py-0.5 font-semibold text-emerald-300">
+                                ✓ Accepted for {eventName || targetId}
+                              </span>
+                            ) : (
+                              <>
+                                {targetId && (
+                                  <button
+                                    type="button"
+                                    disabled={Boolean(acceptingKey)}
+                                    onClick={() => handleAccept(id, value, targetId, 'event')}
+                                    className="rounded border border-amber-400/40 bg-amber-500/10 px-2 py-1 font-medium text-amber-200 hover:bg-amber-500/20 disabled:opacity-50"
+                                    title={`Accept "${value}" for ${eventName || targetId}`}
+                                  >
+                                    {isEventAccepting ? 'Accepting…' : `+ Accept for ${eventName || targetId}`}
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  disabled={Boolean(acceptingKey)}
+                                  onClick={() => handleAccept(id, value, null, 'global')}
+                                  className="rounded border border-[#14a6d9]/40 bg-[#14a6d9]/10 px-2 py-1 font-medium text-[#6bd5f7] hover:bg-[#14a6d9]/20 disabled:opacity-50"
+                                  title={`Accept "${value}" across all events globally`}
+                                >
+                                  {isGlobalAccepting ? 'Accepting…' : '+ Accept globally'}
+                                </button>
+                              </>
                             )}
-                            <button
-                              type="button"
-                              disabled={Boolean(acceptingKey)}
-                              onClick={() => handleAccept(id, value, null, 'global')}
-                              className="rounded border border-[#14a6d9]/40 bg-[#14a6d9]/10 px-2 py-1 font-medium text-[#6bd5f7] hover:bg-[#14a6d9]/20 disabled:opacity-50"
-                              title={`Accept "${value}" across all events globally`}
-                            >
-                              {isGlobalAccepting ? 'Accepting…' : '+ Accept globally'}
-                            </button>
                           </div>
                         )}
                       </div>

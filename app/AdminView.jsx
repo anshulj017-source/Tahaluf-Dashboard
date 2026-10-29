@@ -387,6 +387,28 @@ export default function AdminView({
               ))}
             </div>
 
+            {/* MOBILE & TABLET QUICK ACTIONS (< 1024px): BACK TO DASHBOARD & SIGN OUT */}
+            <div className="flex lg:hidden items-center justify-between gap-2 mt-3 pt-2.5 border-t border-white/10">
+              <button 
+                type="button" 
+                onClick={() => onNavigate ? onNavigate('summary') : (window.location.href = '/')}
+                className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-left text-xs font-bold text-slate-300 hover:text-white hover:bg-white/10 transition-all border border-white/10"
+              >
+                <ArrowLeft className="h-3.5 w-3.5 text-[#cedc28] shrink-0" />
+                <span>Back to Dashboard</span>
+              </button>
+              {onSignOut && (
+                <button 
+                  type="button" 
+                  onClick={onSignOut}
+                  className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-left text-xs font-bold text-red-400 hover:text-red-300 hover:bg-red-500/10 border border-red-500/20 transition-all"
+                >
+                  <LogOut className="h-3.5 w-3.5 shrink-0" />
+                  <span>Sign Out</span>
+                </button>
+              )}
+            </div>
+
             {/* 3. DESKTOP SCREENS (>= 1024px): VERTICAL SIDEBAR */}
             <div className="hidden lg:flex sticky top-0 flex-col gap-2">
               <p className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-400">Administration</p>
