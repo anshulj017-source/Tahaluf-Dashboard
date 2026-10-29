@@ -331,3 +331,39 @@ test('Admin section navigation is responsive with custom dropdown on mobile, 2-l
   const desktopButtons = nodes(desktopSidebarContainer, node => node.type === 'button');
   assert.equal(desktopButtons.length, 6, 'all 6 admin sections must be rendered as accessible buttons in desktop layout');
 });
+
+test('Regular Admin cannot view or change user roles and cannot access User Access section', async () => {
+  const harness = hookHarness();
+  const stub = () => null;
+  let activeSectionState = 'users';
+  const component = await load('../app/AdminView.jsx', {
+    react: { ...harness.hooks, useEffect() {} },
+    './components/EventsAdmin': stub,
+    './components/DataHealthAdmin': stub,
+    './components/AnalyticsAdmin': stub,
+    './components/ApiQuotasAdmin': stub,
+    './components/FeatureControlsAdmin': stub,
+    './components/AdminUI': {
+      AdminDialog: stub, useAdminDirtyGuard() {},
+      useAdminView: (_, initial) => [activeSectionState, (s) => { activeSectionState = s; }]
+    }
+  });
+
+  // Render AdminView with userRole='admin' (regular admin, not super_admin)
+  const tree = harness.render(component.default, { userRole: 'admin' });
+  const nav = nodes(tree, node => node.props?.['aria-label'] === 'Admin sections')[0];
+  assert.ok(nav, 'Admin sections navigation must be present');
+
+  // Verify only 4 operational sections are available (events, health, quotas, analytics)
+  // Both 'features' and 'users' must be excluded
+  const buttons = nodes(nav, node => node.type === 'button' && typeof node.props?.children === 'string');
+  const sectionLabels = buttons.map(b => b.props.children);
+  assert.ok(!sectionLabels.some(l => l.includes('User Access')), 'User Access must NOT be visible to regular admin');
+  assert.ok(!sectionLabels.some(l => l.includes('Feature Controls')), 'Feature Controls must NOT be visible to regular admin');
+
+  // When activeSection is forced to 'users', verify Super Admin Access Required warning is shown
+  const headings = nodes(tree, node => node.type === 'h3').map(h => h.props?.children);
+  assert.ok(headings.includes('Super Admin Access Required'), 'Accessing users section shows Super Admin Access Required message');
+  const tables = nodes(tree, node => node.type === 'table');
+  assert.equal(tables.length, 0, 'No user roster table is rendered for regular admin');
+});

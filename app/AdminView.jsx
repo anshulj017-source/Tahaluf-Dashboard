@@ -14,7 +14,7 @@ const ALL_ADMIN_SECTIONS = [
   { id: 'quotas', featureId: 'adminQuotas', label: 'API & Quotas', icon: Gauge },
   { id: 'analytics', featureId: 'adminAnalytics', label: 'Analytics & Activity', icon: BarChart3 },
   { id: 'features', label: 'Feature Controls', icon: Shield, superAdminOnly: true },
-  { id: 'users', label: 'User Access', icon: UsersIcon },
+  { id: 'users', label: 'User Access', icon: UsersIcon, superAdminOnly: true },
 ];
 
 const sections = ALL_ADMIN_SECTIONS;
@@ -35,13 +35,9 @@ export default function AdminView({
 
   // Filter sections dynamically based on role and feature controls
   const visibleSections = ALL_ADMIN_SECTIONS.filter(section => {
-    // Feature Controls tab itself is restricted strictly to SUPER ADMIN
+    // Feature Controls and User Access are restricted strictly to SUPER ADMIN
     if (section.superAdminOnly && !isSuperAdmin) {
       return false;
-    }
-    // User Access is always available (exempt from feature control)
-    if (section.id === 'users') {
-      return true;
     }
     // Other admin features obey feature control configuration
     if (section.featureId) {
@@ -55,7 +51,7 @@ export default function AdminView({
     return true;
   });
 
-  const [activeSection, setActiveSection] = useAdminView('admin', 'users', ALL_ADMIN_SECTIONS.map(section => section.id));
+  const [activeSection, setActiveSection] = useAdminView('admin', isSuperAdmin ? 'users' : 'events', ALL_ADMIN_SECTIONS.map(section => section.id));
 
   // If active section is hidden by feature controls or super admin check, fallback safely
   useEffect(() => {
@@ -123,11 +119,20 @@ export default function AdminView({
     setSortConfig({ key, direction });
   };
 
+  const getAdminHeaders = () => ({
+    'Content-Type': 'application/json',
+    'x-admin-email': currentUserEmail || (typeof window !== 'undefined' ? localStorage.getItem('tahaluf_cached_email') : '') || 'admin@tahaluf.com',
+    'x-admin-role': userRole || (typeof window !== 'undefined' ? localStorage.getItem('tahaluf_cached_role') : '') || 'super_admin'
+  });
+
   const fetchUsers = async () => {
+    if (!isSuperAdmin) return;
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/admin/users');
+      const res = await fetch('/api/admin/users', {
+        headers: getAdminHeaders()
+      });
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
         throw new Error(errorData.error || 'Failed to fetch users');
@@ -142,15 +147,16 @@ export default function AdminView({
     }
   };
 
-  // Only fetch users on demand when switching to the users section
+  // Only fetch users on demand when switching to the users section and if user is super admin
   useEffect(() => {
-    if (activeSection === 'users' && users.length === 0) {
+    if (activeSection === 'users' && users.length === 0 && isSuperAdmin) {
       fetchUsers();
     }
-  }, [activeSection]);
+  }, [activeSection, isSuperAdmin]);
 
   const handleAddUser = async (e) => {
     e.preventDefault();
+    if (!isSuperAdmin) return;
     setAddingUser(true);
     setError(null);
     setAddSuccess(false);
@@ -158,7 +164,7 @@ export default function AdminView({
     try {
       const res = await fetch('/api/admin/users', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminHeaders(),
         body: JSON.stringify({ email: newEmail, password: newPassword, role: newRole })
       });
       
@@ -180,10 +186,11 @@ export default function AdminView({
   };
 
   const handleDeleteUser = async (uid) => {
+    if (!isSuperAdmin) return;
     try {
       const res = await fetch('/api/admin/users', {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminHeaders(),
         body: JSON.stringify({ uid })
       });
       
@@ -200,10 +207,11 @@ export default function AdminView({
   };
 
   const updateUserRole = async (uid, newRole) => {
+    if (!isSuperAdmin) return;
     try {
       const res = await fetch('/api/admin/users', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminHeaders(),
         body: JSON.stringify({ uid, role: newRole })
       });
       
@@ -222,10 +230,11 @@ export default function AdminView({
   };
 
   const handleChangePassword = async (uid, email, password) => {
+    if (!isSuperAdmin) return;
     try {
       const res = await fetch('/api/admin/users', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminHeaders(),
         body: JSON.stringify({ uid, password })
       });
       
@@ -469,6 +478,23 @@ export default function AdminView({
 
         {/* SECTION 2: USER ACCESS MANAGEMENT */}
         {activeSection === 'users' && (
+          !isSuperAdmin ? (
+            <div className="card-surface p-8 rounded-3xl border border-amber-500/30 bg-[#0a2442]/80 text-center max-w-xl mx-auto my-12 shadow-2xl">
+              <div className="w-16 h-16 rounded-full bg-amber-500/15 border border-amber-500/40 text-amber-300 flex items-center justify-center mx-auto mb-4">
+                <Shield className="w-8 h-8" />
+              </div>
+              <h3 className="text-xl font-bold text-white mb-2">Super Admin Access Required</h3>
+              <p className="text-sm text-gray-400 mb-6">
+                Viewing user lists and modifying user roles is restricted strictly to designated Super Administrators.
+              </p>
+              <button
+                onClick={() => setActiveSection('events')}
+                className="px-5 py-2.5 bg-[#cedc28] text-[#1a302e] font-bold text-xs uppercase tracking-wider rounded-xl hover:brightness-110 shadow-lg"
+              >
+                Go to Events & Data
+              </button>
+            </div>
+          ) : (
           <div>
             <div className="flex flex-wrap gap-3 justify-between items-end mb-5">
               <div>
@@ -683,6 +709,7 @@ export default function AdminView({
           <button disabled={visibleUserPage * 20 >= filteredUsers.length} onClick={() => setUserPage(visibleUserPage + 1)} className="rounded border border-slate-600 p-2 disabled:opacity-40">Next</button>
         </nav>}
       </div>
+          )
       )}
 
       {/* SECTION 3: ANALYTICS & ACTIVITY */}

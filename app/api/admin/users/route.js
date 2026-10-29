@@ -1,11 +1,16 @@
 import { NextResponse } from 'next/server';
 import { getFirebaseAdmin } from '../../../../lib/firebaseAdmin';
+import { isSuperAdminRequest } from '../../../../lib/requireAdminRequest';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 export async function GET(req) {
   try {
+    if (!await isSuperAdminRequest(req)) {
+      return NextResponse.json({ error: 'Super Admin access required to view user accounts.' }, { status: 403 });
+    }
+
     const { adminAuth, adminDb } = getFirebaseAdmin();
     const listUsersResult = await adminAuth.listUsers(1000);
 
@@ -39,6 +44,10 @@ export async function GET(req) {
 
 export async function POST(req) {
   try {
+    if (!await isSuperAdminRequest(req)) {
+      return NextResponse.json({ error: 'Super Admin access required to create user accounts.' }, { status: 403 });
+    }
+
     const { adminAuth, adminDb } = getFirebaseAdmin();
     const { email, password, role } = await req.json();
 
@@ -76,6 +85,10 @@ export async function POST(req) {
 
 export async function PUT(req) {
   try {
+    if (!await isSuperAdminRequest(req)) {
+      return NextResponse.json({ error: 'Super Admin access required to modify user accounts or roles.' }, { status: 403 });
+    }
+
     const { adminAuth, adminDb } = getFirebaseAdmin();
     const { uid, role, password } = await req.json();
 
@@ -110,6 +123,10 @@ export async function PUT(req) {
 
 export async function DELETE(req) {
   try {
+    if (!await isSuperAdminRequest(req)) {
+      return NextResponse.json({ error: 'Super Admin access required to delete user accounts.' }, { status: 403 });
+    }
+
     const { adminAuth, adminDb } = getFirebaseAdmin();
     const { uid } = await req.json();
 
