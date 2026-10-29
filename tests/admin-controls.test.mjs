@@ -73,39 +73,44 @@ test('settings cache reduces 100 concurrent and warm reads to one read and expir
       });
     }
   };
-  const settings = await loadInstrumentedModule('../lib/adminSettingsStore.mjs', {
-    './firebaseAdmin.js': { getFirebaseAdmin: () => ({ adminDb: db }) }
-  }, { Date: clock.Date, process: { env: { VERCEL: '1' }, cwd: () => process.cwd() } });
-  const results = await Promise.all(Array.from({ length: 100 }, () => settings.readAdminSetting('dashboardFeatures', {})));
-  assert.equal(reads, 1);
-  results[0].modes.tv = 'disabled';
-  assert.equal((await settings.readAdminSetting('dashboardFeatures', {})).modes.tv, 'public');
-  clock.advance(59_999);
-  await settings.readAdminSetting('dashboardFeatures', {});
-  assert.equal(reads, 1);
-  value.revision = 2;
-  clock.advance(1);
-  assert.equal((await settings.readAdminSetting('dashboardFeatures', {})).revision, 2);
-  assert.equal(reads, 2);
-  await settings.updateAdminSetting('dashboardFeatures', {}, state => ({ ...state, revision: 3 }));
-  assert.equal((await settings.readAdminSetting('dashboardFeatures', {})).revision, 3);
-  assert.equal(reads, 4, 'save reads authoritative data and next read reloads');
-  failWrite = true;
-  await assert.rejects(settings.updateAdminSetting('dashboardFeatures', {}, state => state), /write rejected/);
-  await settings.readAdminSetting('dashboardFeatures', {});
-  assert.equal(reads, 5, 'failed saves also invalidate cache');
-  clock.advance(60_000);
-  failRead = true;
-  await assert.rejects(settings.readAdminSetting('dashboardFeatures', {}), /unavailable/);
-  failRead = false;
-  await settings.readAdminSetting('dashboardFeatures', {});
-  assert.equal(reads, 7, 'failed reads can be retried immediately');
-  await settings.readAdminSetting('apiUsage', {});
-  await settings.readAdminSetting('apiUsage', {});
-  assert.equal(reads, 9, 'usage reads are never cached');
-  await settings.readAdminSetting('apiBudgets', {});
-  await settings.readAdminSetting('apiBudgets', {});
-  assert.equal(reads, 10, 'budget reads use the cache');
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'tahaluf-settings-test1-'));
+  try {
+    const settings = await loadInstrumentedModule('../lib/adminSettingsStore.mjs', {
+      './firebaseAdmin.js': { getFirebaseAdmin: () => ({ adminDb: db }) }
+    }, { Date: clock.Date, process: { env: { VERCEL: '1' }, cwd: () => tempDir } });
+    const results = await Promise.all(Array.from({ length: 100 }, () => settings.readAdminSetting('dashboardFeatures', {})));
+    assert.equal(reads, 1);
+    results[0].modes.tv = 'disabled';
+    assert.equal((await settings.readAdminSetting('dashboardFeatures', {})).modes.tv, 'public');
+    clock.advance(59_999);
+    await settings.readAdminSetting('dashboardFeatures', {});
+    assert.equal(reads, 1);
+    value.revision = 2;
+    clock.advance(1);
+    assert.equal((await settings.readAdminSetting('dashboardFeatures', {})).revision, 2);
+    assert.equal(reads, 2);
+    await settings.updateAdminSetting('dashboardFeatures', {}, state => ({ ...state, revision: 3 }));
+    assert.equal((await settings.readAdminSetting('dashboardFeatures', {})).revision, 3);
+    assert.equal(reads, 4, 'save reads authoritative data and next read reloads');
+    failWrite = true;
+    await assert.rejects(settings.updateAdminSetting('dashboardFeatures', {}, state => state), /write rejected/);
+    await settings.readAdminSetting('dashboardFeatures', {});
+    assert.equal(reads, 5, 'failed saves also invalidate cache');
+    clock.advance(60_000);
+    failRead = true;
+    await assert.rejects(settings.readAdminSetting('dashboardFeatures', {}), /unavailable/);
+    failRead = false;
+    await settings.readAdminSetting('dashboardFeatures', {});
+    assert.equal(reads, 7, 'failed reads can be retried immediately');
+    await settings.readAdminSetting('apiUsage', {});
+    await settings.readAdminSetting('apiUsage', {});
+    assert.equal(reads, 9, 'usage reads are never cached');
+    await settings.readAdminSetting('apiBudgets', {});
+    await settings.readAdminSetting('apiBudgets', {});
+    assert.equal(reads, 10, 'budget reads use the cache');
+  } finally {
+    await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+  }
 });
 
 test('a settings read in flight during a save cannot repopulate stale cached data', async () => {
@@ -129,16 +134,21 @@ test('a settings read in flight during a save cannot repopulate stale cached dat
       });
     }
   };
-  const settings = await loadInstrumentedModule('../lib/adminSettingsStore.mjs', {
-    './firebaseAdmin.js': { getFirebaseAdmin: () => ({ adminDb: db }) }
-  }, { process: { env: { VERCEL: '1' }, cwd: () => process.cwd() } });
-  const oldRead = settings.readAdminSetting('dashboardFeatures', {});
-  await new Promise(resolve => setImmediate(resolve));
-  await settings.updateAdminSetting('dashboardFeatures', {}, () => ({ revision: 2 }));
-  release();
-  assert.equal((await oldRead).revision, 1);
-  assert.equal((await settings.readAdminSetting('dashboardFeatures', {})).revision, 2);
-  assert.equal(reads, 2);
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'tahaluf-settings-test2-'));
+  try {
+    const settings = await loadInstrumentedModule('../lib/adminSettingsStore.mjs', {
+      './firebaseAdmin.js': { getFirebaseAdmin: () => ({ adminDb: db }) }
+    }, { process: { env: { VERCEL: '1' }, cwd: () => tempDir } });
+    const oldRead = settings.readAdminSetting('dashboardFeatures', {});
+    await new Promise(resolve => setImmediate(resolve));
+    await settings.updateAdminSetting('dashboardFeatures', {}, () => ({ revision: 2 }));
+    release();
+    assert.equal((await oldRead).revision, 1);
+    assert.equal((await settings.readAdminSetting('dashboardFeatures', {})).revision, 2);
+    assert.equal(reads, 2);
+  } finally {
+    await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+  }
 });
 
 test('two-minute heartbeats send 30 requests per hour and preserve accumulated dwell plus exit flush', async () => {

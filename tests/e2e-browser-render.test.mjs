@@ -35,7 +35,7 @@ function findChromePath() {
 // Check if a URL is responding
 async function isServerReady(url) {
   try {
-    const res = await fetch(url, { method: 'HEAD', signal: AbortSignal.timeout(2000) });
+    const res = await fetch(url, { method: 'GET', signal: AbortSignal.timeout(6000) });
     return res.status < 500;
   } catch {
     return false;
@@ -77,15 +77,24 @@ test('E2E Browser Render & Console Error Verification Suite', async (t) => {
   }
 
   let browser = null;
+  const launchBrowser = () => puppeteer.launch({
+    executablePath: chromePath,
+    headless: true,
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
+  });
+
+  const getPage = async () => {
+    if (!browser || (typeof browser.isConnected === 'function' && !browser.isConnected())) {
+      browser = await launchBrowser();
+    }
+    return browser.newPage();
+  };
+
   try {
-    browser = await puppeteer.launch({
-      executablePath: chromePath,
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
-    });
+    browser = await launchBrowser();
 
     await t.test('Page loads with HTTP 200 and zero console errors or uncaught exceptions', async () => {
-      const page = await browser.newPage();
+      const page = await getPage();
       await page.setViewport({ width: 1440, height: 900 });
 
       const consoleErrors = [];
@@ -132,7 +141,7 @@ test('E2E Browser Render & Console Error Verification Suite', async (t) => {
     });
 
     await t.test('CSS Stylesheets are delivered and applied (no unstyled white fallback)', async () => {
-      const page = await browser.newPage();
+      const page = await getPage();
       await page.setViewport({ width: 1440, height: 900 });
 
       const responses = [];
@@ -186,7 +195,7 @@ test('E2E Browser Render & Console Error Verification Suite', async (t) => {
     });
 
     await t.test('Interactive view navigation maintains styling and clean console', async () => {
-      const page = await browser.newPage();
+      const page = await getPage();
       await page.setViewport({ width: 1440, height: 900 });
 
       const consoleErrors = [];
@@ -220,7 +229,7 @@ test('E2E Browser Render & Console Error Verification Suite', async (t) => {
     });
 
     await t.test('Full dashboard live data sync completes, spinner unmounts, and UI cards render without freezing', async () => {
-      const page = await browser.newPage();
+      const page = await getPage();
       await page.setViewport({ width: 1440, height: 900 });
 
       const runtimeErrors = [];
@@ -264,7 +273,7 @@ test('E2E Browser Render & Console Error Verification Suite', async (t) => {
     });
 
     await t.test('Top filters open seamlessly and switch between dropdowns without backdrop interception', async () => {
-      const page = await browser.newPage();
+      const page = await getPage();
       await page.setViewport({ width: 1440, height: 900 });
 
       const runtimeErrors = [];
@@ -342,7 +351,7 @@ test('E2E Browser Render & Console Error Verification Suite', async (t) => {
     });
 
     await t.test('AI Strategic Intelligence renders Event & Portfolio Breakdown tabs cleanly', async () => {
-      const page = await browser.newPage();
+      const page = await getPage();
       await page.setViewport({ width: 1440, height: 900 });
 
       const runtimeErrors = [];
@@ -431,7 +440,7 @@ test('E2E Browser Render & Console Error Verification Suite', async (t) => {
     });
 
     await t.test('Admin section menu orientation adapts to screen size (dropdown on mobile, 2-line layout on medium, vertical on desktop)', async () => {
-      const page = await browser.newPage();
+      const page = await getPage();
       const consoleErrors = [];
       page.on('console', msg => {
         if (msg.type() === 'error') {

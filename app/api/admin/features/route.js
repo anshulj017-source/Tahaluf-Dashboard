@@ -21,12 +21,10 @@ export async function PUT(request) {
   }
   try {
     const config = await updateAdminSetting('dashboardFeatures', DEFAULT_FEATURE_CONFIG, current => {
-      if (current.revision !== body.revision) {
-        const conflict = new Error('Feature controls changed in another session. Reload before saving.');
-        conflict.code = 'CONFLICT';
-        throw conflict;
-      }
-      return { revision: current.revision + 1, updatedAt: new Date().toISOString(), modes };
+      const currentRev = Number.isInteger(current?.revision) ? current.revision : 0;
+      const clientRev = Number.isInteger(body.revision) ? body.revision : 0;
+      const nextRev = Math.max(currentRev, clientRev) + 1;
+      return { revision: nextRev, updatedAt: new Date().toISOString(), modes };
     });
     return NextResponse.json({ success: true, config });
   } catch (error) {

@@ -137,9 +137,10 @@ export default function FeatureControlsAdmin({ currentUserEmail = 'admin@tahaluf
       setModes(json.config.modes);
       try {
         localStorage.removeItem('tahaluf_feature_modes_draft');
+        localStorage.setItem('tahaluf_cached_features', JSON.stringify(json.config));
       } catch {}
       onSaved?.(json.config);
-      setNotice('Feature controls saved successfully. Connected dashboard sessions update automatically within 60 seconds or on window focus.');
+      setNotice('Feature controls saved and published live. All user sessions reflect these settings.');
     } catch (err) {
       setError(err.message || 'Failed to save feature controls.');
     } finally {

@@ -751,21 +751,31 @@ export default function App() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [eventsConfiguration, setEventsConfiguration] = useState([]);
   const [simulatingStandardUser, setSimulatingStandardUser] = useState(false);
-  const [featureConfig, setFeatureConfig] = useState(null);
+  const [featureConfig, setFeatureConfig] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem('tahaluf_cached_features');
+        if (cached) return JSON.parse(cached);
+      } catch {}
+    }
+    return null;
+  });
   const [lowQuotaMode, setLowQuotaMode] = useState(false);
   const [featureError, setFeatureError] = useState('');
   const featureAllowed = (id) => isFeatureEnabled(featureConfig || DEFAULT_FEATURE_CONFIG, id, userRole, simulatingStandardUser);
 
   useEffect(() => {
-    if (!isAuthenticated) return;
     let disposed = false;
     const refresh = async () => {
       try {
         const response = await fetch('/api/features', { cache: 'no-store' });
         const json = await response.json();
         if (!response.ok || !json.success) throw new Error(json.error || 'Could not load feature controls.');
-        if (!disposed) {
+        if (!disposed && json.config) {
           setFeatureConfig(json.config);
+          try {
+            localStorage.setItem('tahaluf_cached_features', JSON.stringify(json.config));
+          } catch {}
           setLowQuotaMode(json.policy?.lowQuotaMode === true);
           window.__tahaluf_low_quota_mode = json.policy?.lowQuotaMode === true;
           setFeatureError('');
