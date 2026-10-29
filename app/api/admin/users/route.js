@@ -20,8 +20,7 @@ export async function GET(req) {
 
     const users = listUsersResult.users.map(userRecord => {
       const userData = userRolesMap.get(userRecord.uid) || {};
-      const rawRole = userData.role || (userData.isAdmin ? 'super_admin' : 'standard');
-      const role = rawRole === 'admin' ? 'super_admin' : rawRole;
+      const role = userData.role || (userData.isAdmin ? 'admin' : 'standard');
       return {
         uid: userRecord.uid,
         email: userRecord.email,

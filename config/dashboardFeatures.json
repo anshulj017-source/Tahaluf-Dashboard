@@ -1,6 +1,6 @@
 {
-  "revision": 9,
-  "updatedAt": "2026-10-29T09:21:21.880Z",
+  "revision": 10,
+  "updatedAt": "2026-10-29T10:39:34.243Z",
   "modes": {
     "summary": "public",
     "campaign": "public",
@@ -17,9 +17,9 @@
     "dimensionExport": "admin_only",
     "bulkDimensionImport": "admin_only",
     "currency": "public",
-    "aiSummary": "admin_only",
-    "budgetSimulator": "admin_only",
-    "channelQuadrant": "admin_only",
+    "aiSummary": "disabled",
+    "budgetSimulator": "disabled",
+    "channelQuadrant": "disabled",
     "granularTimeline": "admin_only",
     "benchmarkComparison": "admin_only",
     "launchForecaster": "admin_only",

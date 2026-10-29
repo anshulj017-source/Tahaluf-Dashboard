@@ -46,8 +46,7 @@ export async function GET(request) {
       const userDoc = await adminDb.collection('users').doc(uid).get().catch(() => null);
       if (userDoc && userDoc.exists) {
         const data = userDoc.data() || {};
-        const rawRole = data.role || (data.isAdmin ? 'super_admin' : 'standard');
-        const role = rawRole === 'admin' ? 'super_admin' : rawRole;
+        const role = data.role || (data.isAdmin ? 'admin' : 'standard');
         return NextResponse.json({ role, email, authenticated: true });
       }
     }
@@ -57,8 +56,7 @@ export async function GET(request) {
       const emailQuery = await adminDb.collection('users').where('email', '==', email).limit(1).get().catch(() => null);
       if (emailQuery && !emailQuery.empty) {
         const data = emailQuery.docs[0].data() || {};
-        const rawRole = data.role || (data.isAdmin ? 'super_admin' : 'standard');
-        const role = rawRole === 'admin' ? 'super_admin' : rawRole;
+        const role = data.role || (data.isAdmin ? 'admin' : 'standard');
         return NextResponse.json({ role, email, authenticated: true });
       }
     }

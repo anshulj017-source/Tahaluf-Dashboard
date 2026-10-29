@@ -701,7 +701,7 @@ export default function App() {
     if (typeof window !== 'undefined') {
       try {
         const cached = localStorage.getItem('tahaluf_cached_role');
-        if (cached) return cached === 'admin' ? 'super_admin' : cached;
+        if (cached) return cached;
       } catch {}
     }
     return 'standard';
@@ -952,7 +952,7 @@ export default function App() {
         if (cachedEmail) {
           setUserEmail(cachedEmail);
           setIsAuthenticated(true);
-          if (cachedRole) setUserRole(cachedRole === 'admin' ? 'super_admin' : cachedRole);
+          if (cachedRole) setUserRole(cachedRole);
           setIsAuthLoading(false);
         }
       } catch (e) {}
