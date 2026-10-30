@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { 
   Shield, Eye, EyeOff, Save, RotateCcw, Search, CheckCircle2, 
   AlertTriangle, Filter, Sparkles, Tv, Layers, Wrench, Activity, 
-  Brain, BarChart2, Globe, Lock, Ban, ExternalLink
+  Brain, BarChart2, Globe, Lock, Ban, ExternalLink, Users,
+  ChevronDown, Check, X, Plus, UserCheck
 } from 'lucide-react';
 import { auth } from '../../lib/firebase';
 import { DASHBOARD_FEATURES, DEFAULT_FEATURE_CONFIG, isFeatureEnabled } from '../../lib/dashboardFeatures.mjs';
@@ -20,6 +21,189 @@ const GROUP_ICONS = {
   'Advanced Analytics': BarChart2,
   'Admin Center': Shield
 };
+
+function CustomUserDropdown({ featureId, allUsers = [], selectedEmails = [], onChange }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const wrapperRef = useRef(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    function handleClickOutside(e) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
+        setIsOpen(false);
+        setSearch('');
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen]);
+
+  const combinedUserOptions = useMemo(() => {
+    const map = new Map();
+    allUsers.forEach(u => {
+      const email = (u.email || '').trim().toLowerCase();
+      if (email) {
+        map.set(email, { email, role: u.role || 'standard' });
+      }
+    });
+    selectedEmails.forEach(email => {
+      const lower = (email || '').trim().toLowerCase();
+      if (lower && !map.has(lower)) {
+        map.set(lower, { email: lower, role: 'custom' });
+      }
+    });
+    return Array.from(map.values());
+  }, [allUsers, selectedEmails]);
+
+  const filteredUsers = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return combinedUserOptions;
+    return combinedUserOptions.filter(u => u.email.includes(q) || u.role.includes(q));
+  }, [combinedUserOptions, search]);
+
+  const toggleUser = (email) => {
+    const lower = email.trim().toLowerCase();
+    let next;
+    if (selectedEmails.includes(lower)) {
+      next = selectedEmails.filter(e => e !== lower);
+    } else {
+      next = [...selectedEmails, lower];
+    }
+    onChange(next);
+  };
+
+  const selectAll = () => {
+    const allEmails = combinedUserOptions.map(u => u.email);
+    onChange(allEmails);
+  };
+
+  const clearAll = () => {
+    onChange([]);
+  };
+
+  const addCustomEmail = (email) => {
+    const lower = email.trim().toLowerCase();
+    if (!lower || selectedEmails.includes(lower)) return;
+    onChange([...selectedEmails, lower]);
+    setSearch('');
+  };
+
+  const canAddCustom = search.trim() && !combinedUserOptions.some(u => u.email === search.trim().toLowerCase());
+
+  return (
+    <div ref={wrapperRef} className="relative z-30">
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center justify-between gap-2 px-3 py-1.5 rounded-xl bg-[#041628] border border-amber-500/40 text-xs font-semibold text-slate-200 hover:text-white hover:border-amber-400 transition-all shadow-sm min-w-[190px]"
+      >
+        <div className="flex items-center gap-1.5 truncate">
+          <Users className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+          <span className="truncate font-mono text-[11px]">
+            {selectedEmails.length === 0
+              ? 'Select Users (0)'
+              : selectedEmails.length === 1
+                ? selectedEmails[0]
+                : `${selectedEmails.length} Users Selected`}
+          </span>
+        </div>
+        <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && (
+        <div className="absolute right-0 top-full mt-2 w-72 sm:w-88 p-3 rounded-2xl bg-[#0a2442] border border-amber-500/40 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-100">
+          <div className="flex items-center justify-between gap-2 mb-2 pb-2 border-b border-white/10">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-300">Assign Custom Users</span>
+            <div className="flex items-center gap-2 text-[10px]">
+              <button 
+                type="button" 
+                onClick={selectAll}
+                className="text-cyan-400 hover:text-cyan-300 font-semibold"
+              >
+                Select All
+              </button>
+              <span className="text-white/20">|</span>
+              <button 
+                type="button" 
+                onClick={clearAll}
+                className="text-slate-400 hover:text-rose-400 font-semibold"
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+
+          <div className="relative mb-2">
+            <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search or enter email..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && search.trim()) {
+                  e.preventDefault();
+                  addCustomEmail(search.trim());
+                }
+              }}
+              className="w-full pl-8 pr-3 py-1.5 rounded-lg bg-[#041628] border border-white/10 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400/60"
+            />
+          </div>
+
+          {canAddCustom && (
+            <button
+              type="button"
+              onClick={() => addCustomEmail(search.trim())}
+              className="w-full mb-2 px-2.5 py-1.5 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-300 hover:bg-amber-500/25 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Add "{search.trim()}"</span>
+            </button>
+          )}
+
+          <div className="max-h-48 overflow-y-auto space-y-1 custom-scrollbar pr-1">
+            {filteredUsers.length === 0 ? (
+              <div className="text-center py-3 text-xs text-slate-400">
+                No matching users found.
+              </div>
+            ) : (
+              filteredUsers.map(user => {
+                const isSelected = selectedEmails.includes(user.email);
+                return (
+                  <button
+                    key={user.email}
+                    type="button"
+                    onClick={() => toggleUser(user.email)}
+                    className={`w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-colors text-left ${
+                      isSelected
+                        ? 'bg-amber-500/20 text-white font-semibold'
+                        : 'text-slate-300 hover:bg-white/5 hover:text-white'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 truncate">
+                      <div className={`w-3.5 h-3.5 rounded flex items-center justify-center border shrink-0 ${
+                        isSelected
+                          ? 'bg-amber-500 border-amber-400 text-black'
+                          : 'border-white/20 bg-black/20'
+                      }`}>
+                        {isSelected && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+                      </div>
+                      <span className="truncate font-mono text-[11px]">{user.email}</span>
+                    </div>
+                    <span className="text-[9px] px-1.5 py-0.2 rounded font-bold uppercase tracking-wider bg-white/10 text-slate-400 shrink-0">
+                      {user.role}
+                    </span>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function FeatureControlsAdmin({ currentUserEmail = 'admin@tahaluf.com', userRole = 'super_admin', onSaved, onNavigate }) {
   const isSuperAdmin = userRole === 'super_admin' || (userRole !== 'admin' && userRole !== 'standard' && userRole !== 'non-finance' && isRootSuperAdmin(currentUserEmail));
@@ -42,13 +226,36 @@ export default function FeatureControlsAdmin({ currentUserEmail = 'admin@tahaluf
   }
   const [config, setConfig] = useState(null);
   const [modes, setModes] = useState(DEFAULT_FEATURE_CONFIG.modes);
+  const [customUsers, setCustomUsers] = useState(DEFAULT_FEATURE_CONFIG.customUsers || {});
+  const [availableUsers, setAvailableUsers] = useState([]);
   const [previewRole, setPreviewRole] = useState('standard');
+  const [previewUserEmail, setPreviewUserEmail] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGroup, setSelectedGroup] = useState('All');
   const [selectedStatusFilter, setSelectedStatusFilter] = useState('All');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+
+  const loadUsers = async () => {
+    try {
+      const token = await auth.currentUser?.getIdToken(true).catch(() => null);
+      const email = currentUserEmail || auth.currentUser?.email || (typeof window !== 'undefined' ? localStorage.getItem('tahaluf_cached_email') : '') || 'admin@tahaluf.com';
+      const headers = {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        'x-admin-email': email,
+        'x-admin-role': 'super_admin'
+      };
+      const res = await fetch('/api/admin/users', { headers });
+      const data = await res.json();
+      if (data && Array.isArray(data.users)) {
+        setAvailableUsers(data.users);
+      }
+    } catch (err) {
+      console.warn('[FeatureControls] Could not fetch users:', err);
+    }
+  };
 
   const load = async () => {
     setBusy(true);
@@ -59,8 +266,8 @@ export default function FeatureControlsAdmin({ currentUserEmail = 'admin@tahaluf
       if (!response.ok || !json.success) throw new Error(json.error || 'Could not load feature controls.');
       setConfig(json.config);
       
-      // Check for preserved draft in localStorage
       let effectiveModes = { ...DEFAULT_FEATURE_CONFIG.modes, ...json.config.modes };
+      let effectiveCustomUsers = { ...(json.config.customUsers || {}) };
       try {
         const savedDraft = localStorage.getItem('tahaluf_feature_modes_draft');
         if (savedDraft) {
@@ -69,10 +276,19 @@ export default function FeatureControlsAdmin({ currentUserEmail = 'admin@tahaluf
             effectiveModes = { ...effectiveModes, ...parsed };
           }
         }
+        const savedUsersDraft = localStorage.getItem('tahaluf_feature_custom_users_draft');
+        if (savedUsersDraft) {
+          const parsedUsers = JSON.parse(savedUsersDraft);
+          if (parsedUsers && typeof parsedUsers === 'object') {
+            effectiveCustomUsers = { ...effectiveCustomUsers, ...parsedUsers };
+          }
+        }
       } catch {}
 
       setModes(effectiveModes);
+      setCustomUsers(effectiveCustomUsers);
       setNotice('');
+      loadUsers();
     } catch (err) {
       setError(err.message || 'Error loading feature controls.');
     } finally {
@@ -104,12 +320,31 @@ export default function FeatureControlsAdmin({ currentUserEmail = 'admin@tahaluf
     setNotice('');
   };
 
+  const setCustomUsersForFeature = (featureId, userEmails) => {
+    setCustomUsers(prev => {
+      const updated = { ...prev, [featureId]: userEmails };
+      try {
+        localStorage.setItem('tahaluf_feature_custom_users_draft', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+    setNotice('');
+  };
+
+  const removeCustomUser = (featureId, emailToRemove) => {
+    const current = customUsers[featureId] || [];
+    const next = current.filter(e => e !== emailToRemove);
+    setCustomUsersForFeature(featureId, next);
+  };
+
   const discardDraft = () => {
     try {
       localStorage.removeItem('tahaluf_feature_modes_draft');
+      localStorage.removeItem('tahaluf_feature_custom_users_draft');
     } catch {}
     if (config) {
       setModes({ ...DEFAULT_FEATURE_CONFIG.modes, ...config.modes });
+      setCustomUsers({ ...(config.customUsers || {}) });
       setNotice('Draft changes discarded. Reverted to active database configuration.');
     }
   };
@@ -131,14 +366,20 @@ export default function FeatureControlsAdmin({ currentUserEmail = 'admin@tahaluf
       const response = await fetch('/api/admin/features', {
         method: 'PUT',
         headers,
-        body: JSON.stringify({ modes, revision: config?.revision ?? 0 })
+        body: JSON.stringify({ 
+          modes, 
+          customUsers,
+          revision: config?.revision ?? 0 
+        })
       });
       const json = await response.json();
       if (!response.ok || !json.success) throw new Error(json.error || 'Could not save feature controls.');
       setConfig(json.config);
       setModes(json.config.modes);
+      setCustomUsers(json.config.customUsers || {});
       try {
         localStorage.removeItem('tahaluf_feature_modes_draft');
+        localStorage.removeItem('tahaluf_feature_custom_users_draft');
         localStorage.setItem('tahaluf_cached_features', JSON.stringify(json.config));
       } catch {}
       onSaved?.(json.config);
@@ -150,25 +391,41 @@ export default function FeatureControlsAdmin({ currentUserEmail = 'admin@tahaluf
     }
   };
 
-  const dirty = config && JSON.stringify(modes) !== JSON.stringify({ ...DEFAULT_FEATURE_CONFIG.modes, ...config.modes });
+  const dirty = Boolean(config && (
+    JSON.stringify(modes) !== JSON.stringify({ ...DEFAULT_FEATURE_CONFIG.modes, ...config.modes }) ||
+    JSON.stringify(customUsers) !== JSON.stringify(config.customUsers || {})
+  ));
+
   useAdminDirtyGuard('features', Boolean(dirty));
-  const changedFeatures = config ? DASHBOARD_FEATURES.filter(feature => modes[feature.id] !== ({ ...DEFAULT_FEATURE_CONFIG.modes, ...config.modes })[feature.id]) : [];
+  const changedFeatures = config ? DASHBOARD_FEATURES.filter(feature => {
+    const origMode = ({ ...DEFAULT_FEATURE_CONFIG.modes, ...config.modes })[feature.id];
+    const currMode = modes[feature.id];
+    const origUsers = JSON.stringify((config.customUsers || {})[feature.id] || []);
+    const currUsers = JSON.stringify(customUsers[feature.id] || []);
+    return origMode !== currMode || origUsers !== currUsers;
+  }) : [];
 
   // Summary Metrics
   const metrics = useMemo(() => {
     let publicCount = 0;
     let adminCount = 0;
+    let superAdminCount = 0;
+    let customUsersCount = 0;
     let disabledCount = 0;
     DASHBOARD_FEATURES.forEach(f => {
       const mode = modes[f.id] || f.defaultMode || 'public';
       if (mode === 'public') publicCount++;
       else if (mode === 'admin_only') adminCount++;
+      else if (mode === 'super_admin_only') superAdminCount++;
+      else if (mode === 'custom_users') customUsersCount++;
       else if (mode === 'disabled') disabledCount++;
     });
     return {
       total: DASHBOARD_FEATURES.length,
       publicCount,
       adminCount,
+      superAdminCount,
+      customUsersCount,
       disabledCount
     };
   }, [modes]);
@@ -222,7 +479,7 @@ export default function FeatureControlsAdmin({ currentUserEmail = 'admin@tahaluf
             <h2 className="text-2xl font-bold tracking-tight text-white">Dashboard Feature Controls</h2>
           </div>
           <p className="text-sm text-slate-400">
-            Dynamically toggle visibility of dashboard views, executive intelligence tools, and presentation modes.
+            Dynamically configure access tiers, role visibility, custom user permissions, and feature availability.
           </p>
         </div>
 
@@ -289,32 +546,50 @@ export default function FeatureControlsAdmin({ currentUserEmail = 'admin@tahaluf
       )}
 
       {/* KPI METRIC TILES */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <div className="card-surface p-4 rounded-2xl border border-white/10 bg-[#0a2442]/60 backdrop-blur-md">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Features</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total</span>
             <Layers className="w-4 h-4 text-[#14a6d9]" />
           </div>
           <div className="text-2xl font-extrabold text-white">{metrics.total}</div>
-          <p className="text-[10px] text-slate-400 mt-0.5">Managed permission modules</p>
+          <p className="text-[10px] text-slate-400 mt-0.5">Permission modules</p>
         </div>
 
         <div className="card-surface p-4 rounded-2xl border border-emerald-500/25 bg-emerald-500/5 backdrop-blur-md">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400">Public Access</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400">Public</span>
             <Globe className="w-4 h-4 text-emerald-400" />
           </div>
           <div className="text-2xl font-extrabold text-emerald-300">{metrics.publicCount}</div>
-          <p className="text-[10px] text-emerald-400/80 mt-0.5">Visible to all visitors & viewers</p>
+          <p className="text-[10px] text-emerald-400/80 mt-0.5">Visible to all visitors</p>
+        </div>
+
+        <div className="card-surface p-4 rounded-2xl border border-cyan-500/25 bg-cyan-500/5 backdrop-blur-md">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-cyan-400">Admin Only</span>
+            <Lock className="w-4 h-4 text-cyan-400" />
+          </div>
+          <div className="text-2xl font-extrabold text-cyan-300">{metrics.adminCount}</div>
+          <p className="text-[10px] text-cyan-400/80 mt-0.5">Admin & Super Admin</p>
+        </div>
+
+        <div className="card-surface p-4 rounded-2xl border border-purple-500/25 bg-purple-500/5 backdrop-blur-md">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-purple-400">Super Admin</span>
+            <Shield className="w-4 h-4 text-purple-400" />
+          </div>
+          <div className="text-2xl font-extrabold text-purple-300">{metrics.superAdminCount}</div>
+          <p className="text-[10px] text-purple-400/80 mt-0.5">Exclusive to Super Admin</p>
         </div>
 
         <div className="card-surface p-4 rounded-2xl border border-amber-500/25 bg-amber-500/5 backdrop-blur-md">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-400">Admin Gated</span>
-            <Lock className="w-4 h-4 text-amber-400" />
+            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-400">Custom Users</span>
+            <Users className="w-4 h-4 text-amber-400" />
           </div>
-          <div className="text-2xl font-extrabold text-amber-300">{metrics.adminCount}</div>
-          <p className="text-[10px] text-amber-400/80 mt-0.5">Exclusive to administrators</p>
+          <div className="text-2xl font-extrabold text-amber-300">{metrics.customUsersCount}</div>
+          <p className="text-[10px] text-amber-400/80 mt-0.5">Selected user accounts</p>
         </div>
 
         <div className="card-surface p-4 rounded-2xl border border-rose-500/25 bg-rose-500/5 backdrop-blur-md">
@@ -323,7 +598,7 @@ export default function FeatureControlsAdmin({ currentUserEmail = 'admin@tahaluf
             <Ban className="w-4 h-4 text-rose-400" />
           </div>
           <div className="text-2xl font-extrabold text-rose-300">{metrics.disabledCount}</div>
-          <p className="text-[10px] text-rose-400/80 mt-0.5">Deactivated for everyone</p>
+          <p className="text-[10px] text-rose-400/80 mt-0.5">Deactivated for all</p>
         </div>
       </div>
 
@@ -338,11 +613,11 @@ export default function FeatureControlsAdmin({ currentUserEmail = 'admin@tahaluf
             </span>
           </div>
 
-          <div className="flex items-center gap-2 bg-[#041628] p-1 rounded-xl border border-white/10">
+          <div className="flex flex-wrap items-center gap-2 bg-[#041628] p-1 rounded-xl border border-white/10">
             <button
-              onClick={() => setPreviewRole('standard')}
+              onClick={() => { setPreviewRole('standard'); setPreviewUserEmail(''); }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                previewRole === 'standard'
+                previewRole === 'standard' && !previewUserEmail
                   ? 'bg-emerald-500 text-black shadow-[0_0_12px_rgba(16,185,129,0.35)]'
                   : 'text-slate-400 hover:text-white'
               }`}
@@ -351,27 +626,59 @@ export default function FeatureControlsAdmin({ currentUserEmail = 'admin@tahaluf
               <span>Standard Viewer</span>
             </button>
             <button
-              onClick={() => setPreviewRole('admin')}
+              onClick={() => { setPreviewRole('admin'); setPreviewUserEmail(''); }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                 previewRole === 'admin'
-                  ? 'bg-[#cedc28] text-[#1a302e] shadow-[0_0_12px_rgba(206,220,40,0.35)]'
+                  ? 'bg-[#14a6d9] text-white shadow-[0_0_12px_rgba(20,166,217,0.35)]'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Lock className="w-3.5 h-3.5" />
+              <span>Administrator</span>
+            </button>
+            <button
+              onClick={() => { setPreviewRole('super_admin'); setPreviewUserEmail(''); }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                previewRole === 'super_admin'
+                  ? 'bg-purple-600 text-white shadow-[0_0_12px_rgba(147,51,234,0.35)]'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
               <Shield className="w-3.5 h-3.5" />
-              <span>Administrator</span>
+              <span>Super Admin</span>
             </button>
+            <div className="flex items-center gap-1.5 pl-2 border-l border-white/10">
+              <UserCheck className="w-3.5 h-3.5 text-amber-400" />
+              <input
+                type="text"
+                placeholder="Test user email..."
+                value={previewUserEmail}
+                onChange={(e) => {
+                  setPreviewUserEmail(e.target.value);
+                  setPreviewRole('standard');
+                }}
+                className="w-40 px-2 py-1 rounded bg-[#0a2442] border border-white/10 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
+              />
+            </div>
           </div>
         </div>
 
         {/* Live Persona Simulation Pills */}
         <div className="bg-[#041628]/80 rounded-xl p-3 border border-white/5">
           <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
-            Active navigation &amp; tools visible to <span className="text-white font-extrabold">{previewRole === 'admin' ? 'Administrators' : 'Regular Users / Viewers'}</span>:
+            Active navigation &amp; tools visible to <span className="text-white font-extrabold">
+              {previewUserEmail ? `Custom User (${previewUserEmail})` : previewRole === 'super_admin' ? 'Super Administrators' : previewRole === 'admin' ? 'Administrators' : 'Regular Users / Viewers'}
+            </span>:
           </div>
           <div className="flex flex-wrap gap-2">
             {DASHBOARD_FEATURES.map(feature => {
-              const visible = isFeatureEnabled({ modes }, feature.id, previewRole);
+              const visible = isFeatureEnabled(
+                { modes, customUsers }, 
+                feature.id, 
+                previewRole, 
+                false, 
+                previewUserEmail
+              );
               return (
                 <button
                   key={feature.id}
@@ -382,7 +689,7 @@ export default function FeatureControlsAdmin({ currentUserEmail = 'admin@tahaluf
                       ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300 shadow-sm hover:border-[#cedc28] hover:text-[#cedc28] cursor-pointer'
                       : 'bg-white/5 border-white/5 text-slate-500 line-through opacity-50 cursor-pointer hover:border-slate-500'
                   }`}
-                  title={`${feature.name}: ${visible ? 'Visible' : 'Hidden'} for ${previewRole}. Click to jump to this feature.`}
+                  title={`${feature.name}: ${visible ? 'Visible' : 'Hidden'} in simulator. Click to jump.`}
                 >
                   <span className={`w-1.5 h-1.5 rounded-full ${visible ? 'bg-emerald-400' : 'bg-slate-600'}`}></span>
                   <span>{feature.name}</span>
@@ -412,7 +719,7 @@ export default function FeatureControlsAdmin({ currentUserEmail = 'admin@tahaluf
           </button>
           <button
             onClick={() => applyPreset('minimal')}
-            className="px-2.5 py-1 text-xs rounded-lg bg-white/5 border border-white/10 text-slate-300 hover:bg-amber-500/20 hover:text-amber-300 hover:border-amber-500/40 transition-all font-medium"
+            className="px-2.5 py-1 text-xs rounded-lg bg-white/5 border border-white/10 text-slate-300 hover:bg-cyan-500/20 hover:text-cyan-300 hover:border-cyan-500/40 transition-all font-medium"
           >
             Admin Staging Only
           </button>
@@ -456,6 +763,8 @@ export default function FeatureControlsAdmin({ currentUserEmail = 'admin@tahaluf
             <option value="All">All Visibility Modes</option>
             <option value="public">Everyone (Public)</option>
             <option value="admin_only">Admin Only</option>
+            <option value="super_admin_only">Super Admin Only</option>
+            <option value="custom_users">Custom Users</option>
             <option value="disabled">Disabled</option>
           </select>
         </div>
@@ -493,102 +802,196 @@ export default function FeatureControlsAdmin({ currentUserEmail = 'admin@tahaluf
               <div className="divide-y divide-white/5">
                 {featuresInGroup.map(feature => {
                   const currentMode = modes[feature.id] || feature.defaultMode || 'public';
-                  const isVisibleInPreview = isFeatureEnabled({ modes }, feature.id, previewRole);
+                  const isVisibleInPreview = isFeatureEnabled(
+                    { modes, customUsers }, 
+                    feature.id, 
+                    previewRole, 
+                    false, 
+                    previewUserEmail
+                  );
+                  const assignedUsers = customUsers[feature.id] || [];
 
                   return (
-                    <div key={feature.id} className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-white/[0.02] transition-colors">
-                      <div className="flex-1 min-w-[200px]">
-                        <div className="flex items-center gap-2 mb-1 flex-wrap">
-                          <span className="text-sm font-bold text-white">{feature.name}</span>
-                          <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 flex items-center gap-1">
-                            <span>📍</span>
-                            <span>{feature.section || feature.group}</span>
-                          </span>
-                          <span className="px-2 py-0.5 rounded text-[9.5px] font-mono text-slate-400 bg-white/5 border border-white/10 hidden sm:inline-block">
-                            {feature.targetLocation}
-                          </span>
-                          {feature.adminOnly && (
-                            <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                              System Restricted
+                    <div key={feature.id} className="p-4 sm:p-5 hover:bg-white/[0.02] transition-colors">
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div className="flex-1 min-w-[200px]">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <span className="text-sm font-bold text-white">{feature.name}</span>
+                            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 flex items-center gap-1">
+                              <span>📍</span>
+                              <span>{feature.section || feature.group}</span>
                             </span>
-                          )}
-                          {feature.requires && (
-                            <span className="px-2 py-0.5 rounded text-[9px] font-medium bg-blue-500/15 text-blue-300 border border-blue-500/25">
-                              Requires {feature.requires}
+                            <span className="px-2 py-0.5 rounded text-[9.5px] font-mono text-slate-400 bg-white/5 border border-white/10 hidden sm:inline-block">
+                              {feature.targetLocation}
                             </span>
-                          )}
-                          {onNavigate && (
-                            <button
-                              type="button"
-                              onClick={() => onNavigate(feature.id)}
-                              className="px-2.5 py-0.5 rounded text-[10px] font-bold bg-[#cedc28]/15 text-[#cedc28] border border-[#cedc28]/35 hover:bg-[#cedc28] hover:text-[#041628] transition-all flex items-center gap-1 shadow-sm"
-                              title={`Jump directly to ${feature.name} (${feature.targetLocation})`}
-                            >
-                              <span>Go to Section</span>
-                              <ExternalLink className="w-2.5 h-2.5" />
-                            </button>
-                          )}
+                            {feature.adminOnly && (
+                              <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                System Restricted
+                              </span>
+                            )}
+                            {feature.requires && (
+                              <span className="px-2 py-0.5 rounded text-[9px] font-medium bg-blue-500/15 text-blue-300 border border-blue-500/25">
+                                Requires {feature.requires}
+                              </span>
+                            )}
+                            {onNavigate && (
+                              <button
+                                type="button"
+                                onClick={() => onNavigate(feature.id)}
+                                className="px-2.5 py-0.5 rounded text-[10px] font-bold bg-[#cedc28]/15 text-[#cedc28] border border-[#cedc28]/35 hover:bg-[#cedc28] hover:text-[#041628] transition-all flex items-center gap-1 shadow-sm"
+                                title={`Jump directly to ${feature.name} (${feature.targetLocation})`}
+                              >
+                                <span>Go to Section</span>
+                                <ExternalLink className="w-2.5 h-2.5" />
+                              </button>
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-400 leading-relaxed">{feature.description}</p>
                         </div>
-                        <p className="text-xs text-slate-400 leading-relaxed">{feature.description}</p>
-                      </div>
 
-                      {/* Pill Toggle Controls */}
-                      <div className="flex items-center gap-3 shrink-0">
-                        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
-                          isVisibleInPreview ? 'text-emerald-300 bg-emerald-500/10' : 'text-slate-500 bg-white/5'
-                        }`}>
-                          {isVisibleInPreview ? 'Visible in Simulator' : 'Hidden in Simulator'}
-                        </span>
+                        {/* Pill Toggle Controls */}
+                        <div className="flex items-center gap-3 shrink-0 flex-wrap">
+                          <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+                            isVisibleInPreview ? 'text-emerald-300 bg-emerald-500/10' : 'text-slate-500 bg-white/5'
+                          }`}>
+                            {isVisibleInPreview ? 'Visible in Simulator' : 'Hidden in Simulator'}
+                          </span>
 
-                        <div className="flex items-center bg-[#041628] p-1 rounded-xl border border-white/10 shadow-inner">
-                          {/* Option 1: Everyone */}
-                          {!feature.adminOnly && (
+                          <div className="flex flex-wrap items-center bg-[#041628] p-1 rounded-xl border border-white/10 shadow-inner gap-1">
+                            {/* Option 1: Everyone */}
+                            {!feature.adminOnly && (
+                              <button
+                                disabled={busy}
+                                onClick={() => setFeatureMode(feature.id, 'public')}
+                                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                                  currentMode === 'public'
+                                    ? 'bg-[#cedc28] text-[#1a302e] shadow-[0_0_12px_rgba(206,220,40,0.35)]'
+                                    : 'text-slate-400 hover:text-white'
+                                }`}
+                                title="Active for all dashboard visitors"
+                              >
+                                <Globe className="w-3 h-3" />
+                                <span>Everyone</span>
+                              </button>
+                            )}
+
+                            {/* Option 2: Admin Only */}
                             <button
                               disabled={busy}
-                              onClick={() => setFeatureMode(feature.id, 'public')}
-                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                                currentMode === 'public'
-                                  ? 'bg-[#cedc28] text-[#1a302e] shadow-[0_0_12px_rgba(206,220,40,0.35)]'
+                              onClick={() => setFeatureMode(feature.id, 'admin_only')}
+                              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                                currentMode === 'admin_only'
+                                  ? 'bg-[#14a6d9] text-white shadow-[0_0_12px_rgba(20,166,217,0.35)]'
                                   : 'text-slate-400 hover:text-white'
                               }`}
-                              title="Active for all dashboard visitors"
+                              title="Active for Admins & Super Admins"
                             >
-                              <Globe className="w-3 h-3" />
-                              <span>Everyone</span>
+                              <Lock className="w-3 h-3" />
+                              <span>Admin Only</span>
                             </button>
-                          )}
 
-                          {/* Option 2: Admin Only */}
-                          <button
-                            disabled={busy}
-                            onClick={() => setFeatureMode(feature.id, 'admin_only')}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                              currentMode === 'admin_only'
-                                ? 'bg-[#14a6d9] text-white shadow-[0_0_12px_rgba(20,166,217,0.35)]'
-                                : 'text-slate-400 hover:text-white'
-                            }`}
-                            title="Active only for administrator accounts"
-                          >
-                            <Lock className="w-3 h-3" />
-                            <span>Admin Only</span>
-                          </button>
+                            {/* Option 3: Super Admin Only */}
+                            <button
+                              disabled={busy}
+                              onClick={() => setFeatureMode(feature.id, 'super_admin_only')}
+                              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                                currentMode === 'super_admin_only'
+                                  ? 'bg-purple-600 text-white shadow-[0_0_12px_rgba(147,51,234,0.35)]'
+                                  : 'text-slate-400 hover:text-white'
+                              }`}
+                              title="Restricted strictly to Super Administrators"
+                            >
+                              <Shield className="w-3 h-3" />
+                              <span>Super Admin Only</span>
+                            </button>
 
-                          {/* Option 3: Disabled */}
-                          <button
-                            disabled={busy}
-                            onClick={() => setFeatureMode(feature.id, 'disabled')}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                              currentMode === 'disabled'
-                                ? 'bg-rose-500 text-white shadow-[0_0_12px_rgba(244,63,94,0.35)]'
-                                : 'text-slate-400 hover:text-white'
-                            }`}
-                            title="Deactivated completely"
-                          >
-                            <Ban className="w-3 h-3" />
-                            <span>Disabled</span>
-                          </button>
+                            {/* Option 4: Custom Users */}
+                            <button
+                              disabled={busy}
+                              onClick={() => setFeatureMode(feature.id, 'custom_users')}
+                              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                                currentMode === 'custom_users'
+                                  ? 'bg-amber-500 text-black shadow-[0_0_12px_rgba(245,158,11,0.35)]'
+                                  : 'text-slate-400 hover:text-white'
+                              }`}
+                              title="Select specific users who can access this feature"
+                            >
+                              <Users className="w-3 h-3" />
+                              <span>Custom Users</span>
+                              {assignedUsers.length > 0 && (
+                                <span className="px-1.5 py-0.2 rounded-full bg-black/40 text-[9.5px] text-amber-200 font-extrabold">
+                                  {assignedUsers.length}
+                                </span>
+                              )}
+                            </button>
+
+                            {/* Option 5: Disabled */}
+                            <button
+                              disabled={busy}
+                              onClick={() => setFeatureMode(feature.id, 'disabled')}
+                              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                                currentMode === 'disabled'
+                                  ? 'bg-rose-500 text-white shadow-[0_0_12px_rgba(244,63,94,0.35)]'
+                                  : 'text-slate-400 hover:text-white'
+                              }`}
+                              title="Deactivated completely for all users"
+                            >
+                              <Ban className="w-3 h-3" />
+                              <span>Disabled</span>
+                            </button>
+                          </div>
                         </div>
                       </div>
+
+                      {/* CUSTOM USERS SELECTOR & USER PILLS (Visible when Custom Users mode is chosen) */}
+                      {currentMode === 'custom_users' && (
+                        <div className="mt-4 pt-3 border-t border-amber-500/20 bg-amber-500/5 -mx-4 -mb-4 sm:-mx-5 sm:-mb-5 p-4 rounded-b-2xl animate-in fade-in duration-200">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div>
+                              <div className="flex items-center gap-1.5 text-xs font-bold text-amber-300">
+                                <Users className="w-3.5 h-3.5" />
+                                <span>Custom User Access: {feature.name}</span>
+                              </div>
+                              <p className="text-[11px] text-slate-400 mt-0.5">
+                                Only accounts selected below will be able to view and use this feature on their dashboard.
+                              </p>
+                            </div>
+
+                            <CustomUserDropdown
+                              featureId={feature.id}
+                              allUsers={availableUsers}
+                              selectedEmails={assignedUsers}
+                              onChange={(newEmails) => setCustomUsersForFeature(feature.id, newEmails)}
+                            />
+                          </div>
+
+                          {assignedUsers.length > 0 ? (
+                            <div className="flex flex-wrap gap-1.5 mt-3">
+                              {assignedUsers.map(email => (
+                                <span 
+                                  key={email}
+                                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs bg-[#041628] border border-amber-500/30 text-amber-200 font-mono shadow-sm"
+                                >
+                                  <span>{email}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => removeCustomUser(feature.id, email)}
+                                    className="text-slate-400 hover:text-rose-400 transition-colors p-0.5"
+                                    title={`Remove ${email}`}
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="mt-2 text-xs text-amber-400/90 italic flex items-center gap-1.5">
+                              <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                              <span>No users assigned yet. Open the dropdown to select one or more user accounts.</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   );
                 })}

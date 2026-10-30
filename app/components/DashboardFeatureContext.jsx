@@ -3,15 +3,15 @@
 import React, { createContext, useContext } from 'react';
 import { DEFAULT_FEATURE_CONFIG, isFeatureEnabled } from '../../lib/dashboardFeatures.mjs';
 
-export const DashboardFeatureContext = createContext({ config: DEFAULT_FEATURE_CONFIG, role: 'standard', preview: false, lowQuotaMode: false });
+export const DashboardFeatureContext = createContext({ config: DEFAULT_FEATURE_CONFIG, role: 'standard', preview: false, lowQuotaMode: false, userEmail: '' });
 
 export function useLowQuotaMode() {
   return useContext(DashboardFeatureContext).lowQuotaMode === true;
 }
 
 export function useDashboardFeature(id) {
-  const { config, role, preview } = useContext(DashboardFeatureContext);
-  return isFeatureEnabled(config, id, role, preview);
+  const { config, role, preview, userEmail } = useContext(DashboardFeatureContext);
+  return isFeatureEnabled(config, id, role, preview, userEmail);
 }
 
 export function ExportButton(props) {

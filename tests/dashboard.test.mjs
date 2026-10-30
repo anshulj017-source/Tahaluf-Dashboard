@@ -1378,6 +1378,23 @@ function testFeatureControlsLogic() {
     thrown = true;
   }
   assert(thrown === true, 'validateFeatureModes rejects public mode on system-restricted features');
+
+  // 8. Verify super_admin_only and custom_users modes
+  const superAdminConfig = {
+    revision: 1,
+    modes: { ...DEFAULT_FEATURE_CONFIG.modes, aiSummary: 'super_admin_only' }
+  };
+  assert(isFeatureEnabled(superAdminConfig, 'aiSummary', 'super_admin') === true, 'Super Admin can access super_admin_only');
+  assert(isFeatureEnabled(superAdminConfig, 'aiSummary', 'admin') === false, 'Admin cannot access super_admin_only');
+  assert(isFeatureEnabled(superAdminConfig, 'aiSummary', 'standard') === false, 'Standard user cannot access super_admin_only');
+
+  const customConfig = {
+    revision: 1,
+    modes: { ...DEFAULT_FEATURE_CONFIG.modes, aiSummary: 'custom_users' },
+    customUsers: { aiSummary: ['analytics.ksa@umww.com'] }
+  };
+  assert(isFeatureEnabled(customConfig, 'aiSummary', 'standard', false, 'analytics.ksa@umww.com') === true, 'Custom user can access feature');
+  assert(isFeatureEnabled(customConfig, 'aiSummary', 'standard', false, 'other@tahaluf.com') === false, 'Non-assigned user cannot access custom_users feature');
 }
 
 // -------------------------------------------------------------

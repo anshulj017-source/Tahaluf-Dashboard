@@ -828,7 +828,7 @@ export default function App() {
   });
   const [lowQuotaMode, setLowQuotaMode] = useState(false);
   const [featureError, setFeatureError] = useState('');
-  const featureAllowed = (id) => isFeatureEnabled(featureConfig || DEFAULT_FEATURE_CONFIG, id, userRole, simulatingStandardUser);
+  const featureAllowed = (id) => isFeatureEnabled(featureConfig || DEFAULT_FEATURE_CONFIG, id, userRole, simulatingStandardUser, userEmail);
 
   useEffect(() => {
     let disposed = false;
@@ -865,13 +865,13 @@ export default function App() {
 
   useEffect(() => {
     if (!featureConfig) return;
-    const enabled = id => isFeatureEnabled(featureConfig, id, userRole, simulatingStandardUser);
+    const enabled = id => featureAllowed(id);
     if (activeTab === 'admin' && isAdminRole) return;
     if (!enabled(activeTab)) {
       const firstView = DASHBOARD_FEATURES.find(feature => feature.group === 'Dashboard views' && enabled(feature.id));
       setActiveTab(firstView?.id || 'summary');
     }
-  }, [featureConfig, userRole, simulatingStandardUser, activeTab]);
+  }, [featureConfig, userRole, simulatingStandardUser, userEmail, activeTab]);
   
   // State: Global Filters
   const [dateRange, setDateRange] = useState({ start: '', end: '', preset: 'auto' });
@@ -913,12 +913,12 @@ export default function App() {
 
   useEffect(() => {
     if (!featureConfig) return;
-    if (!isFeatureEnabled(featureConfig, 'tv', userRole, simulatingStandardUser)) setTvMode(false);
-    if (!isFeatureEnabled(featureConfig, 'tvAutoCycle', userRole, simulatingStandardUser)) setTvAutoCycle(false);
-    if (!isFeatureEnabled(featureConfig, 'tvCustomization', userRole, simulatingStandardUser)) setShowTvSettings(false);
-    if (!isFeatureEnabled(featureConfig, 'quickJump', userRole, simulatingStandardUser)) setIsQuickJumpOpen(false);
-    if (!isFeatureEnabled(featureConfig, 'currency', userRole, simulatingStandardUser)) setCurrency('USD');
-  }, [featureConfig, userRole, simulatingStandardUser]);
+    if (!featureAllowed('tv')) setTvMode(false);
+    if (!featureAllowed('tvAutoCycle')) setTvAutoCycle(false);
+    if (!featureAllowed('tvCustomization')) setShowTvSettings(false);
+    if (!featureAllowed('quickJump')) setIsQuickJumpOpen(false);
+    if (!featureAllowed('currency')) setCurrency('USD');
+  }, [featureConfig, userRole, simulatingStandardUser, userEmail]);
 
   // Active filter count for mobile badge
   const activeFilterCount = useMemo(() => {
@@ -961,8 +961,8 @@ export default function App() {
   useEffect(() => {
     if (!tvMode || !tvAutoCycle) return;
     const baseViews = tvCycleViews.length > 0 ? tvCycleViews : ['summary', 'campaign', 'weekly'];
-    const cycleTabs = baseViews.filter(id => isFeatureEnabled(featureConfig, id, userRole, simulatingStandardUser));
-    if (!cycleTabs.length || !isFeatureEnabled(featureConfig, 'tvAutoCycle', userRole, simulatingStandardUser)) return;
+    const cycleTabs = baseViews.filter(id => featureAllowed(id));
+    if (!cycleTabs.length || !featureAllowed('tvAutoCycle')) return;
     const intervalMs = Math.max(10, tvCycleIntervalSec) * 1000;
     const interval = setInterval(() => {
       setActiveTab(prev => {
@@ -971,13 +971,13 @@ export default function App() {
       });
     }, intervalMs);
     return () => clearInterval(interval);
-  }, [tvMode, tvAutoCycle, tvCycleIntervalSec, tvCycleViews, featureConfig, userRole, simulatingStandardUser]);
+  }, [tvMode, tvAutoCycle, tvCycleIntervalSec, tvCycleViews, featureConfig, userRole, simulatingStandardUser, userEmail]);
 
   // Command Palette (Cmd + K / Ctrl + K) Quick Jump Listener
   useEffect(() => {
     const handleKeyDown = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
-        if (isFeatureEnabled(featureConfig, 'quickJump', userRole, simulatingStandardUser)) {
+        if (featureAllowed('quickJump')) {
           e.preventDefault();
           setIsQuickJumpOpen(prev => !prev);
         }
@@ -987,7 +987,7 @@ export default function App() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [featureConfig, userRole, simulatingStandardUser, isQuickJumpOpen]);
+  }, [featureConfig, userRole, simulatingStandardUser, userEmail, isQuickJumpOpen]);
 
   useEffect(() => {
     if (userRole === 'non-finance' && ['CPM', 'CPC'].includes(perfMetric)) {
@@ -3048,7 +3048,7 @@ export default function App() {
   };
 
   return (
-    <DashboardFeatureContext.Provider value={{ config: featureConfig || DEFAULT_FEATURE_CONFIG, role: userRole, preview: simulatingStandardUser, lowQuotaMode }}>
+    <DashboardFeatureContext.Provider value={{ config: featureConfig || DEFAULT_FEATURE_CONFIG, role: userRole, preview: simulatingStandardUser, lowQuotaMode, userEmail }}>
     <div className={`h-screen overflow-hidden app-bg font-sans selection:bg-[#cedc28]/30 text-white flex flex-col ${tvMode ? 'tv-mode-active' : ''}`}>
       {/* HEADER: TV Mode or Standard Header */}
       {tvMode ? (

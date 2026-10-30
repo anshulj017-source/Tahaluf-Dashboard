@@ -560,6 +560,29 @@ test('TV auto-cycle obeys its parent visibility', () => {
   assert.equal(isFeatureEnabled(config, 'tvAutoCycle', 'admin'), false);
 });
 
+test('super_admin_only and custom_users permissions enforce strict role and user scoping', () => {
+  const superAdminOnlyConfig = { modes: { ...DEFAULT_FEATURE_CONFIG.modes, aiSummary: 'super_admin_only' } };
+  assert.equal(isFeatureEnabled(superAdminOnlyConfig, 'aiSummary', 'super_admin'), true, 'Super Admin can access super_admin_only');
+  assert.equal(isFeatureEnabled(superAdminOnlyConfig, 'aiSummary', 'admin'), false, 'Admin cannot access super_admin_only');
+  assert.equal(isFeatureEnabled(superAdminOnlyConfig, 'aiSummary', 'standard'), false, 'Standard user cannot access super_admin_only');
+  assert.equal(isFeatureEnabled(superAdminOnlyConfig, 'aiSummary', 'super_admin', true), false, 'Preview hides super_admin_only');
+
+  const adminOnlyConfig = { modes: { ...DEFAULT_FEATURE_CONFIG.modes, aiSummary: 'admin_only' } };
+  assert.equal(isFeatureEnabled(adminOnlyConfig, 'aiSummary', 'super_admin'), true, 'Super Admin is automatically included in admin_only');
+  assert.equal(isFeatureEnabled(adminOnlyConfig, 'aiSummary', 'admin'), true, 'Admin can access admin_only');
+  assert.equal(isFeatureEnabled(adminOnlyConfig, 'aiSummary', 'standard'), false, 'Standard user cannot access admin_only');
+
+  const customUsersConfig = {
+    modes: { ...DEFAULT_FEATURE_CONFIG.modes, aiSummary: 'custom_users' },
+    customUsers: { aiSummary: ['Analytics.KSA@umww.com', 'vip-guest@tahaluf.com'] }
+  };
+  assert.equal(isFeatureEnabled(customUsersConfig, 'aiSummary', 'standard', false, 'analytics.ksa@umww.com'), true, 'Assigned user can access custom_users');
+  assert.equal(isFeatureEnabled(customUsersConfig, 'aiSummary', 'standard', false, 'vip-guest@tahaluf.com'), true, 'Case-insensitive assigned user can access custom_users');
+  assert.equal(isFeatureEnabled(customUsersConfig, 'aiSummary', 'standard', false, 'unauthorized@tahaluf.com'), false, 'Unassigned user cannot access custom_users');
+  assert.equal(isFeatureEnabled(customUsersConfig, 'aiSummary', 'admin', false, 'unassigned-admin@tahaluf.com'), false, 'Unassigned admin cannot access custom_users');
+  assert.equal(isFeatureEnabled(customUsersConfig, 'aiSummary', 'standard', true, 'analytics.ksa@umww.com'), false, 'Preview hides custom_users');
+});
+
 test('audit enhancements features default to admin_only and obey permissions', async () => {
   const { extractChannelMetrics24h, checkMetricDiscrepancies } = await import('../lib/metricIntegrity.mjs');
   

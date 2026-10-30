@@ -30,5 +30,6 @@
     "adminHealth": "admin_only",
     "adminQuotas": "admin_only",
     "adminAnalytics": "admin_only"
-  }
+  },
+  "customUsers": {}
 }
