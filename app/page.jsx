@@ -37,6 +37,7 @@ import {
 } from '../lib/analyticsTracker.js';
 import { getClientDashboardCache, setClientDashboardCache } from '../lib/clientCache.js';
 import { DASHBOARD_FEATURES, DEFAULT_FEATURE_CONFIG, isFeatureEnabled } from '../lib/dashboardFeatures.mjs';
+import { isRootSuperAdmin } from '../lib/authConstants.mjs';
 import { DashboardFeatureContext, ExportButton } from './components/DashboardFeatureContext';
 import AiStrategicIntelligence from './components/AiStrategicIntelligence';
 import GranularWeeklyPacing from './components/GranularWeeklyPacing';
@@ -1005,17 +1006,22 @@ export default function App() {
         } catch (e) {}
       }
 
-      // Root Tahaluf admin email
-      if (email === 'admin@tahaluf.com') {
+      // Root Tahaluf admin and verified super admin emails
+      if (email === 'admin@tahaluf.com' || isRootSuperAdmin(email)) {
         setUserRole('super_admin');
         if (typeof window !== 'undefined') {
           try { localStorage.setItem('tahaluf_cached_role', 'super_admin'); } catch {}
         }
       } else {
-        // For non-root users, immediately ensure baseline standard role so no admin tabs bleed over
-        setUserRole(prev => (prev === 'admin' || prev === 'super_admin' ? 'standard' : prev));
-        if (typeof window !== 'undefined') {
-          try { localStorage.setItem('tahaluf_cached_role', 'standard'); } catch {}
+        // Only demote if not already cached as admin/super_admin, preserving session while /api/auth/me verifies
+        const cachedRole = typeof window !== 'undefined' ? localStorage.getItem('tahaluf_cached_role') : null;
+        if (cachedRole && (cachedRole === 'admin' || cachedRole === 'super_admin')) {
+          setUserRole(cachedRole);
+        } else {
+          setUserRole('standard');
+          if (typeof window !== 'undefined') {
+            try { localStorage.setItem('tahaluf_cached_role', 'standard'); } catch {}
+          }
         }
       }
 
@@ -1399,7 +1405,7 @@ export default function App() {
 
       setEventsConfiguration(configuredEvents);
 
-      const effectiveRole = (isAdminRole && !simulatingStandardUser) ? 'admin' : 'standard';
+      const effectiveRole = (isAdminRole && !simulatingStandardUser) ? (userRole === 'super_admin' ? 'super_admin' : 'admin') : 'standard';
 
       // Filter for active events based on effectiveRole & auto-publish
       const activeEvents = configuredEvents.filter(ev => {
@@ -1410,7 +1416,7 @@ export default function App() {
         const effectiveVisibility = isAutoPublished ? 'public' : (ev.visibility || 'public');
 
         if (effectiveVisibility === 'admin_only' || effectiveStatus === 'admin_only') {
-          return effectiveRole === 'admin';
+          return effectiveRole === 'admin' || effectiveRole === 'super_admin';
         }
         return true;
       });

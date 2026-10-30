@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { auth } from '../../lib/firebase';
 import { DASHBOARD_FEATURES, DEFAULT_FEATURE_CONFIG, isFeatureEnabled } from '../../lib/dashboardFeatures.mjs';
+import { isRootSuperAdmin } from '../../lib/authConstants.mjs';
 import { useAdminDirtyGuard } from './AdminUI';
 
 const GROUP_ICONS = {
@@ -21,7 +22,8 @@ const GROUP_ICONS = {
 };
 
 export default function FeatureControlsAdmin({ currentUserEmail = 'admin@tahaluf.com', userRole = 'super_admin', onSaved, onNavigate }) {
-  if (userRole !== 'super_admin') {
+  const isSuperAdmin = userRole === 'super_admin' || (userRole !== 'admin' && userRole !== 'standard' && userRole !== 'non-finance' && isRootSuperAdmin(currentUserEmail));
+  if (!isSuperAdmin) {
     return (
       <div className="card-surface p-8 rounded-3xl border border-amber-500/30 bg-[#0a2442]/80 text-center max-w-xl mx-auto my-12 shadow-2xl">
         <div className="w-16 h-16 rounded-full bg-amber-500/15 border border-amber-500/40 text-amber-300 flex items-center justify-center mx-auto mb-4">
@@ -30,7 +32,7 @@ export default function FeatureControlsAdmin({ currentUserEmail = 'admin@tahaluf
         <h3 className="text-xl font-bold text-white mb-2">Super Admin Access Required</h3>
         <p className="text-xs text-slate-300 mb-6 leading-relaxed">
           Feature Controls is strictly restricted to <span className="text-[#cedc28] font-bold">Super Administrators</span>. 
-          Standard administrators can manage Events, Health, Quotas, and User Access, but cannot modify global feature deployments.
+          Standard administrators can manage Events, Health, and Quotas, but cannot modify global feature deployments.
         </p>
         <span className="text-[11px] font-mono px-3 py-1 rounded-full bg-black/40 text-slate-400 border border-white/10">
           Current Role: {userRole}
@@ -119,7 +121,7 @@ export default function FeatureControlsAdmin({ currentUserEmail = 'admin@tahaluf
     try {
       const token = await auth.currentUser?.getIdToken(true).catch(() => null);
       const email = currentUserEmail || auth.currentUser?.email || (typeof window !== 'undefined' ? localStorage.getItem('tahaluf_cached_email') : '') || 'admin@tahaluf.com';
-      const role = userRole || (typeof window !== 'undefined' ? localStorage.getItem('tahaluf_cached_role') : '') || 'super_admin';
+      const role = (isSuperAdmin ? 'super_admin' : userRole) || (typeof window !== 'undefined' ? localStorage.getItem('tahaluf_cached_role') : '') || 'super_admin';
       const headers = {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),

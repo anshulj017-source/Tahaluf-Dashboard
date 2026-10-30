@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getFirebaseAdmin } from '../../../../lib/firebaseAdmin.js';
+import { isRootSuperAdmin } from '../../../../lib/authConstants.mjs';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -28,8 +29,8 @@ export async function GET(request) {
       return NextResponse.json({ role: 'standard', email: '', authenticated: false });
     }
 
-    // Root Tahaluf admin
-    if (email === 'admin@tahaluf.com') {
+    // Root Tahaluf admin and verified super admin emails
+    if (email === 'admin@tahaluf.com' || isRootSuperAdmin(email)) {
       return NextResponse.json({ role: 'super_admin', email, authenticated: true });
     }
 

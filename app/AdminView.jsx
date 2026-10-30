@@ -8,6 +8,19 @@ import ApiQuotasAdmin from './components/ApiQuotasAdmin';
 import FeatureControlsAdmin from './components/FeatureControlsAdmin';
 import { AdminDialog, useAdminView, useAdminDirtyGuard } from './components/AdminUI';
 
+const ROOT_ADMIN_EMAILS = new Set([
+  'admin@tahaluf.com',
+  'analytics.ksa@umww.com',
+  'anshul.jaiswal@omc.com',
+  'anshulj017@gmail.com',
+  'analyticsum2019@gmail.com'
+]);
+
+function isRootSuperAdmin(email) {
+  if (!email || typeof email !== 'string') return false;
+  return ROOT_ADMIN_EMAILS.has(email.toLowerCase().trim());
+}
+
 const ALL_ADMIN_SECTIONS = [
   { id: 'events', featureId: 'adminEvents', label: 'Events & Data', icon: Layers },
   { id: 'health', featureId: 'adminHealth', label: 'Health Monitor', icon: Activity },
@@ -31,12 +44,16 @@ export default function AdminView({
   onNavigate,
   onSignOut
 }) {
-  const isSuperAdmin = userRole === 'super_admin';
+  const isSuperAdmin = userRole === 'super_admin' || (userRole !== 'admin' && userRole !== 'standard' && userRole !== 'non-finance' && isRootSuperAdmin(currentUserEmail));
 
   // Filter sections dynamically based on role and feature controls
   const visibleSections = ALL_ADMIN_SECTIONS.filter(section => {
+    // Super Admins have unrestricted access to all admin sections including Feature Controls & User Access
+    if (isSuperAdmin) {
+      return true;
+    }
     // Feature Controls and User Access are restricted strictly to SUPER ADMIN
-    if (section.superAdminOnly && !isSuperAdmin) {
+    if (section.superAdminOnly) {
       return false;
     }
     // Other admin features obey feature control configuration
@@ -119,19 +136,24 @@ export default function AdminView({
     setSortConfig({ key, direction });
   };
 
-  const getAdminHeaders = () => ({
-    'Content-Type': 'application/json',
-    'x-admin-email': currentUserEmail || (typeof window !== 'undefined' ? localStorage.getItem('tahaluf_cached_email') : '') || 'admin@tahaluf.com',
-    'x-admin-role': userRole || (typeof window !== 'undefined' ? localStorage.getItem('tahaluf_cached_role') : '') || 'super_admin'
-  });
+  const getAdminHeaders = () => {
+    const email = currentUserEmail || (typeof window !== 'undefined' ? localStorage.getItem('tahaluf_cached_email') : '') || 'admin@tahaluf.com';
+    const role = (isSuperAdmin ? 'super_admin' : userRole) || (typeof window !== 'undefined' ? localStorage.getItem('tahaluf_cached_role') : '') || 'super_admin';
+    return {
+      'Content-Type': 'application/json',
+      'x-admin-email': email,
+      'x-admin-role': role
+    };
+  };
 
   const fetchUsers = async () => {
     if (!isSuperAdmin) return;
     setLoading(true);
     setError(null);
     try {
+      const headers = await getAdminHeaders();
       const res = await fetch('/api/admin/users', {
-        headers: getAdminHeaders()
+        headers
       });
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
@@ -162,9 +184,10 @@ export default function AdminView({
     setAddSuccess(false);
     
     try {
+      const headers = await getAdminHeaders();
       const res = await fetch('/api/admin/users', {
         method: 'POST',
-        headers: getAdminHeaders(),
+        headers,
         body: JSON.stringify({ email: newEmail, password: newPassword, role: newRole })
       });
       
@@ -188,9 +211,10 @@ export default function AdminView({
   const handleDeleteUser = async (uid) => {
     if (!isSuperAdmin) return;
     try {
+      const headers = await getAdminHeaders();
       const res = await fetch('/api/admin/users', {
         method: 'DELETE',
-        headers: getAdminHeaders(),
+        headers,
         body: JSON.stringify({ uid })
       });
       
@@ -209,9 +233,10 @@ export default function AdminView({
   const updateUserRole = async (uid, newRole) => {
     if (!isSuperAdmin) return;
     try {
+      const headers = await getAdminHeaders();
       const res = await fetch('/api/admin/users', {
         method: 'PUT',
-        headers: getAdminHeaders(),
+        headers,
         body: JSON.stringify({ uid, role: newRole })
       });
       
@@ -232,9 +257,10 @@ export default function AdminView({
   const handleChangePassword = async (uid, email, password) => {
     if (!isSuperAdmin) return;
     try {
+      const headers = await getAdminHeaders();
       const res = await fetch('/api/admin/users', {
         method: 'PUT',
-        headers: getAdminHeaders(),
+        headers,
         body: JSON.stringify({ uid, password })
       });
       
