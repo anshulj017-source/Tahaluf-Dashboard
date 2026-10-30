@@ -910,6 +910,14 @@ export default function App() {
   const [showTvSettings, setShowTvSettings] = useState(false);
   const [isQuickJumpOpen, setIsQuickJumpOpen] = useState(false);
   const [quickJumpSearch, setQuickJumpSearch] = useState('');
+  const [isMacUser, setIsMacUser] = useState(true);
+
+  useEffect(() => {
+    if (typeof navigator !== 'undefined') {
+      const isMac = /Mac|iPod|iPhone|iPad/i.test(navigator.userAgent || navigator.platform || '');
+      setIsMacUser(isMac);
+    }
+  }, []);
 
   useEffect(() => {
     if (!featureConfig) return;
@@ -3267,12 +3275,14 @@ export default function App() {
               {featureAllowed('quickJump') && (
                 <button
                   onClick={() => setIsQuickJumpOpen(true)}
-                  title="Search & Quick Jump (Cmd+K)"
+                  title={`Search & Quick Jump (${isMacUser ? 'Cmd+K' : 'Ctrl+K'})`}
                   className="h-[28px] xl:h-[30px] px-2 bg-white/5 border border-white/15 text-slate-300 rounded-lg hover:bg-white/10 hover:text-white transition-colors flex items-center gap-1.5 text-[10px] font-semibold shrink-0"
                 >
                   <Search className="w-3 h-3 text-[#14a6d9]" />
                   <span className="hidden 2xl:inline">Search</span>
-                  <kbd className="hidden 2xl:inline-block rounded bg-black/40 px-1 py-0.2 text-[9px] text-slate-400 font-mono">⌘K</kbd>
+                  <kbd className="hidden 2xl:inline-block rounded bg-black/40 px-1 py-0.2 text-[9px] text-slate-400 font-mono">
+                    {isMacUser ? '⌘K' : 'Ctrl+K'}
+                  </kbd>
                 </button>
               )}
               {featureAllowed('tv') && (
@@ -3327,7 +3337,7 @@ export default function App() {
               {featureAllowed('quickJump') && (
                 <button
                   onClick={() => setIsQuickJumpOpen(true)}
-                  title="Search & Quick Jump (Cmd+K)"
+                  title={`Search & Quick Jump (${isMacUser ? 'Cmd+K' : 'Ctrl+K'})`}
                   className="h-[32px] w-[32px] bg-white/5 border border-white/15 text-slate-300 rounded-lg hover:bg-white/10 hover:text-white transition-colors flex items-center justify-center shrink-0"
                 >
                   <Search className="w-3.5 h-3.5 text-[#14a6d9]" />
@@ -3823,7 +3833,12 @@ export default function App() {
                 placeholder="Jump to event, view, or tool..."
                 className="w-full bg-transparent text-sm text-white placeholder:text-slate-500 focus:outline-none"
               />
-              <kbd className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-mono text-slate-400">ESC</kbd>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <kbd className="hidden sm:inline-block rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-mono text-slate-400">
+                  {isMacUser ? '⌘K' : 'Ctrl+K'}
+                </kbd>
+                <kbd className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-mono text-slate-400">ESC</kbd>
+              </div>
             </div>
 
             {/* Results List */}
