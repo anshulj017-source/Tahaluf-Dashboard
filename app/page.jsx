@@ -774,14 +774,35 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('summary');
   const [adminVisited, setAdminVisited] = useState(false);
   const isAdminRole = userRole === 'admin' || userRole === 'super_admin';
+  const initialAdminSyncedRef = useRef(false);
   useEffect(() => {
     if (!isAdminRole && activeTab === 'admin') {
       setActiveTab('summary');
     }
-    if (isAdminRole && new URLSearchParams(window.location.search).has('admin')) {
-      setActiveTab('admin');
-    }
   }, [isAdminRole, activeTab]);
+
+  useEffect(() => {
+    if (isAdminRole && !initialAdminSyncedRef.current) {
+      initialAdminSyncedRef.current = true;
+      if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('admin')) {
+        setActiveTab('admin');
+      }
+    }
+  }, [isAdminRole]);
+
+  const returnToDashboard = () => {
+    if (typeof window !== 'undefined') {
+      try {
+        const url = new URL(window.location.href);
+        if (url.searchParams.has('admin')) {
+          url.searchParams.delete('admin');
+          window.history.replaceState(null, '', url.pathname + (url.search ? url.search : ''));
+        }
+      } catch {}
+    }
+    setActiveTab('summary');
+    if (tvMode) setTvMode(false);
+  };
   useEffect(() => {
     if (activeTab === 'admin') setAdminVisited(true);
   }, [activeTab]);
@@ -3159,7 +3180,7 @@ export default function App() {
       ) : activeTab === 'admin' && isAdminRole ? (
         <header className="flex items-center justify-between gap-3 border-b border-[#cedc28]/20 bg-[#0a2442] px-4 py-3 text-white">
           <div 
-            onClick={() => setActiveTab('summary')}
+            onClick={returnToDashboard}
             className="flex items-center gap-3 cursor-pointer hover:opacity-85 transition-opacity"
             title="Return to Overview"
           >
@@ -3169,7 +3190,7 @@ export default function App() {
           <div className="flex items-center gap-3">
             <span className="text-xs text-slate-300 hidden sm:inline font-mono">{userEmail}</span>
             <button 
-              onClick={() => setActiveTab('summary')} 
+              onClick={returnToDashboard} 
               className="rounded-lg border border-[#cedc28]/40 hover:bg-[#cedc28]/10 text-[#cedc28] px-3 py-1.5 text-xs font-bold transition-all"
             >
               Back to dashboard
@@ -3660,6 +3681,15 @@ export default function App() {
             onEventsSaved={setEventsConfiguration}
             onSignOut={handleSignOut}
             onNavigate={(featureId) => {
+              if (typeof window !== 'undefined') {
+                try {
+                  const url = new URL(window.location.href);
+                  if (url.searchParams.has('admin')) {
+                    url.searchParams.delete('admin');
+                    window.history.replaceState(null, '', url.pathname + (url.search ? url.search : ''));
+                  }
+                } catch {}
+              }
               if (['summary', 'campaign', 'weekly', 'channel', 'market', 'detailed', 'webtraffic', 'creative'].includes(featureId)) {
                 setActiveTab(featureId);
               } else if (featureId === 'aiSummary' || featureId === 'budgetSimulator' || featureId === 'channelQuadrant') {

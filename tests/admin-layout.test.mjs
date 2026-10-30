@@ -367,3 +367,54 @@ test('Regular Admin cannot view or change user roles and cannot access User Acce
   const tables = nodes(tree, node => node.type === 'table');
   assert.equal(tables.length, 0, 'No user roster table is rendered for regular admin');
 });
+
+test('Back to Dashboard button in AdminView clears admin search param and navigates to summary', async () => {
+  const harness = hookHarness();
+  const stub = () => null;
+  let navigatedTarget = null;
+  let windowHref = 'http://localhost:3000/?admin=users';
+  const mockWindow = {
+    location: {
+      href: windowHref,
+      search: '?admin=users',
+      pathname: '/'
+    },
+    history: {
+      replaceState: (_state, _title, url) => {
+        windowHref = typeof url === 'string' ? url : url.toString();
+        mockWindow.location.href = windowHref;
+        mockWindow.location.search = new URL(windowHref, 'http://localhost:3000').search;
+      }
+    }
+  };
+
+  const component = await load('../app/AdminView.jsx', {
+    react: { ...harness.hooks, useEffect() {} },
+    './components/EventsAdmin': stub,
+    './components/DataHealthAdmin': stub,
+    './components/AnalyticsAdmin': stub,
+    './components/ApiQuotasAdmin': stub,
+    './components/FeatureControlsAdmin': stub,
+    './components/AdminUI': {
+      AdminDialog: stub, useAdminDirtyGuard() {},
+      useAdminView: (_, initial) => [initial, () => {}]
+    }
+  }, { window: mockWindow });
+
+  const tree = harness.render(component.default, {
+    userRole: 'super_admin',
+    onNavigate: target => { navigatedTarget = target; }
+  });
+
+  const buttons = nodes(tree, node => node.type === 'button');
+  const backButtons = buttons.filter(b => {
+    const textNodes = nodes(b, n => typeof n === 'string' || (n.type === 'span' && typeof n.props?.children === 'string'));
+    return textNodes.some(t => (t.props?.children || t) === 'Back to Dashboard');
+  });
+
+  assert.ok(backButtons.length >= 1, 'At least one Back to Dashboard button must be rendered');
+  // Trigger click on Back to Dashboard button
+  backButtons[0].props.onClick();
+  assert.equal(navigatedTarget, 'summary', 'Clicking Back to Dashboard must trigger navigation to summary view');
+  assert.ok(!new URL(mockWindow.location.href, 'http://localhost:3000').searchParams.has('admin'), 'admin search param must be removed from URL');
+});

@@ -126,6 +126,23 @@ export default function AdminView({
     }
   };
 
+  const handleBackToDashboard = () => {
+    if (typeof window !== 'undefined') {
+      try {
+        const url = new URL(window.location.href);
+        if (url.searchParams.has('admin')) {
+          url.searchParams.delete('admin');
+          window.history.replaceState(null, '', url.pathname + (url.search ? url.search : ''));
+        }
+      } catch {}
+    }
+    if (onNavigate) {
+      onNavigate('summary');
+    } else if (typeof window !== 'undefined') {
+      window.location.href = '/';
+    }
+  };
+
   const [sortConfig, setSortConfig] = useState({ key: 'lastactive', direction: 'desc' });
 
   const handleSort = (key) => {
@@ -417,7 +434,7 @@ export default function AdminView({
             <div className="flex lg:hidden items-center justify-between gap-2 mt-3 pt-2.5 border-t border-white/10">
               <button 
                 type="button" 
-                onClick={() => onNavigate ? onNavigate('summary') : (window.location.href = '/')}
+                onClick={handleBackToDashboard}
                 className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-left text-xs font-bold text-slate-300 hover:text-white hover:bg-white/10 transition-all border border-white/10"
               >
                 <ArrowLeft className="h-3.5 w-3.5 text-[#cedc28] shrink-0" />
@@ -465,7 +482,7 @@ export default function AdminView({
           <div className="hidden lg:flex mt-6 pt-4 border-t border-white/10 flex-col gap-2">
             <button 
               type="button" 
-              onClick={() => onNavigate ? onNavigate('summary') : (window.location.href = '/')}
+              onClick={handleBackToDashboard}
               className="flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-left text-xs font-bold text-slate-300 hover:text-white hover:bg-white/10 transition-all border border-white/10"
             >
               <ArrowLeft className="h-4 w-4 text-[#cedc28] shrink-0" />
