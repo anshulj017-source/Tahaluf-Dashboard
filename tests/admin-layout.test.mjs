@@ -401,6 +401,69 @@ test('Regular Admin can access User Access section when permitted by Feature Con
   assert.ok(sectionLabels.some(l => l.includes('User Access')), 'User Access IS visible when permitted by feature controls');
 });
 
+test('User Access section is hidden even for Super Admin when disabled in Feature Controls', async () => {
+  const harness = hookHarness();
+  const stub = () => null;
+  const component = await load('../app/AdminView.jsx', {
+    react: { ...harness.hooks, useEffect() {} },
+    './components/EventsAdmin': stub,
+    './components/DataHealthAdmin': stub,
+    './components/AnalyticsAdmin': stub,
+    './components/ApiQuotasAdmin': stub,
+    './components/FeatureControlsAdmin': stub,
+    './components/AdminUI': {
+      AdminDialog: stub, useAdminDirtyGuard() {},
+      useAdminView: (_, initial) => ['events', () => {}]
+    }
+  });
+
+  // Render AdminView with userRole='super_admin' and isFeatureAllowed denying adminUsers (disabled)
+  const tree = harness.render(component.default, { 
+    userRole: 'super_admin',
+    isFeatureAllowed: (id) => id !== 'adminUsers'
+  });
+  const nav = nodes(tree, node => node.props?.['aria-label'] === 'Admin sections')[0];
+  assert.ok(nav, 'Admin sections navigation must be present');
+
+  const spans = nodes(nav, node => node.type === 'span' && typeof node.props?.children === 'string');
+  const sectionLabels = spans.map(b => b.props.children);
+  assert.ok(!sectionLabels.some(l => l.includes('User Access')), 'User Access MUST be hidden when disabled, even for Super Admin');
+});
+
+test('User Access section can be shared with custom users and standard user can access it', async () => {
+  const harness = hookHarness();
+  const stub = () => null;
+  const component = await load('../app/AdminView.jsx', {
+    react: { ...harness.hooks, useEffect() {} },
+    './components/EventsAdmin': stub,
+    './components/DataHealthAdmin': stub,
+    './components/AnalyticsAdmin': stub,
+    './components/ApiQuotasAdmin': stub,
+    './components/FeatureControlsAdmin': stub,
+    './components/AdminUI': {
+      AdminDialog: stub, useAdminDirtyGuard() {},
+      useAdminView: (_, initial) => ['users', () => {}]
+    }
+  });
+
+  // Render AdminView for a standard user that is granted custom access to adminUsers
+  const tree = harness.render(component.default, { 
+    userRole: 'standard',
+    currentUserEmail: 'custom.analyst@tahaluf.com',
+    isFeatureAllowed: (id) => id === 'adminUsers'
+  });
+  const nav = nodes(tree, node => node.props?.['aria-label'] === 'Admin sections')[0];
+  assert.ok(nav, 'Admin sections navigation must be present');
+
+  const spans = nodes(nav, node => node.type === 'span' && typeof node.props?.children === 'string');
+  const sectionLabels = spans.map(b => b.props.children);
+  assert.ok(sectionLabels.some(l => l.includes('User Access')), 'User Access is visible when shared with custom user');
+
+  // Verify access is not restricted inside the section
+  const headings = nodes(tree, node => node.type === 'h3').map(h => h.props?.children);
+  assert.ok(!headings.includes('Access Restricted'), 'Custom user does not see Access Restricted');
+});
+
 test('Back to Dashboard button in AdminView clears admin search param and navigates to summary', async () => {
   const harness = hookHarness();
   const stub = () => null;

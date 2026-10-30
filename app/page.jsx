@@ -775,20 +775,6 @@ export default function App() {
   const [adminVisited, setAdminVisited] = useState(false);
   const isAdminRole = userRole === 'admin' || userRole === 'super_admin';
   const initialAdminSyncedRef = useRef(false);
-  useEffect(() => {
-    if (!isAdminRole && activeTab === 'admin') {
-      setActiveTab('summary');
-    }
-  }, [isAdminRole, activeTab]);
-
-  useEffect(() => {
-    if (isAdminRole && !initialAdminSyncedRef.current) {
-      initialAdminSyncedRef.current = true;
-      if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('admin')) {
-        setActiveTab('admin');
-      }
-    }
-  }, [isAdminRole]);
 
   const returnToDashboard = () => {
     if (typeof window !== 'undefined') {
@@ -830,6 +816,27 @@ export default function App() {
   const [featureError, setFeatureError] = useState('');
   const featureAllowed = (id) => isFeatureEnabled(featureConfig || DEFAULT_FEATURE_CONFIG, id, userRole, simulatingStandardUser, userEmail);
 
+  const canAccessAdmin = useMemo(() => {
+    if (isAdminRole) return true;
+    const adminFeatureIds = ['adminEvents', 'adminHealth', 'adminQuotas', 'adminAnalytics', 'adminUsers'];
+    return adminFeatureIds.some(id => featureAllowed(id));
+  }, [isAdminRole, featureAllowed]);
+
+  useEffect(() => {
+    if (!canAccessAdmin && activeTab === 'admin') {
+      setActiveTab('summary');
+    }
+  }, [canAccessAdmin, activeTab]);
+
+  useEffect(() => {
+    if (canAccessAdmin && !initialAdminSyncedRef.current) {
+      initialAdminSyncedRef.current = true;
+      if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('admin')) {
+        setActiveTab('admin');
+      }
+    }
+  }, [canAccessAdmin]);
+
   useEffect(() => {
     let disposed = false;
     const refresh = async () => {
@@ -866,7 +873,7 @@ export default function App() {
   useEffect(() => {
     if (!featureConfig) return;
     const enabled = id => featureAllowed(id);
-    if (activeTab === 'admin' && isAdminRole) return;
+    if (activeTab === 'admin' && canAccessAdmin) return;
     if (!enabled(activeTab)) {
       const firstView = DASHBOARD_FEATURES.find(feature => feature.group === 'Dashboard views' && enabled(feature.id));
       setActiveTab(firstView?.id || 'summary');
@@ -3445,7 +3452,7 @@ export default function App() {
             </div>
 
             <div className="mt-auto pt-4 border-t border-[#cedc28]/20 flex flex-col gap-3">
-              {isAdminRole && (
+              {canAccessAdmin && (
                 <div className="flex flex-col gap-1.5">
                   <button 
                     onClick={() => {
@@ -3624,7 +3631,7 @@ export default function App() {
             <div className="flex-1 min-h-[50px] mt-4"></div>
             
             <div className="flex flex-col gap-2 px-6 pb-6 mt-auto z-30">
-              {isAdminRole && (
+              {canAccessAdmin && (
                 <div className="flex flex-col gap-1.5 px-3 mb-1">
                   <button 
                     onClick={() => setActiveTab('admin')}
@@ -3678,7 +3685,7 @@ export default function App() {
         )}
         
         {/* TABS CONTENT */}
-        {(adminVisited || activeTab === 'admin') && isAdminRole && (
+        {(adminVisited || activeTab === 'admin') && canAccessAdmin && (
           <div className="min-w-0 flex-1 flex overflow-hidden" style={{ display: activeTab === 'admin' ? undefined : 'none' }}>
           <AdminView 
             active={activeTab === 'admin'}
@@ -3727,7 +3734,7 @@ export default function App() {
           />
           </div>
         )}
-        {!(activeTab === 'admin' && isAdminRole) && (
+        {!(activeTab === 'admin' && canAccessAdmin) && (
         <main className="flex-1 overflow-y-auto p-3 sm:p-5 md:p-6 lg:p-8 pb-24 lg:pb-8 custom-scrollbar touch-scroll relative z-10">
           <ReactTooltip id="market-tooltip" className="z-50" style={{ backgroundColor: '#0a2442', color: '#eef7f5', border: '1px solid #cedc2830', borderRadius: '8px', zIndex: 1000 }} />
           <div className="absolute top-0 right-0 w-full h-[500px] bg-gradient-to-br from-[#062f2e]/20 via-transparent to-transparent pointer-events-none -z-10"></div>

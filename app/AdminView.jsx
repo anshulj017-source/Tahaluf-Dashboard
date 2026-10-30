@@ -48,27 +48,40 @@ export default function AdminView({
 
   // Filter sections dynamically based on role and feature controls
   const visibleSections = ALL_ADMIN_SECTIONS.filter(section => {
-    // Super Admins have unrestricted access to all admin sections including Feature Controls & User Access
-    if (isSuperAdmin) {
-      return true;
-    }
-    // Feature Controls and User Access are restricted strictly to SUPER ADMIN
-    if (section.superAdminOnly) {
-      return false;
-    }
-    // Other admin features obey feature control configuration
+    // If section has a feature control, check feature permission first
     if (section.featureId) {
       if (typeof isFeatureAllowed === 'function') {
-        return isFeatureAllowed(section.featureId);
-      }
-      if (featureConfig?.modes?.[section.featureId] === 'disabled') {
+        const allowed = isFeatureAllowed(section.featureId);
+        // If disabled or restricted, it cannot be visible to anyone (including Super Admin)
+        if (!allowed) return false;
+      } else if (featureConfig?.modes?.[section.featureId] === 'disabled') {
         return false;
       }
     }
+
+    // Super Admins have unrestricted access to all enabled admin sections (including Feature Controls)
+    if (isSuperAdmin) {
+      return true;
+    }
+
+    // Feature Controls is restricted strictly to SUPER ADMIN
+    if (section.superAdminOnly) {
+      return false;
+    }
+
+    // Admin features that passed isFeatureAllowed check are permitted
+    if (section.featureId) {
+      return true;
+    }
+
     return true;
   });
 
-  const [activeSection, setActiveSection] = useAdminView('admin', isSuperAdmin ? 'users' : 'events', ALL_ADMIN_SECTIONS.map(section => section.id));
+  const canAccessUsers = typeof isFeatureAllowed === 'function'
+    ? isFeatureAllowed('adminUsers')
+    : isSuperAdmin;
+
+  const [activeSection, setActiveSection] = useAdminView('admin', isSuperAdmin ? 'users' : (visibleSections[0]?.id || 'events'), ALL_ADMIN_SECTIONS.map(section => section.id));
 
   // If active section is hidden by feature controls or super admin check, fallback safely
   useEffect(() => {
@@ -153,18 +166,30 @@ export default function AdminView({
     setSortConfig({ key, direction });
   };
 
-  const getAdminHeaders = () => {
+  const getAdminHeaders = async () => {
+    let token = '';
+    try {
+      const { auth } = await import('../lib/firebase');
+      if (auth?.currentUser) {
+        token = await auth.currentUser.getIdToken();
+      }
+    } catch {}
+
     const email = currentUserEmail || (typeof window !== 'undefined' ? localStorage.getItem('tahaluf_cached_email') : '') || 'admin@tahaluf.com';
-    const role = (isSuperAdmin ? 'super_admin' : userRole) || (typeof window !== 'undefined' ? localStorage.getItem('tahaluf_cached_role') : '') || 'super_admin';
-    return {
+    const role = (isSuperAdmin ? 'super_admin' : userRole) || (typeof window !== 'undefined' ? localStorage.getItem('tahaluf_cached_role') : '') || 'admin';
+    const headers = {
       'Content-Type': 'application/json',
       'x-admin-email': email,
       'x-admin-role': role
     };
+    if (token) {
+      headers['authorization'] = `Bearer ${token}`;
+    }
+    return headers;
   };
 
   const fetchUsers = async () => {
-    if (!isSuperAdmin) return;
+    if (!canAccessUsers) return;
     setLoading(true);
     setError(null);
     try {
@@ -186,16 +211,16 @@ export default function AdminView({
     }
   };
 
-  // Only fetch users on demand when switching to the users section and if user is super admin
+  // Fetch users on demand when switching to the users section if user has access
   useEffect(() => {
-    if (activeSection === 'users' && users.length === 0 && isSuperAdmin) {
+    if (activeSection === 'users' && users.length === 0 && canAccessUsers) {
       fetchUsers();
     }
-  }, [activeSection, isSuperAdmin]);
+  }, [activeSection, canAccessUsers]);
 
   const handleAddUser = async (e) => {
     e.preventDefault();
-    if (!isSuperAdmin) return;
+    if (!canAccessUsers) return;
     setAddingUser(true);
     setError(null);
     setAddSuccess(false);
@@ -226,7 +251,7 @@ export default function AdminView({
   };
 
   const handleDeleteUser = async (uid) => {
-    if (!isSuperAdmin) return;
+    if (!canAccessUsers) return;
     try {
       const headers = await getAdminHeaders();
       const res = await fetch('/api/admin/users', {
@@ -248,7 +273,7 @@ export default function AdminView({
   };
 
   const updateUserRole = async (uid, newRole) => {
-    if (!isSuperAdmin) return;
+    if (!canAccessUsers) return;
     try {
       const headers = await getAdminHeaders();
       const res = await fetch('/api/admin/users', {
@@ -272,7 +297,7 @@ export default function AdminView({
   };
 
   const handleChangePassword = async (uid, email, password) => {
-    if (!isSuperAdmin) return;
+    if (!canAccessUsers) return;
     try {
       const headers = await getAdminHeaders();
       const res = await fetch('/api/admin/users', {
@@ -304,8 +329,8 @@ export default function AdminView({
   const filteredUsers = users.filter(user => `${user.email} ${user.role}`.toLowerCase().includes(userSearch.toLowerCase()));
   const visibleUserPage = Math.min(userPage, Math.max(1, Math.ceil(filteredUsers.length / 20)));
 
-  const isAdmin = userRole === 'admin' || userRole === 'super_admin';
-  if (!isAdmin) {
+  const hasAccess = isSuperAdmin || userRole === 'admin' || (visibleSections && visibleSections.length > 0);
+  if (!hasAccess) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-[#061726] text-white min-h-[60vh]">
         <Shield className="w-16 h-16 text-rose-400 mb-4 opacity-80" />
@@ -649,7 +674,7 @@ export default function AdminView({
                   onChange={(e) => setNewRole(e.target.value)}
                   className="w-full bg-[#0a2442] border border-gray-600/50 rounded-xl px-4 py-2.5 text-sm text-[#eef7f5] font-bold focus:outline-none focus:border-[#cedc28]/50 transition-all cursor-pointer appearance-none"
                 >
-                  <option value="super_admin">Super Admin</option>
+                  {isSuperAdmin && <option value="super_admin">Super Admin</option>}
                   <option value="admin">Admin</option>
                   <option value="standard">Standard</option>
                   <option value="non-finance">Non-Finance</option>
@@ -729,15 +754,16 @@ export default function AdminView({
                            <select 
                             aria-label={`Role for ${user.email}`}
                             value={user.role || 'standard'}
+                            disabled={!isSuperAdmin && user.role === 'super_admin'}
                             onChange={(e) => { setUserAction({ type: 'role', ...user, nextRole: e.target.value }); setError(null); }}
                             className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all outline-none cursor-pointer appearance-none text-center ${
                               user.role === 'super_admin' ? 'bg-[#cedc28]/25 border-2 border-[#cedc28] text-[#cedc28] shadow-[0_0_12px_rgba(206,220,40,0.35)]' :
                               user.role === 'admin' ? 'bg-[#14a6d9]/15 border border-[#14a6d9]/40 text-[#14a6d9]' : 
                               user.role === 'non-finance' ? 'bg-purple-900/20 border border-purple-500/30 text-purple-400' : 
                               'bg-gray-800 border border-gray-600 text-gray-400'
-                            }`}
+                            } ${!isSuperAdmin && user.role === 'super_admin' ? 'opacity-60 cursor-not-allowed' : ''}`}
                            >
-                            <option value="super_admin">Super Admin</option>
+                            {isSuperAdmin && <option value="super_admin">Super Admin</option>}
                             <option value="admin">Admin</option>
                             <option value="standard">Standard</option>
                             <option value="non-finance">Non-Finance</option>
@@ -752,18 +778,28 @@ export default function AdminView({
                       <td className="py-4 px-6">
                         <div className="flex justify-center gap-2">
                           <button 
+                            disabled={!isSuperAdmin && user.role === 'super_admin'}
                             onClick={() => { setUserAction({ type: 'password', ...user }); setActionPassword(''); setError(null); }}
                             aria-label={`Change password for ${user.email}`}
-                            className="p-2 bg-blue-500/0 hover:bg-blue-500/10 text-gray-500 hover:text-blue-400 rounded-lg transition-colors"
-                            title="Change Password"
+                            className={`p-2 rounded-lg transition-colors ${
+                              !isSuperAdmin && user.role === 'super_admin'
+                                ? 'opacity-30 cursor-not-allowed text-gray-600'
+                                : 'bg-blue-500/0 hover:bg-blue-500/10 text-gray-500 hover:text-blue-400'
+                            }`}
+                            title={!isSuperAdmin && user.role === 'super_admin' ? 'Only Super Admins can manage Super Admin accounts' : 'Change Password'}
                           >
                             <Key className="w-4 h-4" />
                           </button>
                           <button 
+                            disabled={!isSuperAdmin && user.role === 'super_admin'}
                             onClick={() => { setUserAction({ type: 'delete', ...user }); setError(null); }}
                             aria-label={`Delete ${user.email}`}
-                            className="p-2 bg-red-500/0 hover:bg-red-500/10 text-gray-500 hover:text-red-400 rounded-lg transition-colors"
-                            title="Delete User"
+                            className={`p-2 rounded-lg transition-colors ${
+                              !isSuperAdmin && user.role === 'super_admin'
+                                ? 'opacity-30 cursor-not-allowed text-gray-600'
+                                : 'bg-red-500/0 hover:bg-red-500/10 text-gray-500 hover:text-red-400'
+                            }`}
+                            title={!isSuperAdmin && user.role === 'super_admin' ? 'Only Super Admins can delete Super Admin accounts' : 'Delete User'}
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
