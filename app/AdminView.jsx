@@ -26,8 +26,8 @@ const ALL_ADMIN_SECTIONS = [
   { id: 'health', featureId: 'adminHealth', label: 'Health Monitor', icon: Activity },
   { id: 'quotas', featureId: 'adminQuotas', label: 'API & Quotas', icon: Gauge },
   { id: 'analytics', featureId: 'adminAnalytics', label: 'Analytics & Activity', icon: BarChart3 },
+  { id: 'users', featureId: 'adminUsers', label: 'User Access', icon: UsersIcon },
   { id: 'features', label: 'Feature Controls', icon: Shield, superAdminOnly: true },
-  { id: 'users', label: 'User Access', icon: UsersIcon, superAdminOnly: true },
 ];
 
 const sections = ALL_ADMIN_SECTIONS;
@@ -539,6 +539,8 @@ export default function AdminView({
               onNavigate={(featureId) => {
                 if (featureId === 'dimensionExport' || featureId === 'bulkDimensionImport') {
                   setActiveSection('health');
+                } else if (featureId === 'adminUsers') {
+                  setActiveSection('users');
                 } else if (onNavigate) {
                   onNavigate(featureId);
                 }
@@ -549,14 +551,14 @@ export default function AdminView({
 
         {/* SECTION 2: USER ACCESS MANAGEMENT */}
         {activeSection === 'users' && (
-          !isSuperAdmin ? (
+          !(typeof isFeatureAllowed === 'function' ? isFeatureAllowed('adminUsers') : isSuperAdmin) ? (
             <div className="card-surface p-8 rounded-3xl border border-amber-500/30 bg-[#0a2442]/80 text-center max-w-xl mx-auto my-12 shadow-2xl">
               <div className="w-16 h-16 rounded-full bg-amber-500/15 border border-amber-500/40 text-amber-300 flex items-center justify-center mx-auto mb-4">
                 <Shield className="w-8 h-8" />
               </div>
-              <h3 className="text-xl font-bold text-white mb-2">Super Admin Access Required</h3>
+              <h3 className="text-xl font-bold text-white mb-2">Access Restricted</h3>
               <p className="text-sm text-gray-400 mb-6">
-                Viewing user lists and modifying user roles is restricted strictly to designated Super Administrators.
+                Viewing user accounts and modifying roles is restricted according to current Feature Controls policy.
               </p>
               <button
                 onClick={() => setActiveSection('events')}

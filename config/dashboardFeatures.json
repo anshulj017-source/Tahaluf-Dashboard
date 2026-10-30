@@ -29,7 +29,8 @@
     "adminEvents": "admin_only",
     "adminHealth": "admin_only",
     "adminQuotas": "admin_only",
-    "adminAnalytics": "admin_only"
+    "adminAnalytics": "admin_only",
+    "adminUsers": "admin_only"
   },
   "customUsers": {}
 }

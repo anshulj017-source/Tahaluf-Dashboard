@@ -332,7 +332,7 @@ test('Admin section navigation is responsive with custom dropdown on mobile, 2-l
   assert.equal(desktopButtons.length, 6, 'all 6 admin sections must be rendered as accessible buttons in desktop layout');
 });
 
-test('Regular Admin cannot view or change user roles and cannot access User Access section', async () => {
+test('Regular Admin cannot view or change user roles and cannot access User Access section when restricted by Feature Controls', async () => {
   const harness = hookHarness();
   const stub = () => null;
   let activeSectionState = 'users';
@@ -349,23 +349,56 @@ test('Regular Admin cannot view or change user roles and cannot access User Acce
     }
   });
 
-  // Render AdminView with userRole='admin' (regular admin, not super_admin)
-  const tree = harness.render(component.default, { userRole: 'admin' });
+  // Render AdminView with userRole='admin' and isFeatureAllowed denying adminUsers
+  const tree = harness.render(component.default, { 
+    userRole: 'admin',
+    isFeatureAllowed: (id) => id !== 'adminUsers'
+  });
   const nav = nodes(tree, node => node.props?.['aria-label'] === 'Admin sections')[0];
   assert.ok(nav, 'Admin sections navigation must be present');
 
-  // Verify only 4 operational sections are available (events, health, quotas, analytics)
+  // Verify only operational sections are available (events, health, quotas, analytics)
   // Both 'features' and 'users' must be excluded
   const buttons = nodes(nav, node => node.type === 'button' && typeof node.props?.children === 'string');
   const sectionLabels = buttons.map(b => b.props.children);
-  assert.ok(!sectionLabels.some(l => l.includes('User Access')), 'User Access must NOT be visible to regular admin');
+  assert.ok(!sectionLabels.some(l => l.includes('User Access')), 'User Access must NOT be visible when restricted');
   assert.ok(!sectionLabels.some(l => l.includes('Feature Controls')), 'Feature Controls must NOT be visible to regular admin');
 
-  // When activeSection is forced to 'users', verify Super Admin Access Required warning is shown
+  // When activeSection is forced to 'users', verify Access Restricted warning is shown
   const headings = nodes(tree, node => node.type === 'h3').map(h => h.props?.children);
-  assert.ok(headings.includes('Super Admin Access Required'), 'Accessing users section shows Super Admin Access Required message');
+  assert.ok(headings.includes('Access Restricted'), 'Accessing restricted users section shows Access Restricted message');
   const tables = nodes(tree, node => node.type === 'table');
-  assert.equal(tables.length, 0, 'No user roster table is rendered for regular admin');
+  assert.equal(tables.length, 0, 'No user roster table is rendered when restricted');
+});
+
+test('Regular Admin can access User Access section when permitted by Feature Controls', async () => {
+  const harness = hookHarness();
+  const stub = () => null;
+  let activeSectionState = 'users';
+  const component = await load('../app/AdminView.jsx', {
+    react: { ...harness.hooks, useEffect() {} },
+    './components/EventsAdmin': stub,
+    './components/DataHealthAdmin': stub,
+    './components/AnalyticsAdmin': stub,
+    './components/ApiQuotasAdmin': stub,
+    './components/FeatureControlsAdmin': stub,
+    './components/AdminUI': {
+      AdminDialog: stub, useAdminDirtyGuard() {},
+      useAdminView: (_, initial) => [activeSectionState, (s) => { activeSectionState = s; }]
+    }
+  });
+
+  // Render AdminView with userRole='admin' and isFeatureAllowed permitting adminUsers
+  const tree = harness.render(component.default, { 
+    userRole: 'admin',
+    isFeatureAllowed: (id) => id === 'adminUsers' || id === 'adminEvents'
+  });
+  const nav = nodes(tree, node => node.props?.['aria-label'] === 'Admin sections')[0];
+  assert.ok(nav, 'Admin sections navigation must be present');
+
+  const spans = nodes(nav, node => node.type === 'span' && typeof node.props?.children === 'string');
+  const sectionLabels = spans.map(b => b.props.children);
+  assert.ok(sectionLabels.some(l => l.includes('User Access')), 'User Access IS visible when permitted by feature controls');
 });
 
 test('Back to Dashboard button in AdminView clears admin search param and navigates to summary', async () => {

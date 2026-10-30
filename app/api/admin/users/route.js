@@ -1,14 +1,43 @@
 import { NextResponse } from 'next/server';
 import { getFirebaseAdmin } from '../../../../lib/firebaseAdmin';
-import { isSuperAdminRequest } from '../../../../lib/requireAdminRequest';
+import { isAdminRequest, isSuperAdminRequest } from '../../../../lib/requireAdminRequest';
+import { readAdminSetting } from '../../../../lib/adminSettingsStore.mjs';
+import { DEFAULT_FEATURE_CONFIG, isFeatureEnabled } from '../../../../lib/dashboardFeatures.mjs';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
+async function canAccessUserManagement(req) {
+  const isSuper = await isSuperAdminRequest(req);
+  try {
+    const config = await readAdminSetting('dashboardFeatures', DEFAULT_FEATURE_CONFIG);
+    const mode = config?.modes?.adminUsers ?? DEFAULT_FEATURE_CONFIG.modes.adminUsers ?? 'admin_only';
+    if (mode === 'disabled') {
+      return false;
+    }
+    if (mode === 'super_admin_only') {
+      return isSuper;
+    }
+    const adminEmailHeader = (req.headers.get('x-admin-email') || '').toLowerCase().trim();
+    const adminRoleHeader = (req.headers.get('x-admin-role') || '').toLowerCase().trim();
+    const role = isSuper ? 'super_admin' : (adminRoleHeader || 'admin');
+
+    const isAdm = isSuper || await isAdminRequest(req);
+    if (!isAdm && mode === 'admin_only') {
+      return false;
+    }
+
+    return isFeatureEnabled(config, 'adminUsers', role, false, adminEmailHeader);
+  } catch (err) {
+    console.warn('[AUTH] Fallback user management permission check:', err.message);
+    return isSuper;
+  }
+}
+
 export async function GET(req) {
   try {
-    if (!await isSuperAdminRequest(req)) {
-      return NextResponse.json({ error: 'Super Admin access required to view user accounts.' }, { status: 403 });
+    if (!await canAccessUserManagement(req)) {
+      return NextResponse.json({ error: 'Access restricted: user management is not permitted under active feature controls.' }, { status: 403 });
     }
 
     const { adminAuth, adminDb } = getFirebaseAdmin();
@@ -44,8 +73,8 @@ export async function GET(req) {
 
 export async function POST(req) {
   try {
-    if (!await isSuperAdminRequest(req)) {
-      return NextResponse.json({ error: 'Super Admin access required to create user accounts.' }, { status: 403 });
+    if (!await canAccessUserManagement(req)) {
+      return NextResponse.json({ error: 'Access restricted: user creation is not permitted under active feature controls.' }, { status: 403 });
     }
 
     const { adminAuth, adminDb } = getFirebaseAdmin();
@@ -57,6 +86,10 @@ export async function POST(req) {
 
     const normalizedEmail = email.toLowerCase().trim();
     const assignedRole = role || 'standard';
+
+    if (assignedRole === 'super_admin' && !await isSuperAdminRequest(req)) {
+      return NextResponse.json({ error: 'Super Admin access required to create Super Admin accounts.' }, { status: 403 });
+    }
 
     const userRecord = await adminAuth.createUser({
       email: normalizedEmail,
@@ -85,8 +118,8 @@ export async function POST(req) {
 
 export async function PUT(req) {
   try {
-    if (!await isSuperAdminRequest(req)) {
-      return NextResponse.json({ error: 'Super Admin access required to modify user accounts or roles.' }, { status: 403 });
+    if (!await canAccessUserManagement(req)) {
+      return NextResponse.json({ error: 'Access restricted: user modification is not permitted under active feature controls.' }, { status: 403 });
     }
 
     const { adminAuth, adminDb } = getFirebaseAdmin();
@@ -97,6 +130,10 @@ export async function PUT(req) {
     }
 
     if (role) {
+      if (role === 'super_admin' && !await isSuperAdminRequest(req)) {
+        return NextResponse.json({ error: 'Super Admin access required to assign Super Admin role.' }, { status: 403 });
+      }
+
       await adminDb.collection('users').doc(uid).set({
         role: role,
         updatedAt: new Date().toISOString()
@@ -123,8 +160,8 @@ export async function PUT(req) {
 
 export async function DELETE(req) {
   try {
-    if (!await isSuperAdminRequest(req)) {
-      return NextResponse.json({ error: 'Super Admin access required to delete user accounts.' }, { status: 403 });
+    if (!await canAccessUserManagement(req)) {
+      return NextResponse.json({ error: 'Access restricted: user deletion is not permitted under active feature controls.' }, { status: 403 });
     }
 
     const { adminAuth, adminDb } = getFirebaseAdmin();
