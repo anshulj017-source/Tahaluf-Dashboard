@@ -1,6 +1,6 @@
 {
-  "revision": 10,
-  "updatedAt": "2026-10-29T10:39:34.243Z",
+  "revision": 11,
+  "updatedAt": "2026-10-30T04:59:57.302Z",
   "modes": {
     "summary": "public",
     "campaign": "public",
@@ -30,7 +30,7 @@
     "adminHealth": "admin_only",
     "adminQuotas": "admin_only",
     "adminAnalytics": "admin_only",
-    "adminUsers": "admin_only"
+    "adminUsers": "super_admin_only"
   },
   "customUsers": {}
 }

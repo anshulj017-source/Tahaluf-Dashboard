@@ -233,6 +233,7 @@ export default function FeatureControlsAdmin({ currentUserEmail = 'admin@tahaluf
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGroup, setSelectedGroup] = useState('All');
   const [selectedStatusFilter, setSelectedStatusFilter] = useState('All');
+  const [collapsedGroups, setCollapsedGroups] = useState({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -469,6 +470,33 @@ export default function FeatureControlsAdmin({ currentUserEmail = 'admin@tahaluf
     });
   }, [selectedGroup, selectedStatusFilter, searchQuery, modes]);
 
+  const toggleGroupCollapse = (group) => {
+    setCollapsedGroups(prev => ({ ...prev, [group]: !prev[group] }));
+  };
+
+  const collapseAll = () => {
+    const next = {};
+    groups.forEach(g => { if (g !== 'All') next[g] = true; });
+    setCollapsedGroups(next);
+  };
+
+  const expandAll = () => {
+    setCollapsedGroups({});
+  };
+
+  const getGroupStatusBreakdown = (groupFeatures) => {
+    let pub = 0, adm = 0, superAdm = 0, cust = 0, dis = 0;
+    groupFeatures.forEach(f => {
+      const m = modes[f.id] || f.defaultMode || 'public';
+      if (m === 'public') pub++;
+      else if (m === 'admin_only') adm++;
+      else if (m === 'super_admin_only') superAdm++;
+      else if (m === 'custom_users') cust++;
+      else if (m === 'disabled') dis++;
+    });
+    return { pub, adm, superAdm, cust, dis };
+  };
+
   return (
     <section className="space-y-6">
       {/* HEADER BAR */}
@@ -545,61 +573,115 @@ export default function FeatureControlsAdmin({ currentUserEmail = 'admin@tahaluf
         </div>
       )}
 
-      {/* KPI METRIC TILES */}
+      {/* KPI METRIC TILES (INTERACTIVE QUICK FILTERS) */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <div className="card-surface p-4 rounded-2xl border border-white/10 bg-[#0a2442]/60 backdrop-blur-md">
+        <button
+          type="button"
+          onClick={() => setSelectedStatusFilter('All')}
+          className={`card-surface p-4 rounded-2xl border text-left transition-all cursor-pointer hover:border-[#cedc28]/60 ${
+            selectedStatusFilter === 'All'
+              ? 'border-[#cedc28] bg-[#0a2442] shadow-[0_0_15px_rgba(206,220,40,0.15)] ring-1 ring-[#cedc28]/50'
+              : 'border-white/10 bg-[#0a2442]/60 hover:bg-[#0a2442]/90'
+          }`}
+          title="Show all features regardless of visibility status"
+        >
           <div className="flex items-center justify-between mb-1">
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total</span>
             <Layers className="w-4 h-4 text-[#14a6d9]" />
           </div>
           <div className="text-2xl font-extrabold text-white">{metrics.total}</div>
           <p className="text-[10px] text-slate-400 mt-0.5">Permission modules</p>
-        </div>
+        </button>
 
-        <div className="card-surface p-4 rounded-2xl border border-emerald-500/25 bg-emerald-500/5 backdrop-blur-md">
+        <button
+          type="button"
+          onClick={() => setSelectedStatusFilter(prev => prev === 'public' ? 'All' : 'public')}
+          className={`card-surface p-4 rounded-2xl border text-left transition-all cursor-pointer hover:border-emerald-500/60 ${
+            selectedStatusFilter === 'public'
+              ? 'border-emerald-400 bg-emerald-500/15 shadow-[0_0_15px_rgba(16,185,129,0.2)] ring-1 ring-emerald-400/50'
+              : 'border-emerald-500/25 bg-emerald-500/5 hover:bg-emerald-500/10'
+          }`}
+          title="Filter by Public (Everyone) status"
+        >
           <div className="flex items-center justify-between mb-1">
             <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400">Public</span>
             <Globe className="w-4 h-4 text-emerald-400" />
           </div>
           <div className="text-2xl font-extrabold text-emerald-300">{metrics.publicCount}</div>
           <p className="text-[10px] text-emerald-400/80 mt-0.5">Visible to all visitors</p>
-        </div>
+        </button>
 
-        <div className="card-surface p-4 rounded-2xl border border-cyan-500/25 bg-cyan-500/5 backdrop-blur-md">
+        <button
+          type="button"
+          onClick={() => setSelectedStatusFilter(prev => prev === 'admin_only' ? 'All' : 'admin_only')}
+          className={`card-surface p-4 rounded-2xl border text-left transition-all cursor-pointer hover:border-cyan-500/60 ${
+            selectedStatusFilter === 'admin_only'
+              ? 'border-cyan-400 bg-cyan-500/15 shadow-[0_0_15px_rgba(20,166,217,0.2)] ring-1 ring-cyan-400/50'
+              : 'border-cyan-500/25 bg-cyan-500/5 hover:bg-cyan-500/10'
+          }`}
+          title="Filter by Admin Only status"
+        >
           <div className="flex items-center justify-between mb-1">
             <span className="text-[11px] font-bold uppercase tracking-wider text-cyan-400">Admin Only</span>
             <Lock className="w-4 h-4 text-cyan-400" />
           </div>
           <div className="text-2xl font-extrabold text-cyan-300">{metrics.adminCount}</div>
           <p className="text-[10px] text-cyan-400/80 mt-0.5">Admin & Super Admin</p>
-        </div>
+        </button>
 
-        <div className="card-surface p-4 rounded-2xl border border-purple-500/25 bg-purple-500/5 backdrop-blur-md">
+        <button
+          type="button"
+          onClick={() => setSelectedStatusFilter(prev => prev === 'super_admin_only' ? 'All' : 'super_admin_only')}
+          className={`card-surface p-4 rounded-2xl border text-left transition-all cursor-pointer hover:border-purple-500/60 ${
+            selectedStatusFilter === 'super_admin_only'
+              ? 'border-purple-400 bg-purple-500/15 shadow-[0_0_15px_rgba(168,85,247,0.2)] ring-1 ring-purple-400/50'
+              : 'border-purple-500/25 bg-purple-500/5 hover:bg-purple-500/10'
+          }`}
+          title="Filter by Super Admin Only status"
+        >
           <div className="flex items-center justify-between mb-1">
             <span className="text-[11px] font-bold uppercase tracking-wider text-purple-400">Super Admin</span>
             <Shield className="w-4 h-4 text-purple-400" />
           </div>
           <div className="text-2xl font-extrabold text-purple-300">{metrics.superAdminCount}</div>
           <p className="text-[10px] text-purple-400/80 mt-0.5">Exclusive to Super Admin</p>
-        </div>
+        </button>
 
-        <div className="card-surface p-4 rounded-2xl border border-amber-500/25 bg-amber-500/5 backdrop-blur-md">
+        <button
+          type="button"
+          onClick={() => setSelectedStatusFilter(prev => prev === 'custom_users' ? 'All' : 'custom_users')}
+          className={`card-surface p-4 rounded-2xl border text-left transition-all cursor-pointer hover:border-amber-500/60 ${
+            selectedStatusFilter === 'custom_users'
+              ? 'border-amber-400 bg-amber-500/15 shadow-[0_0_15px_rgba(245,158,11,0.2)] ring-1 ring-amber-400/50'
+              : 'border-amber-500/25 bg-amber-500/5 hover:bg-amber-500/10'
+          }`}
+          title="Filter by Custom Users status"
+        >
           <div className="flex items-center justify-between mb-1">
             <span className="text-[11px] font-bold uppercase tracking-wider text-amber-400">Custom Users</span>
             <Users className="w-4 h-4 text-amber-400" />
           </div>
           <div className="text-2xl font-extrabold text-amber-300">{metrics.customUsersCount}</div>
           <p className="text-[10px] text-amber-400/80 mt-0.5">Selected user accounts</p>
-        </div>
+        </button>
 
-        <div className="card-surface p-4 rounded-2xl border border-rose-500/25 bg-rose-500/5 backdrop-blur-md">
+        <button
+          type="button"
+          onClick={() => setSelectedStatusFilter(prev => prev === 'disabled' ? 'All' : 'disabled')}
+          className={`card-surface p-4 rounded-2xl border text-left transition-all cursor-pointer hover:border-rose-500/60 ${
+            selectedStatusFilter === 'disabled'
+              ? 'border-rose-400 bg-rose-500/15 shadow-[0_0_15px_rgba(244,63,94,0.2)] ring-1 ring-rose-400/50'
+              : 'border-rose-500/25 bg-rose-500/5 hover:bg-rose-500/10'
+          }`}
+          title="Filter by Disabled status"
+        >
           <div className="flex items-center justify-between mb-1">
             <span className="text-[11px] font-bold uppercase tracking-wider text-rose-400">Disabled</span>
             <Ban className="w-4 h-4 text-rose-400" />
           </div>
           <div className="text-2xl font-extrabold text-rose-300">{metrics.disabledCount}</div>
           <p className="text-[10px] text-rose-400/80 mt-0.5">Deactivated for all</p>
-        </div>
+        </button>
       </div>
 
       {/* INTERACTIVE ROLE SIMULATOR / PERSONA PREVIEW CARD */}
@@ -733,32 +815,86 @@ export default function FeatureControlsAdmin({ currentUserEmail = 'admin@tahaluf
         )}
       </div>
 
-      {/* SEARCH & CATEGORY FILTER */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      {/* CATEGORY TABS NAVIGATION */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-1 custom-scrollbar text-xs">
+        {groups.map(g => {
+          const Icon = g === 'All' ? Filter : (GROUP_ICONS[g] || Layers);
+          const count = g === 'All' 
+            ? DASHBOARD_FEATURES.length 
+            : DASHBOARD_FEATURES.filter(f => f.group === g).length;
+          const isSelected = selectedGroup === g;
+          return (
+            <button
+              key={g}
+              type="button"
+              onClick={() => setSelectedGroup(g)}
+              className={`px-3 py-1.5 rounded-xl font-bold flex items-center gap-2 whitespace-nowrap transition-all shrink-0 cursor-pointer ${
+                isSelected
+                  ? 'bg-[#cedc28] text-[#1a302e] shadow-[0_0_15px_rgba(206,220,40,0.3)] ring-1 ring-[#cedc28]'
+                  : 'bg-[#0a2442]/80 border border-white/10 text-slate-300 hover:text-white hover:border-[#cedc28]/40 hover:bg-[#0a2442]'
+              }`}
+            >
+              <Icon className={`w-3.5 h-3.5 ${isSelected ? 'text-[#1a302e]' : 'text-[#14a6d9]'}`} />
+              <span>{g === 'All' ? 'All Modules' : g}</span>
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+                isSelected ? 'bg-black/20 text-[#1a302e]' : 'bg-white/10 text-slate-400'
+              }`}>
+                {count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* SEARCH, FILTERS & ACCORDION CONTROLS */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-[#0a2442]/50 p-3 rounded-2xl border border-white/10">
         <div className="relative flex-1 min-w-[220px] max-w-md">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
-            placeholder="Search features by name or keyword..."
+            placeholder="Search features by name, target or keyword..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 rounded-xl bg-[#0a2442] border border-white/10 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#cedc28]/50"
+            className="w-full pl-9 pr-8 py-2 rounded-xl bg-[#041628] border border-white/10 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#cedc28]/50"
           />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-0.5"
+              title="Clear search"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <select
-            value={selectedGroup}
-            onChange={(e) => setSelectedGroup(e.target.value)}
-            className="px-3 py-2 rounded-xl bg-[#0a2442] border border-white/10 text-xs text-slate-200 focus:outline-none focus:border-[#cedc28]/50"
-          >
-            {groups.map(g => <option key={g} value={g}>{g === 'All' ? 'All Groups' : g}</option>)}
-          </select>
+          {/* Quick Accordion Toggles */}
+          <div className="flex items-center gap-1 bg-[#041628] p-1 rounded-xl border border-white/10">
+            <button
+              type="button"
+              onClick={expandAll}
+              className="px-2.5 py-1 text-[11px] font-bold rounded-lg text-slate-300 hover:text-white hover:bg-white/5 transition"
+              title="Expand all categories"
+            >
+              Expand All
+            </button>
+            <span className="text-slate-600">|</span>
+            <button
+              type="button"
+              onClick={collapseAll}
+              className="px-2.5 py-1 text-[11px] font-bold rounded-lg text-slate-300 hover:text-white hover:bg-white/5 transition"
+              title="Collapse all categories"
+            >
+              Collapse All
+            </button>
+          </div>
 
           <select
             value={selectedStatusFilter}
             onChange={(e) => setSelectedStatusFilter(e.target.value)}
-            className="px-3 py-2 rounded-xl bg-[#0a2442] border border-white/10 text-xs text-slate-200 focus:outline-none focus:border-[#cedc28]/50"
+            className="px-3 py-2 rounded-xl bg-[#041628] border border-white/10 text-xs text-slate-200 focus:outline-none focus:border-[#cedc28]/50 cursor-pointer font-medium"
           >
             <option value="All">All Visibility Modes</option>
             <option value="public">Everyone (Public)</option>
@@ -785,21 +921,86 @@ export default function FeatureControlsAdmin({ currentUserEmail = 'admin@tahaluf
         </div>
       )}
 
+      {/* EMPTY SEARCH RESULT STATE */}
+      {filteredFeatures.length === 0 && (
+        <div className="card-surface p-12 rounded-3xl border border-white/10 text-center bg-[#0a2442]/40 backdrop-blur-md">
+          <Search className="w-10 h-10 text-slate-500 mx-auto mb-3 opacity-60" />
+          <h4 className="text-white font-bold text-base mb-1">No feature controls found</h4>
+          <p className="text-xs text-slate-400 mb-5 max-w-md mx-auto">
+            No features matched your search &quot;{searchQuery}&quot; and active filters ({selectedGroup} · {selectedStatusFilter}).
+          </p>
+          <button
+            type="button"
+            onClick={() => { setSearchQuery(''); setSelectedGroup('All'); setSelectedStatusFilter('All'); }}
+            className="px-4 py-2 rounded-xl bg-[#cedc28] text-[#1a302e] text-xs font-bold hover:brightness-110 transition shadow-lg"
+          >
+            Reset Filters
+          </button>
+        </div>
+      )}
+
       {/* FEATURE CARDS LIST BY GROUP */}
       <div className="space-y-4">
         {[...new Set(filteredFeatures.map(f => f.group))].map(group => {
           const GroupIcon = GROUP_ICONS[group] || Layers;
           const featuresInGroup = filteredFeatures.filter(f => f.group === group);
+          const isCollapsed = Boolean(collapsedGroups[group]) && !searchQuery.trim();
+          const statusBreakdown = getGroupStatusBreakdown(featuresInGroup);
           
           return (
-            <div key={group} className="card-surface rounded-2xl border border-white/10 bg-[#0a2442]/60 overflow-hidden shadow-lg">
-              <div className="flex items-center gap-2 px-5 py-3.5 bg-white/[0.03] border-b border-white/5">
-                <GroupIcon className="w-4 h-4 text-[#cedc28]" />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-white">{group}</h3>
-                <span className="text-[10px] text-slate-400 ml-auto font-mono">{featuresInGroup.length} feature{featuresInGroup.length === 1 ? '' : 's'}</span>
+            <div key={group} className="card-surface rounded-2xl border border-white/10 bg-[#0a2442]/60 overflow-hidden shadow-lg transition-all">
+              <div 
+                onClick={() => toggleGroupCollapse(group)}
+                className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 bg-white/[0.03] border-b border-white/5 cursor-pointer hover:bg-white/[0.06] select-none transition-colors"
+                title={isCollapsed ? `Click to expand ${group}` : `Click to collapse ${group}`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${isCollapsed ? '-rotate-90 text-slate-500' : 'rotate-0 text-[#cedc28]'}`} />
+                  <GroupIcon className="w-4 h-4 text-[#cedc28]" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-white">{group}</h3>
+                  <span className="text-[10px] text-slate-400 font-mono">({featuresInGroup.length})</span>
+                </div>
+
+                {/* Status Breakdown Pills in Group Header */}
+                <div className="flex items-center gap-1.5 flex-wrap text-[10px]">
+                  {statusBreakdown.pub > 0 && (
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-semibold flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                      <span>{statusBreakdown.pub} Public</span>
+                    </span>
+                  )}
+                  {statusBreakdown.adm > 0 && (
+                    <span className="px-2 py-0.5 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 font-semibold flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
+                      <span>{statusBreakdown.adm} Admin</span>
+                    </span>
+                  )}
+                  {statusBreakdown.superAdm > 0 && (
+                    <span className="px-2 py-0.5 rounded-full bg-purple-500/15 border border-purple-500/30 text-purple-300 font-semibold flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-purple-400"></span>
+                      <span>{statusBreakdown.superAdm} Super Admin</span>
+                    </span>
+                  )}
+                  {statusBreakdown.cust > 0 && (
+                    <span className="px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 font-semibold flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                      <span>{statusBreakdown.cust} Custom</span>
+                    </span>
+                  )}
+                  {statusBreakdown.dis > 0 && (
+                    <span className="px-2 py-0.5 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-300 font-semibold flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
+                      <span>{statusBreakdown.dis} Disabled</span>
+                    </span>
+                  )}
+                  <span className="text-[10px] text-slate-500 font-mono ml-1 hidden sm:inline">
+                    {isCollapsed ? 'Click to expand' : 'Click to collapse'}
+                  </span>
+                </div>
               </div>
 
-              <div className="divide-y divide-white/5">
+              {!isCollapsed && (
+              <div className="divide-y divide-white/5 animate-in fade-in duration-150">
                 {featuresInGroup.map(feature => {
                   const currentMode = modes[feature.id] || feature.defaultMode || 'public';
                   const isVisibleInPreview = isFeatureEnabled(
@@ -996,6 +1197,7 @@ export default function FeatureControlsAdmin({ currentUserEmail = 'admin@tahaluf
                   );
                 })}
               </div>
+              )}
             </div>
           );
         })}

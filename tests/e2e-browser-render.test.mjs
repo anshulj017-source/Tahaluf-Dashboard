@@ -138,7 +138,7 @@ test('E2E Browser Render & Console Error Verification Suite', async (t) => {
       assert.deepEqual(pageErrors, [], `Detected uncaught page runtime exceptions: ${JSON.stringify(pageErrors)}`);
       assert.deepEqual(failedRequests, [], `Detected failed asset requests: ${JSON.stringify(failedRequests)}`);
 
-      await page.close();
+      await page.close().catch(() => {});
     });
 
     await t.test('CSS Stylesheets are delivered and applied (no unstyled white fallback)', async () => {
@@ -192,7 +192,7 @@ test('E2E Browser Render & Console Error Verification Suite', async (t) => {
         `Font family must be sans-serif/brand, but was ${bodyStyles.fontFamily}`
       );
 
-      await page.close();
+      await page.close().catch(() => {});
     });
 
     await t.test('Interactive view navigation maintains styling and clean console', async () => {
@@ -226,7 +226,7 @@ test('E2E Browser Render & Console Error Verification Suite', async (t) => {
 
       assert.deepEqual(consoleErrors, [], `Console errors during interactive navigation: ${JSON.stringify(consoleErrors)}`);
 
-      await page.close();
+      await page.close().catch(() => {});
     });
 
     await t.test('Full dashboard live data sync completes, spinner unmounts, and UI cards render without freezing', async () => {
@@ -270,7 +270,7 @@ test('E2E Browser Render & Console Error Verification Suite', async (t) => {
       assert.ok(dashboardState.cardCount > 0, 'Dashboard cards must be rendered on the page');
       assert.deepEqual(runtimeErrors, [], `Detected runtime errors during full dashboard render: ${JSON.stringify(runtimeErrors)}`);
 
-      await page.close();
+      await page.close().catch(() => {});
     });
 
     await t.test('Top filters open seamlessly and switch between dropdowns without backdrop interception', async () => {
@@ -348,7 +348,7 @@ test('E2E Browser Render & Console Error Verification Suite', async (t) => {
       assert.ok(filterInteractions.menuClosed, 'Dropdown closed on click outside');
       assert.deepEqual(runtimeErrors, [], `No console errors during filter interactions: ${JSON.stringify(runtimeErrors)}`);
 
-      await page.close();
+      await page.close().catch(() => {});
     });
 
     await t.test('AI Strategic Intelligence renders Event & Portfolio Breakdown tabs cleanly', async () => {
@@ -387,7 +387,7 @@ test('E2E Browser Render & Console Error Verification Suite', async (t) => {
       if (!hasAiCard) {
         // AI Summary is disabled in current dashboard feature controls; verify clean render without errors
         assert.deepEqual(runtimeErrors, [], `No console errors when AI Summary is disabled in feature controls: ${JSON.stringify(runtimeErrors)}`);
-        await page.close();
+        await page.close().catch(() => {});
         return;
       }
 
@@ -444,7 +444,7 @@ test('E2E Browser Render & Console Error Verification Suite', async (t) => {
       assert.ok(tabResults.hasBrief, 'Executive Brief tab restores strategic cards');
       assert.deepEqual(runtimeErrors, [], `No console errors during AI tab navigation: ${JSON.stringify(runtimeErrors)}`);
 
-      await page.close();
+      await page.close().catch(() => {});
     });
 
     await t.test('Admin section menu orientation adapts to screen size (dropdown on mobile, 2-line layout on medium, vertical on desktop)', async () => {
@@ -519,7 +519,7 @@ test('E2E Browser Render & Console Error Verification Suite', async (t) => {
 
       assert.deepEqual(consoleErrors, [], `No console errors during admin menu orientation check: ${JSON.stringify(consoleErrors)}`);
 
-      await page.close();
+      await page.close().catch(() => {});
     });
 
   } finally {
