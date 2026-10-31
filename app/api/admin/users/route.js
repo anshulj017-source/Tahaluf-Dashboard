@@ -94,6 +94,19 @@ export async function GET(req) {
       };
     });
 
+    // Ensure root Super Admin (admin@tahaluf.com) is permanently listed in User Accounts
+    if (!users.some(u => u.email?.toLowerCase() === 'admin@tahaluf.com')) {
+      const rootDoc = Array.from(userRolesMap.values()).find(d => d.email?.toLowerCase() === 'admin@tahaluf.com') || {};
+      users.unshift({
+        uid: 'root_super_admin',
+        email: 'admin@tahaluf.com',
+        role: 'super_admin',
+        isFixed: true,
+        lastSignInTime: rootDoc.lastActive || new Date().toISOString(),
+        creationTime: '2026-01-01T00:00:00.000Z'
+      });
+    }
+
     return NextResponse.json({ 
       users,
       domainRules: Array.isArray(userAccessConfig?.domainRules) ? userAccessConfig.domainRules : DEFAULT_USER_ACCESS_CONFIG.domainRules,
@@ -302,6 +315,12 @@ export async function PUT(req) {
     const prevRole = userDoc?.data()?.role || 'standard';
     const targetEmail = userDoc?.data()?.email || uid;
 
+    if (uid === 'root_super_admin' || targetEmail?.toLowerCase() === 'admin@tahaluf.com') {
+      if (role && role !== 'super_admin') {
+        return NextResponse.json({ error: 'System Root Super Admin role cannot be modified.' }, { status: 400 });
+      }
+    }
+
     if (role) {
       if (role === 'super_admin' && !await isSuperAdminRequest(req)) {
         return NextResponse.json({ error: 'Super Admin access required to assign Super Admin role.' }, { status: 403 });
@@ -363,6 +382,10 @@ export async function DELETE(req) {
 
     const userDoc = await adminDb.collection('users').doc(uid).get().catch(() => null);
     const targetEmail = userDoc?.data()?.email || uid;
+
+    if (uid === 'root_super_admin' || targetEmail?.toLowerCase() === 'admin@tahaluf.com') {
+      return NextResponse.json({ error: 'System Root Super Admin account cannot be deleted.' }, { status: 400 });
+    }
 
     await adminAuth.deleteUser(uid);
     await adminDb.collection('users').doc(uid).delete();

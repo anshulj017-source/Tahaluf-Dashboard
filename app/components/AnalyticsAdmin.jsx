@@ -217,9 +217,11 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com',
     if (selectedUserEmail) {
       list = list.filter(u => u.email?.toLowerCase() === selectedUserEmail.toLowerCase());
     } else if (userFilter === 'non_admin') {
-      list = list.filter(u => u.role !== 'admin' && !u.email?.toLowerCase().includes('admin@'));
+      list = list.filter(u => u.role !== 'admin' && u.role !== 'super_admin' && !u.email?.toLowerCase().includes('admin@'));
     } else if (userFilter === 'admin_only') {
-      list = list.filter(u => u.role === 'admin' || u.email?.toLowerCase().includes('admin@'));
+      list = list.filter(u => u.role === 'admin' || u.role === 'super_admin' || u.email?.toLowerCase().includes('admin@'));
+    } else if (userFilter === 'super_admin_only') {
+      list = list.filter(u => u.role === 'super_admin' || u.email?.toLowerCase() === 'admin@tahaluf.com');
     }
 
     if (searchQuery.trim()) {
@@ -450,11 +452,14 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com',
               <option value="non_admin" className="bg-[#0a2442] text-white">All Users (Excl. Admins) [Default]</option>
               <option value="all" className="bg-[#0a2442] text-white">All Users (Incl. Admins)</option>
               <option value="admin_only" className="bg-[#0a2442] text-white">Admins Only</option>
+              <option value="super_admin_only" className="bg-[#0a2442] text-white">Super Admins Only</option>
             </select>
             {data?.userCounts && (
               <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#cedc28]/15 text-[#cedc28] border border-[#cedc28]/30 font-bold whitespace-nowrap">
                 {userFilter === 'non_admin' 
                   ? `${data.userCounts.nonAdmin} Users (${data.userCounts.admin} Admins Filtered)`
+                  : userFilter === 'super_admin_only'
+                  ? `${data.userCounts.superAdmin ?? 0} Super Admins`
                   : userFilter === 'admin_only'
                   ? `${data.userCounts.admin} Admins`
                   : `${data.userCounts.total} Total Users`}
@@ -510,7 +515,7 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com',
 
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-gray-300">
         <p>
-          Active scope: <strong>{selectedUserEmail || (userFilter === 'non_admin' ? 'Users excluding admins' : userFilter === 'admin_only' ? 'Admins only' : 'All users')}</strong>
+          Active scope: <strong>{selectedUserEmail || (userFilter === 'non_admin' ? 'Users excluding admins' : userFilter === 'super_admin_only' ? 'Super Admins only' : userFilter === 'admin_only' ? 'Admins only' : 'All users')}</strong>
           {' · '}{timeRange === 'all' ? 'All time' : timeRange === 'today' ? 'Today' : timeRange === 'yesterday' ? 'Yesterday' : timeRange === '7d' ? 'Last 7 days' : 'Last 30 days'}
           {' · '}{viewerTimeZone}
         </p>
@@ -1561,6 +1566,7 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com',
                     { id: 'non_admin', label: 'Excl. Admins (Default)' },
                     { id: 'all', label: 'All Users' },
                     { id: 'admin_only', label: 'Admins Only' },
+                    { id: 'super_admin_only', label: 'Super Admin' },
                   ].map((f) => (
                     <button
                       key={f.id}
@@ -1717,6 +1723,8 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com',
                 ? `Isolating: ${selectedUserEmail}`
                 : userFilter === 'non_admin' 
                 ? 'Filtered Scope: Business Users (Admins Hidden)' 
+                : userFilter === 'super_admin_only'
+                ? 'Filtered Scope: Super Admins Only'
                 : userFilter === 'admin_only'
                 ? 'Filtered Scope: Admins Only'
                 : 'Scope: All Users'}

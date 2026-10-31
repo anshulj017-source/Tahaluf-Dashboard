@@ -1169,6 +1169,12 @@ async function testAnalyticsApi() {
     assert(adminOnlyRes.status === 200, 'GET /api/admin/analytics?userRoleFilter=admin_only returns HTTP 200');
     assert(adminOnlyJson.users.every(u => u.role === 'admin' || u.email.includes('admin@')), 'userRoleFilter=admin_only returns only admin users');
 
+    // Test GET Admin Analytics with userRoleFilter=super_admin_only
+    const superAdminRes = await fetch(`${adminAnalyticsUrl}?userRoleFilter=super_admin_only&email=admin@tahaluf.com`);
+    const superAdminJson = await superAdminRes.json();
+    assert(superAdminRes.status === 200, 'GET /api/admin/analytics?userRoleFilter=super_admin_only returns HTTP 200');
+    assert(superAdminJson.users.every(u => u.role === 'super_admin' || u.email === 'admin@tahaluf.com'), 'userRoleFilter=super_admin_only returns only super admins');
+
     // Test GET Admin Analytics with specific userEmail filter
     const singleUserRes = await fetch(`${adminAnalyticsUrl}?userEmail=exec-vip@tahaluf.com&email=admin@tahaluf.com`);
     const singleUserJson = await singleUserRes.json();

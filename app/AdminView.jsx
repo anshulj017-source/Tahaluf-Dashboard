@@ -112,6 +112,7 @@ export default function AdminView({
   const [newDomainDesc, setNewDomainDesc] = useState('');
   const [showAddDomainForm, setShowAddDomainForm] = useState(false);
   const [historyActionFilter, setHistoryActionFilter] = useState('all');
+  const [userRoleFilter, setUserRoleFilter] = useState('all');
   useAdminDirtyGuard('new-user', showAddForm && Boolean(newEmail || newPassword || newRole !== 'standard'));
   useEffect(() => {
     const updateDirty = event => {
@@ -421,7 +422,11 @@ export default function AdminView({
       hour: 'numeric', minute: '2-digit', hour12: true
     }).format(date);
   };
-  const filteredUsers = users.filter(user => `${user.email} ${user.role}`.toLowerCase().includes(userSearch.toLowerCase()));
+  const filteredUsers = users.filter(user => {
+    const matchesSearch = `${user.email} ${user.role}`.toLowerCase().includes(userSearch.toLowerCase());
+    const matchesRole = userRoleFilter === 'all' || user.role === userRoleFilter;
+    return matchesSearch && matchesRole;
+  });
   const visibleUserPage = Math.min(userPage, Math.max(1, Math.ceil(filteredUsers.length / 20)));
 
   const hasAccess = isSuperAdmin || userRole === 'admin' || (visibleSections && visibleSections.length > 0);
@@ -842,9 +847,34 @@ export default function AdminView({
               </div>
             )}
 
-            <label className="mb-4 block text-sm text-slate-300">Search users
-              <input type="search" value={userSearch} onChange={event => { setUserSearch(event.target.value); setUserPage(1); }} className="ml-3 rounded-lg border border-slate-600 bg-[#071b2e] p-2" />
-            </label>
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+              <label className="block text-sm text-slate-300">Search users
+                <input type="search" value={userSearch} onChange={event => { setUserSearch(event.target.value); setUserPage(1); }} className="ml-3 rounded-lg border border-slate-600 bg-[#071b2e] p-2 text-white" />
+              </label>
+
+              <div className="flex items-center gap-1.5 bg-[#071322] p-1 rounded-xl border border-gray-800">
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-2">Role:</span>
+                {[
+                  { id: 'all', label: 'All Roles' },
+                  { id: 'super_admin', label: 'Super Admin' },
+                  { id: 'admin', label: 'Admin' },
+                  { id: 'standard', label: 'Standard' }
+                ].map(r => (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() => { setUserRoleFilter(r.id); setUserPage(1); }}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      userRoleFilter === r.id
+                        ? 'bg-[#14a6d9] text-white shadow-sm'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    {r.label}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="card-surface border border-[#cedc28]/10 rounded-3xl overflow-hidden shadow-2xl relative">
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
@@ -894,7 +924,14 @@ export default function AdminView({
                                 {user.role === 'super_admin' || user.role === 'admin' ? <Shield className="w-5 h-5" /> : <User className="w-5 h-5" />}
                               </div>
                               <div>
-                                <div className="font-bold text-white text-sm">{user.email}</div>
+                                <div className="font-bold text-white text-sm flex items-center gap-2">
+                                  <span>{user.email}</span>
+                                  {user.isFixed && (
+                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-[#cedc28]/20 text-[#cedc28] border border-[#cedc28]/40" title="Fixed System Root Account">
+                                      Root
+                                    </span>
+                                  )}
+                                </div>
                                 <div className="text-xs text-gray-500">ID: {user.uid.substring(0, 8)}...</div>
                               </div>
                             </div>
@@ -904,14 +941,14 @@ export default function AdminView({
                                <select 
                                 aria-label={`Role for ${user.email}`}
                                 value={user.role || 'standard'}
-                                disabled={!isSuperAdmin && user.role === 'super_admin'}
+                                disabled={user.isFixed || (!isSuperAdmin && user.role === 'super_admin')}
                                 onChange={(e) => { setUserAction({ type: 'role', ...user, nextRole: e.target.value }); setError(null); }}
                                 className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all outline-none cursor-pointer appearance-none text-center ${
                                   user.role === 'super_admin' ? 'bg-[#cedc28]/25 border-2 border-[#cedc28] text-[#cedc28] shadow-[0_0_12px_rgba(206,220,40,0.35)]' :
                                   user.role === 'admin' ? 'bg-[#14a6d9]/15 border border-[#14a6d9]/40 text-[#14a6d9]' : 
                                   user.role === 'non-finance' ? 'bg-purple-900/20 border border-purple-500/30 text-purple-400' : 
                                   'bg-gray-800 border border-gray-600 text-gray-400'
-                                } ${!isSuperAdmin && user.role === 'super_admin' ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                } ${user.isFixed || (!isSuperAdmin && user.role === 'super_admin') ? 'opacity-60 cursor-not-allowed' : ''}`}
                                >
                                 {isSuperAdmin && <option value="super_admin">Super Admin</option>}
                                 <option value="admin">Admin</option>
@@ -928,28 +965,28 @@ export default function AdminView({
                           <td className="py-4 px-6">
                             <div className="flex justify-center gap-2">
                               <button 
-                                disabled={!isSuperAdmin && user.role === 'super_admin'}
+                                disabled={user.isFixed || (!isSuperAdmin && user.role === 'super_admin')}
                                 onClick={() => { setUserAction({ type: 'password', ...user }); setActionPassword(''); setError(null); }}
                                 aria-label={`Change password for ${user.email}`}
                                 className={`p-2 rounded-lg transition-colors ${
-                                  !isSuperAdmin && user.role === 'super_admin'
+                                  user.isFixed || (!isSuperAdmin && user.role === 'super_admin')
                                     ? 'opacity-30 cursor-not-allowed text-gray-600'
                                     : 'bg-blue-500/0 hover:bg-blue-500/10 text-gray-500 hover:text-blue-400'
                                 }`}
-                                title={!isSuperAdmin && user.role === 'super_admin' ? 'Only Super Admins can manage Super Admin accounts' : 'Change Password'}
+                                title={user.isFixed ? 'System Root account password cannot be modified here' : !isSuperAdmin && user.role === 'super_admin' ? 'Only Super Admins can manage Super Admin accounts' : 'Change Password'}
                               >
                                 <Key className="w-4 h-4" />
                               </button>
                               <button 
-                                disabled={!isSuperAdmin && user.role === 'super_admin'}
+                                disabled={user.isFixed || (!isSuperAdmin && user.role === 'super_admin')}
                                 onClick={() => { setUserAction({ type: 'delete', ...user }); setError(null); }}
                                 aria-label={`Delete ${user.email}`}
                                 className={`p-2 rounded-lg transition-colors ${
-                                  !isSuperAdmin && user.role === 'super_admin'
+                                  user.isFixed || (!isSuperAdmin && user.role === 'super_admin')
                                     ? 'opacity-30 cursor-not-allowed text-gray-600'
                                     : 'bg-red-500/0 hover:bg-red-500/10 text-gray-500 hover:text-red-400'
                                 }`}
-                                title={!isSuperAdmin && user.role === 'super_admin' ? 'Only Super Admins can delete Super Admin accounts' : 'Delete User'}
+                                title={user.isFixed ? 'System Root Super Admin cannot be deleted' : !isSuperAdmin && user.role === 'super_admin' ? 'Only Super Admins can delete Super Admin accounts' : 'Delete User'}
                               >
                                 <Trash2 className="w-4 h-4" />
                               </button>

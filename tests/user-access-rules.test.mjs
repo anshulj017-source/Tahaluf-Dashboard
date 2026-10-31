@@ -203,4 +203,25 @@ test('User Access Domain Rules and Audit History API', async (t) => {
     // Verify mockUsers has reverted role
     assert.equal(targetUser.role, origRole, 'Role should be rolled back to original in storage');
   });
+
+  await t.test('Root Super Admin admin@tahaluf.com is permanently visible and protected', async () => {
+    const req = mockRequest('http://localhost:3000/api/admin/users');
+    const res = await route.GET(req);
+    assert.equal(res.status, 200);
+    const data = await res.json();
+    const rootAdmin = data.users.find(u => u.email === 'admin@tahaluf.com');
+    assert.ok(rootAdmin, 'admin@tahaluf.com must be listed in users');
+    assert.equal(rootAdmin.role, 'super_admin');
+    assert.equal(rootAdmin.isFixed, true);
+
+    // Attempting to delete root super admin should fail
+    const delReq = mockRequest('http://localhost:3000/api/admin/users', 'DELETE', { uid: rootAdmin.uid });
+    const delRes = await route.DELETE(delReq);
+    assert.equal(delRes.status, 400);
+
+    // Attempting to demote root super admin should fail
+    const putReq = mockRequest('http://localhost:3000/api/admin/users', 'PUT', { uid: rootAdmin.uid, role: 'standard' });
+    const putRes = await route.PUT(putReq);
+    assert.equal(putRes.status, 400);
+  });
 });
