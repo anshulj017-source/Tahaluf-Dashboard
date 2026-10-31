@@ -515,10 +515,11 @@ test('Back to Dashboard button in AdminView clears admin search param and naviga
   assert.ok(!new URL(mockWindow.location.href, 'http://localhost:3000').searchParams.has('admin'), 'admin search param must be removed from URL');
 });
 
-test('Root system admin accounts are hidden by default in user panel table and surfaced with toggle', async () => {
+test('Root system admin account (fehmatics@gmail.com) is hidden by default while other super admins remain visible, toggleable via bottom-right icon', async () => {
   const users = [
     { uid: 'u1', email: 'regular@tahaluf.com', role: 'standard' },
-    { uid: 'u2', email: 'fehmatics@gmail.com', role: 'super_admin', isFixed: true }
+    { uid: 'u2', email: 'other.super@tahaluf.com', role: 'super_admin' },
+    { uid: 'u3', email: 'fehmatics@gmail.com', role: 'super_admin', isFixed: true }
   ];
   const harness = hookHarness();
   const stub = () => null;
@@ -544,13 +545,11 @@ test('Root system admin accounts are hidden by default in user panel table and s
   const renderedEmails = spans.map(s => s.props?.children);
 
   assert.ok(renderedEmails.includes('regular@tahaluf.com'), 'Regular user must be visible by default');
-  assert.ok(!renderedEmails.includes('fehmatics@gmail.com'), 'Root super admin fehmatics@gmail.com must be hidden by default in user panel table');
+  assert.ok(renderedEmails.includes('other.super@tahaluf.com'), 'Non-root super admin must remain visible by default');
+  assert.ok(!renderedEmails.includes('fehmatics@gmail.com'), 'Root super admin fehmatics@gmail.com must be hidden by default');
 
-  // Verify the toggle button is present
+  // Verify the discreet icon-only toggle button is present in bottom right
   const buttons = nodes(tree, node => node.type === 'button');
-  const toggleBtn = buttons.find(b => {
-    const spans = nodes(b, n => n.type === 'span' && typeof n.props?.children === 'string');
-    return spans.some(s => s.props?.children?.includes('System Root'));
-  });
-  assert.ok(toggleBtn, 'Discreet System Root toggle button must be rendered');
+  const toggleBtn = buttons.find(b => b.props?.['aria-label'] === 'Toggle root administrator visibility');
+  assert.ok(toggleBtn, 'Discreet icon button in bottom right must be rendered');
 });

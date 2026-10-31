@@ -9,11 +9,7 @@ import FeatureControlsAdmin from './components/FeatureControlsAdmin';
 import { AdminDialog, useAdminView, useAdminDirtyGuard } from './components/AdminUI';
 
 const ROOT_ADMIN_EMAILS = new Set([
-  'fehmatics@gmail.com',
-  'analytics.ksa@umww.com',
-  'anshul.jaiswal@omc.com',
-  'anshulj017@gmail.com',
-  'analyticsum2019@gmail.com'
+  'fehmatics@gmail.com'
 ]);
 
 function isRootSuperAdmin(email) {
@@ -423,10 +419,12 @@ export default function AdminView({
       hour: 'numeric', minute: '2-digit', hour12: true
     }).format(date);
   };
-  const hiddenSystemCount = users.filter(user => user.isFixed || isRootSuperAdmin(user.email)).length;
+  const isRootAccount = (email) => (email || '').toLowerCase().trim() === 'fehmatics@gmail.com';
+  const hiddenSystemCount = users.filter(user => isRootAccount(user.email)).length;
   const filteredUsers = users.filter(user => {
-    const isSystemRoot = user.isFixed || isRootSuperAdmin(user.email);
-    if (isSystemRoot && !showSystemAccounts && userRoleFilter !== 'super_admin') {
+    const isRoot = isRootAccount(user.email);
+    // Only hide root super admin (fehmatics@gmail.com) when showSystemAccounts is false
+    if (isRoot && !showSystemAccounts) {
       return false;
     }
     const matchesSearch = `${user.email} ${user.role}`.toLowerCase().includes(userSearch.toLowerCase());
@@ -858,45 +856,27 @@ export default function AdminView({
                 <input type="search" value={userSearch} onChange={event => { setUserSearch(event.target.value); setUserPage(1); }} className="ml-3 rounded-lg border border-slate-600 bg-[#071b2e] p-2 text-white" />
               </label>
 
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="flex items-center gap-1.5 bg-[#071322] p-1 rounded-xl border border-gray-800">
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-2">Role:</span>
-                  {[
-                    { id: 'all', label: 'All Roles' },
-                    { id: 'super_admin', label: 'Super Admin' },
-                    { id: 'admin', label: 'Admin' },
-                    { id: 'standard', label: 'Standard' }
-                  ].map(r => (
-                    <button
-                      key={r.id}
-                      type="button"
-                      onClick={() => { setUserRoleFilter(r.id); setUserPage(1); }}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                        userRoleFilter === r.id
-                          ? 'bg-[#14a6d9] text-white shadow-sm'
-                          : 'text-gray-400 hover:text-white'
-                      }`}
-                    >
-                      {r.label}
-                    </button>
-                  ))}
-                </div>
-
-                {hiddenSystemCount > 0 && userRoleFilter !== 'super_admin' && (
+              <div className="flex items-center gap-1.5 bg-[#071322] p-1 rounded-xl border border-gray-800">
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-2">Role:</span>
+                {[
+                  { id: 'all', label: 'All Roles' },
+                  { id: 'super_admin', label: 'Super Admin' },
+                  { id: 'admin', label: 'Admin' },
+                  { id: 'standard', label: 'Standard' }
+                ].map(r => (
                   <button
+                    key={r.id}
                     type="button"
-                    onClick={() => setShowSystemAccounts(prev => !prev)}
-                    className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 border ${
-                      showSystemAccounts
-                        ? 'bg-purple-900/30 text-purple-300 border-purple-700/60 shadow-[0_0_10px_rgba(168,85,247,0.2)]'
-                        : 'bg-[#071322] text-gray-400 hover:text-gray-200 border-gray-800'
+                    onClick={() => { setUserRoleFilter(r.id); setUserPage(1); }}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      userRoleFilter === r.id
+                        ? 'bg-[#14a6d9] text-white shadow-sm'
+                        : 'text-gray-400 hover:text-white'
                     }`}
-                    title="Toggle visibility of root system administrator accounts"
                   >
-                    <Shield className="w-3 h-3 text-purple-400" />
-                    <span>{showSystemAccounts ? 'Hide System Root' : `System Root (${hiddenSystemCount} hidden)`}</span>
+                    {r.label}
                   </button>
-                )}
+                ))}
               </div>
             </div>
             <div className="card-surface border border-[#cedc28]/10 rounded-3xl overflow-hidden shadow-2xl relative">
@@ -1352,6 +1332,22 @@ export default function AdminView({
           </div>
         </form>
       </AdminDialog>}
+      {/* Discreet bottom-right icon to toggle root system account visibility (no text) */}
+      {activeSection === 'users' && (
+        <button
+          type="button"
+          onClick={() => setShowSystemAccounts(prev => !prev)}
+          aria-label="Toggle root administrator visibility"
+          title={showSystemAccounts ? "Hide root account" : "Show root account"}
+          className={`fixed bottom-5 right-5 z-40 p-2.5 rounded-full border transition-all duration-300 shadow-xl cursor-pointer ${
+            showSystemAccounts
+              ? 'bg-purple-900/80 text-purple-200 border-purple-500/60 shadow-[0_0_15px_rgba(168,85,247,0.4)] scale-105'
+              : 'bg-[#071322]/80 text-gray-500 hover:text-gray-300 border-gray-800 hover:border-gray-700 backdrop-blur-sm opacity-50 hover:opacity-100'
+          }`}
+        >
+          <Shield className="w-4 h-4" />
+        </button>
+      )}
     </div>
   );
 }
