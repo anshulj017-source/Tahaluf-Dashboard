@@ -580,7 +580,17 @@ test('super_admin_only and custom_users permissions enforce strict role and user
   assert.equal(isFeatureEnabled(customUsersConfig, 'aiSummary', 'standard', false, 'vip-guest@tahaluf.com'), true, 'Case-insensitive assigned user can access custom_users');
   assert.equal(isFeatureEnabled(customUsersConfig, 'aiSummary', 'standard', false, 'unauthorized@tahaluf.com'), false, 'Unassigned user cannot access custom_users');
   assert.equal(isFeatureEnabled(customUsersConfig, 'aiSummary', 'admin', false, 'unassigned-admin@tahaluf.com'), false, 'Unassigned admin cannot access custom_users');
+  assert.equal(isFeatureEnabled(customUsersConfig, 'aiSummary', 'super_admin'), true, 'Super Admin always has access to all controls including custom_users');
   assert.equal(isFeatureEnabled(customUsersConfig, 'aiSummary', 'standard', true, 'analytics.ksa@umww.com'), false, 'Preview hides custom_users');
+
+  // Verify adminFeatures is registered and obeys permissions
+  const adminFeatures = DASHBOARD_FEATURES.find(f => f.id === 'adminFeatures');
+  assert.ok(adminFeatures, 'adminFeatures is registered in DASHBOARD_FEATURES');
+  assert.equal(adminFeatures.group, 'Admin Center');
+  assert.equal(adminFeatures.defaultMode, 'super_admin_only');
+  assert.equal(isFeatureEnabled(DEFAULT_FEATURE_CONFIG, 'adminFeatures', 'super_admin'), true, 'Super Admin can access adminFeatures by default');
+  assert.equal(isFeatureEnabled(DEFAULT_FEATURE_CONFIG, 'adminFeatures', 'admin'), false, 'Standard admin cannot access adminFeatures by default');
+  assert.equal(isFeatureEnabled(DEFAULT_FEATURE_CONFIG, 'adminFeatures', 'standard'), false, 'Standard user cannot access adminFeatures');
 });
 
 test('audit enhancements features default to admin_only and obey permissions', async () => {

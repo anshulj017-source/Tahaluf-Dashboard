@@ -1,13 +1,27 @@
 import { NextResponse } from 'next/server';
 import { isAdminRequest } from '../../../../lib/requireAdminRequest.js';
-import { updateAdminSetting } from '../../../../lib/adminSettingsStore.mjs';
+import { readAdminSetting, updateAdminSetting } from '../../../../lib/adminSettingsStore.mjs';
 import { DEFAULT_FEATURE_CONFIG, validateFeatureModes, validateCustomUsers } from '../../../../lib/dashboardFeatures.mjs';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 export async function PUT(request) {
-  if (!await isAdminRequest(request)) {
+  const adminAuthorized = await isAdminRequest(request);
+  let customUserAuthorized = false;
+  if (!adminAuthorized) {
+    const adminEmail = (request.headers.get('x-admin-email') || '').toLowerCase().trim();
+    if (adminEmail) {
+      try {
+        const currentConfig = await readAdminSetting('dashboardFeatures', DEFAULT_FEATURE_CONFIG);
+        const allowedUsers = currentConfig?.customUsers?.adminFeatures || [];
+        if (allowedUsers.map(u => (u || '').toLowerCase().trim()).includes(adminEmail)) {
+          customUserAuthorized = true;
+        }
+      } catch {}
+    }
+  }
+  if (!adminAuthorized && !customUserAuthorized) {
     return NextResponse.json({ success: false, error: 'Admin access required.' }, { status: 401 });
   }
   let body;

@@ -43,13 +43,13 @@ function CustomUserDropdown({ featureId, allUsers = [], selectedEmails = [], onC
     const map = new Map();
     allUsers.forEach(u => {
       const email = (u.email || '').trim().toLowerCase();
-      if (email) {
+      if (email && u.role !== 'super_admin' && !isRootSuperAdmin(email)) {
         map.set(email, { email, role: u.role || 'standard' });
       }
     });
     selectedEmails.forEach(email => {
       const lower = (email || '').trim().toLowerCase();
-      if (lower && !map.has(lower)) {
+      if (lower && !map.has(lower) && !isRootSuperAdmin(lower)) {
         map.set(lower, { email: lower, role: 'custom' });
       }
     });
@@ -84,28 +84,28 @@ function CustomUserDropdown({ featureId, allUsers = [], selectedEmails = [], onC
 
   const addCustomEmail = (email) => {
     const lower = email.trim().toLowerCase();
-    if (!lower || selectedEmails.includes(lower)) return;
+    if (!lower || selectedEmails.includes(lower) || isRootSuperAdmin(lower)) return;
     onChange([...selectedEmails, lower]);
     setSearch('');
   };
 
-  const canAddCustom = search.trim() && !combinedUserOptions.some(u => u.email === search.trim().toLowerCase());
+  const canAddCustom = search.trim() && !isRootSuperAdmin(search.trim().toLowerCase()) && !combinedUserOptions.some(u => u.email === search.trim().toLowerCase());
 
   return (
     <div ref={wrapperRef} className="relative z-30">
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center justify-between gap-2 px-3 py-1.5 rounded-xl bg-[#041628] border border-amber-500/40 text-xs font-semibold text-slate-200 hover:text-white hover:border-amber-400 transition-all shadow-sm min-w-[190px]"
+        className="flex items-center justify-between gap-2 px-3 py-1.5 rounded-xl bg-[#041628] border border-amber-500/40 text-xs font-semibold text-slate-200 hover:text-white hover:border-amber-400 transition-all shadow-sm min-w-[210px]"
       >
         <div className="flex items-center gap-1.5 truncate">
           <Users className="w-3.5 h-3.5 text-amber-400 shrink-0" />
           <span className="truncate font-mono text-[11px]">
             {selectedEmails.length === 0
-              ? 'Select Users (0)'
+              ? 'Super Admin (Fixed) + 0 Users'
               : selectedEmails.length === 1
-                ? selectedEmails[0]
-                : `${selectedEmails.length} Users Selected`}
+                ? `Super Admin + 1 User`
+                : `Super Admin + ${selectedEmails.length} Users`}
           </span>
         </div>
         <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
@@ -132,6 +132,23 @@ function CustomUserDropdown({ featureId, allUsers = [], selectedEmails = [], onC
                 Clear
               </button>
             </div>
+          </div>
+
+          {/* PINNED SUPER ADMIN ROW - FIXED AND PERMANENT */}
+          <div className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-xs bg-purple-500/15 border border-purple-500/30 text-purple-200 select-none mb-2">
+            <div className="flex items-center gap-2 truncate">
+              <div className="w-3.5 h-3.5 rounded flex items-center justify-center bg-purple-600 border border-purple-400 text-white shrink-0">
+                <Check className="w-2.5 h-2.5 stroke-[3]" />
+              </div>
+              <div className="flex items-center gap-1.5 truncate">
+                <Shield className="w-3 h-3 text-purple-400 shrink-0" />
+                <span className="truncate font-mono text-[11px] font-semibold text-white">Super Admin (All Controls)</span>
+              </div>
+            </div>
+            <span className="text-[9px] px-1.5 py-0.2 rounded font-bold uppercase tracking-wider bg-purple-500/30 text-purple-300 shrink-0 flex items-center gap-1">
+              <Lock className="w-2.5 h-2.5" />
+              <span>Fixed</span>
+            </span>
           </div>
 
           <div className="relative mb-2">
@@ -165,7 +182,7 @@ function CustomUserDropdown({ featureId, allUsers = [], selectedEmails = [], onC
           <div className="max-h-48 overflow-y-auto space-y-1 custom-scrollbar pr-1">
             {filteredUsers.length === 0 ? (
               <div className="text-center py-3 text-xs text-slate-400">
-                No matching users found.
+                No other matching users found.
               </div>
             ) : (
               filteredUsers.map(user => {
@@ -205,18 +222,29 @@ function CustomUserDropdown({ featureId, allUsers = [], selectedEmails = [], onC
   );
 }
 
-export default function FeatureControlsAdmin({ currentUserEmail = 'admin@tahaluf.com', userRole = 'super_admin', onSaved, onNavigate }) {
+export default function FeatureControlsAdmin({ 
+  currentUserEmail = 'admin@tahaluf.com', 
+  userRole = 'super_admin', 
+  featureConfig = null,
+  isFeatureAllowed = null,
+  onSaved, 
+  onNavigate 
+}) {
   const isSuperAdmin = userRole === 'super_admin' || (userRole !== 'admin' && userRole !== 'standard' && userRole !== 'non-finance' && isRootSuperAdmin(currentUserEmail));
-  if (!isSuperAdmin) {
+  const hasFeaturePermission = typeof isFeatureAllowed === 'function'
+    ? isFeatureAllowed('adminFeatures')
+    : isSuperAdmin;
+  const canAccess = isSuperAdmin || hasFeaturePermission;
+
+  if (!canAccess) {
     return (
       <div className="card-surface p-8 rounded-3xl border border-amber-500/30 bg-[#0a2442]/80 text-center max-w-xl mx-auto my-12 shadow-2xl">
         <div className="w-16 h-16 rounded-full bg-amber-500/15 border border-amber-500/40 text-amber-300 flex items-center justify-center mx-auto mb-4">
           <Lock className="w-8 h-8" />
         </div>
-        <h3 className="text-xl font-bold text-white mb-2">Super Admin Access Required</h3>
+        <h3 className="text-xl font-bold text-white mb-2">Access Restricted</h3>
         <p className="text-xs text-slate-300 mb-6 leading-relaxed">
-          Feature Controls is strictly restricted to <span className="text-[#cedc28] font-bold">Super Administrators</span>. 
-          Standard administrators can manage Events, Health, and Quotas, but cannot modify global feature deployments.
+          Feature Controls is restricted by system policy. You do not have permission to view or modify feature controls.
         </p>
         <span className="text-[11px] font-mono px-3 py-1 rounded-full bg-black/40 text-slate-400 border border-white/10">
           Current Role: {userRole}
@@ -1018,6 +1046,13 @@ export default function FeatureControlsAdmin({ currentUserEmail = 'admin@tahaluf
                         <div className="flex-1 min-w-[200px]">
                           <div className="flex items-center gap-2 mb-1 flex-wrap">
                             <span className="text-sm font-bold text-white">{feature.name}</span>
+                            <span 
+                              className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-500/15 border border-purple-500/30 text-purple-300 flex items-center gap-1 select-none"
+                              title="Super Admin has permanent, fixed access to this control with no option to change it."
+                            >
+                              <Shield className="w-2.5 h-2.5 text-purple-400" />
+                              <span>Super Admin: Fixed</span>
+                            </span>
                             <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 flex items-center gap-1">
                               <span>📍</span>
                               <span>{feature.section || feature.group}</span>
@@ -1154,7 +1189,7 @@ export default function FeatureControlsAdmin({ currentUserEmail = 'admin@tahaluf
                                 <span>Custom User Access: {feature.name}</span>
                               </div>
                               <p className="text-[11px] text-slate-400 mt-0.5">
-                                Only accounts selected below will be able to view and use this feature on their dashboard.
+                                Super Admin is permanently fixed with access. Select additional accounts below to grant access.
                               </p>
                             </div>
 
@@ -1166,31 +1201,42 @@ export default function FeatureControlsAdmin({ currentUserEmail = 'admin@tahaluf
                             />
                           </div>
 
-                          {assignedUsers.length > 0 ? (
-                            <div className="flex flex-wrap gap-1.5 mt-3">
-                              {assignedUsers.map(email => (
-                                <span 
-                                  key={email}
-                                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs bg-[#041628] border border-amber-500/30 text-amber-200 font-mono shadow-sm"
+                          <div className="flex flex-wrap items-center gap-1.5 mt-3">
+                            {/* FIXED SUPER ADMIN USER PILL - Always has access, cannot be removed */}
+                            <span 
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs bg-purple-500/20 border border-purple-500/40 text-purple-200 font-mono shadow-sm select-none"
+                              title="Super Admin has permanent, fixed access to all controls with no option to change it."
+                            >
+                              <Shield className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                              <span className="font-semibold text-white">Super Admin</span>
+                              <span className="text-[9px] px-1.5 py-0.2 rounded bg-purple-500/40 text-purple-300 font-bold uppercase tracking-wider">Fixed User</span>
+                              <Lock className="w-3 h-3 text-purple-300/80 ml-0.5" />
+                            </span>
+
+                            {/* REST OF THE CUSTOM USERS - Can be changed, removed, or added */}
+                            {assignedUsers.map(email => (
+                              <span 
+                                key={email}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs bg-[#041628] border border-amber-500/30 text-amber-200 font-mono shadow-sm"
+                              >
+                                <span>{email}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => removeCustomUser(feature.id, email)}
+                                  className="text-slate-400 hover:text-rose-400 transition-colors p-0.5 cursor-pointer"
+                                  title={`Remove ${email}`}
                                 >
-                                  <span>{email}</span>
-                                  <button
-                                    type="button"
-                                    onClick={() => removeCustomUser(feature.id, email)}
-                                    className="text-slate-400 hover:text-rose-400 transition-colors p-0.5"
-                                    title={`Remove ${email}`}
-                                  >
-                                    <X className="w-3 h-3" />
-                                  </button>
-                                </span>
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="mt-2 text-xs text-amber-400/90 italic flex items-center gap-1.5">
-                              <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                              <span>No users assigned yet. Open the dropdown to select one or more user accounts.</span>
-                            </div>
-                          )}
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </span>
+                            ))}
+
+                            {assignedUsers.length === 0 && (
+                              <span className="text-xs text-amber-400/80 italic flex items-center gap-1.5 ml-1">
+                                <span>(No extra custom users assigned. Open dropdown above to add users.)</span>
+                              </span>
+                            )}
+                          </div>
                         </div>
                       )}
                     </div>

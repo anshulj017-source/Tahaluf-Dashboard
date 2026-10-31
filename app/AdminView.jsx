@@ -27,7 +27,7 @@ const ALL_ADMIN_SECTIONS = [
   { id: 'quotas', featureId: 'adminQuotas', label: 'API & Quotas', icon: Gauge },
   { id: 'analytics', featureId: 'adminAnalytics', label: 'Analytics & Activity', icon: BarChart3 },
   { id: 'users', featureId: 'adminUsers', label: 'User Access', icon: UsersIcon },
-  { id: 'features', label: 'Feature Controls', icon: Shield, superAdminOnly: true },
+  { id: 'features', featureId: 'adminFeatures', label: 'Feature Controls', icon: Shield },
 ];
 
 const sections = ALL_ADMIN_SECTIONS;
@@ -48,11 +48,10 @@ export default function AdminView({
 
   // Filter sections dynamically based on role and feature controls
   const visibleSections = ALL_ADMIN_SECTIONS.filter(section => {
-    // If section has a feature control, check feature permission first
+    // If section has a feature control, check feature permission first (allows disabling)
     if (section.featureId) {
       if (typeof isFeatureAllowed === 'function') {
         const allowed = isFeatureAllowed(section.featureId);
-        // If disabled or restricted, it cannot be visible to anyone (including Super Admin)
         if (!allowed) return false;
       } else if (featureConfig?.modes?.[section.featureId] === 'disabled') {
         return false;
@@ -64,16 +63,7 @@ export default function AdminView({
       return true;
     }
 
-    // Feature Controls is restricted strictly to SUPER ADMIN
-    if (section.superAdminOnly) {
-      return false;
-    }
-
     // Admin features that passed isFeatureAllowed check are permitted
-    if (section.featureId) {
-      return true;
-    }
-
     return true;
   });
 
@@ -560,6 +550,8 @@ export default function AdminView({
             <FeatureControlsAdmin
               currentUserEmail={currentUserEmail}
               userRole={userRole}
+              featureConfig={featureConfig}
+              isFeatureAllowed={isFeatureAllowed}
               onSaved={onFeaturesSaved}
               onNavigate={(featureId) => {
                 if (featureId === 'dimensionExport' || featureId === 'bulkDimensionImport') {

@@ -1395,6 +1395,8 @@ function testFeatureControlsLogic() {
   };
   assert(isFeatureEnabled(customConfig, 'aiSummary', 'standard', false, 'analytics.ksa@umww.com') === true, 'Custom user can access feature');
   assert(isFeatureEnabled(customConfig, 'aiSummary', 'standard', false, 'other@tahaluf.com') === false, 'Non-assigned user cannot access custom_users feature');
+  assert(isFeatureEnabled(customConfig, 'aiSummary', 'super_admin') === true, 'Super Admin always has access to all controls including custom_users');
+  assert(featureIds.includes('adminFeatures'), 'Includes adminFeatures (Feature Controls)');
 }
 
 // -------------------------------------------------------------

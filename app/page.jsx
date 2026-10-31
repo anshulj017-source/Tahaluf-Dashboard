@@ -818,7 +818,7 @@ export default function App() {
 
   const canAccessAdmin = useMemo(() => {
     if (isAdminRole) return true;
-    const adminFeatureIds = ['adminEvents', 'adminHealth', 'adminQuotas', 'adminAnalytics', 'adminUsers'];
+    const adminFeatureIds = ['adminEvents', 'adminHealth', 'adminQuotas', 'adminAnalytics', 'adminUsers', 'adminFeatures'];
     return adminFeatureIds.some(id => featureAllowed(id));
   }, [isAdminRole, featureAllowed]);
 

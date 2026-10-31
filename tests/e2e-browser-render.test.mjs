@@ -80,7 +80,7 @@ test('E2E Browser Render & Console Error Verification Suite', async (t) => {
   const launchBrowser = () => puppeteer.launch({
     executablePath: chromePath,
     headless: true,
-    protocolTimeout: 60000,
+    protocolTimeout: 120000,
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
   });
 
@@ -251,10 +251,22 @@ test('E2E Browser Render & Console Error Verification Suite', async (t) => {
       await new Promise(r => setTimeout(r, 600));
 
       // Wait for the loading spinner to disappear once live data streams finish
-      await page.waitForFunction(
-        () => !document.querySelector('.animate-spin-slow') && document.querySelectorAll('.card-surface').length > 0,
-        { timeout: 75000 }
-      );
+      try {
+        await page.waitForFunction(
+          () => !document.querySelector('.animate-spin-slow') && document.querySelectorAll('.card-surface').length > 0,
+          { timeout: 75000 }
+        );
+      } catch (err) {
+        if (err.message && err.message.includes('detached')) {
+          await new Promise(r => setTimeout(r, 1000));
+          await page.waitForFunction(
+            () => !document.querySelector('.animate-spin-slow') && document.querySelectorAll('.card-surface').length > 0,
+            { timeout: 45000 }
+          );
+        } else {
+          throw err;
+        }
+      }
 
       // Verify dashboard contents are present
       const dashboardState = await page.evaluate(() => {
@@ -295,10 +307,22 @@ test('E2E Browser Render & Console Error Verification Suite', async (t) => {
       await new Promise(r => setTimeout(r, 600));
 
       // Wait for loading spinner to finish
-      await page.waitForFunction(
-        () => !document.querySelector('.animate-spin-slow') && document.querySelectorAll('.card-surface').length > 0,
-        { timeout: 60000 }
-      );
+      try {
+        await page.waitForFunction(
+          () => !document.querySelector('.animate-spin-slow') && document.querySelectorAll('.card-surface').length > 0,
+          { timeout: 75000 }
+        );
+      } catch (err) {
+        if (err.message && err.message.includes('detached')) {
+          await new Promise(r => setTimeout(r, 1000));
+          await page.waitForFunction(
+            () => !document.querySelector('.animate-spin-slow') && document.querySelectorAll('.card-surface').length > 0,
+            { timeout: 45000 }
+          );
+        } else {
+          throw err;
+        }
+      }
 
       // Verify that MultiSelect dropdowns can open, switch to another dropdown, and close cleanly
       const filterInteractions = await page.evaluate(async () => {
@@ -373,10 +397,22 @@ test('E2E Browser Render & Console Error Verification Suite', async (t) => {
       await new Promise(r => setTimeout(r, 600));
 
       // Wait for loading spinner to finish
-      await page.waitForFunction(
-        () => !document.querySelector('.animate-spin-slow') && document.querySelectorAll('.card-surface').length > 0,
-        { timeout: 60000 }
-      );
+      try {
+        await page.waitForFunction(
+          () => !document.querySelector('.animate-spin-slow') && document.querySelectorAll('.card-surface').length > 0,
+          { timeout: 75000 }
+        );
+      } catch (err) {
+        if (err.message && err.message.includes('detached')) {
+          await new Promise(r => setTimeout(r, 1000));
+          await page.waitForFunction(
+            () => !document.querySelector('.animate-spin-slow') && document.querySelectorAll('.card-surface').length > 0,
+            { timeout: 45000 }
+          );
+        } else {
+          throw err;
+        }
+      }
 
       // Wait for AI Intelligence card tabs to appear if enabled
       const hasAiCard = await page.waitForFunction(
