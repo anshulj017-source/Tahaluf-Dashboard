@@ -15,7 +15,8 @@ export async function GET() {
       ...DEFAULT_FEATURE_CONFIG,
       ...rawConfig,
       modes: { ...DEFAULT_FEATURE_CONFIG.modes, ...(rawConfig?.modes || {}) },
-      customUsers: { ...(rawConfig?.customUsers || {}) }
+      customUsers: { ...(rawConfig?.customUsers || {}) },
+      history: Array.isArray(rawConfig?.history) ? rawConfig.history : []
     };
     return NextResponse.json({ success: true, config, policy: { lowQuotaMode: budgets.policy?.lowQuotaMode === true } }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {

@@ -1396,6 +1396,15 @@ function testFeatureControlsLogic() {
   assert(isFeatureEnabled(customConfig, 'aiSummary', 'standard', false, 'analytics.ksa@umww.com') === true, 'Custom user can access feature');
   assert(isFeatureEnabled(customConfig, 'aiSummary', 'standard', false, 'other@tahaluf.com') === false, 'Non-assigned user cannot access custom_users feature');
   assert(isFeatureEnabled(customConfig, 'aiSummary', 'super_admin') === true, 'Super Admin always has access to all controls including custom_users');
+
+  const domainConfig = {
+    revision: 1,
+    modes: { ...DEFAULT_FEATURE_CONFIG.modes, aiSummary: 'custom_users' },
+    customUsers: { aiSummary: ['@tahaluf.com'] }
+  };
+  assert(isFeatureEnabled(domainConfig, 'aiSummary', 'standard', false, 'mohammad@tahaluf.com') === true, 'Domain rule @tahaluf.com matches company user');
+  assert(isFeatureEnabled(domainConfig, 'aiSummary', 'standard', false, 'other@informa.com') === false, 'Domain rule does not match different domain');
+
   assert(featureIds.includes('adminFeatures'), 'Includes adminFeatures (Feature Controls)');
 }
 

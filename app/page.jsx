@@ -803,6 +803,8 @@ export default function App() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [eventsConfiguration, setEventsConfiguration] = useState([]);
   const [simulatingStandardUser, setSimulatingStandardUser] = useState(false);
+  const [simulatedRole, setSimulatedRole] = useState(null);
+  const [simulatedUserEmail, setSimulatedUserEmail] = useState('');
   const [featureConfig, setFeatureConfig] = useState(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -814,13 +816,16 @@ export default function App() {
   });
   const [lowQuotaMode, setLowQuotaMode] = useState(false);
   const [featureError, setFeatureError] = useState('');
-  const featureAllowed = (id) => isFeatureEnabled(featureConfig || DEFAULT_FEATURE_CONFIG, id, userRole, simulatingStandardUser, userEmail);
+  const activeEffectiveRole = simulatingStandardUser ? (simulatedRole || 'standard') : userRole;
+  const activeEffectiveEmail = simulatingStandardUser && simulatedUserEmail.trim() ? simulatedUserEmail.trim().toLowerCase() : userEmail;
+  const featureAllowed = (id) => isFeatureEnabled(featureConfig || DEFAULT_FEATURE_CONFIG, id, activeEffectiveRole, simulatingStandardUser && !simulatedRole, activeEffectiveEmail);
 
   const canAccessAdmin = useMemo(() => {
-    if (isAdminRole) return true;
+    if (isAdminRole && !simulatingStandardUser) return true;
+    if (simulatingStandardUser && activeEffectiveRole === 'admin') return true;
     const adminFeatureIds = ['adminEvents', 'adminHealth', 'adminQuotas', 'adminAnalytics', 'adminUsers', 'adminFeatures'];
     return adminFeatureIds.some(id => featureAllowed(id));
-  }, [isAdminRole, featureAllowed]);
+  }, [isAdminRole, simulatingStandardUser, activeEffectiveRole, featureAllowed]);
 
   useEffect(() => {
     if (!canAccessAdmin && activeTab === 'admin') {
@@ -3063,7 +3068,7 @@ export default function App() {
   };
 
   return (
-    <DashboardFeatureContext.Provider value={{ config: featureConfig || DEFAULT_FEATURE_CONFIG, role: userRole, preview: simulatingStandardUser, lowQuotaMode, userEmail }}>
+    <DashboardFeatureContext.Provider value={{ config: featureConfig || DEFAULT_FEATURE_CONFIG, role: activeEffectiveRole, preview: simulatingStandardUser && !simulatedRole, lowQuotaMode, userEmail: activeEffectiveEmail }}>
     <div className={`h-screen overflow-hidden app-bg font-sans selection:bg-[#cedc28]/30 text-white flex flex-col ${tvMode ? 'tv-mode-active' : ''}`}>
       {/* HEADER: TV Mode or Standard Header */}
       {tvMode ? (
@@ -3749,20 +3754,59 @@ export default function App() {
             }} />
           )}
           
-          {/* 1. Standard User Preview Simulation Banner */}
+          {/* 1. Persona Simulation Active Banner */}
           {simulatingStandardUser && !tvMode && (
-            <div className="mb-6 p-3.5 bg-amber-500/15 border border-amber-500/40 rounded-2xl flex items-center justify-between text-xs text-amber-200 shadow-xl backdrop-blur-md">
-              <div className="flex items-center gap-2.5">
+            <div className="mb-6 p-3.5 bg-amber-500/15 border border-amber-500/40 rounded-2xl flex flex-wrap items-center justify-between gap-3 text-xs text-amber-200 shadow-xl backdrop-blur-md">
+              <div className="flex items-center gap-2.5 flex-wrap">
                 <EyeOff className="w-4 h-4 text-amber-400 animate-pulse flex-shrink-0" />
                 <span>
-                  <strong>Standard User Preview Active:</strong> All admin-only staging events are hidden. You are viewing the dashboard exactly as a regular viewer does.
+                  <strong>Persona Simulation Active:</strong> Viewing dashboard as{' '}
+                  <span className="font-mono font-bold text-amber-100 bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-500/30">
+                    {simulatedUserEmail ? simulatedUserEmail : simulatedRole === 'admin' ? 'Administrator' : 'Standard Viewer'}
+                  </span>
                 </span>
+                <div className="flex items-center gap-1.5 ml-1 bg-[#041628]/80 p-0.5 rounded-lg border border-amber-500/30">
+                  <button
+                    onClick={() => { setSimulatedRole('standard'); setSimulatedUserEmail(''); }}
+                    className={`px-2 py-0.5 rounded text-[10px] font-bold transition-colors ${
+                      simulatedRole === 'standard' && !simulatedUserEmail
+                        ? 'bg-amber-400 text-black shadow-sm'
+                        : 'text-amber-200 hover:text-white'
+                    }`}
+                  >
+                    Viewer
+                  </button>
+                  <button
+                    onClick={() => { setSimulatedRole('admin'); setSimulatedUserEmail(''); }}
+                    className={`px-2 py-0.5 rounded text-[10px] font-bold transition-colors ${
+                      simulatedRole === 'admin' && !simulatedUserEmail
+                        ? 'bg-cyan-500 text-black shadow-sm'
+                        : 'text-amber-200 hover:text-white'
+                    }`}
+                  >
+                    Admin
+                  </button>
+                  <input
+                    type="text"
+                    placeholder="Simulate user / @domain..."
+                    value={simulatedUserEmail}
+                    onChange={(e) => {
+                      setSimulatedUserEmail(e.target.value);
+                      if (e.target.value.trim()) setSimulatedRole('standard');
+                    }}
+                    className="w-44 px-2 py-0.5 rounded bg-black/40 border border-white/10 text-[10px] text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 font-mono"
+                  />
+                </div>
               </div>
               <button
-                onClick={() => setSimulatingStandardUser(false)}
-                className="px-3 py-1 bg-amber-500/30 hover:bg-amber-500 text-amber-100 hover:text-black rounded-lg font-bold text-[10px] uppercase tracking-wider transition-all"
+                onClick={() => {
+                  setSimulatingStandardUser(false);
+                  setSimulatedRole(null);
+                  setSimulatedUserEmail('');
+                }}
+                className="px-3 py-1 bg-amber-500/30 hover:bg-amber-500 text-amber-100 hover:text-black rounded-lg font-bold text-[10px] uppercase tracking-wider transition-all cursor-pointer"
               >
-                Exit Preview
+                Exit Simulation
               </button>
             </div>
           )}

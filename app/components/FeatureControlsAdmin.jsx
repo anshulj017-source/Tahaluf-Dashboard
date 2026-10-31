@@ -5,7 +5,7 @@ import {
   Shield, Eye, EyeOff, Save, RotateCcw, Search, CheckCircle2, 
   AlertTriangle, Filter, Sparkles, Tv, Layers, Wrench, Activity, 
   Brain, BarChart2, Globe, Lock, Ban, ExternalLink, Users,
-  ChevronDown, Check, X, Plus, UserCheck
+  ChevronDown, Check, X, Plus, UserCheck, History, Clock
 } from 'lucide-react';
 import { auth } from '../../lib/firebase';
 import { DASHBOARD_FEATURES, DEFAULT_FEATURE_CONFIG, isFeatureEnabled } from '../../lib/dashboardFeatures.mjs';
@@ -50,7 +50,7 @@ function CustomUserDropdown({ featureId, allUsers = [], selectedEmails = [], onC
     selectedEmails.forEach(email => {
       const lower = (email || '').trim().toLowerCase();
       if (lower && !map.has(lower) && !isRootSuperAdmin(lower)) {
-        map.set(lower, { email: lower, role: 'custom' });
+        map.set(lower, { email: lower, role: lower.startsWith('@') ? 'domain' : 'custom' });
       }
     });
     return Array.from(map.values());
@@ -168,14 +168,38 @@ function CustomUserDropdown({ featureId, allUsers = [], selectedEmails = [], onC
             />
           </div>
 
+          {search.trim().startsWith('@') && search.trim().length === 1 && (
+            <div className="mb-2 p-1.5 rounded-lg bg-[#071b2e] border border-cyan-500/30 space-y-1">
+              <span className="text-[10px] text-cyan-300 font-bold uppercase tracking-wider block px-1">Quick Domain Rules:</span>
+              {['@tahaluf.com', '@informa.com', '@umww.com'].map(d => (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => addCustomEmail(d)}
+                  className="w-full text-left px-2 py-1 rounded text-xs text-slate-300 hover:text-white hover:bg-cyan-500/20 flex items-center justify-between"
+                >
+                  <span className="font-mono text-cyan-300 flex items-center gap-1">
+                    <Globe className="w-3 h-3" />
+                    <span>{d}</span>
+                  </span>
+                  <span className="text-[10px] text-slate-400">All company users</span>
+                </button>
+              ))}
+            </div>
+          )}
+
           {canAddCustom && (
             <button
               type="button"
               onClick={() => addCustomEmail(search.trim())}
-              className="w-full mb-2 px-2.5 py-1.5 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-300 hover:bg-amber-500/25 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
+              className={`w-full mb-2 px-2.5 py-1.5 rounded-lg border text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors ${
+                search.trim().startsWith('@')
+                  ? 'bg-cyan-500/15 border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/25'
+                  : 'bg-amber-500/15 border-amber-500/30 text-amber-300 hover:bg-amber-500/25'
+              }`}
             >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Add "{search.trim()}"</span>
+              {search.trim().startsWith('@') ? <Globe className="w-3.5 h-3.5 text-cyan-400" /> : <Plus className="w-3.5 h-3.5" />}
+              <span>{search.trim().startsWith('@') ? `Add Domain Rule "${search.trim()}"` : `Add "${search.trim()}"`}</span>
             </button>
           )}
 
@@ -265,6 +289,7 @@ export default function FeatureControlsAdmin({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
 
   const loadUsers = async () => {
     try {
@@ -420,6 +445,48 @@ export default function FeatureControlsAdmin({
     }
   };
 
+  const rollbackRevision = async (targetRev) => {
+    if (!window.confirm(`Are you sure you want to rollback to Revision ${targetRev}? This will restore all feature permissions from that snapshot.`)) {
+      return;
+    }
+    setBusy(true);
+    setError('');
+    setNotice('');
+    try {
+      const token = await auth.currentUser?.getIdToken(true).catch(() => null);
+      const email = currentUserEmail || auth.currentUser?.email || (typeof window !== 'undefined' ? localStorage.getItem('tahaluf_cached_email') : '') || 'admin@tahaluf.com';
+      const role = (isSuperAdmin ? 'super_admin' : userRole) || (typeof window !== 'undefined' ? localStorage.getItem('tahaluf_cached_role') : '') || 'super_admin';
+      const headers = {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        'x-admin-email': email,
+        'x-admin-role': role
+      };
+      const response = await fetch('/api/admin/features', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ action: 'rollback', targetRevision: targetRev })
+      });
+      const json = await response.json();
+      if (!response.ok || !json.success) throw new Error(json.error || 'Could not rollback revision.');
+      setConfig(json.config);
+      setModes(json.config.modes);
+      setCustomUsers(json.config.customUsers || {});
+      try {
+        localStorage.removeItem('tahaluf_feature_modes_draft');
+        localStorage.removeItem('tahaluf_feature_custom_users_draft');
+        localStorage.setItem('tahaluf_cached_features', JSON.stringify(json.config));
+      } catch {}
+      onSaved?.(json.config);
+      setNotice(`Successfully restored to Revision ${targetRev}! All user sessions reflect these settings.`);
+      setShowHistoryModal(false);
+    } catch (err) {
+      setError(err.message || 'Failed to rollback revision.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const dirty = Boolean(config && (
     JSON.stringify(modes) !== JSON.stringify({ ...DEFAULT_FEATURE_CONFIG.modes, ...config.modes }) ||
     JSON.stringify(customUsers) !== JSON.stringify(config.customUsers || {})
@@ -540,6 +607,16 @@ export default function FeatureControlsAdmin({
         </div>
 
         <div className="flex items-center gap-3">
+          <button
+            disabled={busy}
+            onClick={() => setShowHistoryModal(true)}
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold bg-[#0a2442] border border-purple-500/30 text-purple-300 hover:text-white hover:border-purple-400 transition-all"
+            title="View revision history and rollback snapshots"
+          >
+            <History className="w-3.5 h-3.5 text-purple-400" />
+            <span>History ({config?.history?.length || 0})</span>
+          </button>
+
           <button
             disabled={busy}
             onClick={load}
@@ -1214,22 +1291,30 @@ export default function FeatureControlsAdmin({
                             </span>
 
                             {/* REST OF THE CUSTOM USERS - Can be changed, removed, or added */}
-                            {assignedUsers.map(email => (
-                              <span 
-                                key={email}
-                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs bg-[#041628] border border-amber-500/30 text-amber-200 font-mono shadow-sm"
-                              >
-                                <span>{email}</span>
-                                <button
-                                  type="button"
-                                  onClick={() => removeCustomUser(feature.id, email)}
-                                  className="text-slate-400 hover:text-rose-400 transition-colors p-0.5 cursor-pointer"
-                                  title={`Remove ${email}`}
+                            {assignedUsers.map(email => {
+                              const isDomainRule = email.startsWith('@');
+                              return (
+                                <span 
+                                  key={email}
+                                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono shadow-sm ${
+                                    isDomainRule 
+                                      ? 'bg-cyan-950/60 border border-cyan-500/40 text-cyan-200' 
+                                      : 'bg-[#041628] border border-amber-500/30 text-amber-200'
+                                  }`}
                                 >
-                                  <X className="w-3 h-3" />
-                                </button>
-                              </span>
-                            ))}
+                                  {isDomainRule && <Globe className="w-3 h-3 text-cyan-400 shrink-0" />}
+                                  <span>{isDomainRule ? `Domain: ${email}` : email}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => removeCustomUser(feature.id, email)}
+                                    className="text-slate-400 hover:text-rose-400 transition-colors p-0.5 cursor-pointer"
+                                    title={`Remove ${email}`}
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </span>
+                              );
+                            })}
 
                             {assignedUsers.length === 0 && (
                               <span className="text-xs text-amber-400/80 italic flex items-center gap-1.5 ml-1">
@@ -1248,6 +1333,87 @@ export default function FeatureControlsAdmin({
           );
         })}
       </div>
+
+      {/* REVISION HISTORY & 1-CLICK ROLLBACK MODAL */}
+      {showHistoryModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-[#071b2e] border border-purple-500/40 rounded-2xl max-w-2xl w-full p-6 shadow-2xl max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between pb-4 border-b border-white/10 mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-purple-500/20 text-purple-300">
+                  <History className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Feature Controls Revision History</h3>
+                  <p className="text-xs text-slate-400">View past snapshots and restore any previous configuration with 1-click.</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowHistoryModal(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-3 custom-scrollbar pr-1">
+              {(!config?.history || config.history.length === 0) ? (
+                <div className="text-center py-8 text-slate-400 text-sm">
+                  No previous revisions recorded yet. Revisions are created automatically whenever changes are published.
+                </div>
+              ) : (
+                config.history.map(entry => {
+                  const dateStr = entry.timestamp ? new Date(entry.timestamp).toLocaleString() : 'Unknown';
+                  const modesCount = entry.modes ? Object.keys(entry.modes).length : 0;
+                  return (
+                    <div 
+                      key={entry.revision}
+                      className="p-3.5 rounded-xl bg-[#041628] border border-white/10 flex flex-wrap items-center justify-between gap-3 hover:border-purple-500/30 transition-all"
+                    >
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-sm text-purple-300 font-mono">Rev #{entry.revision}</span>
+                          <span className="text-[10px] px-2 py-0.5 rounded bg-white/10 text-slate-300 font-mono">
+                            {dateStr}
+                          </span>
+                          {entry.revertedFrom && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-semibold">
+                              Reverted from Rev #{entry.revertedFrom}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-400 mt-1 flex items-center gap-2">
+                          <span>By: <strong className="text-slate-300">{entry.author || 'Admin'}</strong></span>
+                          <span>•</span>
+                          <span>{modesCount} features configured</span>
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => rollbackRevision(entry.revision)}
+                        className="px-3 py-1.5 rounded-lg bg-purple-500/20 hover:bg-purple-500 text-purple-200 hover:text-white border border-purple-500/40 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>1-Click Restore</span>
+                      </button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            <div className="pt-4 border-t border-white/10 mt-4 flex justify-end">
+              <button
+                onClick={() => setShowHistoryModal(false)}
+                className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-semibold text-white transition-colors cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

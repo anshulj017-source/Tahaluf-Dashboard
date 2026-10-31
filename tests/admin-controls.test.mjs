@@ -583,6 +583,14 @@ test('super_admin_only and custom_users permissions enforce strict role and user
   assert.equal(isFeatureEnabled(customUsersConfig, 'aiSummary', 'super_admin'), true, 'Super Admin always has access to all controls including custom_users');
   assert.equal(isFeatureEnabled(customUsersConfig, 'aiSummary', 'standard', true, 'analytics.ksa@umww.com'), false, 'Preview hides custom_users');
 
+  const domainRuleConfig = {
+    modes: { ...DEFAULT_FEATURE_CONFIG.modes, aiSummary: 'custom_users' },
+    customUsers: { aiSummary: ['@tahaluf.com', 'partner@external.com'] }
+  };
+  assert.equal(isFeatureEnabled(domainRuleConfig, 'aiSummary', 'standard', false, 'mohammad@tahaluf.com'), true, 'Domain rule matches company email');
+  assert.equal(isFeatureEnabled(domainRuleConfig, 'aiSummary', 'standard', false, 'partner@external.com'), true, 'Specific user still matches in domain config');
+  assert.equal(isFeatureEnabled(domainRuleConfig, 'aiSummary', 'standard', false, 'hacker@otherdomain.com'), false, 'Unmatched domain cannot access');
+
   // Verify adminFeatures is registered and obeys permissions
   const adminFeatures = DASHBOARD_FEATURES.find(f => f.id === 'adminFeatures');
   assert.ok(adminFeatures, 'adminFeatures is registered in DASHBOARD_FEATURES');
