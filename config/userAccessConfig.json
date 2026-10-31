@@ -1,0 +1,17 @@
+{
+  "domainRules": [
+    {
+      "domain": "@tahaluf.com",
+      "role": "admin",
+      "description": "Internal Tahaluf team default role",
+      "createdAt": "2026-10-31T00:00:00.000Z"
+    },
+    {
+      "domain": "@informa.com",
+      "role": "standard",
+      "description": "Informa Group organization access",
+      "createdAt": "2026-10-31T00:00:00.000Z"
+    }
+  ],
+  "history": []
+}

@@ -62,16 +62,23 @@ export async function GET(request) {
       }
     }
 
-    // Default: any authenticated user without explicit admin role in Firestore is standard
+    // Default: check domain rules before defaulting to standard
+    const { readAdminSetting } = await import('../../../../lib/adminSettingsStore.mjs');
+    const userAccessConfig = await readAdminSetting('userAccessConfig', { domainRules: [] }).catch(() => ({ domainRules: [] }));
+    const domainRules = Array.isArray(userAccessConfig?.domainRules) ? userAccessConfig.domainRules : [];
+    const matchedRule = domainRules.find(r => r.domain && email.endsWith(r.domain.toLowerCase().trim()));
+    const assignedDefaultRole = matchedRule?.role || 'standard';
+
     if (uid && email) {
       await adminDb.collection('users').doc(uid).set({
         email,
-        role: 'standard',
-        createdAt: new Date().toISOString()
+        role: assignedDefaultRole,
+        createdAt: new Date().toISOString(),
+        assignedByDomainRule: matchedRule ? matchedRule.domain : null
       }, { merge: true }).catch(() => {});
     }
 
-    return NextResponse.json({ role: 'standard', email, authenticated: true });
+    return NextResponse.json({ role: assignedDefaultRole, email, authenticated: true });
   } catch (error) {
     console.warn('[AUTH ME] Error resolving role:', error.message);
     return NextResponse.json({ role: 'standard', error: error.message }, { status: 500 });

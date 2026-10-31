@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect } from 'react';
-import { Trash2, UserPlus, Shield, User, RefreshCw, CheckCircle2, Key, Layers, Activity, Users as UsersIcon, BarChart3, Gauge, ChevronDown, LogOut, ArrowLeft } from 'lucide-react';
+import { Trash2, UserPlus, Shield, User, RefreshCw, CheckCircle2, Key, Layers, Activity, Users as UsersIcon, BarChart3, Gauge, ChevronDown, LogOut, ArrowLeft, Globe, History, Plus, X, RotateCcw } from 'lucide-react';
 import EventsAdmin from './components/EventsAdmin';
 import DataHealthAdmin from './components/DataHealthAdmin';
 import AnalyticsAdmin from './components/AnalyticsAdmin';
@@ -103,6 +103,15 @@ export default function AdminView({
   const [newRole, setNewRole] = useState('standard');
   const [addingUser, setAddingUser] = useState(false);
   const [addSuccess, setAddSuccess] = useState(false);
+  const [userSubtab, setUserSubtab] = useState('users');
+  const [userAccessMetadata, setUserAccessMetadata] = useState(null);
+  const domainRules = userAccessMetadata?.domainRules || [];
+  const userAccessHistory = userAccessMetadata?.history || [];
+  const [newDomain, setNewDomain] = useState('');
+  const [newDomainRole, setNewDomainRole] = useState('standard');
+  const [newDomainDesc, setNewDomainDesc] = useState('');
+  const [showAddDomainForm, setShowAddDomainForm] = useState(false);
+  const [historyActionFilter, setHistoryActionFilter] = useState('all');
   useAdminDirtyGuard('new-user', showAddForm && Boolean(newEmail || newPassword || newRole !== 'standard'));
   useEffect(() => {
     const updateDirty = event => {
@@ -193,9 +202,105 @@ export default function AdminView({
       }
       const data = await res.json();
       setUsers(data.users || []);
+      setUserAccessMetadata({
+        domainRules: data.domainRules || [],
+        history: data.history || []
+      });
     } catch (err) {
       console.error(err);
       setError(err.message || 'Could not load users. Make sure you are an admin and the server is running.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddDomainRule = async (e) => {
+    e.preventDefault();
+    if (!newDomain.trim() || !newDomain.startsWith('@') || !newDomain.includes('.')) {
+      setError('Please enter a valid domain rule starting with @ (e.g. @company.com)');
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const headers = await getAdminHeaders();
+      const res = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          action: 'add_domain_rule',
+          domain: newDomain.trim().toLowerCase(),
+          role: newDomainRole,
+          description: newDomainDesc.trim()
+        })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Failed to save domain rule');
+      setUserAccessMetadata(prev => ({
+        ...prev,
+        domainRules: data.domainRules,
+        history: data.history
+      }));
+      setNewDomain('');
+      setNewDomainDesc('');
+      setShowAddDomainForm(false);
+      setNotice(`Domain rule for ${newDomain.trim().toLowerCase()} successfully added.`);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteDomainRule = async (domain) => {
+    if (!window.confirm(`Delete domain rule for ${domain}? Existing accounts will keep their current roles.`)) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const headers = await getAdminHeaders();
+      const res = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          action: 'delete_domain_rule',
+          domain
+        })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Failed to delete domain rule');
+      setUserAccessMetadata(prev => ({
+        ...prev,
+        domainRules: data.domainRules,
+        history: data.history
+      }));
+      setNotice(`Domain rule for ${domain} deleted.`);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRollbackUserHistory = async (actionId) => {
+    if (!window.confirm('Roll back this user access action?')) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const headers = await getAdminHeaders();
+      const res = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          action: 'rollback_history',
+          actionId
+        })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Failed to roll back action');
+      fetchUsers();
+      setNotice(data.message || 'Successfully rolled back action.');
+    } catch (err) {
+      setError(err.message);
     } finally {
       setLoading(false);
     }
@@ -586,29 +691,80 @@ export default function AdminView({
             </div>
           ) : (
           <div>
-            <div className="flex flex-wrap gap-3 justify-between items-end mb-5">
+            <div className="flex flex-wrap gap-3 justify-between items-end mb-4">
               <div>
                 <h2 className="text-2xl font-bold text-white mb-1">User Access</h2>
-                <p className="text-[#14a6d9] text-sm font-medium">Control dashboard access and administrator privileges</p>
+                <p className="text-[#14a6d9] text-sm font-medium">Control dashboard access, domain rules, and view audit history</p>
               </div>
               
               <div className="flex gap-3">
                 <button 
                   onClick={fetchUsers}
                   disabled={loading}
-                  className="px-4 py-2 bg-[#0a2442] border border-[#cedc28]/30 text-[#cedc28] hover:bg-[#cedc28]/10 hover:text-white rounded-xl transition-all text-xs font-bold uppercase tracking-widest flex items-center gap-2"
+                  className="px-4 py-2 bg-[#0a2442] border border-[#cedc28]/30 text-[#cedc28] hover:bg-[#cedc28]/10 hover:text-white rounded-xl transition-all text-xs font-bold uppercase tracking-widest flex items-center gap-2 cursor-pointer"
                 >
                   <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                   Refresh
                 </button>
-                <button 
-                  onClick={() => setShowAddForm(!showAddForm)}
-                  className="px-4 py-2 bg-[#cedc28]/20 border border-[#cedc28]/50 text-[#cedc28] hover:bg-[#cedc28]/40 hover:text-white rounded-xl transition-all text-xs font-bold uppercase tracking-widest flex items-center gap-2 shadow-[0_0_15px_rgba(200,130,20,0.15)]"
-                >
-                  <UserPlus className="w-4 h-4" />
-                  {showAddForm ? 'Cancel' : 'Add User'}
-                </button>
+                {userSubtab === 'users' && (
+                  <button 
+                    onClick={() => setShowAddForm(!showAddForm)}
+                    className="px-4 py-2 bg-[#cedc28]/20 border border-[#cedc28]/50 text-[#cedc28] hover:bg-[#cedc28]/40 hover:text-white rounded-xl transition-all text-xs font-bold uppercase tracking-widest flex items-center gap-2 shadow-[0_0_15px_rgba(200,130,20,0.15)] cursor-pointer"
+                  >
+                    <UserPlus className="w-4 h-4" />
+                    {showAddForm ? 'Cancel' : 'Add User'}
+                  </button>
+                )}
+                {userSubtab === 'domains' && (
+                  <button 
+                    onClick={() => setShowAddDomainForm(!showAddDomainForm)}
+                    className="px-4 py-2 bg-cyan-500/20 border border-cyan-500/50 text-cyan-300 hover:bg-cyan-500/40 hover:text-white rounded-xl transition-all text-xs font-bold uppercase tracking-widest flex items-center gap-2 shadow-[0_0_15px_rgba(6,182,212,0.15)] cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    {showAddDomainForm ? 'Cancel' : 'Add Domain Rule'}
+                  </button>
+                )}
               </div>
+            </div>
+
+            {/* USER ACCESS SUBTAB NAVIGATION */}
+            <div className="flex items-center gap-2 mb-6 border-b border-white/10 pb-3 flex-wrap">
+              <button
+                type="button"
+                onClick={() => setUserSubtab('users')}
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  userSubtab === 'users'
+                    ? 'bg-[#14a6d9] text-white shadow-[0_0_12px_rgba(20,166,217,0.35)]'
+                    : 'text-slate-400 hover:text-white bg-[#0a2442]/60'
+                }`}
+              >
+                <UsersIcon className="w-3.5 h-3.5" />
+                <span>User Accounts ({users.length})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setUserSubtab('domains')}
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  userSubtab === 'domains'
+                    ? 'bg-cyan-500 text-black shadow-[0_0_12px_rgba(6,182,212,0.35)]'
+                    : 'text-slate-400 hover:text-white bg-[#0a2442]/60'
+                }`}
+              >
+                <Globe className="w-3.5 h-3.5" />
+                <span>Domain Rules ({domainRules.length})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setUserSubtab('history')}
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  userSubtab === 'history'
+                    ? 'bg-purple-600 text-white shadow-[0_0_12px_rgba(147,51,234,0.35)]'
+                    : 'text-slate-400 hover:text-white bg-[#0a2442]/60'
+                }`}
+              >
+                <History className="w-3.5 h-3.5" />
+                <span>Access History ({userAccessHistory.length})</span>
+              </button>
             </div>
 
         {notice && <p role="status" className="mb-4 text-sm text-lime-300">{notice}</p>}
@@ -626,191 +782,436 @@ export default function AdminView({
           </div>
         )}
 
-        {showAddForm && (
-          <div className="card-surface backdrop-blur-2xl p-6 rounded-3xl border border-[#cedc28]/20 shadow-2xl mb-8 relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-64 h-64 opacity-5 pointer-events-none" style={{ backgroundImage: "url('/loc-pattern.png')", backgroundSize: 'contain', backgroundRepeat: 'no-repeat', backgroundPosition: 'top right' }}></div>
-            
-            <h3 className="text-[#14a6d9] font-bold uppercase tracking-widest text-sm mb-4">Create New User</h3>
-            
-            <form onSubmit={handleAddUser} className="relative z-10 flex flex-wrap items-end gap-4">
-              <div className="flex-1 min-w-[200px]">
-                <label htmlFor="new-user-email" className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 block">Email Address</label>
-                <input 
-                  id="new-user-email"
-                  type="email" 
-                  value={newEmail}
-                  onChange={(e) => setNewEmail(e.target.value)}
-                  className="w-full bg-[#0a2442] border border-gray-600/50 rounded-xl px-4 py-2.5 text-sm text-[#eef7f5] focus:outline-none focus:border-[#cedc28]/50 transition-all"
-                  placeholder="name@example.com"
-                  required 
-                />
+        {userSubtab === 'users' && (
+          <div>
+            {showAddForm && (
+              <div className="card-surface backdrop-blur-2xl p-6 rounded-3xl border border-[#cedc28]/20 shadow-2xl mb-8 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-64 h-64 opacity-5 pointer-events-none" style={{ backgroundImage: "url('/loc-pattern.png')", backgroundSize: 'contain', backgroundRepeat: 'no-repeat', backgroundPosition: 'top right' }}></div>
+                
+                <h3 className="text-[#14a6d9] font-bold uppercase tracking-widest text-sm mb-4">Create New User</h3>
+                
+                <form onSubmit={handleAddUser} className="relative z-10 flex flex-wrap items-end gap-4">
+                  <div className="flex-1 min-w-[200px]">
+                    <label htmlFor="new-user-email" className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 block">Email Address</label>
+                    <input 
+                      id="new-user-email"
+                      type="email" 
+                      value={newEmail}
+                      onChange={(e) => setNewEmail(e.target.value)}
+                      className="w-full bg-[#0a2442] border border-gray-600/50 rounded-xl px-4 py-2.5 text-sm text-[#eef7f5] focus:outline-none focus:border-[#cedc28]/50 transition-all"
+                      placeholder="name@example.com"
+                      required 
+                    />
+                  </div>
+                  <div className="flex-1 min-w-[200px]">
+                    <label htmlFor="new-user-password" className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 block">Temporary Password</label>
+                    <input 
+                      id="new-user-password"
+                      type="password" 
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="w-full bg-[#0a2442] border border-gray-600/50 rounded-xl px-4 py-2.5 text-sm text-[#eef7f5] focus:outline-none focus:border-[#cedc28]/50 transition-all"
+                      placeholder="Min 6 characters"
+                      required 
+                      minLength={6}
+                    />
+                  </div>
+                  <div className="flex-1 min-w-[150px]">
+                    <label htmlFor="new-user-role" className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 block">User Role</label>
+                    <select 
+                      id="new-user-role"
+                      value={newRole}
+                      onChange={(e) => setNewRole(e.target.value)}
+                      className="w-full bg-[#0a2442] border border-gray-600/50 rounded-xl px-4 py-2.5 text-sm text-[#eef7f5] font-bold focus:outline-none focus:border-[#cedc28]/50 transition-all cursor-pointer appearance-none"
+                    >
+                      {isSuperAdmin && <option value="super_admin">Super Admin</option>}
+                      <option value="admin">Admin</option>
+                      <option value="standard">Standard</option>
+                      <option value="non-finance">Non-Finance</option>
+                    </select>
+                  </div>
+                  
+                  <button 
+                    type="submit" 
+                    disabled={addingUser}
+                    className="px-6 py-2.5 bg-[#cedc28]/20 hover:bg-[#cedc28]/40 border border-[#cedc28]/50 text-[#cedc28] hover:text-white rounded-xl text-xs font-bold uppercase tracking-widest transition-all disabled:opacity-50 cursor-pointer"
+                  >
+                    {addingUser ? 'Creating...' : 'Create'}
+                  </button>
+                </form>
               </div>
-              <div className="flex-1 min-w-[200px]">
-                <label htmlFor="new-user-password" className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 block">Temporary Password</label>
-                <input 
-                  id="new-user-password"
-                  type="password" 
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full bg-[#0a2442] border border-gray-600/50 rounded-xl px-4 py-2.5 text-sm text-[#eef7f5] focus:outline-none focus:border-[#cedc28]/50 transition-all"
-                  placeholder="Min 6 characters"
-                  required 
-                  minLength={6}
-                />
+            )}
+
+            <label className="mb-4 block text-sm text-slate-300">Search users
+              <input type="search" value={userSearch} onChange={event => { setUserSearch(event.target.value); setUserPage(1); }} className="ml-3 rounded-lg border border-slate-600 bg-[#071b2e] p-2" />
+            </label>
+            <div className="card-surface border border-[#cedc28]/10 rounded-3xl overflow-hidden shadow-2xl relative">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-[#0a2442]/50 border-b border-[#cedc28]/10">
+                      {[['userdetails', 'User Details'], ['role', 'Role'], ['lastactive', 'Last Active']].map(([key, label]) => <th key={key} aria-sort={sortConfig.key === key ? sortConfig.direction === 'asc' ? 'ascending' : 'descending' : 'none'} className="py-4 px-6 text-sm text-[#14a6d9]"><button onClick={() => { handleSort(key); setUserPage(1); }}>{label}{sortConfig.key === key ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</button></th>)}
+                      <th className="py-4 px-6 text-sm text-[#14a6d9]">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {loading && users.length === 0 ? (
+                      <tr>
+                        <td colSpan="4" className="py-12 text-center text-gray-500 font-medium">
+                          Loading users...
+                        </td>
+                      </tr>
+                    ) : filteredUsers.length === 0 ? (
+                      <tr>
+                        <td colSpan="4" className="py-12 text-center text-gray-500 font-medium">
+                          No users found.
+                        </td>
+                      </tr>
+                    ) : (
+                      [...filteredUsers].sort((a, b) => {
+                        if (!sortConfig) return 0;
+                        let valA = a.email;
+                        let valB = b.email;
+                        if (sortConfig.key === 'role') {
+                          valA = a.role || 'standard';
+                          valB = b.role || 'standard';
+                        } else if (sortConfig.key === 'lastactive') {
+                          valA = a.lastSignInTime ? new Date(a.lastSignInTime).getTime() : 0;
+                          valB = b.lastSignInTime ? new Date(b.lastSignInTime).getTime() : 0;
+                        }
+                        if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+                        if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+                        return 0;
+                      }).slice((visibleUserPage - 1) * 20, visibleUserPage * 20).map(user => (
+                        <tr key={user.uid} className="hover:bg-[#0a2442]/30 transition-colors group">
+                          <td className="py-4 px-6">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                                user.role === 'super_admin' ? 'bg-[#cedc28]/20 text-[#cedc28] border border-[#cedc28]/50 shadow-[0_0_10px_rgba(206,220,40,0.3)]' :
+                                user.role === 'admin' ? 'bg-[#14a6d9]/15 text-[#14a6d9] border border-[#14a6d9]/30' : 
+                                'bg-gray-800 text-gray-400'
+                              }`}>
+                                {user.role === 'super_admin' || user.role === 'admin' ? <Shield className="w-5 h-5" /> : <User className="w-5 h-5" />}
+                              </div>
+                              <div>
+                                <div className="font-bold text-white text-sm">{user.email}</div>
+                                <div className="text-xs text-gray-500">ID: {user.uid.substring(0, 8)}...</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-4 px-6">
+                            <div className="flex justify-center">
+                               <select 
+                                aria-label={`Role for ${user.email}`}
+                                value={user.role || 'standard'}
+                                disabled={!isSuperAdmin && user.role === 'super_admin'}
+                                onChange={(e) => { setUserAction({ type: 'role', ...user, nextRole: e.target.value }); setError(null); }}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all outline-none cursor-pointer appearance-none text-center ${
+                                  user.role === 'super_admin' ? 'bg-[#cedc28]/25 border-2 border-[#cedc28] text-[#cedc28] shadow-[0_0_12px_rgba(206,220,40,0.35)]' :
+                                  user.role === 'admin' ? 'bg-[#14a6d9]/15 border border-[#14a6d9]/40 text-[#14a6d9]' : 
+                                  user.role === 'non-finance' ? 'bg-purple-900/20 border border-purple-500/30 text-purple-400' : 
+                                  'bg-gray-800 border border-gray-600 text-gray-400'
+                                } ${!isSuperAdmin && user.role === 'super_admin' ? 'opacity-60 cursor-not-allowed' : ''}`}
+                               >
+                                {isSuperAdmin && <option value="super_admin">Super Admin</option>}
+                                <option value="admin">Admin</option>
+                                <option value="standard">Standard</option>
+                                <option value="non-finance">Non-Finance</option>
+                               </select>
+                            </div>
+                          </td>
+                          <td className="py-4 px-6 text-center">
+                            <div className="text-sm font-medium text-gray-400">
+                              {formatDate(user.lastSignInTime)}
+                            </div>
+                          </td>
+                          <td className="py-4 px-6">
+                            <div className="flex justify-center gap-2">
+                              <button 
+                                disabled={!isSuperAdmin && user.role === 'super_admin'}
+                                onClick={() => { setUserAction({ type: 'password', ...user }); setActionPassword(''); setError(null); }}
+                                aria-label={`Change password for ${user.email}`}
+                                className={`p-2 rounded-lg transition-colors ${
+                                  !isSuperAdmin && user.role === 'super_admin'
+                                    ? 'opacity-30 cursor-not-allowed text-gray-600'
+                                    : 'bg-blue-500/0 hover:bg-blue-500/10 text-gray-500 hover:text-blue-400'
+                                }`}
+                                title={!isSuperAdmin && user.role === 'super_admin' ? 'Only Super Admins can manage Super Admin accounts' : 'Change Password'}
+                              >
+                                <Key className="w-4 h-4" />
+                              </button>
+                              <button 
+                                disabled={!isSuperAdmin && user.role === 'super_admin'}
+                                onClick={() => { setUserAction({ type: 'delete', ...user }); setError(null); }}
+                                aria-label={`Delete ${user.email}`}
+                                className={`p-2 rounded-lg transition-colors ${
+                                  !isSuperAdmin && user.role === 'super_admin'
+                                    ? 'opacity-30 cursor-not-allowed text-gray-600'
+                                    : 'bg-red-500/0 hover:bg-red-500/10 text-gray-500 hover:text-red-400'
+                                }`}
+                                title={!isSuperAdmin && user.role === 'super_admin' ? 'Only Super Admins can delete Super Admin accounts' : 'Delete User'}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
               </div>
-              <div className="flex-1 min-w-[150px]">
-                <label htmlFor="new-user-role" className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 block">User Role</label>
-                <select 
-                  id="new-user-role"
-                  value={newRole}
-                  onChange={(e) => setNewRole(e.target.value)}
-                  className="w-full bg-[#0a2442] border border-gray-600/50 rounded-xl px-4 py-2.5 text-sm text-[#eef7f5] font-bold focus:outline-none focus:border-[#cedc28]/50 transition-all cursor-pointer appearance-none"
-                >
-                  {isSuperAdmin && <option value="super_admin">Super Admin</option>}
-                  <option value="admin">Admin</option>
-                  <option value="standard">Standard</option>
-                  <option value="non-finance">Non-Finance</option>
-                </select>
-              </div>
-              
-              <button 
-                type="submit" 
-                disabled={addingUser}
-                className="px-6 py-2.5 bg-[#cedc28]/20 hover:bg-[#cedc28]/40 border border-[#cedc28]/50 text-[#cedc28] hover:text-white rounded-xl text-xs font-bold uppercase tracking-widest transition-all disabled:opacity-50"
-              >
-                {addingUser ? 'Creating...' : 'Create'}
-              </button>
-            </form>
+            </div>
+            {filteredUsers.length > 20 && <nav aria-label="User list pagination" className="mt-4 flex flex-wrap items-center gap-3 text-sm">
+              <button disabled={visibleUserPage <= 1} onClick={() => setUserPage(visibleUserPage - 1)} className="rounded border border-slate-600 p-2 disabled:opacity-40">Previous</button>
+              <span aria-live="polite">Page {visibleUserPage} of {Math.ceil(filteredUsers.length / 20)} · {filteredUsers.length} users</span>
+              <button disabled={visibleUserPage * 20 >= filteredUsers.length} onClick={() => setUserPage(visibleUserPage + 1)} className="rounded border border-slate-600 p-2 disabled:opacity-40">Next</button>
+            </nav>}
           </div>
         )}
 
-        <label className="mb-4 block text-sm text-slate-300">Search users
-          <input type="search" value={userSearch} onChange={event => { setUserSearch(event.target.value); setUserPage(1); }} className="ml-3 rounded-lg border border-slate-600 bg-[#071b2e] p-2" />
-        </label>
-        <div className="card-surface border border-[#cedc28]/10 rounded-3xl overflow-hidden shadow-2xl relative">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-[#0a2442]/50 border-b border-[#cedc28]/10">
-                  {[['userdetails', 'User Details'], ['role', 'Role'], ['lastactive', 'Last Active']].map(([key, label]) => <th key={key} aria-sort={sortConfig.key === key ? sortConfig.direction === 'asc' ? 'ascending' : 'descending' : 'none'} className="py-4 px-6 text-sm text-[#14a6d9]"><button onClick={() => { handleSort(key); setUserPage(1); }}>{label}{sortConfig.key === key ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}</button></th>)}
-                  <th className="py-4 px-6 text-sm text-[#14a6d9]">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                {loading && users.length === 0 ? (
-                  <tr>
-                    <td colSpan="4" className="py-12 text-center text-gray-500 font-medium">
-                      Loading users...
-                    </td>
+        {/* DOMAIN RULES SUBTAB */}
+        {userSubtab === 'domains' && (
+          <div className="space-y-6 animate-in fade-in duration-150">
+            <div className="card-surface p-4 rounded-2xl border border-cyan-500/30 bg-cyan-950/20 text-xs text-cyan-200 flex items-start gap-3">
+              <Globe className="w-5 h-5 text-cyan-400 shrink-0 mt-0.5" />
+              <div>
+                <strong className="text-white font-semibold">Corporate Domain Auto-Assignment:</strong>
+                <p className="mt-0.5 text-cyan-200/80">
+                  Users signing in with an email matching an active domain rule (e.g. <code>@tahaluf.com</code>) automatically receive the specified default role unless overridden by an explicit user record.
+                </p>
+              </div>
+            </div>
+
+            {showAddDomainForm && (
+              <div className="card-surface backdrop-blur-2xl p-6 rounded-3xl border border-cyan-500/30 shadow-2xl mb-6 relative overflow-hidden">
+                <h3 className="text-cyan-400 font-bold uppercase tracking-widest text-sm mb-4">Add Corporate Domain Rule</h3>
+                <form onSubmit={handleAddDomainRule} className="relative z-10 flex flex-wrap items-end gap-4">
+                  <div className="flex-1 min-w-[200px]">
+                    <label htmlFor="domain-input" className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 block">Domain Pattern</label>
+                    <input 
+                      id="domain-input"
+                      type="text" 
+                      value={newDomain}
+                      onChange={(e) => setNewDomain(e.target.value)}
+                      className="w-full bg-[#0a2442] border border-gray-600/50 rounded-xl px-4 py-2.5 text-sm text-[#eef7f5] focus:outline-none focus:border-cyan-400/50 transition-all font-mono"
+                      placeholder="@company.com"
+                      required 
+                    />
+                  </div>
+                  <div className="flex-1 min-w-[150px]">
+                    <label htmlFor="domain-role" className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 block">Default Role</label>
+                    <select 
+                      id="domain-role"
+                      value={newDomainRole}
+                      onChange={(e) => setNewDomainRole(e.target.value)}
+                      className="w-full bg-[#0a2442] border border-gray-600/50 rounded-xl px-4 py-2.5 text-sm text-[#eef7f5] font-bold focus:outline-none focus:border-cyan-400/50 transition-all cursor-pointer appearance-none"
+                    >
+                      <option value="admin">Admin</option>
+                      <option value="standard">Standard</option>
+                      <option value="non-finance">Non-Finance</option>
+                    </select>
+                  </div>
+                  <div className="flex-1 min-w-[220px]">
+                    <label htmlFor="domain-desc" className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 block">Description</label>
+                    <input 
+                      id="domain-desc"
+                      type="text" 
+                      value={newDomainDesc}
+                      onChange={(e) => setNewDomainDesc(e.target.value)}
+                      className="w-full bg-[#0a2442] border border-gray-600/50 rounded-xl px-4 py-2.5 text-sm text-[#eef7f5] focus:outline-none focus:border-cyan-400/50 transition-all"
+                      placeholder="e.g. Official organization team"
+                    />
+                  </div>
+                  <button 
+                    type="submit" 
+                    disabled={loading}
+                    className="px-6 py-2.5 bg-cyan-500/20 hover:bg-cyan-500/40 border border-cyan-500/50 text-cyan-300 hover:text-white rounded-xl text-xs font-bold uppercase tracking-widest transition-all disabled:opacity-50 cursor-pointer"
+                  >
+                    Save Rule
+                  </button>
+                </form>
+              </div>
+            )}
+
+            <div className="card-surface border border-cyan-500/20 rounded-3xl overflow-hidden shadow-2xl">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-[#0a2442]/50 border-b border-cyan-500/20">
+                    <th className="py-4 px-6 text-sm text-cyan-400 font-bold">Domain Pattern</th>
+                    <th className="py-4 px-6 text-sm text-cyan-400 font-bold text-center">Default Role</th>
+                    <th className="py-4 px-6 text-sm text-cyan-400 font-bold">Description</th>
+                    <th className="py-4 px-6 text-sm text-cyan-400 font-bold text-right">Actions</th>
                   </tr>
-                ) : filteredUsers.length === 0 ? (
-                  <tr>
-                    <td colSpan="4" className="py-12 text-center text-gray-500 font-medium">
-                      No users found.
-                    </td>
-                  </tr>
-                ) : (
-                  [...filteredUsers].sort((a, b) => {
-                    if (!sortConfig) return 0;
-                    let valA = a.email;
-                    let valB = b.email;
-                    if (sortConfig.key === 'role') {
-                      valA = a.role || 'standard';
-                      valB = b.role || 'standard';
-                    } else if (sortConfig.key === 'lastactive') {
-                      valA = a.lastSignInTime ? new Date(a.lastSignInTime).getTime() : 0;
-                      valB = b.lastSignInTime ? new Date(b.lastSignInTime).getTime() : 0;
-                    }
-                    if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
-                    if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
-                    return 0;
-                  }).slice((visibleUserPage - 1) * 20, visibleUserPage * 20).map(user => (
-                    <tr key={user.uid} className="hover:bg-[#0a2442]/30 transition-colors group">
-                      <td className="py-4 px-6">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                            user.role === 'super_admin' ? 'bg-[#cedc28]/20 text-[#cedc28] border border-[#cedc28]/50 shadow-[0_0_10px_rgba(206,220,40,0.3)]' :
-                            user.role === 'admin' ? 'bg-[#14a6d9]/15 text-[#14a6d9] border border-[#14a6d9]/30' : 
-                            'bg-gray-800 text-gray-400'
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {domainRules.length === 0 ? (
+                    <tr>
+                      <td colSpan="4" className="py-12 text-center text-gray-500 font-medium">
+                        No domain rules configured yet. Click &ldquo;Add Domain Rule&rdquo; above to create one.
+                      </td>
+                    </tr>
+                  ) : (
+                    domainRules.map(rule => (
+                      <tr key={rule.domain} className="hover:bg-[#0a2442]/30 transition-colors">
+                        <td className="py-4 px-6 font-mono text-sm text-white font-bold flex items-center gap-2">
+                          <Globe className="w-4 h-4 text-cyan-400 shrink-0" />
+                          <span>{rule.domain}</span>
+                        </td>
+                        <td className="py-4 px-6 text-center">
+                          <span className={`inline-block px-3 py-1 rounded-xl text-xs font-black uppercase tracking-wider ${
+                            rule.role === 'admin' ? 'bg-[#14a6d9]/20 text-[#14a6d9] border border-[#14a6d9]/40' :
+                            rule.role === 'non-finance' ? 'bg-purple-900/20 text-purple-400 border border-purple-500/30' :
+                            'bg-gray-800 text-gray-300 border border-gray-700'
                           }`}>
-                            {user.role === 'super_admin' || user.role === 'admin' ? <Shield className="w-5 h-5" /> : <User className="w-5 h-5" />}
-                          </div>
-                          <div>
-                            <div className="font-bold text-white text-sm">{user.email}</div>
-                            <div className="text-xs text-gray-500">ID: {user.uid.substring(0, 8)}...</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-4 px-6">
-                        <div className="flex justify-center">
-                           <select 
-                            aria-label={`Role for ${user.email}`}
-                            value={user.role || 'standard'}
-                            disabled={!isSuperAdmin && user.role === 'super_admin'}
-                            onChange={(e) => { setUserAction({ type: 'role', ...user, nextRole: e.target.value }); setError(null); }}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all outline-none cursor-pointer appearance-none text-center ${
-                              user.role === 'super_admin' ? 'bg-[#cedc28]/25 border-2 border-[#cedc28] text-[#cedc28] shadow-[0_0_12px_rgba(206,220,40,0.35)]' :
-                              user.role === 'admin' ? 'bg-[#14a6d9]/15 border border-[#14a6d9]/40 text-[#14a6d9]' : 
-                              user.role === 'non-finance' ? 'bg-purple-900/20 border border-purple-500/30 text-purple-400' : 
-                              'bg-gray-800 border border-gray-600 text-gray-400'
-                            } ${!isSuperAdmin && user.role === 'super_admin' ? 'opacity-60 cursor-not-allowed' : ''}`}
-                           >
-                            {isSuperAdmin && <option value="super_admin">Super Admin</option>}
-                            <option value="admin">Admin</option>
-                            <option value="standard">Standard</option>
-                            <option value="non-finance">Non-Finance</option>
-                           </select>
-                        </div>
-                      </td>
-                      <td className="py-4 px-6 text-center">
-                        <div className="text-sm font-medium text-gray-400">
-                          {formatDate(user.lastSignInTime)}
-                        </div>
-                      </td>
-                      <td className="py-4 px-6">
-                        <div className="flex justify-center gap-2">
-                          <button 
-                            disabled={!isSuperAdmin && user.role === 'super_admin'}
-                            onClick={() => { setUserAction({ type: 'password', ...user }); setActionPassword(''); setError(null); }}
-                            aria-label={`Change password for ${user.email}`}
-                            className={`p-2 rounded-lg transition-colors ${
-                              !isSuperAdmin && user.role === 'super_admin'
-                                ? 'opacity-30 cursor-not-allowed text-gray-600'
-                                : 'bg-blue-500/0 hover:bg-blue-500/10 text-gray-500 hover:text-blue-400'
-                            }`}
-                            title={!isSuperAdmin && user.role === 'super_admin' ? 'Only Super Admins can manage Super Admin accounts' : 'Change Password'}
-                          >
-                            <Key className="w-4 h-4" />
-                          </button>
-                          <button 
-                            disabled={!isSuperAdmin && user.role === 'super_admin'}
-                            onClick={() => { setUserAction({ type: 'delete', ...user }); setError(null); }}
-                            aria-label={`Delete ${user.email}`}
-                            className={`p-2 rounded-lg transition-colors ${
-                              !isSuperAdmin && user.role === 'super_admin'
-                                ? 'opacity-30 cursor-not-allowed text-gray-600'
-                                : 'bg-red-500/0 hover:bg-red-500/10 text-gray-500 hover:text-red-400'
-                            }`}
-                            title={!isSuperAdmin && user.role === 'super_admin' ? 'Only Super Admins can delete Super Admin accounts' : 'Delete User'}
+                            {rule.role}
+                          </span>
+                        </td>
+                        <td className="py-4 px-6 text-xs text-slate-400">
+                          {rule.description || 'Auto-assign role on sign-in'}
+                        </td>
+                        <td className="py-4 px-6 text-right">
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteDomainRule(rule.domain)}
+                            className="p-2 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                            title={`Delete ${rule.domain}`}
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
-                        </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* ACCESS HISTORY SUBTAB */}
+        {userSubtab === 'history' && (
+          <div className="space-y-4 animate-in fade-in duration-150">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-xs text-slate-400 font-bold uppercase tracking-wider mr-2">Filter:</span>
+                {[
+                  { id: 'all', label: 'All Actions' },
+                  { id: 'roles', label: 'Role Changes' },
+                  { id: 'users', label: 'User Operations' },
+                  { id: 'domains', label: 'Domain Rules' }
+                ].map(f => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => setHistoryActionFilter(f.id)}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      historyActionFilter === f.id
+                        ? 'bg-purple-600 text-white shadow-sm'
+                        : 'bg-[#0a2442]/60 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+              <span className="text-xs text-slate-400 font-mono">
+                {userAccessHistory.filter(item => {
+                  if (historyActionFilter === 'all') return true;
+                  if (historyActionFilter === 'roles') return item.action === 'ROLE_UPDATE';
+                  if (historyActionFilter === 'users') return item.action === 'USER_CREATE' || item.action === 'USER_DELETE' || item.action === 'PASSWORD_RESET';
+                  if (historyActionFilter === 'domains') return item.action === 'DOMAIN_RULE_ADD' || item.action === 'DOMAIN_RULE_DELETE';
+                  return true;
+                }).length} event(s) recorded
+              </span>
+            </div>
+
+            <div className="card-surface border border-purple-500/20 rounded-3xl overflow-hidden shadow-2xl">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-[#0a2442]/50 border-b border-purple-500/20">
+                    <th className="py-4 px-6 text-sm text-purple-300 font-bold">Timestamp</th>
+                    <th className="py-4 px-6 text-sm text-purple-300 font-bold">Action</th>
+                    <th className="py-4 px-6 text-sm text-purple-300 font-bold">Target</th>
+                    <th className="py-4 px-6 text-sm text-purple-300 font-bold">Author</th>
+                    <th className="py-4 px-6 text-sm text-purple-300 font-bold">Details</th>
+                    <th className="py-4 px-6 text-sm text-purple-300 font-bold text-right">Rollback</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {userAccessHistory.filter(item => {
+                    if (historyActionFilter === 'all') return true;
+                    if (historyActionFilter === 'roles') return item.action === 'ROLE_UPDATE';
+                    if (historyActionFilter === 'users') return item.action === 'USER_CREATE' || item.action === 'USER_DELETE' || item.action === 'PASSWORD_RESET';
+                    if (historyActionFilter === 'domains') return item.action === 'DOMAIN_RULE_ADD' || item.action === 'DOMAIN_RULE_DELETE';
+                    return true;
+                  }).length === 0 ? (
+                    <tr>
+                      <td colSpan="6" className="py-12 text-center text-gray-500 font-medium">
+                        No history records matching the filter. User access modifications are recorded here automatically.
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    userAccessHistory.filter(item => {
+                      if (historyActionFilter === 'all') return true;
+                      if (historyActionFilter === 'roles') return item.action === 'ROLE_UPDATE';
+                      if (historyActionFilter === 'users') return item.action === 'USER_CREATE' || item.action === 'USER_DELETE' || item.action === 'PASSWORD_RESET';
+                      if (historyActionFilter === 'domains') return item.action === 'DOMAIN_RULE_ADD' || item.action === 'DOMAIN_RULE_DELETE';
+                      return true;
+                    }).map(entry => {
+                      const canRollback = entry.action === 'ROLE_UPDATE' || (entry.action === 'DOMAIN_RULE_DELETE' && entry.previousRule);
+                      return (
+                        <tr key={entry.id || entry.timestamp} className="hover:bg-[#0a2442]/30 transition-colors">
+                          <td className="py-4 px-6 text-xs text-slate-300 font-mono whitespace-nowrap">
+                            {entry.timestamp ? new Date(entry.timestamp).toLocaleString() : 'Unknown'}
+                          </td>
+                          <td className="py-4 px-6">
+                            <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                              entry.action === 'ROLE_UPDATE' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
+                              entry.action === 'USER_CREATE' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' :
+                              entry.action === 'USER_DELETE' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' :
+                              entry.action === 'DOMAIN_RULE_ADD' ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30' :
+                              entry.action === 'DOMAIN_RULE_DELETE' ? 'bg-orange-500/20 text-orange-300 border border-orange-500/30' :
+                              entry.action === 'ROLLBACK' ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' :
+                              'bg-white/10 text-slate-400'
+                            }`}>
+                              {entry.action}
+                            </span>
+                          </td>
+                          <td className="py-4 px-6 text-xs font-mono text-white">
+                            {entry.target}
+                          </td>
+                          <td className="py-4 px-6 text-xs text-slate-400">
+                            {entry.author || 'Admin'}
+                          </td>
+                          <td className="py-4 px-6 text-xs text-slate-300 max-w-xs truncate">
+                            {entry.details}
+                          </td>
+                          <td className="py-4 px-6 text-right">
+                            {canRollback && (
+                              <button
+                                type="button"
+                                disabled={loading}
+                                onClick={() => handleRollbackUserHistory(entry.id)}
+                                className="px-2.5 py-1 bg-purple-500/20 hover:bg-purple-500 text-purple-200 hover:text-white rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all flex items-center gap-1 ml-auto cursor-pointer"
+                                title="Revert this change"
+                              >
+                                <RotateCcw className="w-3 h-3" />
+                                <span>Revert</span>
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-        {filteredUsers.length > 20 && <nav aria-label="User list pagination" className="mt-4 flex flex-wrap items-center gap-3 text-sm">
-          <button disabled={visibleUserPage <= 1} onClick={() => setUserPage(visibleUserPage - 1)} className="rounded border border-slate-600 p-2 disabled:opacity-40">Previous</button>
-          <span aria-live="polite">Page {visibleUserPage} of {Math.ceil(filteredUsers.length / 20)} · {filteredUsers.length} users</span>
-          <button disabled={visibleUserPage * 20 >= filteredUsers.length} onClick={() => setUserPage(visibleUserPage + 1)} className="rounded border border-slate-600 p-2 disabled:opacity-40">Next</button>
-        </nav>}
-      </div>
-          )
+        )}
+          </div>
+        )
       )}
 
       {/* SECTION 3: ANALYTICS & ACTIVITY */}
