@@ -514,3 +514,43 @@ test('Back to Dashboard button in AdminView clears admin search param and naviga
   assert.equal(navigatedTarget, 'summary', 'Clicking Back to Dashboard must trigger navigation to summary view');
   assert.ok(!new URL(mockWindow.location.href, 'http://localhost:3000').searchParams.has('admin'), 'admin search param must be removed from URL');
 });
+
+test('Root system admin accounts are hidden by default in user panel table and surfaced with toggle', async () => {
+  const users = [
+    { uid: 'u1', email: 'regular@tahaluf.com', role: 'standard' },
+    { uid: 'u2', email: 'fehmatics@gmail.com', role: 'super_admin', isFixed: true }
+  ];
+  const harness = hookHarness();
+  const stub = () => null;
+  const component = await load('../app/AdminView.jsx', {
+    react: {
+      ...harness.hooks,
+      useState: initial => harness.hooks.useState(Array.isArray(initial) ? users : initial),
+      useEffect() {}
+    },
+    './components/EventsAdmin': stub,
+    './components/DataHealthAdmin': stub,
+    './components/AnalyticsAdmin': stub,
+    './components/ApiQuotasAdmin': stub,
+    './components/FeatureControlsAdmin': stub,
+    './components/AdminUI': {
+      AdminDialog: stub, useAdminDirtyGuard() {},
+      useAdminView: (_, initial) => [initial, () => {}]
+    }
+  });
+
+  const tree = harness.render(component.default, {});
+  const spans = nodes(tree, node => node.type === 'span' && typeof node.props?.children === 'string');
+  const renderedEmails = spans.map(s => s.props?.children);
+
+  assert.ok(renderedEmails.includes('regular@tahaluf.com'), 'Regular user must be visible by default');
+  assert.ok(!renderedEmails.includes('fehmatics@gmail.com'), 'Root super admin fehmatics@gmail.com must be hidden by default in user panel table');
+
+  // Verify the toggle button is present
+  const buttons = nodes(tree, node => node.type === 'button');
+  const toggleBtn = buttons.find(b => {
+    const spans = nodes(b, n => n.type === 'span' && typeof n.props?.children === 'string');
+    return spans.some(s => s.props?.children?.includes('System Root'));
+  });
+  assert.ok(toggleBtn, 'Discreet System Root toggle button must be rendered');
+});

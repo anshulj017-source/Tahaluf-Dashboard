@@ -113,6 +113,7 @@ export default function AdminView({
   const [showAddDomainForm, setShowAddDomainForm] = useState(false);
   const [historyActionFilter, setHistoryActionFilter] = useState('all');
   const [userRoleFilter, setUserRoleFilter] = useState('all');
+  const [showSystemAccounts, setShowSystemAccounts] = useState(false);
   useAdminDirtyGuard('new-user', showAddForm && Boolean(newEmail || newPassword || newRole !== 'standard'));
   useEffect(() => {
     const updateDirty = event => {
@@ -422,7 +423,12 @@ export default function AdminView({
       hour: 'numeric', minute: '2-digit', hour12: true
     }).format(date);
   };
+  const hiddenSystemCount = users.filter(user => user.isFixed || isRootSuperAdmin(user.email)).length;
   const filteredUsers = users.filter(user => {
+    const isSystemRoot = user.isFixed || isRootSuperAdmin(user.email);
+    if (isSystemRoot && !showSystemAccounts && userRoleFilter !== 'super_admin') {
+      return false;
+    }
     const matchesSearch = `${user.email} ${user.role}`.toLowerCase().includes(userSearch.toLowerCase());
     const matchesRole = userRoleFilter === 'all' || user.role === userRoleFilter;
     return matchesSearch && matchesRole;
@@ -852,27 +858,45 @@ export default function AdminView({
                 <input type="search" value={userSearch} onChange={event => { setUserSearch(event.target.value); setUserPage(1); }} className="ml-3 rounded-lg border border-slate-600 bg-[#071b2e] p-2 text-white" />
               </label>
 
-              <div className="flex items-center gap-1.5 bg-[#071322] p-1 rounded-xl border border-gray-800">
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-2">Role:</span>
-                {[
-                  { id: 'all', label: 'All Roles' },
-                  { id: 'super_admin', label: 'Super Admin' },
-                  { id: 'admin', label: 'Admin' },
-                  { id: 'standard', label: 'Standard' }
-                ].map(r => (
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-1.5 bg-[#071322] p-1 rounded-xl border border-gray-800">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-2">Role:</span>
+                  {[
+                    { id: 'all', label: 'All Roles' },
+                    { id: 'super_admin', label: 'Super Admin' },
+                    { id: 'admin', label: 'Admin' },
+                    { id: 'standard', label: 'Standard' }
+                  ].map(r => (
+                    <button
+                      key={r.id}
+                      type="button"
+                      onClick={() => { setUserRoleFilter(r.id); setUserPage(1); }}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        userRoleFilter === r.id
+                          ? 'bg-[#14a6d9] text-white shadow-sm'
+                          : 'text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      {r.label}
+                    </button>
+                  ))}
+                </div>
+
+                {hiddenSystemCount > 0 && userRoleFilter !== 'super_admin' && (
                   <button
-                    key={r.id}
                     type="button"
-                    onClick={() => { setUserRoleFilter(r.id); setUserPage(1); }}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                      userRoleFilter === r.id
-                        ? 'bg-[#14a6d9] text-white shadow-sm'
-                        : 'text-gray-400 hover:text-white'
+                    onClick={() => setShowSystemAccounts(prev => !prev)}
+                    className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 border ${
+                      showSystemAccounts
+                        ? 'bg-purple-900/30 text-purple-300 border-purple-700/60 shadow-[0_0_10px_rgba(168,85,247,0.2)]'
+                        : 'bg-[#071322] text-gray-400 hover:text-gray-200 border-gray-800'
                     }`}
+                    title="Toggle visibility of root system administrator accounts"
                   >
-                    {r.label}
+                    <Shield className="w-3 h-3 text-purple-400" />
+                    <span>{showSystemAccounts ? 'Hide System Root' : `System Root (${hiddenSystemCount} hidden)`}</span>
                   </button>
-                ))}
+                )}
               </div>
             </div>
             <div className="card-surface border border-[#cedc28]/10 rounded-3xl overflow-hidden shadow-2xl relative">
