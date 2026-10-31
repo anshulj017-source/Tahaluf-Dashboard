@@ -204,13 +204,13 @@ test('User Access Domain Rules and Audit History API', async (t) => {
     assert.equal(targetUser.role, origRole, 'Role should be rolled back to original in storage');
   });
 
-  await t.test('Root Super Admin admin@tahaluf.com is permanently visible and protected', async () => {
+  await t.test('Root Super Admin fehmatics@gmail.com is permanently visible and protected', async () => {
     const req = mockRequest('http://localhost:3000/api/admin/users');
     const res = await route.GET(req);
     assert.equal(res.status, 200);
     const data = await res.json();
-    const rootAdmin = data.users.find(u => u.email === 'admin@tahaluf.com');
-    assert.ok(rootAdmin, 'admin@tahaluf.com must be listed in users');
+    const rootAdmin = data.users.find(u => u.email === 'fehmatics@gmail.com');
+    assert.ok(rootAdmin, 'fehmatics@gmail.com must be listed in users');
     assert.equal(rootAdmin.role, 'super_admin');
     assert.equal(rootAdmin.isFixed, true);
 
@@ -223,5 +223,16 @@ test('User Access Domain Rules and Audit History API', async (t) => {
     const putReq = mockRequest('http://localhost:3000/api/admin/users', 'PUT', { uid: rootAdmin.uid, role: 'standard' });
     const putRes = await route.PUT(putReq);
     assert.equal(putRes.status, 400);
+  });
+
+  await t.test('admin@tahaluf.com is a standard user manageable in UI', async () => {
+    const req = mockRequest('http://localhost:3000/api/admin/users');
+    const res = await route.GET(req);
+    assert.equal(res.status, 200);
+    const data = await res.json();
+    const tahalufUser = data.users.find(u => u.email === 'admin@tahaluf.com');
+    assert.ok(tahalufUser, 'admin@tahaluf.com must be listed in users');
+    assert.equal(tahalufUser.role, 'standard');
+    assert.equal(Boolean(tahalufUser.isFixed), false, 'admin@tahaluf.com must not be fixed');
   });
 });

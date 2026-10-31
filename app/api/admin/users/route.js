@@ -94,16 +94,29 @@ export async function GET(req) {
       };
     });
 
-    // Ensure root Super Admin (admin@tahaluf.com) is permanently listed in User Accounts
-    if (!users.some(u => u.email?.toLowerCase() === 'admin@tahaluf.com')) {
-      const rootDoc = Array.from(userRolesMap.values()).find(d => d.email?.toLowerCase() === 'admin@tahaluf.com') || {};
+    // Ensure root Super Admin (fehmatics@gmail.com) is listed in User Accounts
+    if (!users.some(u => u.email?.toLowerCase() === 'fehmatics@gmail.com')) {
+      const rootDoc = Array.from(userRolesMap.values()).find(d => d.email?.toLowerCase() === 'fehmatics@gmail.com') || {};
       users.unshift({
-        uid: 'root_super_admin',
-        email: 'admin@tahaluf.com',
+        uid: 'root_super_admin_fehmatics',
+        email: 'fehmatics@gmail.com',
         role: 'super_admin',
         isFixed: true,
         lastSignInTime: rootDoc.lastActive || new Date().toISOString(),
         creationTime: '2026-01-01T00:00:00.000Z'
+      });
+    }
+
+    // Ensure admin@tahaluf.com is listed as a standard user manageable in UI
+    if (!users.some(u => u.email?.toLowerCase() === 'admin@tahaluf.com')) {
+      const tahalufDoc = Array.from(userRolesMap.values()).find(d => d.email?.toLowerCase() === 'admin@tahaluf.com') || {};
+      users.push({
+        uid: 'user_admin_tahaluf',
+        email: 'admin@tahaluf.com',
+        role: tahalufDoc.role || 'standard',
+        isFixed: false,
+        lastSignInTime: tahalufDoc.lastActive || null,
+        creationTime: '2026-10-31T00:00:00.000Z'
       });
     }
 
@@ -315,7 +328,7 @@ export async function PUT(req) {
     const prevRole = userDoc?.data()?.role || 'standard';
     const targetEmail = userDoc?.data()?.email || uid;
 
-    if (uid === 'root_super_admin' || targetEmail?.toLowerCase() === 'admin@tahaluf.com') {
+    if (uid === 'root_super_admin_fehmatics' || targetEmail?.toLowerCase() === 'fehmatics@gmail.com') {
       if (role && role !== 'super_admin') {
         return NextResponse.json({ error: 'System Root Super Admin role cannot be modified.' }, { status: 400 });
       }
@@ -383,7 +396,7 @@ export async function DELETE(req) {
     const userDoc = await adminDb.collection('users').doc(uid).get().catch(() => null);
     const targetEmail = userDoc?.data()?.email || uid;
 
-    if (uid === 'root_super_admin' || targetEmail?.toLowerCase() === 'admin@tahaluf.com') {
+    if (uid === 'root_super_admin_fehmatics' || targetEmail?.toLowerCase() === 'fehmatics@gmail.com') {
       return NextResponse.json({ error: 'System Root Super Admin account cannot be deleted.' }, { status: 400 });
     }
 

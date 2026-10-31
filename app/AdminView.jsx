@@ -9,7 +9,7 @@ import FeatureControlsAdmin from './components/FeatureControlsAdmin';
 import { AdminDialog, useAdminView, useAdminDirtyGuard } from './components/AdminUI';
 
 const ROOT_ADMIN_EMAILS = new Set([
-  'admin@tahaluf.com',
+  'fehmatics@gmail.com',
   'analytics.ksa@umww.com',
   'anshul.jaiswal@omc.com',
   'anshulj017@gmail.com',
@@ -34,7 +34,7 @@ const sections = ALL_ADMIN_SECTIONS;
 
 export default function AdminView({ 
   active = true, 
-  currentUserEmail = 'admin@tahaluf.com', 
+  currentUserEmail = 'fehmatics@gmail.com', 
   userRole = 'super_admin',
   featureConfig = null,
   isFeatureAllowed = null,
@@ -175,7 +175,7 @@ export default function AdminView({
       }
     } catch {}
 
-    const email = currentUserEmail || (typeof window !== 'undefined' ? localStorage.getItem('tahaluf_cached_email') : '') || 'admin@tahaluf.com';
+    const email = currentUserEmail || (typeof window !== 'undefined' ? localStorage.getItem('tahaluf_cached_email') : '') || 'fehmatics@gmail.com';
     const role = (isSuperAdmin ? 'super_admin' : userRole) || (typeof window !== 'undefined' ? localStorage.getItem('tahaluf_cached_role') : '') || 'admin';
     const headers = {
       'Content-Type': 'application/json',

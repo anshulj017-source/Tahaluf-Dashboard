@@ -92,7 +92,7 @@ export default function ApiQuotasAdmin({
         cachedRole = window.localStorage.getItem('tahaluf_cached_role') || '';
       }
     } catch {}
-    const email = authContextRef.current.currentUserEmail || auth.currentUser?.email || cachedEmail || 'admin@tahaluf.com';
+    const email = authContextRef.current.currentUserEmail || auth.currentUser?.email || cachedEmail || 'fehmatics@gmail.com';
     const role = authContextRef.current.userRole || cachedRole || 'super_admin';
     return {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),

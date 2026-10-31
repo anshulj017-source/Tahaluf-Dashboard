@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { isAdminRequest } from '../../../../lib/requireAdminRequest.js';
+import { isRootSuperAdmin } from '../../../../lib/authConstants.mjs';
 import { getFirebaseAdmin } from '../../../../lib/firebaseAdmin.js';
 import { getAnalyticsSummary, resetAnalyticsData } from '../../../../lib/analyticsService.mjs';
 import { observeApiRequest, withUsageScope } from '../../../../lib/apiUsage.mjs';
@@ -18,8 +19,8 @@ async function checkAdmin(req) {
   const email = (searchParams.get('email') || req.headers.get('x-admin-email') || '').toLowerCase().trim();
   if (!email) return false;
 
-  // Root Tahaluf admin
-  if (email === 'admin@tahaluf.com') return true;
+  // Root verified super admin
+  if (isRootSuperAdmin(email)) return true;
 
   try {
     const { adminAuth, adminDb } = getFirebaseAdmin();
@@ -68,7 +69,7 @@ async function updateAnalytics(req) {
     const { actionId, operation, reason } = body;
     const enable = operation === 'revert' ? false : (typeof body.enable === 'boolean' ? body.enable : true);
     const { searchParams } = new URL(req.url);
-    const email = (searchParams.get('email') || req.headers.get('x-admin-email') || body.email || 'admin@tahaluf.com').toLowerCase().trim();
+    const email = (searchParams.get('email') || req.headers.get('x-admin-email') || body.email || 'fehmatics@gmail.com').toLowerCase().trim();
 
     if (!actionId) {
       return NextResponse.json({ error: 'Missing actionId parameter' }, { status: 400 });

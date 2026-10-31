@@ -60,8 +60,9 @@ async function harness({ snapshot = {}, lowQuota = false, active = true } = {}) 
     module: sandboxModule, exports: sandboxModule.exports,
     require: name => name === 'react' ? hooks
       : name === '../../lib/firebase' ? { auth: { currentUser: null } }
-        : name === './DashboardFeatureContext' ? { useLowQuotaMode: () => lowQuota }
-          : name === './AdminUI' ? adminUI : require(name),
+      : name === '../../lib/authConstants.mjs' ? { isRootSuperAdmin: (e) => (e || '').toLowerCase() === 'fehmatics@gmail.com' }
+      : name === './DashboardFeatureContext' ? { useLowQuotaMode: () => lowQuota }
+      : name === './AdminUI' ? adminUI : require(name),
     document: { visibilityState: 'visible', addEventListener() {}, removeEventListener() {} },
     setInterval: (fn, delay) => { const id = timers.size + 1; timers.set(id, { fn, delay }); return id; },
     clearInterval: id => timers.delete(id),

@@ -9,6 +9,7 @@ import {
   RotateCcw, ShieldCheck, History
 } from 'lucide-react';
 import { auth } from '../../lib/firebase';
+import { isRootSuperAdmin } from '../../lib/authConstants.mjs';
 import { useLowQuotaMode } from './DashboardFeatureContext';
 import { AdminTabs, useAdminView, useAdminDirtyGuard } from './AdminUI';
 
@@ -21,7 +22,7 @@ const ANALYTICS_TABS = [
   { id: 'recommendations', label: 'Recommendations' },
 ];
 
-export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com', active = true }) {
+export default function AnalyticsAdmin({ currentUserEmail = 'fehmatics@gmail.com', active = true }) {
   const lowQuotaMode = useLowQuotaMode();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -217,11 +218,26 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com',
     if (selectedUserEmail) {
       list = list.filter(u => u.email?.toLowerCase() === selectedUserEmail.toLowerCase());
     } else if (userFilter === 'non_admin') {
-      list = list.filter(u => u.role !== 'admin' && u.role !== 'super_admin' && !u.email?.toLowerCase().includes('admin@'));
+      list = list.filter(u => {
+        const email = u.email?.toLowerCase() || '';
+        const role = u.role?.toLowerCase() || '';
+        const isSuper = role === 'super_admin' || isRootSuperAdmin(email);
+        const isAdmin = !isSuper && (role === 'admin' || (email.includes('admin@') && email !== 'admin@tahaluf.com'));
+        return !isSuper && !isAdmin;
+      });
     } else if (userFilter === 'admin_only') {
-      list = list.filter(u => u.role === 'admin' || u.role === 'super_admin' || u.email?.toLowerCase().includes('admin@'));
+      list = list.filter(u => {
+        const email = u.email?.toLowerCase() || '';
+        const role = u.role?.toLowerCase() || '';
+        const isSuper = role === 'super_admin' || isRootSuperAdmin(email);
+        return !isSuper && (role === 'admin' || (email.includes('admin@') && email !== 'admin@tahaluf.com'));
+      });
     } else if (userFilter === 'super_admin_only') {
-      list = list.filter(u => u.role === 'super_admin' || u.email?.toLowerCase() === 'admin@tahaluf.com');
+      list = list.filter(u => {
+        const email = u.email?.toLowerCase() || '';
+        const role = u.role?.toLowerCase() || '';
+        return role === 'super_admin' || isRootSuperAdmin(email);
+      });
     }
 
     if (searchQuery.trim()) {
@@ -1594,11 +1610,17 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com',
                     className="bg-[#071322] border border-gray-800 text-xs font-medium text-white rounded-xl px-3 py-1.5 focus:outline-none focus:border-[#cedc28]"
                   >
                     <option value="">All Users in Scope ({filteredUsers.length})</option>
-                    {data.allKnownUsers.map((u) => (
-                      <option key={u.email} value={u.email} className="bg-[#0a2442] text-white">
-                        {u.email} {u.role === 'admin' ? '[Admin]' : ''}
-                      </option>
-                    ))}
+                    {data.allKnownUsers.map((u) => {
+                      const email = (u.email || '').toLowerCase().trim();
+                      const isSuper = u.role === 'super_admin' || isRootSuperAdmin(email);
+                      const isAdmin = !isSuper && (u.role === 'admin' || (email.includes('admin@') && email !== 'admin@tahaluf.com'));
+                      const tag = isSuper ? '[Super Admin]' : isAdmin ? '[Admin]' : '';
+                      return (
+                        <option key={u.email} value={u.email} className="bg-[#0a2442] text-white">
+                          {u.email} {tag}
+                        </option>
+                      );
+                    })}
                   </select>
                 )}
 
@@ -1647,7 +1669,10 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com',
                     </tr>
                   ) : (
                     filteredUsers.map((u) => {
-                      const isAdmin = u.role === 'admin';
+                      const email = (u.email || '').toLowerCase().trim();
+                      const isSuperAdmin = u.role === 'super_admin' || isRootSuperAdmin(email);
+                      const isAdmin = !isSuperAdmin && (u.role === 'admin' || (email.includes('admin@') && email !== 'admin@tahaluf.com'));
+                      const displayRole = isSuperAdmin ? 'super_admin' : (isAdmin ? 'admin' : (u.role === 'super_admin' ? 'standard' : u.role || 'standard'));
                       return (
                         <tr key={u.email} className="hover:bg-[#0d2238]/40 transition-colors">
                           <td className="py-3 px-4">
@@ -1656,12 +1681,14 @@ export default function AnalyticsAdmin({ currentUserEmail = 'admin@tahaluf.com',
                           </td>
                           <td className="py-3 px-4">
                             <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                              isAdmin 
-                                ? 'bg-[#cedc28]/15 text-[#cedc28] border border-[#cedc28]/40' 
-                                : 'bg-[#14a6d9]/15 text-[#14a6d9] border border-[#14a6d9]/40'
+                              isSuperAdmin
+                                ? 'bg-purple-500/15 text-purple-400 border border-purple-500/40 shadow-[0_0_8px_rgba(168,85,247,0.2)]'
+                                : isAdmin 
+                                  ? 'bg-[#cedc28]/15 text-[#cedc28] border border-[#cedc28]/40' 
+                                  : 'bg-[#14a6d9]/15 text-[#14a6d9] border border-[#14a6d9]/40'
                             }`}>
                               <Shield className="w-2.5 h-2.5" />
-                              {u.role}
+                              {displayRole === 'super_admin' ? 'SUPER ADMIN' : displayRole === 'admin' ? 'ADMIN' : 'STANDARD'}
                             </span>
                           </td>
                           <td className="py-3 px-4 font-mono font-bold text-gray-200">

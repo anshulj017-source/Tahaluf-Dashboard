@@ -1,17 +1,54 @@
 {
   "domainRules": [
     {
-      "domain": "@tahaluf.com",
-      "role": "admin",
-      "description": "Internal Tahaluf team default role",
-      "createdAt": "2026-10-31T00:00:00.000Z"
-    },
-    {
-      "domain": "@informa.com",
+      "domain": "@umww.com",
       "role": "standard",
-      "description": "Informa Group organization access",
-      "createdAt": "2026-10-31T00:00:00.000Z"
+      "description": "UM",
+      "createdAt": "2026-10-31T18:01:47.425Z"
     }
   ],
-  "history": []
+  "history": [
+    {
+      "id": "act_1793469712595_lxp5c",
+      "timestamp": "2026-10-31T18:01:52.595Z",
+      "author": "analytics.ksa@umww.com",
+      "action": "DOMAIN_RULE_DELETE",
+      "target": "@informa.com",
+      "details": "Deleted domain rule for @informa.com",
+      "previousRule": {
+        "domain": "@informa.com",
+        "role": "standard",
+        "description": "Informa Group organization access",
+        "createdAt": "2026-10-31T00:00:00.000Z"
+      }
+    },
+    {
+      "id": "act_1793469707425_itwmj",
+      "timestamp": "2026-10-31T18:01:47.425Z",
+      "author": "analytics.ksa@umww.com",
+      "action": "DOMAIN_RULE_ADD",
+      "target": "@umww.com",
+      "details": "Added domain rule @umww.com with default role standard",
+      "rule": {
+        "domain": "@umww.com",
+        "role": "standard",
+        "description": "UM",
+        "createdAt": "2026-10-31T18:01:47.425Z"
+      }
+    },
+    {
+      "id": "act_1793469668732_fxl0r",
+      "timestamp": "2026-10-31T18:01:08.732Z",
+      "author": "analytics.ksa@umww.com",
+      "action": "DOMAIN_RULE_DELETE",
+      "target": "@tahaluf.com",
+      "details": "Deleted domain rule for @tahaluf.com",
+      "previousRule": {
+        "domain": "@tahaluf.com",
+        "role": "admin",
+        "description": "Internal Tahaluf team default role",
+        "createdAt": "2026-10-31T00:00:00.000Z"
+      }
+    }
+  ]
 }

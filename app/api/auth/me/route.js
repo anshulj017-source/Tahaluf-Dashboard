@@ -29,8 +29,8 @@ export async function GET(request) {
       return NextResponse.json({ role: 'standard', email: '', authenticated: false });
     }
 
-    // Root Tahaluf admin and verified super admin emails
-    if (email === 'admin@tahaluf.com' || isRootSuperAdmin(email)) {
+    // Root verified super admin emails
+    if (isRootSuperAdmin(email)) {
       return NextResponse.json({ role: 'super_admin', email, authenticated: true });
     }
 

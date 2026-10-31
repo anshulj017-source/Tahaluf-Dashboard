@@ -500,7 +500,7 @@ const MetricTrendChart = ({ data, dataKey, name, format, color }) => (
   </div>
 );
 
-const TrendSection = React.memo(({ title, trendData, currentTrendView, setViewFn, userRole, exSym, formatShort, userEmail = 'admin@tahaluf.com' }) => {
+const TrendSection = React.memo(({ title, trendData, currentTrendView, setViewFn, userRole, exSym, formatShort, userEmail = '' }) => {
   const [showInsights, setShowInsights] = useState(false);
 
   if (!trendData || trendData.length === 0) return null;
@@ -1047,8 +1047,8 @@ export default function App() {
         } catch (e) {}
       }
 
-      // Root Tahaluf admin and verified super admin emails
-      if (email === 'admin@tahaluf.com' || isRootSuperAdmin(email)) {
+      // Root super admin emails
+      if (isRootSuperAdmin(email)) {
         setUserRole('super_admin');
         if (typeof window !== 'undefined') {
           try { localStorage.setItem('tahaluf_cached_role', 'super_admin'); } catch {}
@@ -3694,7 +3694,7 @@ export default function App() {
           <div className="min-w-0 flex-1 flex overflow-hidden" style={{ display: activeTab === 'admin' ? undefined : 'none' }}>
           <AdminView 
             active={activeTab === 'admin'}
-            currentUserEmail={userEmail || (auth?.currentUser?.email) || 'admin@tahaluf.com'} 
+            currentUserEmail={userEmail || (auth?.currentUser?.email) || 'fehmatics@gmail.com'} 
             userRole={userRole}
             featureConfig={featureConfig}
             isFeatureAllowed={featureAllowed}

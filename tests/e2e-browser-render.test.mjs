@@ -243,7 +243,7 @@ test('E2E Browser Render & Console Error Verification Suite', async (t) => {
       page.on('pageerror', err => runtimeErrors.push(err.message || String(err)));
 
       await page.evaluateOnNewDocument(() => {
-        localStorage.setItem('tahaluf_cached_email', 'admin@tahaluf.com');
+        localStorage.setItem('tahaluf_cached_email', 'fehmatics@gmail.com');
         localStorage.setItem('tahaluf_cached_role', 'super_admin');
       });
 
@@ -299,7 +299,7 @@ test('E2E Browser Render & Console Error Verification Suite', async (t) => {
       page.on('pageerror', err => runtimeErrors.push(err.message || String(err)));
 
       await page.evaluateOnNewDocument(() => {
-        localStorage.setItem('tahaluf_cached_email', 'admin@tahaluf.com');
+        localStorage.setItem('tahaluf_cached_email', 'fehmatics@gmail.com');
         localStorage.setItem('tahaluf_cached_role', 'super_admin');
       });
 
@@ -389,7 +389,7 @@ test('E2E Browser Render & Console Error Verification Suite', async (t) => {
       page.on('pageerror', err => runtimeErrors.push(err.message || String(err)));
 
       await page.evaluateOnNewDocument(() => {
-        localStorage.setItem('tahaluf_cached_email', 'admin@tahaluf.com');
+        localStorage.setItem('tahaluf_cached_email', 'fehmatics@gmail.com');
         localStorage.setItem('tahaluf_cached_role', 'super_admin');
       });
 
@@ -495,7 +495,7 @@ test('E2E Browser Render & Console Error Verification Suite', async (t) => {
       page.on('pageerror', err => consoleErrors.push(err.message));
 
       await page.evaluateOnNewDocument(() => {
-        localStorage.setItem('tahaluf_cached_email', 'admin@tahaluf.com');
+        localStorage.setItem('tahaluf_cached_email', 'fehmatics@gmail.com');
         localStorage.setItem('tahaluf_cached_role', 'super_admin');
       });
 
