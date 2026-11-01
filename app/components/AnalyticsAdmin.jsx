@@ -102,9 +102,9 @@ export default function AnalyticsAdmin({ currentUserEmail = 'fehmatics@gmail.com
       }
       headers['x-admin-email'] = email;
 
-      const url = `/api/admin/analytics?timeRange=${timeRange}&timeZone=${encodeURIComponent(viewerTimeZone)}&userRoleFilter=${userFilter}&userEmail=${encodeURIComponent(selectedUserEmail)}&email=${encodeURIComponent(email)}`;
+      const url = `/api/admin/analytics?timeRange=${timeRange}&timeZone=${encodeURIComponent(viewerTimeZone)}&userRoleFilter=${userFilter}&userEmail=${encodeURIComponent(selectedUserEmail)}&email=${encodeURIComponent(email)}&_t=${Date.now()}`;
       if (!activeRef.current || id !== requestId.current) return;
-      const res = await fetch(url, { headers });
+      const res = await fetch(url, { headers, cache: 'no-store' });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
         throw new Error(errData.error || 'Failed to fetch analytics data');
@@ -1268,7 +1268,12 @@ export default function AnalyticsAdmin({ currentUserEmail = 'fehmatics@gmail.com
                 return (
                   <div key={t.tab} className="p-4 rounded-xl bg-[#071322] border border-gray-800">
                     <div className="flex justify-between items-start mb-2">
-                      <h4 className="text-xs font-bold text-white">{t.label}</h4>
+                      <div>
+                        <h4 className="text-xs font-bold text-white">{t.label}</h4>
+                        <div className="text-[10px] font-mono text-[#14a6d9] mt-0.5">
+                          {t.count?.toLocaleString() || 0} views ({t.percentage || 0}%)
+                        </div>
+                      </div>
                       <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold ${
                         isHighBounce ? 'bg-red-500/15 text-red-400 border border-red-500/30' : 'bg-[#cedc28]/10 text-[#cedc28]'
                       }`}>

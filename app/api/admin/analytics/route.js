@@ -50,7 +50,17 @@ async function getAnalytics(req) {
     const timeZone = searchParams.get('timeZone') || 'UTC';
 
     const summary = await getAnalyticsSummary(timeRange, { userRoleFilter, userEmailFilter, timeZone });
-    return NextResponse.json({ success: true, ...summary }, { status: 200 });
+    return NextResponse.json(
+      { success: true, ...summary },
+      {
+        status: 200,
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
+      }
+    );
   } catch (error) {
     console.error('Admin analytics GET error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
