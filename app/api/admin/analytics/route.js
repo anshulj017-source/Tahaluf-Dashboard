@@ -29,7 +29,7 @@ async function checkAdmin(req) {
 
     const userDoc = await adminDb.collection('users').doc(userRecord.uid).get().catch(() => null);
     const data = userDoc?.data() || {};
-    return data.role === 'admin' || data.isAdmin === true;
+    return data.role === 'admin' || data.role === 'super_admin' || data.isAdmin === true;
   } catch {
     return false;
   }

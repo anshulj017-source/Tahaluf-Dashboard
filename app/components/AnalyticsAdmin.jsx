@@ -264,11 +264,12 @@ export const KPI_DOCUMENTATION = {
   }
 };
 
-const ANALYTICS_VIEWS = ['overview', 'users', 'activity', 'performance', 'recommendations', 'optimizations'];
+const ANALYTICS_VIEWS = ['overview', 'users', 'activity', 'performance', 'recommendations', 'optimizations', 'journeys'];
 const ANALYTICS_TABS = [
   { id: 'overview', label: 'Overview' },
   { id: 'users', label: 'Users' },
   { id: 'activity', label: 'Activity' },
+  { id: 'journeys', label: 'Flow & Journeys' },
   { id: 'performance', label: 'Performance' },
   { id: 'recommendations', label: 'Recommendations' },
 ];
@@ -304,6 +305,26 @@ export default function AnalyticsAdmin({ currentUserEmail = '', active = true })
   const [glossarySearch, setGlossarySearch] = useState('');
   const [glossaryCategory, setGlossaryCategory] = useState('all');
   const [copiedDoc, setCopiedDoc] = useState(false);
+  const [isExportingPptx, setIsExportingPptx] = useState(false);
+
+  const handleExportPptx = async () => {
+    if (isExportingPptx || !data) return;
+    setIsExportingPptx(true);
+    try {
+      const { generateExecutivePptxReport } = await import('../../lib/exportExecutivePptx.js');
+      await generateExecutivePptxReport({
+        data,
+        timeRange,
+        viewerTimeZone,
+        authorEmail: currentUserEmail || auth.currentUser?.email || (typeof window !== 'undefined' ? localStorage.getItem('tahaluf_cached_email') : '') || 'Platform Administrator',
+      });
+    } catch (err) {
+      console.error('Failed to export executive PPTX:', err);
+      setActionFeedback({ message: 'Could not generate PPTX report: ' + (err.message || ''), error: true });
+    } finally {
+      setIsExportingPptx(false);
+    }
+  };
 
   const copyMarkdownReference = () => {
     try {
@@ -813,6 +834,17 @@ export default function AnalyticsAdmin({ currentUserEmail = '', active = true })
           </button>
 
           <button
+            type="button"
+            onClick={handleExportPptx}
+            disabled={isExportingPptx || !data}
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-[#cedc28]/20 to-[#14a6d9]/20 hover:from-[#cedc28]/30 hover:to-[#14a6d9]/30 border border-[#cedc28]/40 text-xs font-bold text-white transition-all shadow-sm cursor-pointer disabled:opacity-50"
+            title="Generate executive presentation slide deck summarizing platform analytics"
+          >
+            <FileText className={`w-3.5 h-3.5 text-[#cedc28] ${isExportingPptx ? 'animate-pulse' : ''}`} />
+            <span>{isExportingPptx ? 'Generating Slides…' : 'Export Executive PPTX'}</span>
+          </button>
+
+          <button
             onClick={() => fetchAnalytics(false)}
             disabled={isRefreshing}
             className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#0a2442] hover:bg-[#0d2f56] border border-[#14a6d9]/30 text-xs font-bold text-[#14a6d9] hover:text-white transition-all shadow-sm"
@@ -1139,6 +1171,79 @@ export default function AnalyticsAdmin({ currentUserEmail = '', active = true })
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
+
+          {/* Telemetry Drift & Heuristic Anomaly Radar */}
+          {Array.isArray(data?.anomalies) && data.anomalies.length > 0 && (
+            <div className="card-surface p-5 rounded-2xl border border-amber-500/30 bg-[#071322] shadow-lg">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3.5">
+                <div className="flex items-center gap-2">
+                  <Flame className="w-5 h-5 text-amber-400" />
+                  <h3 className="text-sm font-bold text-white uppercase tracking-wider">
+                    Telemetry Drift & Heuristic Anomaly Radar
+                  </h3>
+                  <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-mono font-bold">
+                    {data.anomalies.filter(a => a.status === 'active').length} Active Flags
+                  </span>
+                </div>
+                <span className="text-[11px] text-gray-400 font-mono">
+                  SLA Baseline vs. Observed Telemetry
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {data.anomalies.map(anom => {
+                  const isMitigated = anom.status === 'mitigated';
+                  return (
+                    <div
+                      key={anom.id}
+                      className={`p-3.5 rounded-xl border flex flex-col justify-between ${
+                        isMitigated
+                          ? 'bg-[#081f1e] border-emerald-500/30 text-emerald-200'
+                          : anom.severity === 'high'
+                          ? 'bg-[#1e0f13] border-red-500/30 text-red-200'
+                          : 'bg-[#1c1808] border-amber-500/30 text-amber-200'
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-center justify-between text-xs mb-1.5">
+                          <span className="font-bold text-white">{anom.title}</span>
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase font-mono ${
+                            isMitigated
+                              ? 'bg-emerald-500/20 text-emerald-300'
+                              : anom.severity === 'high'
+                              ? 'bg-red-500/20 text-red-300'
+                              : 'bg-amber-500/20 text-amber-300'
+                          }`}>
+                            {isMitigated ? 'Mitigated' : `${anom.severity} Drift`}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-gray-300 leading-relaxed mb-2.5">
+                          {anom.description}
+                        </p>
+                      </div>
+
+                      <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[11px]">
+                        <div>
+                          <span className="text-gray-400 font-mono">Observed: </span>
+                          <strong className="text-white font-mono">{anom.observedValue}</strong>
+                          <span className="text-gray-400 font-mono"> (SLA: {anom.benchmarkValue})</span>
+                        </div>
+                        {!isMitigated && anom.recommendedActionId && (
+                          <button
+                            type="button"
+                            onClick={() => handleAction(anom.recommendedActionId, true, 'Applied mitigation from Telemetry Drift Radar')}
+                            className="px-2 py-1 rounded bg-[#cedc28] hover:bg-[#d8e82c] text-[#0a2442] font-bold text-[10px] transition-colors"
+                          >
+                            1-Click Fix
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Findings Cards Grid */}
           {filteredFindings.length === 0 && <p className="text-sm text-gray-400">No recommendations match this category and snapshot.</p>}
@@ -2020,6 +2125,160 @@ export default function AnalyticsAdmin({ currentUserEmail = '', active = true })
                   <span>Top Exit Tab: <strong className="text-white">Summary (54.7% healthy exit)</strong></span>
                   <span className="text-[#cedc28]">Detailed Exit: 22.1% (mitigated)</span>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SUB-VIEW 2.5: USER JOURNEYS & NAVIGATION FLOW SEQUENCING */}
+      {subView === 'journeys' && (
+        <div className="space-y-6">
+          {/* Header Banner */}
+          <div className="p-4 rounded-2xl bg-gradient-to-r from-[#0a2442] to-[#071322] border border-[#14a6d9]/30 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-md">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <Compass className="w-5 h-5 text-[#cedc28]" />
+                <h3 className="text-base font-bold text-white uppercase tracking-wider">
+                  User Journeys & Navigation Flow Sequencing
+                </h3>
+                <span className="px-2.5 py-0.5 rounded-full bg-[#cedc28]/20 text-[#cedc28] text-xs font-mono font-bold">
+                  Phase 2 Telemetry
+                </span>
+              </div>
+              <p className="text-xs text-gray-300">
+                Empirical transition sequences, pairwise tab paths, and drop-off rates across executive and operational user sessions.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-400 font-mono">Active Horizon:</span>
+              <span className="px-3 py-1 rounded-lg bg-[#071322] border border-gray-700 text-xs font-bold text-[#cedc28]">
+                {timeRange === 'all' ? 'All Time' : timeRange === 'today' ? 'Today' : timeRange === 'yesterday' ? 'Yesterday' : timeRange === '7d' ? '7 Days' : '30 Days'}
+              </span>
+            </div>
+          </div>
+
+          {/* Primary Funnels Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {(userJourneys.commonFunnels || []).map(funnel => (
+              <div key={funnel.path} className="card-surface p-5 rounded-2xl border border-gray-800 shadow-lg flex flex-col justify-between">
+                <div>
+                  <div className="flex justify-between items-center text-xs mb-3">
+                    <span className="font-bold text-white text-sm">{funnel.path}</span>
+                    <span className="px-2.5 py-1 rounded-full bg-[#cedc28]/15 text-[#cedc28] font-bold font-mono text-xs border border-[#cedc28]/30">
+                      {funnel.conversionPercent}% Conversion
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-400 mb-4">
+                    Sampled over <strong className="text-white">{funnel.sessions || funnel.volume}</strong> user sessions.
+                  </p>
+
+                  <div className="space-y-2 mb-4">
+                    {funnel.flow.map((step, idx) => (
+                      <div key={step} className="flex items-center gap-2 text-xs">
+                        <span className="w-5 h-5 rounded-full bg-gray-800 text-gray-300 font-mono font-bold flex items-center justify-center text-[10px]">
+                          {idx + 1}
+                        </span>
+                        <span className="px-3 py-1 rounded-lg bg-[#0a2442] border border-gray-700 text-white font-medium flex-1">
+                          {step}
+                        </span>
+                        {idx < funnel.flow.length - 1 && (
+                          <ArrowRight className="w-3.5 h-3.5 text-gray-500" />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-gray-800 flex justify-between items-center text-[11px] text-gray-400">
+                  <span>Conversion Velocity</span>
+                  <span className="text-[#14a6d9] font-mono font-bold">Optimal</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Pairwise Transitions & High-Friction Exit Table */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Pairwise Tab Transitions */}
+            <div className="card-surface p-6 rounded-2xl border border-gray-800 shadow-lg">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Activity className="w-5 h-5 text-[#14a6d9]" />
+                  <h4 className="text-sm font-bold text-white uppercase tracking-wider">
+                    Pairwise Tab Transitions Matrix
+                  </h4>
+                </div>
+                <span className="text-xs text-gray-400 font-mono">Transition Density</span>
+              </div>
+              <p className="text-xs text-gray-400 mb-4">
+                Measures the exact navigation hops between platform views, showing relative share and dwell time prior to transitioning.
+              </p>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs text-gray-300">
+                  <thead className="bg-[#071322] text-gray-400 uppercase font-mono text-[10px] border-b border-gray-800">
+                    <tr>
+                      <th className="py-2.5 px-3">From Tab</th>
+                      <th className="py-2.5 px-3">To Destination</th>
+                      <th className="py-2.5 px-3 text-right">Transition Volume</th>
+                      <th className="py-2.5 px-3 text-right">Share %</th>
+                      <th className="py-2.5 px-3 text-right">Avg Dwell Before Move</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-800/60 font-mono">
+                    {(userJourneys.tabTransitions || []).map((trans, i) => (
+                      <tr key={i} className="hover:bg-white/[0.02] transition-colors">
+                        <td className="py-2.5 px-3 font-bold text-white">{trans.from}</td>
+                        <td className="py-2.5 px-3 text-[#14a6d9] flex items-center gap-1.5">
+                          <ArrowRight className="w-3 h-3 text-gray-500" />
+                          <span>{trans.to}</span>
+                        </td>
+                        <td className="py-2.5 px-3 text-right text-gray-200">{trans.count} hops</td>
+                        <td className="py-2.5 px-3 text-right text-[#cedc28] font-bold">{trans.sharePct}%</td>
+                        <td className="py-2.5 px-3 text-right text-gray-400">{trans.avgDwellBeforeSec}s</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Exit Tabs & Abandonment Analysis */}
+            <div className="card-surface p-6 rounded-2xl border border-gray-800 shadow-lg">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-amber-400" />
+                  <h4 className="text-sm font-bold text-white uppercase tracking-wider">
+                    Tab Exit & Drop-Off Radar
+                  </h4>
+                </div>
+                <span className="text-xs text-amber-300 font-mono">Friction Points</span>
+              </div>
+              <p className="text-xs text-gray-400 mb-4">
+                Identifies which platform views stakeholders depart from, highlighting friction points vs. natural workflow completions.
+              </p>
+
+              <div className="space-y-3">
+                {(userJourneys.exitTabs || []).map(exit => (
+                  <div key={exit.tab} className="p-3.5 rounded-xl bg-[#071322] border border-gray-800 flex items-center justify-between gap-3">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-white text-xs">{exit.tab}</span>
+                        <span className="px-2 py-0.5 rounded bg-gray-800 text-gray-300 text-[10px] font-mono">
+                          {exit.exits} exits
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-gray-400 leading-snug">
+                        {exit.primaryReason}
+                      </p>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <div className="text-sm font-bold font-mono text-[#cedc28]">{exit.exitRatePct}%</div>
+                      <div className="text-[10px] text-gray-500 font-mono">Exit Share</div>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>

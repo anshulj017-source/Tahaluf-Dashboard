@@ -1144,6 +1144,9 @@ async function testAnalyticsApi() {
     assert(adminJson.recentActivity.some(a => Boolean(a.geo?.timezone)), 'Recent activity entries contain geo timezone information');
     assert(adminJson.findings.every(f => Boolean(f.plainProblem && f.plainSolution && f.howToVerify)), 'Findings contain plain problem, plain solution, and how to verify');
     assert(adminJson.monitoredFixes.every(f => Boolean(f.plainProblem && f.plainSolution && f.howToVerify)), 'Monitored fixes contain plain problem, plain solution, and how to verify');
+    assert(Array.isArray(adminJson.userJourneys?.tabTransitions) && adminJson.userJourneys.tabTransitions.length > 0, 'Admin analytics userJourneys includes pairwise tabTransitions');
+    assert(Array.isArray(adminJson.userJourneys?.exitTabs) && adminJson.userJourneys.exitTabs.length > 0, 'Admin analytics userJourneys includes exitTabs radar');
+    assert(Array.isArray(adminJson.anomalies) && adminJson.anomalies.length > 0, 'Admin analytics provides telemetry drift & anomaly radar');
 
     // Test GET Admin Analytics with timeRange=today & timeZone=Asia/Dubai
     const todayRes = await fetch(`${adminAnalyticsUrl}?timeRange=today&timeZone=Asia/Dubai&email=admin@tahaluf.com`);
