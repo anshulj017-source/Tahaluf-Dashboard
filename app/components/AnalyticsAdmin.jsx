@@ -6,12 +6,185 @@ import {
   Shield, Laptop, MapPin, Zap, AlertTriangle,
   ArrowRight, Settings, Download, Monitor, Sliders,
   Gauge, Cpu, AlertCircle, PlayCircle,
-  RotateCcw, ShieldCheck, History
+  RotateCcw, ShieldCheck, History,
+  Info, BookOpen, X, FileText, Check, Copy
 } from 'lucide-react';
 import { auth } from '../../lib/firebase';
 import { isRootSuperAdmin } from '../../lib/authConstants.mjs';
 import { useLowQuotaMode } from './DashboardFeatureContext';
 import { AdminTabs, useAdminView, useAdminDirtyGuard } from './AdminUI';
+
+export const KPI_DOCUMENTATION = {
+  totalViews: {
+    id: 'totalViews',
+    name: 'Total Views',
+    category: 'Executive Overview',
+    badge: 'Traffic Volume',
+    definition: 'Cumulative volume of page loads and explicit tab navigation events across the dashboard.',
+    formula: 'SUM(page_view + tab_view events in active window)',
+    telemetrySource: 'Client route change & tab transition triggers (lib/analyticsTracker.js).',
+    exclusions: 'Heartbeat dwell updates are excluded to prevent volume inflation.',
+    slaTarget: 'Sub-30ms client dispatch, 0 telemetry drop.',
+    dateBehavior: 'Recalculates strictly within the selected date horizon (Today, Yesterday, 7D, 30D, All Time).',
+    audienceBehavior: 'Audience-filtered when specific filters apply; all-time totals represent aggregate activity.'
+  },
+  activeUsers: {
+    id: 'activeUsers',
+    name: 'Active Users',
+    category: 'Executive Overview',
+    badge: 'User Engagement',
+    definition: 'Count of distinct team members with recorded sessions, interactions, or lastActive timestamp in the selected time window.',
+    formula: 'COUNT(DISTINCT userEmail with lastActive in window OR events in activity log)',
+    telemetrySource: 'Firebase Auth token verification and session heartbeat synchronization.',
+    exclusions: 'Admins and super admins excluded by default under "Excl. Admins" view.',
+    slaTarget: 'Real-time synchronization across role permissions.',
+    dateBehavior: 'Strictly displays only users who interacted during the selected date window.',
+    audienceBehavior: 'Directly controlled by audience buttons: Excl. Admins (Default), All Users, Admins Only, Super Admin.'
+  },
+  avgSessionDuration: {
+    id: 'avgSessionDuration',
+    name: 'Avg Session Duration',
+    category: 'Executive Overview',
+    badge: 'Session Quality',
+    definition: 'Average time in minutes and seconds that users actively spend interacting with views in a single session.',
+    formula: 'SUM(dwellTimeSec for sessions) / COUNT(sessions)',
+    telemetrySource: 'Web Locks API (navigator.locks) + visibilitychange events to ensure only focused tabs accumulate dwell.',
+    exclusions: 'Inactive or background tabs are automatically paused and do not count toward session duration.',
+    slaTarget: '3 to 7 minutes (180s – 420s) for executive review workflows.',
+    dateBehavior: 'Calculated over sessions recorded in the active date preset.',
+    audienceBehavior: 'Reflects the chosen audience cohort (business users vs admins).'
+  },
+  appliedOptimizations: {
+    id: 'appliedOptimizations',
+    name: 'Active Optimizations',
+    category: 'Executive Overview',
+    badge: 'Dynamic Overrides',
+    definition: 'Number of in-UI heuristic behavioral rules and layout optimizations currently enabled on the platform.',
+    formula: 'COUNT(rules where status == "active")',
+    telemetrySource: 'Persistent admin configuration store with transaction audit receipts.',
+    exclusions: 'Reverted rules are archived in version history and excluded from the active count.',
+    slaTarget: 'Instant sub-10ms UI application with 1-click rollback.',
+    dateBehavior: 'Reflects active platform state across all viewers.',
+    audienceBehavior: 'Global system configuration.'
+  },
+  heuristicFindings: {
+    id: 'heuristicFindings',
+    name: 'Heuristic Findings',
+    category: 'Executive Overview',
+    badge: 'Actionable Insights',
+    definition: 'Automated actionable recommendations identified by the rule engine based on user friction or latency patterns.',
+    formula: 'Rule engine heuristics: detailedBounce > 30%, b2bShare > 60%, bioLatency > 300ms, zeroResults > 10.',
+    telemetrySource: 'Continuous statistical profiling over real-time telemetry distributions.',
+    exclusions: 'Already resolved findings are marked green with probe verification timestamps.',
+    slaTarget: 'Automated detection with zero human supervision required.',
+    dateBehavior: 'Evaluated continuously over incoming telemetry.',
+    audienceBehavior: 'Analyzes user interaction friction patterns.'
+  },
+  displaySamples: {
+    id: 'displaySamples',
+    name: 'Display Samples',
+    category: 'Executive Overview',
+    badge: 'Device Baseline',
+    definition: 'Total recorded client viewport and screen resolution observations.',
+    formula: 'SUM(observations across 1440x900, 1920x1080, 2K, 4K, Tablet/Mobile)',
+    telemetrySource: 'Client-side window.innerWidth x innerHeight sampling on session initialization.',
+    exclusions: 'Sub-second browser resizes are debounced to prevent duplicate observations.',
+    slaTarget: 'Protects 13" laptop baseline (1440x900) layout constraints.',
+    dateBehavior: 'Scales with the selected time horizon.',
+    audienceBehavior: 'Aggregated across all visiting client devices.'
+  },
+  tabDwell: {
+    id: 'tabDwell',
+    name: 'Tab Dwell & Engagement',
+    category: 'Attention & Engagement',
+    badge: 'Feature Adoption',
+    definition: 'Deep attention measurement per dashboard view, detailing average seconds spent and single-tab bounce percentage.',
+    formula: 'totalDwellSec / visits per tab; bouncePercent = (single-view sessions / total visits) * 100',
+    telemetrySource: 'Tab switch timestamps and window unload beacons.',
+    exclusions: 'Heartbeats shorter than 2 seconds are filtered as accidental clicks.',
+    slaTarget: 'Bounce rate < 15% across core analytical tabs; Detailed Grid < 30%.',
+    dateBehavior: 'Displays volume and dwell times tailored to selected date preset.',
+    audienceBehavior: 'Examines navigation patterns across audience cohorts.'
+  },
+  navigationFunnels: {
+    id: 'navigationFunnels',
+    name: 'Navigation Funnels',
+    category: 'Attention & Engagement',
+    badge: 'Workflow Flow',
+    definition: 'Sequential view paths taken by users and their completion percentages from Overview to deep analytical breakdowns.',
+    formula: '(Completed funnel sessions / Started funnel sessions) * 100',
+    telemetrySource: 'Client user journey sequence tracking.',
+    exclusions: 'Random back-and-forth loops are smoothed into primary directional vectors.',
+    slaTarget: '> 60% completion rate for primary executive and financial review flows.',
+    dateBehavior: 'Scaled by date horizon.',
+    audienceBehavior: 'Tracks cross-functional workflow paths.'
+  },
+  zeroResultQueries: {
+    id: 'zeroResultQueries',
+    name: 'Zero-Result Queries (Dead-Ends)',
+    category: 'Data Quality & Hygiene',
+    badge: 'UX Friction',
+    definition: 'Filter combinations selected by users that returned empty tables with 0 campaign rows (e.g., B2B + TikTok on IDWS).',
+    formula: 'COUNT(queries where tableRowCount == 0 and filters were non-empty)',
+    telemetrySource: 'Data table render hooks monitoring filter state changes.',
+    exclusions: 'Valid zero-data searches that match intentional empty sets.',
+    slaTarget: '0 dead-end queries; mitigated via Smart Inactive Filter Badging.',
+    dateBehavior: 'Scaled by date horizon.',
+    audienceBehavior: 'Tracks user query paths.'
+  },
+  sheetLatency: {
+    id: 'sheetLatency',
+    name: 'Sheet Ingestion Latencies',
+    category: 'Reliability & Performance',
+    badge: 'API & Cache SLA',
+    definition: 'Response times for Google Sheets data ingestion comparing cold parse fetch (p95) against in-memory proxy cache (p50).',
+    formula: 'p50 = median response time ms; p95 = 95th percentile response time ms; cacheHitRate = (cache hits / total requests) * 100',
+    telemetrySource: 'API proxy route timing probes in /api/sheets.',
+    exclusions: 'Failed network requests surface as health check alerts.',
+    slaTarget: 'p50 < 30ms (cached), p95 < 500ms (cold), Cache Hit Rate >= 98%.',
+    dateBehavior: 'Operational health metric updated continuously.',
+    audienceBehavior: 'System-wide backend performance.'
+  },
+  geographicDistribution: {
+    id: 'geographicDistribution',
+    name: 'Access Footprint (Countries & Cities)',
+    category: 'Audience & Access',
+    badge: 'Global Footprint',
+    definition: 'Geographic distribution of user sessions mapped via edge IP and timezone resolution.',
+    formula: 'COUNT(sessions) grouped by country ISO code and primary city',
+    telemetrySource: 'Vercel edge geo headers (x-vercel-ip-country) with local timezone fallback.',
+    exclusions: 'Local development and unknown proxies normalized to primary business regions.',
+    slaTarget: 'Accurate regional mapping for Gulf (Saudi Arabia, UAE) vs international access.',
+    dateBehavior: 'Dynamic session distribution for the selected time horizon.',
+    audienceBehavior: 'Tracks global user adoption.'
+  },
+  dimensionAdoption: {
+    id: 'dimensionAdoption',
+    name: 'Business Filter Adoption',
+    category: 'Audience & Access',
+    badge: 'Audience Intent',
+    definition: 'Relative selection frequency between B2B, B2C, and All portfolio dimensions.',
+    formula: '(Count of B2B or B2C selections / Total business filter changes) * 100',
+    telemetrySource: 'Global header dimension dropdown tracking.',
+    exclusions: 'Default initial loads do not count as user selections unless explicitly toggled.',
+    slaTarget: 'Reflects executive orientation (e.g. 78% B2B in Gulf enterprise events).',
+    dateBehavior: 'Scaled across the selected time horizon.',
+    audienceBehavior: 'Measures stakeholder dimension usage.'
+  },
+  userAuditLog: {
+    id: 'userAuditLog',
+    name: 'User Access & Activity Log',
+    category: 'Audience & Access',
+    badge: 'Access Ledger',
+    definition: 'Immutable audit trail of team members, access timestamps, dwell times, and primary active tabs.',
+    formula: 'Directory joined with session heartbeats and role attribution.',
+    telemetrySource: 'Firebase Auth user record + in-memory activity ledger.',
+    exclusions: 'Root Super Admin is concealed by default and unlocked via discreet icon button.',
+    slaTarget: '100% audit attribution with sub-minute lastActive precision.',
+    dateBehavior: 'Only displays users active within the chosen date horizon.',
+    audienceBehavior: 'Scoped by audience filter pills.'
+  }
+};
 
 const ANALYTICS_VIEWS = ['overview', 'users', 'activity', 'performance', 'recommendations', 'optimizations'];
 const ANALYTICS_TABS = [
@@ -48,6 +221,34 @@ export default function AnalyticsAdmin({ currentUserEmail = 'fehmatics@gmail.com
   const [pageVisible, setPageVisible] = useState(true);
   const [pendingAction, setPendingAction] = useState(null);
   const [actionReason, setActionReason] = useState('');
+  const [selectedKpiInfo, setSelectedKpiInfo] = useState(null);
+  const [showGlossaryModal, setShowGlossaryModal] = useState(false);
+  const [glossarySearch, setGlossarySearch] = useState('');
+  const [glossaryCategory, setGlossaryCategory] = useState('all');
+  const [copiedDoc, setCopiedDoc] = useState(false);
+
+  const copyMarkdownReference = () => {
+    try {
+      const text = Object.values(KPI_DOCUMENTATION).map(kpi => 
+        `### ${kpi.name} (${kpi.badge})\n` +
+        `- **Category**: ${kpi.category}\n` +
+        `- **Definition**: ${kpi.definition}\n` +
+        `- **Formula / Method**: \`${kpi.formula}\`\n` +
+        `- **Telemetry Source**: ${kpi.telemetrySource}\n` +
+        `- **Target SLA**: ${kpi.slaTarget}\n` +
+        `- **Time Horizon Alignment**: ${kpi.dateBehavior}\n` +
+        `- **Audience Filter Behavior**: ${kpi.audienceBehavior}\n`
+      ).join('\n---\n\n');
+
+      if (navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(text);
+        setCopiedDoc(true);
+        setTimeout(() => setCopiedDoc(false), 2500);
+      }
+    } catch (err) {
+      console.warn('Failed to copy markdown reference:', err);
+    }
+  };
   const actionDialog = useRef(null);
   const requestId = useRef(0);
   const refreshRef = useRef(null);
@@ -519,6 +720,16 @@ export default function AnalyticsAdmin({ currentUserEmail = 'fehmatics@gmail.com
           </div>
 
           <button
+            type="button"
+            onClick={() => setShowGlossaryModal(true)}
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#cedc28]/10 hover:bg-[#cedc28]/20 border border-[#cedc28]/35 text-xs font-bold text-[#cedc28] hover:text-white transition-all shadow-sm"
+            title="View complete KPI definitions, calculation formulas, and SLA standards"
+          >
+            <BookOpen className="w-3.5 h-3.5" />
+            <span>KPI Standards & Glossary</span>
+          </button>
+
+          <button
             onClick={() => fetchAnalytics(false)}
             disabled={isRefreshing}
             className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#0a2442] hover:bg-[#0d2f56] border border-[#14a6d9]/30 text-xs font-bold text-[#14a6d9] hover:text-white transition-all shadow-sm"
@@ -570,7 +781,18 @@ export default function AnalyticsAdmin({ currentUserEmail = 'fehmatics@gmail.com
           <div className="absolute top-0 right-0 w-20 h-20 bg-[#cedc28]/10 rounded-full blur-xl -mr-6 -mt-6"></div>
           <div className="flex justify-between items-start relative z-10">
             <div>
-              <p className="text-[10px] font-bold text-[#cedc28] uppercase tracking-wider mb-1">Total Views</p>
+              <div className="flex items-center gap-1.5 mb-1">
+                <p className="text-[10px] font-bold text-[#cedc28] uppercase tracking-wider">Total Views</p>
+                <button
+                  type="button"
+                  onClick={() => setSelectedKpiInfo(KPI_DOCUMENTATION.totalViews)}
+                  className="text-gray-400 hover:text-[#cedc28] transition-colors p-0.5 rounded hover:bg-white/5"
+                  title="View Total Views KPI Definition & SLA"
+                  aria-label="View Total Views KPI definition"
+                >
+                  <Info className="w-3 h-3" />
+                </button>
+              </div>
               <h3 className="text-2xl font-black text-white">{kpis.totalViews?.toLocaleString() || 0}</h3>
               <p className="text-[10px] text-gray-400 mt-1 flex items-center gap-1">
                 <TrendingUp className="w-3 h-3 text-[#cedc28]" /> Page loads & tabs
@@ -587,7 +809,18 @@ export default function AnalyticsAdmin({ currentUserEmail = 'fehmatics@gmail.com
           <div className="absolute top-0 right-0 w-20 h-20 bg-[#14a6d9]/10 rounded-full blur-xl -mr-6 -mt-6"></div>
           <div className="flex justify-between items-start relative z-10">
             <div>
-              <p className="text-[10px] font-bold text-[#14a6d9] uppercase tracking-wider mb-1">Active Users</p>
+              <div className="flex items-center gap-1.5 mb-1">
+                <p className="text-[10px] font-bold text-[#14a6d9] uppercase tracking-wider">Active Users</p>
+                <button
+                  type="button"
+                  onClick={() => setSelectedKpiInfo(KPI_DOCUMENTATION.activeUsers)}
+                  className="text-gray-400 hover:text-[#14a6d9] transition-colors p-0.5 rounded hover:bg-white/5"
+                  title="View Active Users KPI Definition & Formula"
+                  aria-label="View Active Users KPI definition"
+                >
+                  <Info className="w-3 h-3" />
+                </button>
+              </div>
               <h3 className="text-2xl font-black text-white">{kpis.totalUsers ?? (filteredUsers?.length || 0)}</h3>
               <p className="text-[10px] text-gray-400 mt-1 flex items-center gap-1 truncate">
                 <Users className="w-3 h-3 text-[#14a6d9]" /> {kpis.userScopeLabel || 'Excl. Admins'}
@@ -604,7 +837,18 @@ export default function AnalyticsAdmin({ currentUserEmail = 'fehmatics@gmail.com
           <div className="absolute top-0 right-0 w-20 h-20 bg-[#14a6d9]/10 rounded-full blur-xl -mr-6 -mt-6"></div>
           <div className="flex justify-between items-start relative z-10">
             <div>
-              <p className="text-[10px] font-bold text-[#14a6d9] uppercase tracking-wider mb-1">Avg Session Duration</p>
+              <div className="flex items-center gap-1.5 mb-1">
+                <p className="text-[10px] font-bold text-[#14a6d9] uppercase tracking-wider">Avg Session Duration</p>
+                <button
+                  type="button"
+                  onClick={() => setSelectedKpiInfo(KPI_DOCUMENTATION.avgSessionDuration)}
+                  className="text-gray-400 hover:text-[#14a6d9] transition-colors p-0.5 rounded hover:bg-white/5"
+                  title="View Avg Session Duration Definition & Tracking Method"
+                  aria-label="View Avg Session Duration KPI definition"
+                >
+                  <Info className="w-3 h-3" />
+                </button>
+              </div>
               <h3 className="text-2xl font-black text-white">{kpis.totalSessions > 0 && Number.isFinite(kpis.avgSessionDurationSec) ? formatDurationSec(kpis.avgSessionDurationSec) : 'Not measured'}</h3>
               <p className="text-[10px] text-gray-400 mt-1 flex items-center gap-1">
                 <Clock className="w-3 h-3 text-[#14a6d9]" /> {kpis.totalSessions || 0} total sessions
@@ -621,7 +865,18 @@ export default function AnalyticsAdmin({ currentUserEmail = 'fehmatics@gmail.com
           <div className="absolute top-0 right-0 w-20 h-20 bg-teal-500/10 rounded-full blur-xl -mr-6 -mt-6"></div>
           <div className="flex justify-between items-start relative z-10">
             <div>
-              <p className="text-[10px] font-bold text-teal-400 uppercase tracking-wider mb-1">Active Optimizations</p>
+              <div className="flex items-center gap-1.5 mb-1">
+                <p className="text-[10px] font-bold text-teal-400 uppercase tracking-wider">Active Optimizations</p>
+                <button
+                  type="button"
+                  onClick={() => setSelectedKpiInfo(KPI_DOCUMENTATION.appliedOptimizations)}
+                  className="text-gray-400 hover:text-teal-400 transition-colors p-0.5 rounded hover:bg-white/5"
+                  title="View Active Optimizations Governance & Rollback Standard"
+                  aria-label="View Active Optimizations KPI definition"
+                >
+                  <Info className="w-3 h-3" />
+                </button>
+              </div>
               <h3 className="text-2xl font-black text-white">{kpis.appliedOptimizationsCount || 0} Active</h3>
               <p className="text-[10px] text-gray-400 mt-1 flex items-center gap-1">
                 <CheckCircle2 className="w-3 h-3 text-teal-400" /> In-UI enhancements
@@ -638,7 +893,18 @@ export default function AnalyticsAdmin({ currentUserEmail = 'fehmatics@gmail.com
           <div className="absolute top-0 right-0 w-20 h-20 bg-amber-400/10 rounded-full blur-xl -mr-6 -mt-6"></div>
           <div className="flex justify-between items-start relative z-10">
             <div>
-              <p className="text-[10px] font-bold text-amber-300 uppercase tracking-wider mb-1">Heuristic Findings</p>
+              <div className="flex items-center gap-1.5 mb-1">
+                <p className="text-[10px] font-bold text-amber-300 uppercase tracking-wider">Heuristic Findings</p>
+                <button
+                  type="button"
+                  onClick={() => setSelectedKpiInfo(KPI_DOCUMENTATION.heuristicFindings)}
+                  className="text-gray-400 hover:text-amber-300 transition-colors p-0.5 rounded hover:bg-white/5"
+                  title="View Algorithmic Heuristic Detection Rules"
+                  aria-label="View Heuristic Findings KPI definition"
+                >
+                  <Info className="w-3 h-3" />
+                </button>
+              </div>
               <h3 className="text-2xl font-black text-white">{findings.length} Identified</h3>
               <p className="text-[10px] text-gray-400 mt-1 flex items-center gap-1">
                 <Sparkles className="w-3 h-3 text-amber-300" /> {kpis.pendingFindingsCount || 0} actionable
@@ -655,7 +921,18 @@ export default function AnalyticsAdmin({ currentUserEmail = 'fehmatics@gmail.com
           <div className="absolute top-0 right-0 w-20 h-20 bg-purple-400/10 rounded-full blur-xl -mr-6 -mt-6"></div>
           <div className="flex justify-between items-start relative z-10">
             <div>
-              <p className="text-[10px] font-bold text-purple-300 uppercase tracking-wider mb-1">Display Samples</p>
+              <div className="flex items-center gap-1.5 mb-1">
+                <p className="text-[10px] font-bold text-purple-300 uppercase tracking-wider">Display Samples</p>
+                <button
+                  type="button"
+                  onClick={() => setSelectedKpiInfo(KPI_DOCUMENTATION.displaySamples)}
+                  className="text-gray-400 hover:text-purple-300 transition-colors p-0.5 rounded hover:bg-white/5"
+                  title="View Viewport & Hardware Baseline Standards"
+                  aria-label="View Display Samples KPI definition"
+                >
+                  <Info className="w-3 h-3" />
+                </button>
+              </div>
               <h3 className="text-2xl font-black text-white">{Object.values(deviceFootprint.screenResolutions || {}).reduce((sum, count) => sum + count, 0)}</h3>
               <p className="text-[10px] text-gray-400 mt-1 flex items-center gap-1">
                 <Laptop className="w-3 h-3 text-purple-300" /> Recorded viewport observations
@@ -1255,6 +1532,15 @@ export default function AnalyticsAdmin({ currentUserEmail = 'fehmatics@gmail.com
                 <h3 className="text-base font-bold text-white tracking-wide uppercase">
                   Dwell Time & Engagement By Tab
                 </h3>
+                <button
+                  type="button"
+                  onClick={() => setSelectedKpiInfo(KPI_DOCUMENTATION.tabDwell)}
+                  aria-label="Explain Tab Dwell KPI"
+                  className="w-5 h-5 rounded-full bg-white/5 hover:bg-white/10 text-gray-400 hover:text-[#14a6d9] flex items-center justify-center transition-colors"
+                  title="Click for KPI definition, formula & SLA"
+                >
+                  <Info className="w-3.5 h-3.5" />
+                </button>
               </div>
               <span className="text-xs text-gray-400 font-mono">
                 Identifies deep analytical views vs high-dropoff friction points
@@ -1301,14 +1587,25 @@ export default function AnalyticsAdmin({ currentUserEmail = 'fehmatics@gmail.com
           {/* User Journey Funnels & Drop-offs */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="card-surface p-6 rounded-2xl border border-gray-800 shadow-lg">
-              <div className="flex items-center gap-2 mb-4">
-                <Compass className="w-5 h-5 text-[#cedc28]" />
-                <h4 className="text-sm font-bold text-white uppercase tracking-wider">Top User Navigation Funnels</h4>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Compass className="w-5 h-5 text-[#cedc28]" />
+                  <h4 className="text-sm font-bold text-white uppercase tracking-wider">Top User Navigation Funnels</h4>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedKpiInfo(KPI_DOCUMENTATION.navigationFunnels)}
+                    aria-label="Explain Navigation Funnels KPI"
+                    className="w-5 h-5 rounded-full bg-white/5 hover:bg-white/10 text-gray-400 hover:text-[#cedc28] flex items-center justify-center transition-colors"
+                    title="Click for KPI definition, formula & SLA"
+                  >
+                    <Info className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-3">
                 {(userJourneys.commonFunnels || []).map(funnel => (
-                  <div key={funnel.path} className="p-3.5 rounded-xl bg-[#071322] border border-gray-850">
+                  <div key={funnel.path} className="p-3.5 rounded-xl bg-[#071322] border border-gray-855">
                     <div className="flex justify-between items-center text-xs mb-2">
                       <span className="font-bold text-white">{funnel.path}</span>
                       <span className="text-[#cedc28] font-bold font-mono">{funnel.conversionPercent}% Completion</span>
@@ -1328,9 +1625,20 @@ export default function AnalyticsAdmin({ currentUserEmail = 'fehmatics@gmail.com
 
             {/* Zero-Result Friction Queries */}
             <div className="card-surface p-6 rounded-2xl border border-gray-800 shadow-lg">
-              <div className="flex items-center gap-2 mb-4">
-                <AlertTriangle className="w-5 h-5 text-amber-400" />
-                <h4 className="text-sm font-bold text-white uppercase tracking-wider">Zero-Result Queries (Dead-Ends)</h4>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-amber-400" />
+                  <h4 className="text-sm font-bold text-white uppercase tracking-wider">Zero-Result Queries (Dead-Ends)</h4>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedKpiInfo(KPI_DOCUMENTATION.zeroResultQueries)}
+                    aria-label="Explain Zero Result Queries KPI"
+                    className="w-5 h-5 rounded-full bg-white/5 hover:bg-white/10 text-gray-400 hover:text-amber-400 flex items-center justify-center transition-colors"
+                    title="Click for KPI definition, formula & SLA"
+                  >
+                    <Info className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
 
               <p className="text-xs text-gray-400 mb-3">
@@ -1365,6 +1673,15 @@ export default function AnalyticsAdmin({ currentUserEmail = 'fehmatics@gmail.com
                 <div className="flex items-center gap-2">
                   <Monitor className="w-5 h-5 text-purple-400" />
                   <h4 className="text-sm font-bold text-white uppercase tracking-wider">Screen Resolution Distribution</h4>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedKpiInfo(KPI_DOCUMENTATION.displaySamples)}
+                    aria-label="Explain Screen Resolution KPI"
+                    className="w-5 h-5 rounded-full bg-white/5 hover:bg-white/10 text-gray-400 hover:text-purple-400 flex items-center justify-center transition-colors"
+                    title="Click for KPI definition, formula & SLA"
+                  >
+                    <Info className="w-3.5 h-3.5" />
+                  </button>
                 </div>
                 <span className="text-xs text-purple-400 font-mono">13&quot; Laptop = Baseline</span>
               </div>
@@ -1440,6 +1757,15 @@ export default function AnalyticsAdmin({ currentUserEmail = 'fehmatics@gmail.com
                 <h4 className="text-sm font-bold text-white uppercase tracking-wider">
                   Reported Sheet Ingestion & Caching Latencies
                 </h4>
+                <button
+                  type="button"
+                  onClick={() => setSelectedKpiInfo(KPI_DOCUMENTATION.sheetLatency)}
+                  aria-label="Explain Sheet Latencies KPI"
+                  className="w-5 h-5 rounded-full bg-white/5 hover:bg-white/10 text-gray-400 hover:text-emerald-400 flex items-center justify-center transition-colors"
+                  title="Click for KPI definition, formula & SLA"
+                >
+                  <Info className="w-3.5 h-3.5" />
+                </button>
               </div>
               <span className="text-xs text-emerald-400 font-mono font-bold">
                 Avg Response: {Object.keys(performanceTelemetry.sheetBreakdown || {}).length > 0 && Number.isFinite(performanceTelemetry.avgApiLatencyMs) ? `${performanceTelemetry.avgApiLatencyMs}ms` : 'Not measured'}
@@ -1484,6 +1810,15 @@ export default function AnalyticsAdmin({ currentUserEmail = 'fehmatics@gmail.com
                 <div className="flex items-center gap-2">
                   <Globe className="w-5 h-5 text-[#14a6d9]" />
                   <h3 className="text-base font-bold text-white tracking-wide uppercase">Access Footprint (Countries)</h3>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedKpiInfo(KPI_DOCUMENTATION.geographicDistribution)}
+                    aria-label="Explain Access Footprint KPI"
+                    className="w-5 h-5 rounded-full bg-white/5 hover:bg-white/10 text-gray-400 hover:text-[#14a6d9] flex items-center justify-center transition-colors"
+                    title="Click for KPI definition, formula & SLA"
+                  >
+                    <Info className="w-3.5 h-3.5" />
+                  </button>
                 </div>
                 <span className="text-xs text-[#14a6d9] font-mono">
                   {geoDistribution.length} Active Regions
@@ -1523,9 +1858,20 @@ export default function AnalyticsAdmin({ currentUserEmail = 'fehmatics@gmail.com
 
             {/* Business & Dimension Adoption */}
             <div className="card-surface p-6 rounded-2xl border border-gray-800 shadow-lg">
-              <div className="flex items-center gap-2 mb-4">
-                <Filter className="w-5 h-5 text-[#cedc28]" />
-                <h4 className="text-base font-bold text-white uppercase tracking-wider">Business Filter Adoption</h4>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Filter className="w-5 h-5 text-[#cedc28]" />
+                  <h4 className="text-base font-bold text-white uppercase tracking-wider">Business Filter Adoption</h4>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedKpiInfo(KPI_DOCUMENTATION.dimensionAdoption)}
+                    aria-label="Explain Business Filter Adoption KPI"
+                    className="w-5 h-5 rounded-full bg-white/5 hover:bg-white/10 text-gray-400 hover:text-[#cedc28] flex items-center justify-center transition-colors"
+                    title="Click for KPI definition, formula & SLA"
+                  >
+                    <Info className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-3 mb-6">
@@ -1574,6 +1920,15 @@ export default function AnalyticsAdmin({ currentUserEmail = 'fehmatics@gmail.com
                 <div className="flex items-center gap-2 mb-1">
                   <Users className="w-5 h-5 text-[#cedc28]" />
                   <h3 className="text-lg font-bold text-white tracking-wide uppercase">User Access & Activity Log</h3>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedKpiInfo(KPI_DOCUMENTATION.userAuditLog)}
+                    aria-label="Explain User Access & Activity Log KPI"
+                    className="w-5 h-5 rounded-full bg-white/5 hover:bg-white/10 text-gray-400 hover:text-[#cedc28] flex items-center justify-center transition-colors"
+                    title="Click for KPI definition, formula & SLA"
+                  >
+                    <Info className="w-3.5 h-3.5" />
+                  </button>
                 </div>
                 <p className="text-xs text-gray-400">
                   Tracking of every team member, access times, dwell times, and primary view
@@ -1668,8 +2023,28 @@ export default function AnalyticsAdmin({ currentUserEmail = 'fehmatics@gmail.com
                 <tbody className="divide-y divide-gray-850 text-xs">
                   {filteredUsers.length === 0 ? (
                     <tr>
-                      <td colSpan="7" className="py-8 text-center text-gray-500 text-xs">
-                        No active user records match your selected scope and time horizon.
+                      <td colSpan="7" className="py-12 text-center text-gray-400 text-xs">
+                        <div className="flex flex-col items-center justify-center gap-2">
+                          <Users className="w-8 h-8 text-gray-600 mb-1" />
+                          <p className="font-semibold text-gray-300">
+                            {selectedUserEmail 
+                              ? `No active telemetry recorded for ${selectedUserEmail} within the "${timeRange}" time window.`
+                              : `No active user records match your selected scope and time horizon (${timeRange}).`
+                            }
+                          </p>
+                          <p className="text-gray-500 text-[11px] max-w-md">
+                            Users who logged in before this window appear under wider time horizons. Try expanding your date filter or clearing specific filters.
+                          </p>
+                          {timeRange !== 'all' && (
+                            <button
+                              type="button"
+                              onClick={() => setTimeRange('all')}
+                              className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#14a6d9]/20 hover:bg-[#14a6d9]/30 text-[#14a6d9] border border-[#14a6d9]/40 font-bold text-xs transition-colors"
+                            >
+                              Reset Time Window to All Time
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ) : (
@@ -1911,6 +2286,261 @@ export default function AnalyticsAdmin({ currentUserEmail = 'fehmatics@gmail.com
             </div>
           </form>}
       </dialog>
+
+      {/* KPI Detail Popover Modal */}
+      {selectedKpiInfo && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in"
+          onClick={() => setSelectedKpiInfo(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="kpi-detail-title"
+        >
+          <div 
+            className="bg-[#071322] border border-gray-700/80 rounded-2xl max-w-xl w-full p-6 text-white shadow-2xl space-y-4 relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between border-b border-gray-800 pb-3">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[#14a6d9]/15 text-[#14a6d9] border border-[#14a6d9]/30">
+                    {selectedKpiInfo.category}
+                  </span>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[#cedc28]/15 text-[#cedc28] border border-[#cedc28]/30">
+                    {selectedKpiInfo.badge}
+                  </span>
+                </div>
+                <h3 id="kpi-detail-title" className="text-lg font-bold text-white flex items-center gap-2">
+                  <Info className="w-5 h-5 text-[#14a6d9]" />
+                  {selectedKpiInfo.name}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedKpiInfo(null)}
+                className="w-8 h-8 rounded-lg bg-gray-800/60 hover:bg-gray-800 text-gray-400 hover:text-white flex items-center justify-center transition-colors"
+                aria-label="Close KPI Details"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3.5 text-xs">
+              <div>
+                <span className="font-bold text-gray-400 uppercase tracking-wider text-[10px] block mb-1">Definition</span>
+                <p className="text-gray-200 leading-relaxed bg-[#030b14] p-3 rounded-xl border border-gray-850">
+                  {selectedKpiInfo.definition}
+                </p>
+              </div>
+
+              <div>
+                <span className="font-bold text-gray-400 uppercase tracking-wider text-[10px] block mb-1">Mathematical Formula / Logic</span>
+                <div className="font-mono text-[11px] text-[#cedc28] bg-[#030b14] p-3 rounded-xl border border-gray-850 break-words">
+                  {selectedKpiInfo.formula}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="p-3 rounded-xl bg-[#030b14] border border-gray-850">
+                  <span className="font-bold text-emerald-400 uppercase tracking-wider text-[10px] block mb-1">SLA Benchmark</span>
+                  <p className="text-gray-300 font-mono text-[11px]">{selectedKpiInfo.slaTarget}</p>
+                </div>
+                <div className="p-3 rounded-xl bg-[#030b14] border border-gray-850">
+                  <span className="font-bold text-[#14a6d9] uppercase tracking-wider text-[10px] block mb-1">Telemetry Origin</span>
+                  <p className="text-gray-300 text-[11px]">{selectedKpiInfo.telemetrySource}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[11px]">
+                <div className="p-2.5 rounded-lg bg-[#071728] border border-gray-800/80">
+                  <span className="font-semibold text-gray-400 block text-[10px]">Date Horizon Behavior:</span>
+                  <span className="text-gray-300">{selectedKpiInfo.dateBehavior}</span>
+                </div>
+                <div className="p-2.5 rounded-lg bg-[#071728] border border-gray-800/80">
+                  <span className="font-semibold text-gray-400 block text-[10px]">Audience Scope Behavior:</span>
+                  <span className="text-gray-300">{selectedKpiInfo.audienceBehavior}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-3 border-t border-gray-800">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedKpiInfo(null);
+                  setShowGlossaryModal(true);
+                }}
+                className="inline-flex items-center gap-1.5 text-xs text-[#14a6d9] hover:underline font-semibold"
+              >
+                <BookOpen className="w-3.5 h-3.5" />
+                Open Full KPI Standards Reference
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedKpiInfo(null)}
+                className="px-4 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-xs font-bold text-white transition-colors"
+              >
+                Got It
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Master KPI Standards & Reference Modal */}
+      {showGlossaryModal && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 animate-in fade-in"
+          onClick={() => setShowGlossaryModal(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="glossary-modal-title"
+        >
+          <div 
+            className="bg-[#071322] border border-gray-700 rounded-2xl max-w-4xl w-full max-h-[88vh] flex flex-col text-white shadow-2xl relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="p-5 border-b border-gray-800 flex items-start justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <BookOpen className="w-5 h-5 text-[#cedc28]" />
+                  <h3 id="glossary-modal-title" className="text-lg font-bold text-white">
+                    Tahaluf Analytics Master KPI Standards & Telemetry Guide
+                  </h3>
+                </div>
+                <p className="text-xs text-gray-400">
+                  Standardized definitions, mathematical formulas, SLA thresholds, and edge telemetry mechanics across all executive metrics.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={copyMarkdownReference}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-bold text-gray-300 hover:text-white border border-gray-700 transition-colors"
+                  title="Copy full reference in GitHub Markdown format"
+                >
+                  {copiedDoc ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copiedDoc ? 'Copied Markdown!' : 'Copy Reference'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowGlossaryModal(false)}
+                  className="w-8 h-8 rounded-lg bg-gray-800/60 hover:bg-gray-800 text-gray-400 hover:text-white flex items-center justify-center transition-colors"
+                  aria-label="Close Standards Guide"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Filter & Search Toolbar */}
+            <div className="p-4 bg-[#0a182a]/60 border-b border-gray-800/80 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
+              <div className="flex flex-wrap items-center gap-1.5">
+                {[
+                  { id: 'all', label: 'All Metrics' },
+                  { id: 'Executive Overview', label: 'Executive' },
+                  { id: 'Attention & Engagement', label: 'Engagement' },
+                  { id: 'Reliability & Performance', label: 'Reliability' },
+                  { id: 'Audience & Access', label: 'Audience' },
+                  { id: 'Data Quality & Hygiene', label: 'Quality' },
+                ].map(cat => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setGlossaryCategory(cat.id)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                      glossaryCategory === cat.id
+                        ? 'bg-[#cedc28] text-[#0a2442] shadow-[0_0_8px_rgba(206,220,40,0.3)]'
+                        : 'bg-white/5 text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    {cat.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="relative w-full sm:w-64">
+                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search KPIs, formulas..."
+                  value={glossarySearch}
+                  onChange={(e) => setGlossarySearch(e.target.value)}
+                  className="w-full bg-[#071322] border border-gray-800 rounded-xl pl-8 pr-3 py-1 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-[#cedc28]"
+                />
+              </div>
+            </div>
+
+            {/* Scrollable KPI Cards */}
+            <div className="p-5 overflow-y-auto space-y-4 max-h-[60vh] divide-y divide-gray-800/60">
+              {Object.values(KPI_DOCUMENTATION)
+                .filter(kpi => {
+                  if (glossaryCategory !== 'all' && kpi.category !== glossaryCategory) return false;
+                  if (!glossarySearch.trim()) return true;
+                  const q = glossarySearch.toLowerCase();
+                  return (
+                    kpi.name.toLowerCase().includes(q) ||
+                    kpi.definition.toLowerCase().includes(q) ||
+                    kpi.formula.toLowerCase().includes(q) ||
+                    kpi.badge.toLowerCase().includes(q)
+                  );
+                })
+                .map((kpi, idx) => (
+                  <div key={kpi.id} className={idx > 0 ? 'pt-4 space-y-2.5' : 'space-y-2.5'}>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-[#14a6d9]"></span>
+                        <h4 className="text-sm font-bold text-white">{kpi.name}</h4>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[#cedc28]/15 text-[#cedc28] border border-[#cedc28]/30">
+                          {kpi.badge}
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-mono text-gray-400">
+                        {kpi.category}
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-gray-300 leading-relaxed">
+                      {kpi.definition}
+                    </p>
+
+                    <div className="bg-[#030b14] p-3 rounded-xl border border-gray-850">
+                      <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Calculation Formula</div>
+                      <div className="font-mono text-xs text-[#cedc28] break-words">{kpi.formula}</div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                      <div className="p-2.5 rounded-lg bg-[#071728]/70 border border-gray-850">
+                        <span className="font-bold text-emerald-400 block text-[10px] uppercase">Target SLA:</span>
+                        <span className="text-gray-300 font-mono">{kpi.slaTarget}</span>
+                      </div>
+                      <div className="p-2.5 rounded-lg bg-[#071728]/70 border border-gray-850">
+                        <span className="font-bold text-[#14a6d9] block text-[10px] uppercase">Telemetry Source:</span>
+                        <span className="text-gray-300">{kpi.telemetrySource}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-gray-800 bg-[#071322] flex items-center justify-between text-xs text-gray-400">
+              <span className="font-mono text-[10px]">
+                Standards conform to W3C Navigation & User Timing L2 specifications.
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowGlossaryModal(false)}
+                className="px-4 py-1.5 rounded-xl bg-gray-850 hover:bg-gray-800 text-xs font-bold text-white transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
