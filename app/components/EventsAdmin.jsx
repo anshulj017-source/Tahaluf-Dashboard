@@ -9,8 +9,8 @@ import {
 } from 'lucide-react';
 import { AdminDialog, useAdminDirtyGuard } from './AdminUI';
 
-export default function EventsAdmin({ currentUserEmail = 'fehmatics@gmail.com', initialEvents = [], onEventsSaved }) {
-  const currentAuthor = currentUserEmail || 'fehmatics@gmail.com';
+export default function EventsAdmin({ currentUserEmail = '', initialEvents = [], onEventsSaved }) {
+  const currentAuthor = currentUserEmail || (typeof window !== 'undefined' ? localStorage.getItem('tahaluf_cached_email') : '') || 'System Administrator';
   const hasInitial = Array.isArray(initialEvents) && initialEvents.length > 0;
   const [config, setConfig] = useState(hasInitial ? { events: initialEvents, version: 'v1.0.0' } : null);
   const [events, setEvents] = useState(hasInitial ? initialEvents : []);
@@ -1905,7 +1905,7 @@ export default function EventsAdmin({ currentUserEmail = 'fehmatics@gmail.com', 
                       {/* Admin Attribution Badge */}
                       <span className="px-3 py-1 rounded-full bg-blue-500/15 text-blue-300 border border-blue-500/30 text-xs font-bold flex items-center gap-1.5 shadow-sm">
                         <User className="w-3.5 h-3.5 text-blue-400" />
-                        <span>Admin: <strong className="text-white font-mono">{ver.author || 'fehmatics@gmail.com'}</strong></span>
+                        <span>Admin: <strong className="text-white font-mono">{ver.author || 'System Administrator'}</strong></span>
                       </span>
 
                       {/* Snapshot Inspector Toggle */}

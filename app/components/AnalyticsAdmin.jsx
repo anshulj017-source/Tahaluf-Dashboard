@@ -273,7 +273,7 @@ const ANALYTICS_TABS = [
   { id: 'recommendations', label: 'Recommendations' },
 ];
 
-export default function AnalyticsAdmin({ currentUserEmail = 'fehmatics@gmail.com', active = true }) {
+export default function AnalyticsAdmin({ currentUserEmail = '', active = true }) {
   const lowQuotaMode = useLowQuotaMode();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -373,7 +373,7 @@ export default function AnalyticsAdmin({ currentUserEmail = 'fehmatics@gmail.com
     const id = ++requestId.current;
     setIsRefreshing(true);
     try {
-      const email = currentUserEmail || auth.currentUser?.email || 'fehmatics@gmail.com';
+      const email = currentUserEmail || auth.currentUser?.email || (typeof window !== 'undefined' ? localStorage.getItem('tahaluf_cached_email') : '') || '';
       const token = await auth.currentUser?.getIdToken().catch(() => null);
       const headers = {};
       if (token) {
@@ -434,7 +434,7 @@ export default function AnalyticsAdmin({ currentUserEmail = 'fehmatics@gmail.com
     setActionLoadingId(actionId);
     setActionFeedback(null);
     try {
-      const email = currentUserEmail || auth.currentUser?.email || 'fehmatics@gmail.com';
+      const email = currentUserEmail || auth.currentUser?.email || (typeof window !== 'undefined' ? localStorage.getItem('tahaluf_cached_email') : '') || '';
       const token = await auth.currentUser?.getIdToken().catch(() => null);
       const headers = { 'Content-Type': 'application/json' };
       if (token) {

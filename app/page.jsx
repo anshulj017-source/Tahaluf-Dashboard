@@ -3694,7 +3694,7 @@ export default function App() {
           <div className="min-w-0 flex-1 flex overflow-hidden" style={{ display: activeTab === 'admin' ? undefined : 'none' }}>
           <AdminView 
             active={activeTab === 'admin'}
-            currentUserEmail={userEmail || (auth?.currentUser?.email) || 'fehmatics@gmail.com'} 
+            currentUserEmail={userEmail || (auth?.currentUser?.email) || (typeof window !== 'undefined' ? localStorage.getItem('tahaluf_cached_email') : '') || ''} 
             userRole={userRole}
             featureConfig={featureConfig}
             isFeatureAllowed={featureAllowed}

@@ -247,7 +247,7 @@ function CustomUserDropdown({ featureId, allUsers = [], selectedEmails = [], onC
 }
 
 export default function FeatureControlsAdmin({ 
-  currentUserEmail = 'fehmatics@gmail.com', 
+  currentUserEmail = '', 
   userRole = 'super_admin', 
   featureConfig = null,
   isFeatureAllowed = null,
@@ -294,7 +294,7 @@ export default function FeatureControlsAdmin({
   const loadUsers = async () => {
     try {
       const token = await auth.currentUser?.getIdToken(true).catch(() => null);
-      const email = currentUserEmail || auth.currentUser?.email || (typeof window !== 'undefined' ? localStorage.getItem('tahaluf_cached_email') : '') || 'fehmatics@gmail.com';
+      const email = currentUserEmail || auth.currentUser?.email || (typeof window !== 'undefined' ? localStorage.getItem('tahaluf_cached_email') : '') || '';
       const headers = {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -409,7 +409,7 @@ export default function FeatureControlsAdmin({
     setNotice('');
     try {
       const token = await auth.currentUser?.getIdToken(true).catch(() => null);
-      const email = currentUserEmail || auth.currentUser?.email || (typeof window !== 'undefined' ? localStorage.getItem('tahaluf_cached_email') : '') || 'fehmatics@gmail.com';
+      const email = currentUserEmail || auth.currentUser?.email || (typeof window !== 'undefined' ? localStorage.getItem('tahaluf_cached_email') : '') || '';
       const role = (isSuperAdmin ? 'super_admin' : userRole) || (typeof window !== 'undefined' ? localStorage.getItem('tahaluf_cached_role') : '') || 'super_admin';
       const headers = {
         'Content-Type': 'application/json',
@@ -454,7 +454,7 @@ export default function FeatureControlsAdmin({
     setNotice('');
     try {
       const token = await auth.currentUser?.getIdToken(true).catch(() => null);
-      const email = currentUserEmail || auth.currentUser?.email || (typeof window !== 'undefined' ? localStorage.getItem('tahaluf_cached_email') : '') || 'fehmatics@gmail.com';
+      const email = currentUserEmail || auth.currentUser?.email || (typeof window !== 'undefined' ? localStorage.getItem('tahaluf_cached_email') : '') || '';
       const role = (isSuperAdmin ? 'super_admin' : userRole) || (typeof window !== 'undefined' ? localStorage.getItem('tahaluf_cached_role') : '') || 'super_admin';
       const headers = {
         'Content-Type': 'application/json',

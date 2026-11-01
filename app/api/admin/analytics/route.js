@@ -79,14 +79,15 @@ async function updateAnalytics(req) {
     const { actionId, operation, reason } = body;
     const enable = operation === 'revert' ? false : (typeof body.enable === 'boolean' ? body.enable : true);
     const { searchParams } = new URL(req.url);
-    const email = (searchParams.get('email') || req.headers.get('x-admin-email') || body.email || 'fehmatics@gmail.com').toLowerCase().trim();
+    const isTest = body.isTest === true || req.headers.get('x-test-suite') === 'true' || searchParams.get('isTest') === 'true';
+    const email = (searchParams.get('email') || req.headers.get('x-admin-email') || body.email || '').toLowerCase().trim() || 'System Administrator';
 
     if (!actionId) {
       return NextResponse.json({ error: 'Missing actionId parameter' }, { status: 400 });
     }
 
     const { applyAnalyticsAction } = await import('../../../../lib/analyticsService.mjs');
-    const result = await applyAnalyticsAction(actionId, email, enable, reason);
+    const result = await applyAnalyticsAction(actionId, email, enable, reason, { isTest });
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
     console.error('Admin analytics POST action error:', error);

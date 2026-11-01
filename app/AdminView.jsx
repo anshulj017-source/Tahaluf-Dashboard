@@ -30,7 +30,7 @@ const sections = ALL_ADMIN_SECTIONS;
 
 export default function AdminView({ 
   active = true, 
-  currentUserEmail = 'fehmatics@gmail.com', 
+  currentUserEmail = '', 
   userRole = 'super_admin',
   featureConfig = null,
   isFeatureAllowed = null,
@@ -172,7 +172,7 @@ export default function AdminView({
       }
     } catch {}
 
-    const email = currentUserEmail || (typeof window !== 'undefined' ? localStorage.getItem('tahaluf_cached_email') : '') || 'fehmatics@gmail.com';
+    const email = currentUserEmail || (typeof window !== 'undefined' ? localStorage.getItem('tahaluf_cached_email') : '') || '';
     const role = (isSuperAdmin ? 'super_admin' : userRole) || (typeof window !== 'undefined' ? localStorage.getItem('tahaluf_cached_role') : '') || 'admin';
     const headers = {
       'Content-Type': 'application/json',
