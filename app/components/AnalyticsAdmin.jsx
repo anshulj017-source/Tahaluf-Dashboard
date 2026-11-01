@@ -94,7 +94,7 @@ export default function AnalyticsAdmin({ currentUserEmail = 'fehmatics@gmail.com
     const id = ++requestId.current;
     setIsRefreshing(true);
     try {
-      const email = currentUserEmail || auth.currentUser?.email || 'admin@tahaluf.com';
+      const email = currentUserEmail || auth.currentUser?.email || 'fehmatics@gmail.com';
       const token = await auth.currentUser?.getIdToken().catch(() => null);
       const headers = {};
       if (token) {
@@ -155,7 +155,7 @@ export default function AnalyticsAdmin({ currentUserEmail = 'fehmatics@gmail.com
     setActionLoadingId(actionId);
     setActionFeedback(null);
     try {
-      const email = currentUserEmail || auth.currentUser?.email || 'admin@tahaluf.com';
+      const email = currentUserEmail || auth.currentUser?.email || 'fehmatics@gmail.com';
       const token = await auth.currentUser?.getIdToken().catch(() => null);
       const headers = { 'Content-Type': 'application/json' };
       if (token) {
