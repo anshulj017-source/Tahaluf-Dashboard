@@ -5,12 +5,48 @@ import {
   Shield, Eye, EyeOff, Save, RotateCcw, Search, CheckCircle2, 
   AlertTriangle, Filter, Sparkles, Tv, Layers, Wrench, Activity, 
   Brain, BarChart2, Globe, Lock, Ban, ExternalLink, Users,
-  ChevronDown, Check, X, Plus, UserCheck, History, Clock
+  ChevronDown, Check, X, Plus, UserCheck, History, Clock, Calendar
 } from 'lucide-react';
 import { auth } from '../../lib/firebase';
 import { DASHBOARD_FEATURES, DEFAULT_FEATURE_CONFIG, isFeatureEnabled } from '../../lib/dashboardFeatures.mjs';
 import { isRootSuperAdmin } from '../../lib/authConstants.mjs';
 import { useAdminDirtyGuard } from './AdminUI';
+
+function formatFeatureDate(dateInput) {
+  if (!dateInput) return 'Oct 24, 2026';
+  const d = new Date(dateInput);
+  if (isNaN(d.getTime())) return 'Oct 24, 2026';
+  return d.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric'
+  });
+}
+
+function formatFeatureDateTime(dateInput) {
+  if (!dateInput) return 'Oct 24, 2026';
+  const d = new Date(dateInput);
+  if (isNaN(d.getTime())) return 'Oct 24, 2026';
+  return d.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit'
+  });
+}
+
+function formatFeatureRelative(dateInput) {
+  if (!dateInput) return 'Baseline';
+  const d = new Date(dateInput);
+  if (isNaN(d.getTime())) return 'Baseline';
+  const diffSec = Math.floor((Date.now() - d.getTime()) / 1000);
+  if (diffSec < 60) return 'Just now';
+  if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+  if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+  if (diffSec < 86400 * 7) return `${Math.floor(diffSec / 86400)}d ago`;
+  return formatFeatureDate(d);
+}
 
 const GROUP_ICONS = {
   'Dashboard views': Layers,
@@ -285,6 +321,7 @@ export default function FeatureControlsAdmin({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGroup, setSelectedGroup] = useState('All');
   const [selectedStatusFilter, setSelectedStatusFilter] = useState('All');
+  const [selectedSort, setSelectedSort] = useState('default');
   const [collapsedGroups, setCollapsedGroups] = useState({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -553,7 +590,7 @@ export default function FeatureControlsAdmin({
   const groups = useMemo(() => ['All', ...new Set(DASHBOARD_FEATURES.map(f => f.group))], []);
   
   const filteredFeatures = useMemo(() => {
-    return DASHBOARD_FEATURES.filter(f => {
+    let list = DASHBOARD_FEATURES.filter(f => {
       if (selectedGroup !== 'All' && f.group !== selectedGroup) return false;
       const currentMode = modes[f.id] || f.defaultMode || 'public';
       if (selectedStatusFilter !== 'All' && currentMode !== selectedStatusFilter) return false;
@@ -563,7 +600,27 @@ export default function FeatureControlsAdmin({
       }
       return true;
     });
-  }, [selectedGroup, selectedStatusFilter, searchQuery, modes]);
+
+    if (selectedSort === 'updated_desc') {
+      list = [...list].sort((a, b) => {
+        const aEntry = config?.featureUpdated?.[a.id];
+        const bEntry = config?.featureUpdated?.[b.id];
+        const aUp = typeof aEntry === 'string' ? aEntry : (aEntry?.updatedAt || a.lastUpdated || a.addedAt || '2026-10-01');
+        const bUp = typeof bEntry === 'string' ? bEntry : (bEntry?.updatedAt || b.lastUpdated || b.addedAt || '2026-10-01');
+        return new Date(bUp).getTime() - new Date(aUp).getTime();
+      });
+    } else if (selectedSort === 'added_desc') {
+      list = [...list].sort((a, b) => {
+        const aAdd = a.addedAt || '2026-10-01';
+        const bAdd = b.addedAt || '2026-10-01';
+        return new Date(bAdd).getTime() - new Date(aAdd).getTime();
+      });
+    } else if (selectedSort === 'name_asc') {
+      list = [...list].sort((a, b) => a.name.localeCompare(b.name));
+    }
+
+    return list;
+  }, [selectedGroup, selectedStatusFilter, searchQuery, modes, selectedSort, config?.featureUpdated]);
 
   const toggleGroupCollapse = (group) => {
     setCollapsedGroups(prev => ({ ...prev, [group]: !prev[group] }));
@@ -1008,6 +1065,18 @@ export default function FeatureControlsAdmin({
             <option value="custom_users">Custom Users</option>
             <option value="disabled">Disabled</option>
           </select>
+
+          <select
+            value={selectedSort}
+            onChange={(e) => setSelectedSort(e.target.value)}
+            className="px-3 py-2 rounded-xl bg-[#041628] border border-white/10 text-xs text-slate-200 focus:outline-none focus:border-[#cedc28]/50 cursor-pointer font-medium"
+            title="Sort features by date or name"
+          >
+            <option value="default">Sort: Default (Category)</option>
+            <option value="updated_desc">Sort: Recently Updated</option>
+            <option value="added_desc">Sort: Recently Added</option>
+            <option value="name_asc">Sort: Name (A-Z)</option>
+          </select>
         </div>
       </div>
 
@@ -1117,6 +1186,16 @@ export default function FeatureControlsAdmin({
                   );
                   const assignedUsers = customUsers[feature.id] || [];
 
+                  const initialMode = config?.modes?.[feature.id] || feature.defaultMode || 'public';
+                  const initialUsers = JSON.stringify(config?.customUsers?.[feature.id] || []);
+                  const isFeatureDirty = currentMode !== initialMode || JSON.stringify(assignedUsers) !== initialUsers;
+
+                  const updatedEntry = config?.featureUpdated?.[feature.id];
+                  const lastUpdatedTime = typeof updatedEntry === 'string'
+                    ? updatedEntry
+                    : (updatedEntry?.updatedAt || feature.lastUpdated || feature.addedAt);
+                  const lastUpdatedAuthor = typeof updatedEntry === 'object' ? updatedEntry?.updatedBy : null;
+
                   return (
                     <div key={feature.id} className="p-4 sm:p-5 hover:bg-white/[0.02] transition-colors">
                       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -1160,6 +1239,44 @@ export default function FeatureControlsAdmin({
                             )}
                           </div>
                           <p className="text-xs text-slate-400 leading-relaxed">{feature.description}</p>
+
+                          {/* Feature Lifecycle Dates */}
+                          <div className="flex items-center gap-2 sm:gap-2.5 mt-2.5 flex-wrap">
+                            {/* Added Date */}
+                            <div 
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#030b14] border border-white/10 text-slate-300 shadow-sm"
+                              title={`Feature added to dashboard: ${formatFeatureDateTime(feature.addedAt)}`}
+                            >
+                              <Calendar className="w-3 h-3 text-[#14a6d9]" />
+                              <span className="text-[10.5px] text-slate-400 font-medium">Added:</span>
+                              <span className="text-[10.5px] font-semibold text-slate-200 font-mono">
+                                {formatFeatureDate(feature.addedAt)}
+                              </span>
+                            </div>
+
+                            {/* Last Updated Date */}
+                            <div 
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#030b14] border ${
+                                isFeatureDirty ? 'border-amber-500/40 text-amber-200' : 'border-cyan-500/25 text-cyan-200'
+                              } shadow-sm`}
+                              title={
+                                isFeatureDirty 
+                                  ? 'Pending save: you modified this feature setting in this session'
+                                  : `Configuration last updated: ${formatFeatureDateTime(lastUpdatedTime)}${lastUpdatedAuthor ? ` by ${lastUpdatedAuthor}` : ''}`
+                              }
+                            >
+                              <Clock className={`w-3 h-3 ${isFeatureDirty ? 'text-amber-400' : 'text-[#cedc28]'}`} />
+                              <span className="text-[10.5px] text-slate-400 font-medium">Last Updated:</span>
+                              <span className={`text-[10.5px] font-semibold font-mono ${isFeatureDirty ? 'text-amber-300' : 'text-[#cedc28]'}`}>
+                                {isFeatureDirty ? 'Modified (Unsaved)' : formatFeatureRelative(lastUpdatedTime)}
+                              </span>
+                              {lastUpdatedAuthor && !isFeatureDirty && (
+                                <span className="text-slate-400 text-[10px] hidden lg:inline">
+                                  by {lastUpdatedAuthor}
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         </div>
 
                         {/* Pill Toggle Controls */}

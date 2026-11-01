@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { isAdminRequest } from '../../../../lib/requireAdminRequest.js';
 import { readAdminSetting, updateAdminSetting } from '../../../../lib/adminSettingsStore.mjs';
-import { DEFAULT_FEATURE_CONFIG, validateFeatureModes, validateCustomUsers } from '../../../../lib/dashboardFeatures.mjs';
+import { DEFAULT_FEATURE_CONFIG, BASELINE_FEATURE_UPDATED, DASHBOARD_FEATURES, validateFeatureModes, validateCustomUsers } from '../../../../lib/dashboardFeatures.mjs';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -50,23 +50,43 @@ export async function PUT(request) {
       const clientRev = Number.isInteger(body.revision) ? body.revision : 0;
       const nextRev = Math.max(currentRev, clientRev) + 1;
       const nextCustomUsers = customUsers !== null ? customUsers : (current?.customUsers || {});
+      const nowIso = new Date().toISOString();
+
+      const featureUpdated = {
+        ...BASELINE_FEATURE_UPDATED,
+        ...(current?.featureUpdated || {})
+      };
+      for (const feature of DASHBOARD_FEATURES) {
+        const oldMode = current?.modes?.[feature.id];
+        const newMode = modes[feature.id];
+        const oldUsers = JSON.stringify(current?.customUsers?.[feature.id] || []);
+        const newUsers = JSON.stringify(nextCustomUsers[feature.id] || []);
+        if (oldMode !== newMode || oldUsers !== newUsers) {
+          featureUpdated[feature.id] = {
+            updatedAt: nowIso,
+            updatedBy: adminEmail
+          };
+        }
+      }
       
       const historyEntry = {
         revision: currentRev,
-        timestamp: current?.updatedAt || new Date().toISOString(),
+        timestamp: current?.updatedAt || nowIso,
         author: current?.updatedBy || 'System / Admin',
         modes: current?.modes || DEFAULT_FEATURE_CONFIG.modes,
-        customUsers: current?.customUsers || {}
+        customUsers: current?.customUsers || {},
+        featureUpdated: current?.featureUpdated || featureUpdated
       };
       const existingHistory = Array.isArray(current?.history) ? current.history : [];
       const updatedHistory = currentRev > 0 ? [historyEntry, ...existingHistory].slice(0, 30) : existingHistory;
 
       return { 
         revision: nextRev, 
-        updatedAt: new Date().toISOString(), 
+        updatedAt: nowIso, 
         updatedBy: adminEmail,
         modes,
         customUsers: nextCustomUsers,
+        featureUpdated,
         history: updatedHistory
       };
     });

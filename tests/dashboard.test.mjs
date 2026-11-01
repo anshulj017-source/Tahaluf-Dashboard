@@ -1014,12 +1014,12 @@ async function testAnalyticsLogic() {
 
   // Action Catalog & In-UI Action Execution
   assert(SYSTEM_ACTIONS_CATALOG['enable_compact_grid_mode'] !== undefined, 'Action catalog includes compact grid density action');
-  const actionRes = await applyAnalyticsAction('enable_compact_grid_mode', 'fehmatics@gmail.com', true);
+  const actionRes = await applyAnalyticsAction('enable_compact_grid_mode', 'fehmatics@gmail.com', true, 'automated test suite', { isTest: true });
   assert(actionRes.success === true, 'Applying analytics optimization succeeds');
   assert(actionRes.status === 'active', 'Action status is updated to active');
 
   // Rollback / Revert Action & History Verification
-  const revertRes = await applyAnalyticsAction('enable_compact_grid_mode', 'fehmatics@gmail.com', false, 'Testing automated rollback');
+  const revertRes = await applyAnalyticsAction('enable_compact_grid_mode', 'fehmatics@gmail.com', false, 'Testing automated rollback', { isTest: true });
   assert(revertRes.success === true, 'Reverting analytics optimization succeeds');
   assert(revertRes.status === 'reverted', 'Reverted action status is updated to reverted');
   assert(Array.isArray(revertRes.actionsHistory), 'Revert returns actions history audit trail');
@@ -1341,7 +1341,7 @@ async function testApiQuotasApi() {
 function testFeatureControlsLogic() {
   console.log('\n--- 11. Testing Dashboard Feature Controls & Role Permissions ---');
   
-  // 1. Verify all managed features are declared
+  // 1. Verify all managed features are declared with addedAt lifecycle dates
   assert(Array.isArray(DASHBOARD_FEATURES) && DASHBOARD_FEATURES.length >= 18, 'DASHBOARD_FEATURES defines all managed modules');
   const featureIds = DASHBOARD_FEATURES.map(f => f.id);
   assert(featureIds.includes('tv'), 'Includes tv mode feature');
@@ -1352,6 +1352,12 @@ function testFeatureControlsLogic() {
   assert(featureIds.includes('dimensionExport'), 'Includes dimensionExport feature');
   assert(featureIds.includes('bulkDimensionImport'), 'Includes bulkDimensionImport feature');
   assert(featureIds.includes('tvCustomization'), 'Includes tvCustomization feature');
+
+  for (const feat of DASHBOARD_FEATURES) {
+    assert(typeof feat.addedAt === 'string' && feat.addedAt.length > 0, `Feature ${feat.id} defines addedAt timestamp`);
+    assert(!isNaN(new Date(feat.addedAt).getTime()), `Feature ${feat.id} addedAt is a valid ISO date`);
+  }
+  assert(DEFAULT_FEATURE_CONFIG.featureUpdated !== undefined, 'DEFAULT_FEATURE_CONFIG includes featureUpdated lifecycle tracking map');
 
   // 2. Verify all new features default strictly to admin_only (zero disruption to live standard users)
   const aiFeature = DASHBOARD_FEATURES.find(f => f.id === 'aiSummary');

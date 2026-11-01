@@ -16,6 +16,10 @@ export async function GET() {
       ...rawConfig,
       modes: { ...DEFAULT_FEATURE_CONFIG.modes, ...(rawConfig?.modes || {}) },
       customUsers: { ...(rawConfig?.customUsers || {}) },
+      featureUpdated: {
+        ...(DEFAULT_FEATURE_CONFIG.featureUpdated || {}),
+        ...(rawConfig?.featureUpdated || {})
+      },
       history: Array.isArray(rawConfig?.history) ? rawConfig.history : []
     };
     return NextResponse.json({ success: true, config, policy: { lowQuotaMode: budgets.policy?.lowQuotaMode === true } }, { headers: { 'Cache-Control': 'no-store' } });
