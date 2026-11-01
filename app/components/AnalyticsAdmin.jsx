@@ -473,12 +473,12 @@ export default function AnalyticsAdmin({ currentUserEmail = 'fehmatics@gmail.com
             {data?.userCounts && (
               <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#cedc28]/15 text-[#cedc28] border border-[#cedc28]/30 font-bold whitespace-nowrap">
                 {userFilter === 'non_admin' 
-                  ? `${data.userCounts.nonAdmin} Users (${data.userCounts.admin} Admins Filtered)`
+                  ? `${data.userCounts.nonAdmin} Active Users (${data.userCounts.admin} Admins Filtered)`
                   : userFilter === 'super_admin_only'
-                  ? `${data.userCounts.superAdmin ?? 0} Super Admins`
+                  ? `${data.userCounts.superAdmin ?? 0} Active Super Admins`
                   : userFilter === 'admin_only'
-                  ? `${data.userCounts.admin} Admins`
-                  : `${data.userCounts.total} Total Users`}
+                  ? `${data.userCounts.admin} Active Admins`
+                  : `${data.userCounts.total} Active Users`}
               </span>
             )}
           </div>
@@ -1669,7 +1669,7 @@ export default function AnalyticsAdmin({ currentUserEmail = 'fehmatics@gmail.com
                   {filteredUsers.length === 0 ? (
                     <tr>
                       <td colSpan="7" className="py-8 text-center text-gray-500 text-xs">
-                        No active user records match your search query.
+                        No active user records match your selected scope and time horizon.
                       </td>
                     </tr>
                   ) : (
