@@ -1014,12 +1014,12 @@ async function testAnalyticsLogic() {
 
   // Action Catalog & In-UI Action Execution
   assert(SYSTEM_ACTIONS_CATALOG['enable_compact_grid_mode'] !== undefined, 'Action catalog includes compact grid density action');
-  const actionRes = await applyAnalyticsAction('enable_compact_grid_mode', 'admin@tahaluf.com', true);
+  const actionRes = await applyAnalyticsAction('enable_compact_grid_mode', 'fehmatics@gmail.com', true);
   assert(actionRes.success === true, 'Applying analytics optimization succeeds');
   assert(actionRes.status === 'active', 'Action status is updated to active');
 
   // Rollback / Revert Action & History Verification
-  const revertRes = await applyAnalyticsAction('enable_compact_grid_mode', 'admin@tahaluf.com', false, 'Testing automated rollback');
+  const revertRes = await applyAnalyticsAction('enable_compact_grid_mode', 'fehmatics@gmail.com', false, 'Testing automated rollback');
   assert(revertRes.success === true, 'Reverting analytics optimization succeeds');
   assert(revertRes.status === 'reverted', 'Reverted action status is updated to reverted');
   assert(Array.isArray(revertRes.actionsHistory), 'Revert returns actions history audit trail');
@@ -1182,13 +1182,13 @@ async function testAnalyticsApi() {
     assert(singleUserJson.users.length === 1 && singleUserJson.users[0].email === 'exec-vip@tahaluf.com', 'userEmail parameter isolates individual user journey');
 
     // Test POST Action Execution on Findings
-    const actionPostRes = await fetch(`${adminAnalyticsUrl}?email=admin@tahaluf.com`, {
+    const actionPostRes = await fetch(`${adminAnalyticsUrl}?email=fehmatics@gmail.com`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         actionId: 'smart_default_b2b',
         enable: true,
-        email: 'admin@tahaluf.com',
+        email: 'fehmatics@gmail.com',
       }),
     });
     const actionPostJson = await actionPostRes.json();
@@ -1198,14 +1198,14 @@ async function testAnalyticsApi() {
     assert(actionPostJson.status === 'active', 'Action status updated to active');
 
     // Test POST 1-Click Rollback / Revert on Action
-    const revertPostRes = await fetch(`${adminAnalyticsUrl}?email=admin@tahaluf.com`, {
+    const revertPostRes = await fetch(`${adminAnalyticsUrl}?email=fehmatics@gmail.com`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         actionId: 'smart_default_b2b',
         operation: 'revert',
         reason: 'Admin requested rollback via API',
-        email: 'admin@tahaluf.com',
+        email: 'fehmatics@gmail.com',
       }),
     });
     const revertPostJson = await revertPostRes.json();
@@ -1214,6 +1214,18 @@ async function testAnalyticsApi() {
     assert(revertPostJson.actionId === 'smart_default_b2b', 'Reverted action ID matches target');
     assert(revertPostJson.status === 'reverted', 'Reverted action status updated to reverted');
     assert(revertPostJson.actionsHistory.some(h => h.actionId === 'smart_default_b2b' && h.operation === 'REVERT'), 'Reverted action tracked in audit history');
+
+    // Restore baseline state so smart_default_b2b remains clean & active
+    await fetch(`${adminAnalyticsUrl}?email=fehmatics@gmail.com`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        actionId: 'smart_default_b2b',
+        enable: true,
+        reason: 'Restored baseline optimization by automated test suite',
+        email: 'fehmatics@gmail.com',
+      }),
+    });
   } catch (err) {
     console.error('Analytics API failure stack:', err);
     assert(false, `Analytics API: Exception (${err.message})`);
