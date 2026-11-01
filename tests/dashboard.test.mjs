@@ -1216,14 +1216,14 @@ async function testAnalyticsApi() {
     assert(revertPostJson.actionsHistory.some(h => h.actionId === 'smart_default_b2b' && h.operation === 'REVERT'), 'Reverted action tracked in audit history');
 
     // Restore baseline state so smart_default_b2b remains clean & active
-    await fetch(`${adminAnalyticsUrl}?email=fehmatics@gmail.com`, {
+    await fetch(`${adminAnalyticsUrl}?email=System+Baseline`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         actionId: 'smart_default_b2b',
         enable: true,
         reason: 'Restored baseline optimization by automated test suite',
-        email: 'fehmatics@gmail.com',
+        email: 'System Baseline',
       }),
     });
   } catch (err) {

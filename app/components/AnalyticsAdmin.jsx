@@ -183,6 +183,32 @@ export const KPI_DOCUMENTATION = {
     slaTarget: '100% audit attribution with sub-minute lastActive precision.',
     dateBehavior: 'Only displays users active within the chosen date horizon.',
     audienceBehavior: 'Scoped by audience filter pills.'
+  },
+  searchIndexing: {
+    id: 'searchIndexing',
+    name: 'Search Indexing & Filter Latency',
+    category: 'Reliability & Performance',
+    badge: 'Query Optimization',
+    definition: 'Execution latency of search filters across large sheet datasets, comparing memoized token index lookups against linear array scans.',
+    formula: 'Time elapsed (ms) between search input debounced event and filtered table state commit.',
+    telemetrySource: 'Client-side performance.now() instrumentation on Detailed Grid filtering.',
+    exclusions: 'Initial component mount and data hydration are excluded.',
+    slaTarget: 'p50 < 8ms, p95 < 15ms on 15,000+ row datasets.',
+    dateBehavior: 'Evaluated continuously across client hardware profiles.',
+    audienceBehavior: 'Applies to all analytical and financial grid queries.'
+  },
+  countdownPacing: {
+    id: 'countdownPacing',
+    name: 'Countdown Velocity & Pacing Crunch',
+    category: 'Executive Overview',
+    badge: 'Pacing Intelligence',
+    definition: 'Tracking of campaign burn rates and conversion acceleration curves during the critical 21-day window (W3 to W0 countdown) prior to event launch.',
+    formula: 'Actual Spend / Planned Target across contiguous countdown weeks [W20...W0].',
+    telemetrySource: 'Weekly pacing aggregation engine joined with normalized event launch dates.',
+    exclusions: 'Past completed events or events > 60 days out do not trigger pacing crunch alerts.',
+    slaTarget: 'Zero unobserved pacing deviations exceeding ±15% of linear trajectory.',
+    dateBehavior: 'Dynamic timeline synchronized with current calendar date.',
+    audienceBehavior: 'Primary intelligence view for growth leads and media planners.'
   }
 };
 
