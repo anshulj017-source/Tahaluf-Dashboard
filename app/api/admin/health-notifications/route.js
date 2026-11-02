@@ -86,7 +86,10 @@ export async function POST(request) {
       return NextResponse.json({ success: true, dimensionSettings });
     }
     if (body.action === 'save-dimensions') {
-      return NextResponse.json({ success: true, dimensionSettings: await saveDimensionSelection(body.enabledDimensions) });
+      return NextResponse.json({
+        success: true,
+        dimensionSettings: await saveDimensionSelection(body.enabledDimensions, { ignoreBlanks: body.ignoreBlanks })
+      });
     }
     if (body.action === 'save-custom-values') {
       const dimensionSettings = await saveCustomValues(body.customValues);

@@ -1070,6 +1070,30 @@ test('blanks, non-standard values and missing columns have separate counts and b
   assert.equal(dimensionRules.checkDimensionRows('', { enabledDimensions: ['event'] }).status, 'unavailable');
 });
 
+test('dimension check ignoreBlanks option ignores blank cells while still reporting missing columns and non-standard values', () => {
+  const rows = Array.from({ length: 10 }, (_, index) => ({
+    ...validDimensionRow(), Channel: index < 5 ? '' : `Unknown${index}`, 'Language DB': ''
+  }));
+  for (const row of rows) {
+    delete row['Strategy DB'];
+    delete row['Language DB'];
+    row.Language = '';
+  }
+  const result = dimensionRules.checkDimensionRows(d3.csvFormat(rows), {
+    ...dimensionContext(),
+    ignoreBlanks: true
+  });
+  const findings = result.groups[0].findings;
+  assert.equal(findings.find(finding => finding.dimension === 'strategy').type, 'missing-column');
+  assert.equal(findings.find(finding => finding.dimension === 'strategy').count, 10);
+  assert.equal(findings.find(finding => finding.dimension === 'language'), undefined);
+  assert.equal(findings.find(finding => finding.dimension === 'channel' && finding.type === 'blank'), undefined);
+  const invalid = findings.find(finding => finding.dimension === 'channel' && finding.type === 'non-standard');
+  assert.equal(invalid.count, 5);
+  assert.deepEqual(invalid.sampleRows, [7, 8, 9]);
+  assert.equal(invalid.values.length, 3);
+});
+
 test('findings stay event-scoped, invalid unmapped event names remain visible and Planned is excluded', () => {
   const rows = [
     { ...validDimensionRow(), Channel: 'bad' },
@@ -1450,8 +1474,11 @@ test('global check settings require booleans, preserve dimension selections and 
   assert.deepEqual(state.enabledDimensions, ['channel']);
   assert.ok(state.values.event);
   assert.equal((await monitor.summarizeDimensions('')).status, 'disabled');
-  await monitor.saveDimensionSelection(['language']);
-  assert.equal(state.dimensionChecksEnabled, false, 'individual selection does not re-enable global checks');
+  await monitor.saveHealthCheckSettings({ metricChecksEnabled: true, dimensionChecksEnabled: true, ignoreBlanks: true });
+  assert.equal(state.ignoreBlanks, true);
+  await monitor.saveDimensionSelection(['language'], { ignoreBlanks: false });
+  assert.equal(state.ignoreBlanks, false);
+  assert.deepEqual(state.enabledDimensions, ['language']);
 });
 
 test('disabling checks retires active issues and queued recoveries without sending misleading resolution emails', async () => {

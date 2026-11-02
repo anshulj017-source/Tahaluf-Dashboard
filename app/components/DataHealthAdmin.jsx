@@ -114,7 +114,7 @@ export default function DataHealthAdmin({
   const [dimensionSettings, setDimensionSettings] = useState(DEFAULT_DIMENSION_SETTINGS);
   const [dimensionBusy, setDimensionBusy] = useState(false);
   const [dimensionNotice, setDimensionNotice] = useState(null);
-  const [checkDraft, setCheckDraft] = useState({ metricChecksEnabled: true, dimensionChecksEnabled: true });
+  const [checkDraft, setCheckDraft] = useState({ metricChecksEnabled: true, dimensionChecksEnabled: true, ignoreBlanks: false });
   const [eventCheckDrafts, setEventCheckDrafts] = useState({});
   const [savingEventChecks, setSavingEventChecks] = useState(null);
   const [eventCheckNotice, setEventCheckNotice] = useState(null);
@@ -152,7 +152,8 @@ export default function DataHealthAdmin({
   const dimensionDraftKey = JSON.stringify({
     enabledDimensions: dimensionSettings.enabledDimensions,
     metricChecksEnabled: checkDraft.metricChecksEnabled,
-    dimensionChecksEnabled: checkDraft.dimensionChecksEnabled
+    dimensionChecksEnabled: checkDraft.dimensionChecksEnabled,
+    ignoreBlanks: Boolean(checkDraft.ignoreBlanks)
   });
   const settingsDirty = !settingsLoading && (JSON.stringify(settings) !== JSON.stringify(savedSettings) || Boolean(recipientDraft.trim()));
   const dimensionSettingsDirty = !settingsLoading && dimensionDraftKey !== savedDimensionDraft;
@@ -243,13 +244,15 @@ export default function DataHealthAdmin({
           if (JSON.stringify(currentDrafts.checkDraft) === JSON.stringify(initialDrafts.checkDraft)) {
             setCheckDraft({
               metricChecksEnabled: nextDimensions.metricChecksEnabled !== false,
-              dimensionChecksEnabled: nextDimensions.dimensionChecksEnabled !== false
+              dimensionChecksEnabled: nextDimensions.dimensionChecksEnabled !== false,
+              ignoreBlanks: Boolean(nextDimensions.ignoreBlanks)
             });
           }
           setSavedDimensionDraft(JSON.stringify({
             enabledDimensions: (result.dimensionSettings || DEFAULT_DIMENSION_SETTINGS).enabledDimensions,
             metricChecksEnabled: result.dimensionSettings?.metricChecksEnabled !== false,
-            dimensionChecksEnabled: result.dimensionSettings?.dimensionChecksEnabled !== false
+            dimensionChecksEnabled: result.dimensionSettings?.dimensionChecksEnabled !== false,
+            ignoreBlanks: Boolean(result.dimensionSettings?.ignoreBlanks)
           }));
         }
       } catch (settingsError) {
@@ -468,7 +471,8 @@ export default function DataHealthAdmin({
       if (action !== 'refresh-standards') {
         const nextCheckDraft = {
           metricChecksEnabled: nextSettings.metricChecksEnabled !== false,
-          dimensionChecksEnabled: nextSettings.dimensionChecksEnabled !== false
+          dimensionChecksEnabled: nextSettings.dimensionChecksEnabled !== false,
+          ignoreBlanks: Boolean(nextSettings.ignoreBlanks)
         };
         setCheckDraft(nextCheckDraft);
         setSavedDimensionDraft(JSON.stringify({
@@ -932,13 +936,13 @@ export default function DataHealthAdmin({
         <section className="space-y-3 rounded-xl border border-white/10 bg-[#071d33] p-4">
           <div><h3 className="text-sm font-bold text-white">Global checks and standards</h3><p className="mt-1 text-xs text-slate-400">Category switches take precedence over event settings. Disabling checks stops validation and related alerts, not data loading. Sheet availability checks continue unless disabled per event.</p></div>
           <fieldset disabled={dimensionBusy || settingsLoading} className="space-y-3"><legend className="sr-only">Global health checks</legend>
-            <div className="grid gap-2 sm:grid-cols-2">{[['metricChecksEnabled', 'Enable metric health checks'], ['dimensionChecksEnabled', 'Enable dimension health checks']].map(([key, label]) => <label key={key} className="flex items-center gap-2 rounded-lg border border-white/10 p-3 text-xs text-white"><input type="checkbox" checked={checkDraft[key]} onChange={event => setCheckDraft(previous => ({ ...previous, [key]: event.target.checked }))} className="accent-[#cedc28]" />{label}</label>)}</div>
+            <div className="grid gap-2 sm:grid-cols-3">{[['metricChecksEnabled', 'Enable metric health checks'], ['dimensionChecksEnabled', 'Enable dimension health checks'], ['ignoreBlanks', 'Ignore blank values in dimension checks']].map(([key, label]) => <label key={key} className="flex items-center gap-2 rounded-lg border border-white/10 p-3 text-xs text-white"><input type="checkbox" checked={Boolean(checkDraft[key])} onChange={event => setCheckDraft(previous => ({ ...previous, [key]: event.target.checked }))} className="accent-[#cedc28]" />{label}</label>)}</div>
             <button type="button" onClick={() => updateDimensions('save-health-checks')} className="rounded-lg border border-[#14a6d9]/40 px-3 py-2 text-xs font-semibold text-[#6bd5f7]">Save global checks</button>
           </fieldset>
           {dimensionNotice && <p role={dimensionNotice.type === 'error' ? 'alert' : 'status'} className={`text-xs ${dimensionNotice.type === 'error' ? 'text-red-300' : 'text-lime-200'}`}>{dimensionNotice.text}</p>}
           <div className="border-t border-white/10 pt-3"><h4 className="text-xs font-semibold text-white">Dimension standards</h4>
             {dimensionSettings.dimensionChecksEnabled === false && <p className="mt-1 text-xs text-amber-200">Dimension health checks are globally disabled; individual selections are retained.</p>}
-            <p className="mt-1 text-[10px] text-slate-400">Actuals only. Values are trimmed and case-insensitive; blanks and missing columns are reported separately. Data is never rewritten. Last standards sync: {formatTimestamp(dimensionSettings.fetchedAt)}; cached for 24 hours.</p>
+            <p className="mt-1 text-[10px] text-slate-400">Actuals only. Values are trimmed and case-insensitive; blanks and missing columns are reported separately (unless blank cells are set to be ignored). Data is never rewritten. Last standards sync: {formatTimestamp(dimensionSettings.fetchedAt)}; cached for 24 hours.</p>
             <a href="https://docs.google.com/spreadsheets/d/1D1BzodAQS45oJ27xwhk9FJkxFFzJk-r9x0lQzWG6u4w/edit?gid=593739615" target="_blank" rel="noreferrer" className="mt-1 inline-block text-xs text-[#6bd5f7]">Open standards documentation</a>
             {dimensionSettings.error && <p role="alert" className="mt-1 text-xs text-amber-300">Standards refresh failed; retaining last valid standards: {dimensionSettings.error}</p>}
             <fieldset disabled={dimensionBusy || settingsLoading} className="mt-3 space-y-3"><legend className="text-[10px] text-slate-300">Dimensions to validate</legend>
