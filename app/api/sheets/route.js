@@ -75,8 +75,8 @@ async function reportHealthForSheet(cacheKey, health = {}) {
     const checkSettings = await getDimensionSettings();
 
     for (const source of sources) {
-      const monitoredSource = applyHealthCheckSettings({ ...source, ...health, ...getEventDataStats(source, health), dimensionHealth: dimensionHealthForSource(source, health.dimensionValidation) }, checkSettings);
-      const issues = getHealthIssues([monitoredSource]);
+      const monitoredSource = applyHealthCheckSettings({ ...source, ...health, ...getEventDataStats(source, health), dimensionHealth: dimensionHealthForSource(source, health.dimensionValidation, checkSettings) }, checkSettings);
+      const issues = getHealthIssues([monitoredSource], checkSettings);
       await observeHealthSourceIssues(`${source.eventId}:${source.kind}`, issues);
     }
   } catch (error) {

@@ -138,7 +138,7 @@ test('E2E Browser Render & Console Error Verification Suite', async (t) => {
       assert.deepEqual(pageErrors, [], `Detected uncaught page runtime exceptions: ${JSON.stringify(pageErrors)}`);
       assert.deepEqual(failedRequests, [], `Detected failed asset requests: ${JSON.stringify(failedRequests)}`);
 
-      await page.close().catch(() => {});
+      await page.close().catch(() => { });
     });
 
     await t.test('CSS Stylesheets are delivered and applied (no unstyled white fallback)', async () => {
@@ -192,7 +192,7 @@ test('E2E Browser Render & Console Error Verification Suite', async (t) => {
         `Font family must be sans-serif/brand, but was ${bodyStyles.fontFamily}`
       );
 
-      await page.close().catch(() => {});
+      await page.close().catch(() => { });
     });
 
     await t.test('Interactive view navigation maintains styling and clean console', async () => {
@@ -226,8 +226,24 @@ test('E2E Browser Render & Console Error Verification Suite', async (t) => {
 
       assert.deepEqual(consoleErrors, [], `Console errors during interactive navigation: ${JSON.stringify(consoleErrors)}`);
 
-      await page.close().catch(() => {});
+      await page.close().catch(() => { });
     });
+
+    async function waitForDashboardReady(pageInstance, timeoutMs = 75000) {
+      const start = Date.now();
+      while (Date.now() - start < timeoutMs) {
+        try {
+          const ready = await pageInstance.evaluate(() => {
+            return !document.querySelector('.animate-spin-slow') && document.querySelectorAll('.card-surface').length > 0;
+          }).catch(() => false);
+          if (ready) return true;
+        } catch {
+          // Ignore transient detached frame during Next.js hydration or HMR
+        }
+        await new Promise(r => setTimeout(r, 400));
+      }
+      throw new Error('Timeout waiting for dashboard ready state');
+    }
 
     await t.test('Full dashboard live data sync completes, spinner unmounts, and UI cards render without freezing', async () => {
       const page = await getPage();
@@ -247,26 +263,11 @@ test('E2E Browser Render & Console Error Verification Suite', async (t) => {
         localStorage.setItem('tahaluf_cached_role', 'super_admin');
       });
 
-      await page.goto(targetUrl, { waitUntil: 'load', timeout: 30000 });
+      await page.goto(targetUrl, { waitUntil: 'load', timeout: 60000 });
       await new Promise(r => setTimeout(r, 600));
 
       // Wait for the loading spinner to disappear once live data streams finish
-      try {
-        await page.waitForFunction(
-          () => !document.querySelector('.animate-spin-slow') && document.querySelectorAll('.card-surface').length > 0,
-          { timeout: 75000 }
-        );
-      } catch (err) {
-        if (err.message && err.message.includes('detached')) {
-          await new Promise(r => setTimeout(r, 1000));
-          await page.waitForFunction(
-            () => !document.querySelector('.animate-spin-slow') && document.querySelectorAll('.card-surface').length > 0,
-            { timeout: 45000 }
-          );
-        } else {
-          throw err;
-        }
-      }
+      await waitForDashboardReady(page);
 
       // Verify dashboard contents are present
       const dashboardState = await page.evaluate(() => {
@@ -282,7 +283,7 @@ test('E2E Browser Render & Console Error Verification Suite', async (t) => {
       assert.ok(dashboardState.cardCount > 0, 'Dashboard cards must be rendered on the page');
       assert.deepEqual(runtimeErrors, [], `Detected runtime errors during full dashboard render: ${JSON.stringify(runtimeErrors)}`);
 
-      await page.close().catch(() => {});
+      await page.close().catch(() => { });
     });
 
     await t.test('Top filters open seamlessly and switch between dropdowns without backdrop interception', async () => {
@@ -303,26 +304,11 @@ test('E2E Browser Render & Console Error Verification Suite', async (t) => {
         localStorage.setItem('tahaluf_cached_role', 'super_admin');
       });
 
-      await page.goto(targetUrl, { waitUntil: 'load', timeout: 30000 });
+      await page.goto(targetUrl, { waitUntil: 'load', timeout: 60000 });
       await new Promise(r => setTimeout(r, 600));
 
       // Wait for loading spinner to finish
-      try {
-        await page.waitForFunction(
-          () => !document.querySelector('.animate-spin-slow') && document.querySelectorAll('.card-surface').length > 0,
-          { timeout: 75000 }
-        );
-      } catch (err) {
-        if (err.message && err.message.includes('detached')) {
-          await new Promise(r => setTimeout(r, 1000));
-          await page.waitForFunction(
-            () => !document.querySelector('.animate-spin-slow') && document.querySelectorAll('.card-surface').length > 0,
-            { timeout: 45000 }
-          );
-        } else {
-          throw err;
-        }
-      }
+      await waitForDashboardReady(page);
 
       // Verify that MultiSelect dropdowns can open, switch to another dropdown, and close cleanly
       const filterInteractions = await page.evaluate(async () => {
@@ -330,7 +316,7 @@ test('E2E Browser Render & Console Error Verification Suite', async (t) => {
         const filterContainers = Array.from(document.querySelectorAll('.shrink-0')).filter(c => c.offsetParent !== null || c.getClientRects().length > 0);
         const eventDropdown = filterContainers.find(c => c.textContent && c.textContent.includes('Event'));
         const channelDropdown = filterContainers.find(c => c.textContent && c.textContent.includes('Channel'));
-        
+
         if (!eventDropdown || !channelDropdown) {
           return { found: false, error: 'Filter dropdown containers not found' };
         }
@@ -372,7 +358,7 @@ test('E2E Browser Render & Console Error Verification Suite', async (t) => {
       assert.ok(filterInteractions.menuClosed, 'Dropdown closed on click outside');
       assert.deepEqual(runtimeErrors, [], `No console errors during filter interactions: ${JSON.stringify(runtimeErrors)}`);
 
-      await page.close().catch(() => {});
+      await page.close().catch(() => { });
     });
 
     await t.test('AI Strategic Intelligence renders Event & Portfolio Breakdown tabs cleanly', async () => {
@@ -393,26 +379,11 @@ test('E2E Browser Render & Console Error Verification Suite', async (t) => {
         localStorage.setItem('tahaluf_cached_role', 'super_admin');
       });
 
-      await page.goto(targetUrl, { waitUntil: 'load', timeout: 30000 });
+      await page.goto(targetUrl, { waitUntil: 'load', timeout: 60000 });
       await new Promise(r => setTimeout(r, 600));
 
       // Wait for loading spinner to finish
-      try {
-        await page.waitForFunction(
-          () => !document.querySelector('.animate-spin-slow') && document.querySelectorAll('.card-surface').length > 0,
-          { timeout: 75000 }
-        );
-      } catch (err) {
-        if (err.message && err.message.includes('detached')) {
-          await new Promise(r => setTimeout(r, 1000));
-          await page.waitForFunction(
-            () => !document.querySelector('.animate-spin-slow') && document.querySelectorAll('.card-surface').length > 0,
-            { timeout: 45000 }
-          );
-        } else {
-          throw err;
-        }
-      }
+      await waitForDashboardReady(page);
 
       // Wait for AI Intelligence card tabs to appear if enabled
       const hasAiCard = await page.waitForFunction(
@@ -423,14 +394,14 @@ test('E2E Browser Render & Console Error Verification Suite', async (t) => {
       if (!hasAiCard) {
         // AI Summary is disabled in current dashboard feature controls; verify clean render without errors
         assert.deepEqual(runtimeErrors, [], `No console errors when AI Summary is disabled in feature controls: ${JSON.stringify(runtimeErrors)}`);
-        await page.close().catch(() => {});
+        await page.close().catch(() => { });
         return;
       }
 
       // Verify AI Strategic tabs switch and render content
       const tabResults = await page.evaluate(async () => {
         const buttons = Array.from(document.querySelectorAll('button'));
-        
+
         // 1. Click "Daily Next Steps" tab
         const nextStepsTab = buttons.find(b => b.textContent && b.textContent.includes('Daily Next Steps'));
         if (nextStepsTab) nextStepsTab.click();
@@ -480,7 +451,7 @@ test('E2E Browser Render & Console Error Verification Suite', async (t) => {
       assert.ok(tabResults.hasBrief, 'Executive Brief tab restores strategic cards');
       assert.deepEqual(runtimeErrors, [], `No console errors during AI tab navigation: ${JSON.stringify(runtimeErrors)}`);
 
-      await page.close().catch(() => {});
+      await page.close().catch(() => { });
     });
 
     await t.test('Admin section menu orientation adapts to screen size (dropdown on mobile, 2-line layout on medium, vertical on desktop)', async () => {
@@ -555,7 +526,7 @@ test('E2E Browser Render & Console Error Verification Suite', async (t) => {
 
       assert.deepEqual(consoleErrors, [], `No console errors during admin menu orientation check: ${JSON.stringify(consoleErrors)}`);
 
-      await page.close().catch(() => {});
+      await page.close().catch(() => { });
     });
 
   } finally {

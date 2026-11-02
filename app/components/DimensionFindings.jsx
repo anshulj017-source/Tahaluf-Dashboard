@@ -6,6 +6,19 @@ const labels = {
   'non-standard': 'Non-standard value'
 };
 
+function isEventBlankIgnored(dimensionId, targetId, eventName, ignoreMap = {}) {
+  if (!ignoreMap || typeof ignoreMap !== 'object') return false;
+  const candidates = [targetId, eventName].filter(Boolean).map(s => String(s).toLowerCase().replace(/[^a-z0-9]/g, ''));
+  for (const [key, dimMap] of Object.entries(ignoreMap)) {
+    if (!dimMap || !dimMap[dimensionId]) continue;
+    const cleanKey = String(key).toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (candidates.some(c => c === cleanKey || (c.endsWith('26') && cleanKey.endsWith('26') && c.replace(/26$/, '') === cleanKey.replace(/26$/, '')))) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function stringSimilarity(s1, s2) {
   const a = String(s1 || '').trim().toLowerCase();
   const b = String(s2 || '').trim().toLowerCase();
@@ -103,127 +116,127 @@ export default function DimensionFindings({
             {group.findings.map((finding, index) => {
               const targetId = finding.eventId || eventId;
               const isBlanksIgnoredGlobal = Boolean(ignoreBlanksByDimension[id]);
-              const isBlanksIgnoredEvent = Boolean(targetId && ignoreBlanksByEventDimension[targetId]?.[id]);
+              const isBlanksIgnoredEvent = isEventBlankIgnored(id, targetId, eventName, ignoreBlanksByEventDimension);
               const isBlankType = finding.type === 'blank';
 
               return (
-              <li key={`${finding.type}:${index}`} className="rounded-lg border border-white/10 bg-[#031120]/70 p-3">
-                <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                  <span className="font-semibold text-amber-200">{labels[finding.type] || finding.type}</span>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-full bg-amber-300/10 px-2 py-1 font-bold tabular-nums text-amber-100">{finding.count.toLocaleString()} record{finding.count === 1 ? '' : 's'}</span>
-                    {onIgnoreBlanks && isBlankType && (
-                      <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
-                        {isBlanksIgnoredGlobal ? (
-                          <span className="inline-flex items-center gap-1 rounded bg-slate-500/20 border border-slate-400/40 px-2 py-0.5 font-semibold text-slate-300">
-                            ✓ Blanks ignored globally
-                          </span>
-                        ) : isBlanksIgnoredEvent ? (
-                          <span className="inline-flex items-center gap-1 rounded bg-slate-500/20 border border-slate-400/40 px-2 py-0.5 font-semibold text-slate-300">
-                            ✓ Blanks ignored for {eventName || targetId}
-                          </span>
-                        ) : (
-                          <>
-                            {targetId && (
+                <li key={`${finding.type}:${index}`} className="rounded-lg border border-white/10 bg-[#031120]/70 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                    <span className="font-semibold text-amber-200">{labels[finding.type] || finding.type}</span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-full bg-amber-300/10 px-2 py-1 font-bold tabular-nums text-amber-100">{finding.count.toLocaleString()} record{finding.count === 1 ? '' : 's'}</span>
+                      {onIgnoreBlanks && isBlankType && (
+                        <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
+                          {isBlanksIgnoredGlobal ? (
+                            <span className="inline-flex items-center gap-1 rounded bg-slate-500/20 border border-slate-400/40 px-2 py-0.5 font-semibold text-slate-300">
+                              ✓ Blanks ignored globally
+                            </span>
+                          ) : isBlanksIgnoredEvent ? (
+                            <span className="inline-flex items-center gap-1 rounded bg-slate-500/20 border border-slate-400/40 px-2 py-0.5 font-semibold text-slate-300">
+                              ✓ Blanks ignored for {eventName || targetId}
+                            </span>
+                          ) : (
+                            <>
+                              {targetId && (
+                                <button
+                                  type="button"
+                                  disabled={Boolean(ignoringKey)}
+                                  onClick={() => handleIgnoreBlanks(id, targetId, 'event')}
+                                  className="rounded border border-amber-400/40 bg-amber-500/10 px-2 py-0.5 font-medium text-amber-200 hover:bg-amber-500/20 disabled:opacity-50"
+                                  title={`Ignore blank values for ${group.label} in ${eventName || targetId}`}
+                                >
+                                  {ignoringKey === `${id}:${targetId}:event` ? 'Ignoring…' : `Ignore blanks (${eventName || targetId})`}
+                                </button>
+                              )}
                               <button
                                 type="button"
                                 disabled={Boolean(ignoringKey)}
-                                onClick={() => handleIgnoreBlanks(id, targetId, 'event')}
-                                className="rounded border border-amber-400/40 bg-amber-500/10 px-2 py-0.5 font-medium text-amber-200 hover:bg-amber-500/20 disabled:opacity-50"
-                                title={`Ignore blank values for ${group.label} in ${eventName || targetId}`}
+                                onClick={() => handleIgnoreBlanks(id, null, 'global')}
+                                className="rounded border border-[#14a6d9]/40 bg-[#14a6d9]/10 px-2 py-0.5 font-medium text-[#6bd5f7] hover:bg-[#14a6d9]/20 disabled:opacity-50"
+                                title={`Ignore blank values for ${group.label} globally across all events`}
                               >
-                                {ignoringKey === `${id}:${targetId}:event` ? 'Ignoring…' : `Ignore blanks (${eventName || targetId})`}
+                                {ignoringKey === `${id}:global:global` ? 'Ignoring…' : 'Ignore blanks globally'}
                               </button>
-                            )}
-                            <button
-                              type="button"
-                              disabled={Boolean(ignoringKey)}
-                              onClick={() => handleIgnoreBlanks(id, null, 'global')}
-                              className="rounded border border-[#14a6d9]/40 bg-[#14a6d9]/10 px-2 py-0.5 font-medium text-[#6bd5f7] hover:bg-[#14a6d9]/20 disabled:opacity-50"
-                              title={`Ignore blank values for ${group.label} globally across all events`}
-                            >
-                              {ignoringKey === `${id}:global:global` ? 'Ignoring…' : 'Ignore blanks globally'}
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              {finding.values.length > 0 && <div className="mt-2 flex flex-col gap-2">
-                {finding.values.map(value => {
-                  const targetId = finding.eventId || eventId;
-                  const isEventAccepting = acceptingKey === `${id}:${value}:event`;
-                  const isGlobalAccepting = acceptingKey === `${id}:${value}:global`;
-                  const normVal = String(value || '').trim().toLowerCase();
-                  const isAcceptedGlobally = (customValues[id] || []).some(v => String(v || '').trim().toLowerCase() === normVal);
-                  const isAcceptedEvent = Boolean(targetId && (eventCustomValues[targetId]?.[id] || []).some(v => String(v || '').trim().toLowerCase() === normVal));
-                  const isAccepted = isAcceptedGlobally || isAcceptedEvent;
-                  const bestSuggestion = finding.type === 'non-standard' && !isAccepted
-                    ? findBestSuggestion(value, [standards[id] || [], customValues[id] || [], eventCustomValues[targetId]?.[id] || []])
-                    : null;
-
-                  return (
-                    <div key={value} className="flex flex-col gap-1.5 rounded bg-white/10 p-2">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <code className="max-w-full break-all font-mono text-xs text-white">{value}</code>
-                        {onAcceptValue && finding.type === 'non-standard' && (
-                          <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
-                            {isAcceptedGlobally ? (
-                              <span className="inline-flex items-center gap-1 rounded bg-emerald-500/20 border border-emerald-400/40 px-2 py-0.5 font-semibold text-emerald-300">
-                                ✓ Accepted globally
-                              </span>
-                            ) : isAcceptedEvent ? (
-                              <span className="inline-flex items-center gap-1 rounded bg-emerald-500/20 border border-emerald-400/40 px-2 py-0.5 font-semibold text-emerald-300">
-                                ✓ Accepted for {eventName || targetId}
-                              </span>
-                            ) : (
-                              <>
-                                {targetId && (
-                                  <button
-                                    type="button"
-                                    disabled={Boolean(acceptingKey)}
-                                    onClick={() => handleAccept(id, value, targetId, 'event')}
-                                    className="rounded border border-amber-400/40 bg-amber-500/10 px-2 py-1 font-medium text-amber-200 hover:bg-amber-500/20 disabled:opacity-50"
-                                    title={`Accept "${value}" for ${eventName || targetId}`}
-                                  >
-                                    {isEventAccepting ? 'Accepting…' : `+ Accept for ${eventName || targetId}`}
-                                  </button>
-                                )}
-                                <button
-                                  type="button"
-                                  disabled={Boolean(acceptingKey)}
-                                  onClick={() => handleAccept(id, value, null, 'global')}
-                                  className="rounded border border-[#14a6d9]/40 bg-[#14a6d9]/10 px-2 py-1 font-medium text-[#6bd5f7] hover:bg-[#14a6d9]/20 disabled:opacity-50"
-                                  title={`Accept "${value}" across all events globally`}
-                                >
-                                  {isGlobalAccepting ? 'Accepting…' : '+ Accept globally'}
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                      {bestSuggestion && (
-                        <div className="flex items-center gap-1.5 text-[11px] text-lime-300/90 bg-lime-950/40 border border-lime-500/20 rounded px-2 py-0.5">
-                          <span>💡 Did you mean standard:</span>
-                          <span className="font-semibold text-lime-200 underline underline-offset-2">{bestSuggestion.suggestion}</span>
-                          <span className="text-[10px] text-lime-400/60">({bestSuggestion.score}% match)</span>
+                            </>
+                          )}
                         </div>
                       )}
                     </div>
-                  );
-                })}
-              </div>}
-              <details className="mt-3 text-xs text-slate-300">
-                <summary className="cursor-pointer rounded py-1 font-semibold text-[#6bd5f7]">View sample records</summary>
-                <p className="mt-2 leading-relaxed">CSV records: {finding.sampleRows.join(', ')} (header included; not necessarily original sheet row numbers).</p>
-                {finding.eventName && <p className="mt-1 break-words">Event value: {finding.eventName}</p>}
-                {finding.sheetWide && <p className="mt-1 text-amber-200">Unmatched event in a shared sheet; shown for source investigation.</p>}
-              </details>
-            </li>
-          );
-        })}
+                  </div>
+                  {finding.values.length > 0 && <div className="mt-2 flex flex-col gap-2">
+                    {finding.values.map(value => {
+                      const targetId = finding.eventId || eventId;
+                      const isEventAccepting = acceptingKey === `${id}:${value}:event`;
+                      const isGlobalAccepting = acceptingKey === `${id}:${value}:global`;
+                      const normVal = String(value || '').trim().toLowerCase();
+                      const isAcceptedGlobally = (customValues[id] || []).some(v => String(v || '').trim().toLowerCase() === normVal);
+                      const isAcceptedEvent = Boolean(targetId && (eventCustomValues[targetId]?.[id] || []).some(v => String(v || '').trim().toLowerCase() === normVal));
+                      const isAccepted = isAcceptedGlobally || isAcceptedEvent;
+                      const bestSuggestion = finding.type === 'non-standard' && !isAccepted
+                        ? findBestSuggestion(value, [standards[id] || [], customValues[id] || [], eventCustomValues[targetId]?.[id] || []])
+                        : null;
+
+                      return (
+                        <div key={value} className="flex flex-col gap-1.5 rounded bg-white/10 p-2">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <code className="max-w-full break-all font-mono text-xs text-white">{value}</code>
+                            {onAcceptValue && finding.type === 'non-standard' && (
+                              <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
+                                {isAcceptedGlobally ? (
+                                  <span className="inline-flex items-center gap-1 rounded bg-emerald-500/20 border border-emerald-400/40 px-2 py-0.5 font-semibold text-emerald-300">
+                                    ✓ Accepted globally
+                                  </span>
+                                ) : isAcceptedEvent ? (
+                                  <span className="inline-flex items-center gap-1 rounded bg-emerald-500/20 border border-emerald-400/40 px-2 py-0.5 font-semibold text-emerald-300">
+                                    ✓ Accepted for {eventName || targetId}
+                                  </span>
+                                ) : (
+                                  <>
+                                    {targetId && (
+                                      <button
+                                        type="button"
+                                        disabled={Boolean(acceptingKey)}
+                                        onClick={() => handleAccept(id, value, targetId, 'event')}
+                                        className="rounded border border-amber-400/40 bg-amber-500/10 px-2 py-1 font-medium text-amber-200 hover:bg-amber-500/20 disabled:opacity-50"
+                                        title={`Accept "${value}" for ${eventName || targetId}`}
+                                      >
+                                        {isEventAccepting ? 'Accepting…' : `+ Accept for ${eventName || targetId}`}
+                                      </button>
+                                    )}
+                                    <button
+                                      type="button"
+                                      disabled={Boolean(acceptingKey)}
+                                      onClick={() => handleAccept(id, value, null, 'global')}
+                                      className="rounded border border-[#14a6d9]/40 bg-[#14a6d9]/10 px-2 py-1 font-medium text-[#6bd5f7] hover:bg-[#14a6d9]/20 disabled:opacity-50"
+                                      title={`Accept "${value}" across all events globally`}
+                                    >
+                                      {isGlobalAccepting ? 'Accepting…' : '+ Accept globally'}
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                          {bestSuggestion && (
+                            <div className="flex items-center gap-1.5 text-[11px] text-lime-300/90 bg-lime-950/40 border border-lime-500/20 rounded px-2 py-0.5">
+                              <span>💡 Did you mean standard:</span>
+                              <span className="font-semibold text-lime-200 underline underline-offset-2">{bestSuggestion.suggestion}</span>
+                              <span className="text-[10px] text-lime-400/60">({bestSuggestion.score}% match)</span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>}
+                  <details className="mt-3 text-xs text-slate-300">
+                    <summary className="cursor-pointer rounded py-1 font-semibold text-[#6bd5f7]">View sample records</summary>
+                    <p className="mt-2 leading-relaxed">CSV records: {finding.sampleRows.join(', ')} (header included; not necessarily original sheet row numbers).</p>
+                    {finding.eventName && <p className="mt-1 break-words">Event value: {finding.eventName}</p>}
+                    {finding.sheetWide && <p className="mt-1 text-amber-200">Unmatched event in a shared sheet; shown for source investigation.</p>}
+                  </details>
+                </li>
+              );
+            })}
           </ul>
           {(standards[id]?.length > 0 || customValues[id]?.length > 0 || (eventId && eventCustomValues[eventId]?.[id]?.length > 0)) && <details className="mt-3 text-xs text-slate-300">
             <summary className="cursor-pointer rounded py-1 font-semibold text-[#6bd5f7]">View allowed values</summary>

@@ -188,7 +188,8 @@ async function setupHealthAdmin(sourceFixture, { delaySettings = false, globalCh
     './DashboardFeatureContext': { useLowQuotaMode: () => false, useDashboardFeature: () => true },
     '../../lib/dimensionStandards.mjs': {
       DEFAULT_DIMENSION_SETTINGS,
-      DIMENSIONS: [{ id: 'geo', label: 'Geo' }]
+      DIMENSIONS: [{ id: 'geo', label: 'Geo' }],
+      AVAILABLE_METRICS: [{ id: 'cost', label: 'Cost / Spend', unit: '$' }]
     },
     './DimensionFindings': ({ findings = [] }) => React.createElement(
       'div',

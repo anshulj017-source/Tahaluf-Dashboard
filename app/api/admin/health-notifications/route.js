@@ -14,6 +14,9 @@ import { getSmtpTransportConfig } from '../../../../lib/healthEmailTransport.mjs
 import {
   getDimensionSettings,
   saveDimensionSelection,
+  saveMetricSelection,
+  addCustomMetric,
+  removeCustomMetric,
   saveHealthCheckSettings,
   saveEventHealthChecks,
   loadDimensionStandards,
@@ -97,6 +100,21 @@ export async function POST(request) {
         success: true,
         dimensionSettings: await saveDimensionSelection(body.enabledDimensions, { ignoreBlanks: body.ignoreBlanks })
       });
+    }
+    if (body.action === 'save-metrics') {
+      const dimensionSettings = await saveMetricSelection(body.enabledMetrics, {
+        metricTolerances: body.metricTolerances,
+        customMetrics: body.customMetrics
+      });
+      return NextResponse.json({ success: true, dimensionSettings });
+    }
+    if (body.action === 'add-metric') {
+      const dimensionSettings = await addCustomMetric(body.metric);
+      return NextResponse.json({ success: true, dimensionSettings });
+    }
+    if (body.action === 'remove-metric') {
+      const dimensionSettings = await removeCustomMetric(body.metricId);
+      return NextResponse.json({ success: true, dimensionSettings });
     }
     if (body.action === 'save-custom-values') {
       const dimensionSettings = await saveCustomValues(body.customValues);

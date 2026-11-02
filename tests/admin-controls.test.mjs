@@ -1402,7 +1402,7 @@ test('Health Monitor renders all selected dimensions and independent enabled cat
   assert.ok(html.includes('Enable metric health checks'));
   assert.ok(html.includes('Enable dimension health checks'));
   assert.ok(html.includes('Save global checks'));
-  assert.equal((html.match(/checked=""/g) || []).length, 18, '11 dimensions, two global checks and five email/dashboard controls default checked');
+  assert.equal((html.match(/checked=""/g) || []).length, 22, '11 dimensions, 4 metrics, two global checks and five email/dashboard controls default checked');
 });
 
 test('dimension settings endpoints enforce admin auth and validate selections without touching email settings', async () => {

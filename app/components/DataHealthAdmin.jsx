@@ -2,7 +2,8 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Activity, AlertCircle, Bell, Download, FileSpreadsheet, Mail, Plus, RefreshCw, Save, Trash2, Upload
+  Activity, AlertCircle, Bell, Download, FileSpreadsheet, Mail, Plus, RefreshCw, Save, Trash2, Upload,
+  Check, HelpCircle, Info, Search, Filter
 } from 'lucide-react';
 import { auth } from '../../lib/firebase';
 import { DEFAULT_HEALTH_NOTIFICATION_SETTINGS, getHealthIssues } from '../../lib/healthNotificationUtils.mjs';
@@ -10,9 +11,27 @@ import * as FeatureCtx from './DashboardFeatureContext';
 
 const useLowQuotaMode = typeof FeatureCtx.useLowQuotaMode === 'function' ? FeatureCtx.useLowQuotaMode : () => false;
 const useDashboardFeature = typeof FeatureCtx.useDashboardFeature === 'function' ? FeatureCtx.useDashboardFeature : () => true;
-import { DIMENSIONS, DEFAULT_DIMENSION_SETTINGS } from '../../lib/dimensionStandards.mjs';
+import { DIMENSIONS, AVAILABLE_METRICS as EXPORTED_METRICS, DEFAULT_DIMENSION_SETTINGS } from '../../lib/dimensionStandards.mjs';
 import DimensionFindings from './DimensionFindings';
 import { AdminTabs, useAdminDirtyGuard, useAdminView } from './AdminUI';
+
+const FALLBACK_AVAILABLE_METRICS = [
+  { id: 'cost', label: 'Cost / Spend', columnRegex: '^(cost|spend|media spend)$', unit: '$', defaultTolerancePercent: 1.0, minDrop: 1.0, description: 'Media expenditure drop between snapshot refreshes.' },
+  { id: 'impressions', label: 'Impressions', columnRegex: '^impressions?$', unit: 'cnt', defaultTolerancePercent: 1.0, minDrop: 5, description: 'Ad view volume drop between snapshot refreshes.' },
+  { id: 'clicks', label: 'Clicks', columnRegex: '^clicks?$', unit: 'cnt', defaultTolerancePercent: 1.0, minDrop: 2, description: 'User traffic click count drop between snapshot refreshes.' },
+  { id: 'conversions', label: 'Conversions / Leads', columnRegex: '^(conversions?|purchases?|leads?)$', unit: 'cnt', defaultTolerancePercent: 1.0, minDrop: 1, description: 'Acquisition / purchase conversion count drop between snapshot refreshes.' }
+];
+const AVAILABLE_METRICS = EXPORTED_METRICS || FALLBACK_AVAILABLE_METRICS;
+
+function formatMetricVal(metricId, val, unit = '') {
+  if (val === null || val === undefined) return '—';
+  const num = Number(val);
+  if (Number.isNaN(num)) return String(val);
+  if (metricId === 'cost' || unit === '$') {
+    return `$${num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+  return num.toLocaleString();
+}
 
 const formatTimestamp = (value) => value
   ? new Date(value).toLocaleString()
@@ -136,6 +155,19 @@ export default function DataHealthAdmin({
   const [overviewEventFilter, setOverviewEventFilter] = useState('all');
   const [overviewCategoryFilter, setOverviewCategoryFilter] = useState('all');
   const [overviewIssuePage, setOverviewIssuePage] = useState(0);
+  const [metricTableSearch, setMetricTableSearch] = useState('');
+  const [metricFilterType, setMetricFilterType] = useState('all');
+  const [metricFilterStatus, setMetricFilterStatus] = useState('all');
+  const [showAddMetricModal, setShowAddMetricModal] = useState(false);
+  const [newMetricDraft, setNewMetricDraft] = useState({
+    id: '',
+    label: '',
+    columnRegex: '',
+    unit: '$',
+    tolerancePercent: 1.0,
+    minDrop: 1.0,
+    description: ''
+  });
   const [historyCategoryFilter, setHistoryCategoryFilter] = useState('all');
   const [historyEventFilter, setHistoryEventFilter] = useState('all');
   const [historyOutcomeFilter, setHistoryOutcomeFilter] = useState('all');
@@ -285,6 +317,84 @@ export default function DataHealthAdmin({
   const missingDataCount = actualSources.filter(source => source.monitoringEnabled !== false && source.sheetChecksEnabled !== false && (source.eventDataStatus === 'missing' || source.eventRows === 0)).length;
   const totalDiscrepancies = useMemo(() => sheetHealth.reduce((sum, s) => sum + (s.metricDiscrepancies?.length || 0), 0), [sheetHealth]);
   const currentIssues = useMemo(() => getHealthIssues(sheetHealth, dimensionSettings), [sheetHealth, dimensionSettings]);
+
+  const allVerifiedMetrics = useMemo(() => {
+    const list = [];
+    const enabledMetrics = dimensionSettings.enabledMetrics || AVAILABLE_METRICS.map(m => m.id);
+    const customMetrics = dimensionSettings.customMetrics || [];
+    const allMetricDefs = [...AVAILABLE_METRICS, ...customMetrics];
+    const metricMap = new Map(allMetricDefs.map(m => [m.id, m]));
+
+    sheetHealth.forEach(source => {
+      const baselines = source.metricBaselines || {};
+      const discrepancies = source.metricDiscrepancies || [];
+      const discMap = new Map(discrepancies.map(d => [`${d.eventName}:::${d.channel}:::${d.metric}:::${d.date}`, d]));
+
+      (source.channelMetrics24h || []).forEach(cm => {
+        const baselineKey = `${cm.eventName}:::${cm.channel}:::${cm.date}`;
+        const prevObj = baselines[baselineKey] || {};
+
+        enabledMetrics.forEach(metricId => {
+          const mDef = metricMap.get(metricId) || { id: metricId, label: metricId, unit: '' };
+          const currVal = typeof cm[metricId] === 'number' ? cm[metricId] : null;
+          if (currVal === null || currVal === undefined) return;
+
+          const prevVal = typeof prevObj[metricId] === 'number' ? prevObj[metricId] : currVal;
+          const discKey = `${cm.eventName}:::${cm.channel}:::${metricId}:::${cm.date}`;
+          const isRegression = discMap.has(discKey);
+          const discrepancy = discMap.get(discKey);
+
+          const delta = Math.round((currVal - prevVal) * 100) / 100;
+          const deltaPercent = prevVal > 0 ? (delta / prevVal) * 100 : 0;
+
+          list.push({
+            id: `${source.eventId}:${cm.eventName}:${cm.channel}:${metricId}:${cm.date}`,
+            sourceKind: source.kind,
+            eventId: source.eventId,
+            eventName: cm.eventName || source.eventName,
+            channel: cm.channel,
+            date: cm.date,
+            metricId,
+            metricLabel: mDef.label || metricId,
+            unit: mDef.unit || '',
+            previousValue: prevVal,
+            currentValue: currVal,
+            delta,
+            deltaPercent,
+            isRegression,
+            dropAmount: discrepancy?.dropAmount,
+            dropPercent: discrepancy?.dropPercent,
+            rowCount: cm.rowCount,
+            lastVerifiedAt: prevObj.lastObservedAt || source.lastSuccessAt || source.updatedAt
+          });
+        });
+      });
+    });
+    return list;
+  }, [sheetHealth, dimensionSettings]);
+
+  const filteredVerifiedMetrics = useMemo(() => {
+    return allVerifiedMetrics.filter(item => {
+      if (metricTableSearch) {
+        const q = metricTableSearch.toLowerCase();
+        const matches = item.eventName.toLowerCase().includes(q) ||
+          item.channel.toLowerCase().includes(q) ||
+          item.metricLabel.toLowerCase().includes(q) ||
+          item.date.includes(q);
+        if (!matches) return false;
+      }
+      if (metricFilterType !== 'all' && item.metricId !== metricFilterType) {
+        return false;
+      }
+      if (metricFilterStatus === 'regressions' && !item.isRegression) {
+        return false;
+      }
+      if (metricFilterStatus === 'healthy' && item.isRegression) {
+        return false;
+      }
+      return true;
+    });
+  }, [allVerifiedMetrics, metricTableSearch, metricFilterType, metricFilterStatus]);
 
   const refreshSources = async (sources, description) => {
     if (sources.length === 0) {
@@ -489,6 +599,82 @@ export default function DataHealthAdmin({
     } catch (dimensionError) {
       console.error(dimensionError);
       setDimensionNotice({ type: 'error', text: dimensionError.message });
+    } finally {
+      setDimensionBusy(false);
+    }
+  };
+
+  const handleSaveMetrics = async (enabledList = dimensionSettings.enabledMetrics, tolerances = dimensionSettings.metricTolerances) => {
+    setDimensionBusy(true);
+    setDimensionNotice(null);
+    try {
+      const response = await fetch('/api/admin/health-notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...await getAdminHeaders() },
+        body: JSON.stringify({
+          action: 'save-metrics',
+          enabledMetrics: enabledList || AVAILABLE_METRICS.map(m => m.id),
+          metricTolerances: tolerances || dimensionSettings.metricTolerances || {},
+          customMetrics: dimensionSettings.customMetrics || []
+        })
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.error || 'Failed to save metric checks.');
+      if (result.dimensionSettings) {
+        setDimensionSettings(result.dimensionSettings);
+        dimensionSettingsRef.current = result.dimensionSettings;
+      }
+      setDimensionNotice({ type: 'success', text: 'Metric standards and monitored metrics saved.' });
+    } catch (err) {
+      setDimensionNotice({ type: 'error', text: err.message });
+    } finally {
+      setDimensionBusy(false);
+    }
+  };
+
+  const handleAddCustomMetric = async (metricDef) => {
+    setDimensionBusy(true);
+    setDimensionNotice(null);
+    try {
+      const response = await fetch('/api/admin/health-notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...await getAdminHeaders() },
+        body: JSON.stringify({ action: 'add-metric', metric: metricDef })
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.error || 'Failed to add custom metric.');
+      if (result.dimensionSettings) {
+        setDimensionSettings(result.dimensionSettings);
+        dimensionSettingsRef.current = result.dimensionSettings;
+      }
+      setDimensionNotice({ type: 'success', text: `Metric "${metricDef.label || metricDef.id}" added and enabled.` });
+      setShowAddMetricModal(false);
+      setNewMetricDraft({ id: '', label: '', columnRegex: '', unit: '$', tolerancePercent: 1.0, minDrop: 1.0, description: '' });
+    } catch (err) {
+      setDimensionNotice({ type: 'error', text: err.message });
+    } finally {
+      setDimensionBusy(false);
+    }
+  };
+
+  const handleRemoveCustomMetric = async (metricId) => {
+    setDimensionBusy(true);
+    setDimensionNotice(null);
+    try {
+      const response = await fetch('/api/admin/health-notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...await getAdminHeaders() },
+        body: JSON.stringify({ action: 'remove-metric', metricId })
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.error || 'Failed to remove metric.');
+      if (result.dimensionSettings) {
+        setDimensionSettings(result.dimensionSettings);
+        dimensionSettingsRef.current = result.dimensionSettings;
+      }
+      setDimensionNotice({ type: 'success', text: 'Custom metric removed.' });
+    } catch (err) {
+      setDimensionNotice({ type: 'error', text: err.message });
     } finally {
       setDimensionBusy(false);
     }
@@ -902,6 +1088,39 @@ export default function DataHealthAdmin({
         </button>
       </header>
 
+      <details className="rounded-xl border border-[#14a6d9]/30 bg-[#071d33] p-3 text-xs">
+        <summary className="cursor-pointer font-bold text-white flex items-center justify-between">
+          <span className="flex items-center gap-2"><HelpCircle className="h-4 w-4 text-[#6bd5f7]" /> How Data Health Checking Works & What Can Be Changed</span>
+          <span className="text-[10px] text-[#6bd5f7]">Toggle Guide</span>
+        </summary>
+        <div className="mt-3 grid gap-3 md:grid-cols-3 border-t border-white/10 pt-3">
+          <div className="rounded-lg border border-white/10 bg-[#041628]/60 p-3 space-y-1">
+            <h4 className="font-semibold text-white flex items-center gap-1.5"><Info className="h-3.5 w-3.5 text-sky-400" /> 1. What is Checked</h4>
+            <ul className="list-disc list-inside space-y-1 text-[11px] text-slate-300">
+              <li><strong>24-Hour Channel Metrics:</strong> Cost, Impressions, Clicks, Conversions, and custom columns.</li>
+              <li><strong>Marketing Dimensions:</strong> 11 taxonomy dimensions (Channel, Campaign Type, Audience, etc.).</li>
+              <li><strong>Sheet Availability:</strong> Verifies HTTP 200, valid CSV structure, and event rows.</li>
+            </ul>
+          </div>
+          <div className="rounded-lg border border-white/10 bg-[#041628]/60 p-3 space-y-1">
+            <h4 className="font-semibold text-white flex items-center gap-1.5"><Activity className="h-3.5 w-3.5 text-lime-400" /> 2. How it is Checked</h4>
+            <ul className="list-disc list-inside space-y-1 text-[11px] text-slate-300">
+              <li><strong>Baseline Tracking:</strong> Ingestion totals for the latest date should increase or remain stable over time.</li>
+              <li><strong>Drop Thresholds:</strong> A drop exceeding the tolerance % triggers a regression alert.</li>
+              <li><strong>Taxonomy Rules:</strong> Values are checked against the canonical sheet and custom aliases.</li>
+            </ul>
+          </div>
+          <div className="rounded-lg border border-white/10 bg-[#041628]/60 p-3 space-y-1">
+            <h4 className="font-semibold text-white flex items-center gap-1.5"><Check className="h-3.5 w-3.5 text-amber-400" /> 3. What Can Be Changed</h4>
+            <ul className="list-disc list-inside space-y-1 text-[11px] text-slate-300">
+              <li><strong>Monitored Metrics:</strong> Enable/disable metrics, adjust drop tolerances, or add custom metrics.</li>
+              <li><strong>Monitored Dimensions:</strong> Select dimensions to validate and add custom accepted values.</li>
+              <li><strong>Issue Suppression:</strong> Ignore blanks or specific raised issues permanently.</li>
+            </ul>
+          </div>
+        </div>
+      </details>
+
       <AdminTabs label="Health monitor sections" tabs={[
         { id: 'overview', label: 'Overview' }, { id: 'events', label: 'Events' },
         { id: 'history', label: 'Issue History' }, { id: 'settings', label: 'Settings' }
@@ -975,10 +1194,147 @@ export default function DataHealthAdmin({
           <span className="text-slate-300">Dashboard notifications are {settings.dashboardEnabled ? 'enabled' : 'disabled'}; this overview remains available to admins.</span>
           <button type="button" onClick={() => setView('events')} className="text-[#6bd5f7] hover:text-white">Review event sources →</button>
         </div>
-        <details className="rounded-xl border border-white/10 bg-[#071d33] p-3">
-          <summary className="cursor-pointer text-sm font-semibold text-white">24-hour channel metric integrity</summary>
-          <p className="mt-2 text-xs text-slate-400">Monitors Cost, Impressions, Clicks, and Conversions per channel for unexpected drops between refreshes.</p>
-          {totalDiscrepancies ? <div className="mt-3 space-y-2">{sheetHealth.flatMap(source => (source.metricDiscrepancies || []).map(item => <div key={item.id} className="rounded-lg border border-amber-400/20 bg-black/20 p-2 text-xs text-slate-200"><strong>{item.eventName} · {item.channel} · {item.metric}</strong><span className="ml-2 text-amber-200">{item.previousValue} → {item.currentValue} (-{item.dropPercent}%)</span><span className="ml-2 text-slate-400">{item.date}</span></div>))}</div> : <p className="mt-2 text-xs text-lime-200">No metric regressions currently detected.</p>}
+        <details className="rounded-xl border border-white/10 bg-[#071d33] p-4" open>
+          <summary className="cursor-pointer text-sm font-semibold text-white flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Activity className="h-4 w-4 text-[#14a6d9]" />
+              <span>24-Hour Channel Metric Integrity & Verification Inspector</span>
+            </div>
+            <span className="text-xs text-slate-400">
+              {allVerifiedMetrics.length} metrics verified across {new Set(allVerifiedMetrics.map(m => m.channel)).size} channels · {totalDiscrepancies ? `${totalDiscrepancies} regression${totalDiscrepancies === 1 ? '' : 's'}` : 'All healthy'}
+            </span>
+          </summary>
+
+          <p className="mt-2 text-xs text-slate-400">
+            Monitors cumulative daily totals per channel for the latest ingestion date ({sheetHealth.find(s => s.latest24hDate)?.latest24hDate || 'current'}). Data should monotonically increase or remain stable between refreshes. Drops exceeding configured tolerances are flagged as regressions.
+          </p>
+
+          {totalDiscrepancies > 0 && (
+            <div className="mt-3 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-xs text-red-200">
+              <strong className="block font-semibold">Active Metric Regressions Detected:</strong>
+              <div className="mt-2 space-y-1.5">
+                {sheetHealth.flatMap(source => (source.metricDiscrepancies || []).map(item => (
+                  <div key={item.id} className="flex flex-wrap items-center justify-between gap-2 rounded bg-black/30 p-2 text-xs">
+                    <span><strong>{item.eventName} · {item.channel} · {item.metric}</strong></span>
+                    <span className="text-amber-300 font-mono">
+                      Baseline: {formatMetricVal(item.metric, item.previousValue)}
+                      {' → '}
+                      Current: {formatMetricVal(item.metric, item.currentValue)}
+                      {' '}(-{item.dropPercent}%)
+                    </span>
+                    <span className="text-slate-400 text-[10px]">{item.date}</span>
+                  </div>
+                )))}
+              </div>
+            </div>
+          )}
+
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-white/10 pt-3">
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <input
+                type="text"
+                value={metricTableSearch}
+                onChange={e => setMetricTableSearch(e.target.value)}
+                placeholder="Search event or channel..."
+                className="rounded-lg border border-white/10 bg-[#041628] px-2.5 py-1.5 text-xs text-white placeholder:text-slate-500"
+              />
+              <select
+                value={metricFilterType}
+                onChange={e => setMetricFilterType(e.target.value)}
+                className="rounded-lg border border-white/10 bg-[#041628] px-2.5 py-1.5 text-xs text-white"
+              >
+                <option value="all">All Metrics</option>
+                {[...AVAILABLE_METRICS, ...(dimensionSettings.customMetrics || [])].map(m => (
+                  <option key={m.id} value={m.id}>{m.label || m.id}</option>
+                ))}
+              </select>
+              <select
+                value={metricFilterStatus}
+                onChange={e => setMetricFilterStatus(e.target.value)}
+                className="rounded-lg border border-white/10 bg-[#041628] px-2.5 py-1.5 text-xs text-white"
+              >
+                <option value="all">All Statuses ({allVerifiedMetrics.length})</option>
+                <option value="regressions">Regressions Only ({totalDiscrepancies})</option>
+                <option value="healthy">Healthy Only ({allVerifiedMetrics.length - totalDiscrepancies})</option>
+              </select>
+            </div>
+            <div className="text-[11px] text-slate-400">
+              Showing {filteredVerifiedMetrics.length} of {allVerifiedMetrics.length} verified metrics
+            </div>
+          </div>
+
+          {filteredVerifiedMetrics.length > 0 ? (
+            <div className="mt-3 overflow-x-auto rounded-lg border border-white/10 bg-[#041628]">
+              <table className="w-full text-left text-xs text-slate-300">
+                <thead className="border-b border-white/10 bg-white/5 text-[10px] uppercase tracking-wider text-slate-400">
+                  <tr>
+                    <th className="p-2.5">Event & Channel</th>
+                    <th className="p-2.5">Date</th>
+                    <th className="p-2.5">Metric</th>
+                    <th className="p-2.5 text-right">Previous Baseline</th>
+                    <th className="p-2.5 text-right">Current Value</th>
+                    <th className="p-2.5 text-right">Variance</th>
+                    <th className="p-2.5 text-center">Status</th>
+                    <th className="p-2.5 text-right">Last Verified</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {filteredVerifiedMetrics.slice(0, 100).map(item => (
+                    <tr key={item.id} className={item.isRegression ? 'bg-red-500/10' : 'hover:bg-white/5'}>
+                      <td className="p-2.5 font-medium text-white">
+                        <div>{item.eventName}</div>
+                        <div className="text-[10px] text-slate-400">{item.channel}</div>
+                      </td>
+                      <td className="p-2.5 text-slate-400 font-mono text-[11px]">{item.date}</td>
+                      <td className="p-2.5">
+                        <span className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[10px] text-sky-200">
+                          {item.metricLabel}
+                        </span>
+                      </td>
+                      <td className="p-2.5 text-right font-mono text-slate-300">
+                        {formatMetricVal(item.metricId, item.previousValue, item.unit)}
+                      </td>
+                      <td className="p-2.5 text-right font-mono font-semibold text-white">
+                        {formatMetricVal(item.metricId, item.currentValue, item.unit)}
+                      </td>
+                      <td className={`p-2.5 text-right font-mono text-[11px] ${
+                        item.delta < 0 ? 'text-amber-300' : item.delta > 0 ? 'text-lime-300' : 'text-slate-400'
+                      }`}>
+                        {item.delta > 0 ? `+${formatMetricVal(item.metricId, item.delta, item.unit)} (+${item.deltaPercent.toFixed(1)}%)`
+                          : item.delta < 0 ? `-${formatMetricVal(item.metricId, Math.abs(item.delta), item.unit)} (-${Math.abs(item.deltaPercent).toFixed(1)}%)`
+                          : '0 (steady)'}
+                      </td>
+                      <td className="p-2.5 text-center">
+                        {item.isRegression ? (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-red-500/40 bg-red-500/20 px-2 py-0.5 text-[10px] font-semibold text-red-200">
+                            ⚠️ Regression (-{item.dropPercent}%)
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-lime-400/40 bg-lime-500/10 px-2 py-0.5 text-[10px] font-semibold text-lime-300">
+                            ✓ Verified In Sync
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-2.5 text-right text-[10px] text-slate-500">
+                        {formatTimestamp(item.lastVerifiedAt)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {filteredVerifiedMetrics.length > 100 && (
+                <div className="p-2 text-center text-[10px] text-slate-500 border-t border-white/5">
+                  Showing first 100 of {filteredVerifiedMetrics.length} metrics. Use filters to narrow down.
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="mt-3 rounded-lg border border-dashed border-white/10 p-6 text-center text-xs text-slate-400">
+              {allVerifiedMetrics.length === 0
+                ? 'No 24-hour channel metrics currently extracted. Refresh actuals sources to pull live metrics.'
+                : 'No metrics match the selected filter criteria.'}
+            </div>
+          )}
         </details>
       </section>
 
@@ -1049,7 +1405,71 @@ export default function DataHealthAdmin({
                     {disabledReasons.length > 0 && <p className="mt-2 text-[10px] text-amber-200">Disabled checks: {disabledReasons.join(' ')} Data loading is unaffected.</p>}
                     <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-slate-400"><span>Last success: {formatTimestamp(source.lastSuccessAt)}</span>{source.lastFailureAt && <span className="text-amber-200">Last failure: {formatTimestamp(source.lastFailureAt)}{source.lastError ? ` · ${source.lastError}` : ''}</span>}<span>Rows: {(source.totalRows ?? source.rowCount ?? 0).toLocaleString()}</span>{source.kind === 'Actuals' && <span>Matching event rows: {(source.eventRows || 0).toLocaleString()} {source.eventDataStatus === 'unverified' ? '(event column not available)' : ''}</span>}<span>Date range: {source.firstDataDate || source.lastDataDate ? `${source.firstDataDate || 'Unknown'} – ${source.lastDataDate || 'Unknown'}` : 'No dated rows'}</span></div>
                     {source.dimensionHealth && <details className="mt-3 rounded-lg border border-white/10 p-2 text-xs"><summary className="cursor-pointer font-semibold text-slate-200">Dimension checks · {source.dimensionHealth.status} · last run {formatTimestamp(source.dimensionHealth.checkedAt)}</summary>{source.dimensionHealth.error && <p className="mt-2 text-amber-200">{source.dimensionHealth.error}</p>}{source.dimensionHealth.findings?.length ? <div className="mt-2"><DimensionFindings findings={source.dimensionHealth.findings} standards={dimensionSettings.values} customValues={dimensionSettings.customValues} eventCustomValues={dimensionSettings.eventCustomValues} ignoreBlanksByDimension={dimensionSettings.ignoreBlanksByDimension || {}} ignoreBlanksByEventDimension={dimensionSettings.ignoreBlanksByEventDimension || {}} eventId={source.eventId} eventName={source.eventName} onAcceptValue={handleAcceptValue} onIgnoreBlanks={handleIgnoreBlanks} /></div> : <p className="mt-2 text-slate-400">No dimension findings.</p>}</details>}
-                    {(source.metricDiscrepancies?.length > 0 || source.channelMetrics24h?.length > 0) && <details className="mt-2 rounded-lg border border-white/10 p-2 text-xs"><summary className="cursor-pointer font-semibold text-slate-200">24-hour channel metrics ({source.metricDiscrepancies?.length || 0} regression{source.metricDiscrepancies?.length === 1 ? '' : 's'})</summary>{source.metricDiscrepancies?.map(item => <p key={item.id} className="mt-2 text-amber-200">{item.channel} · {item.metric}: {item.previousValue} → {item.currentValue} (-{item.dropPercent}%) on {item.date}</p>)}{source.channelMetrics24h?.length > 0 && <p className="mt-2 text-slate-400">{source.channelMetrics24h.length} channel metrics available · latest date {source.latest24hDate || 'unknown'}.</p>}</details>}
+                    {(source.metricDiscrepancies?.length > 0 || source.channelMetrics24h?.length > 0) && (
+                      <details className="mt-2 rounded-lg border border-white/10 p-2 text-xs">
+                        <summary className="cursor-pointer font-semibold text-slate-200">
+                          24-hour channel metrics ({source.metricDiscrepancies?.length || 0} regression{source.metricDiscrepancies?.length === 1 ? '' : 's'}, {source.channelMetrics24h?.length || 0} channels tracked)
+                        </summary>
+                        {source.metricDiscrepancies?.map(item => (
+                          <p key={item.id} className="mt-2 text-amber-200">
+                            ⚠️ {item.channel} · {item.metric}: {formatMetricVal(item.metric, item.previousValue)} → {formatMetricVal(item.metric, item.currentValue)} (-{item.dropPercent}%) on {item.date}
+                          </p>
+                        ))}
+                        {source.channelMetrics24h?.length > 0 && (
+                          <div className="mt-2 overflow-x-auto">
+                            <table className="w-full text-left text-[11px] text-slate-300">
+                              <thead className="border-b border-white/10 text-[9px] uppercase tracking-wider text-slate-400">
+                                <tr>
+                                  <th className="py-1">Channel</th>
+                                  <th className="py-1 text-right">Cost</th>
+                                  <th className="py-1 text-right">Impressions</th>
+                                  <th className="py-1 text-right">Clicks</th>
+                                  <th className="py-1 text-right">Conversions</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-white/5 font-mono">
+                                {source.channelMetrics24h.map(cm => {
+                                  const baselineKey = `${cm.eventName}:::${cm.channel}:::${cm.date}`;
+                                  const prev = source.metricBaselines?.[baselineKey] || {};
+                                  return (
+                                    <tr key={cm.channel} className="hover:bg-white/5">
+                                      <td className="py-1 font-sans font-medium text-white">{cm.channel}</td>
+                                      <td className="py-1 text-right text-slate-200">
+                                        {formatMetricVal('cost', cm.cost, '$')}
+                                        {prev.cost && prev.cost !== cm.cost ? (
+                                          <span className="block text-[9px] text-slate-500">prev {formatMetricVal('cost', prev.cost, '$')}</span>
+                                        ) : null}
+                                      </td>
+                                      <td className="py-1 text-right text-slate-200">
+                                        {formatMetricVal('impressions', cm.impressions)}
+                                        {prev.impressions && prev.impressions !== cm.impressions ? (
+                                          <span className="block text-[9px] text-slate-500">prev {formatMetricVal('impressions', prev.impressions)}</span>
+                                        ) : null}
+                                      </td>
+                                      <td className="py-1 text-right text-slate-200">
+                                        {formatMetricVal('clicks', cm.clicks)}
+                                        {prev.clicks && prev.clicks !== cm.clicks ? (
+                                          <span className="block text-[9px] text-slate-500">prev {formatMetricVal('clicks', prev.clicks)}</span>
+                                        ) : null}
+                                      </td>
+                                      <td className="py-1 text-right text-slate-200">
+                                        {formatMetricVal('conversions', cm.conversions)}
+                                        {prev.conversions && prev.conversions !== cm.conversions ? (
+                                          <span className="block text-[9px] text-slate-500">prev {formatMetricVal('conversions', prev.conversions)}</span>
+                                        ) : null}
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                            <p className="mt-2 text-[10px] text-slate-400">
+                              Latest ingestion date: {source.latest24hDate || 'unknown'} · {source.channelMetrics24h.length} channels tracked.
+                            </p>
+                          </div>
+                        )}
+                      </details>
+                    )}
                   </article>;
                 })}
               </div>
@@ -1118,6 +1538,246 @@ export default function DataHealthAdmin({
             <button type="button" onClick={() => updateDimensions('save-health-checks')} className="rounded-lg border border-[#14a6d9]/40 px-3 py-2 text-xs font-semibold text-[#6bd5f7]">Save global checks</button>
           </fieldset>
           {dimensionNotice && <p role={dimensionNotice.type === 'error' ? 'alert' : 'status'} className={`text-xs ${dimensionNotice.type === 'error' ? 'text-red-300' : 'text-lime-200'}`}>{dimensionNotice.text}</p>}
+
+          {/* Metric Standards & Monitored Metrics */}
+          <div className="border-t border-white/10 pt-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h4 className="text-xs font-semibold text-white flex items-center gap-2">
+                  <Activity className="h-4 w-4 text-[#14a6d9]" />
+                  <span>Metric standards & monitored metrics</span>
+                </h4>
+                <p className="mt-1 text-[10px] text-slate-400">
+                  Monitors 24-hour channel totals for unexpected drops between refreshes. Add custom columns or toggle standard metrics. Drops exceeding the tolerance % trigger integrity alerts.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAddMetricModal(true)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[#14a6d9]/40 bg-[#14a6d9]/10 px-2.5 py-1 text-xs font-semibold text-[#6bd5f7] hover:bg-[#14a6d9]/20 transition"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>Add Custom Metric</span>
+              </button>
+            </div>
+
+            {dimensionSettings.metricChecksEnabled === false && (
+              <p className="mt-2 text-xs text-amber-200">
+                Metric health checks are globally disabled; selections and tolerances are retained.
+              </p>
+            )}
+
+            <fieldset disabled={dimensionBusy || settingsLoading} className="mt-3 space-y-3">
+              <legend className="text-[10px] text-slate-300">Metrics to validate</legend>
+              <div className="flex gap-3 text-xs">
+                <button
+                  type="button"
+                  onClick={() => handleSaveMetrics([
+                    ...AVAILABLE_METRICS.map(m => m.id),
+                    ...(dimensionSettings.customMetrics || []).map(m => m.id)
+                  ])}
+                  className="text-[#6bd5f7]"
+                >
+                  Select all
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSaveMetrics([])}
+                  className="text-[#6bd5f7]"
+                >
+                  Clear all
+                </button>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                {[...AVAILABLE_METRICS, ...(dimensionSettings.customMetrics || [])].map(metric => {
+                  const currentEnabled = dimensionSettings.enabledMetrics || AVAILABLE_METRICS.map(m => m.id);
+                  const isEnabled = currentEnabled.includes(metric.id);
+                  const tol = dimensionSettings.metricTolerances?.[metric.id]?.percent ?? metric.defaultTolerancePercent ?? 1.0;
+                  const minDrop = dimensionSettings.metricTolerances?.[metric.id]?.minDrop ?? metric.minDrop ?? 1.0;
+                  const isCustom = (dimensionSettings.customMetrics || []).some(m => m.id === metric.id);
+
+                  return (
+                    <div key={metric.id} className="rounded-lg border border-white/10 bg-[#041628]/60 p-3 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <label className="flex items-center gap-2 text-xs font-semibold text-slate-200 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={isEnabled}
+                            onChange={e => {
+                              const next = e.target.checked
+                                ? [...new Set([...currentEnabled, metric.id])]
+                                : currentEnabled.filter(id => id !== metric.id);
+                              handleSaveMetrics(next);
+                            }}
+                            className="accent-[#cedc28]"
+                          />
+                          <span>{metric.label}</span>
+                          {isCustom && (
+                            <span className="rounded bg-sky-500/20 px-1.5 py-0.5 text-[9px] text-sky-300">Custom</span>
+                          )}
+                        </label>
+                        {isCustom && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveCustomMetric(metric.id)}
+                            className="text-slate-500 hover:text-red-400 text-xs"
+                            title="Remove this custom metric"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-slate-400">{metric.description}</p>
+                      <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-300 pt-1 border-t border-white/5">
+                        <label className="flex items-center gap-1.5">
+                          <span className="text-[10px] text-slate-400">Tolerance:</span>
+                          <input
+                            type="number"
+                            min="0.1"
+                            max="100"
+                            step="0.1"
+                            value={tol}
+                            onChange={e => {
+                              const val = parseFloat(e.target.value) || 1.0;
+                              const nextTolerances = {
+                                ...(dimensionSettings.metricTolerances || {}),
+                                [metric.id]: { percent: val, minDrop }
+                              };
+                              handleSaveMetrics(undefined, nextTolerances);
+                            }}
+                            className="w-14 rounded border border-white/10 bg-black/40 px-1.5 py-0.5 text-center text-xs text-white"
+                          />
+                          <span className="text-slate-400">%</span>
+                        </label>
+                        <label className="flex items-center gap-1.5">
+                          <span className="text-[10px] text-slate-400">Min drop:</span>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.5"
+                            value={minDrop}
+                            onChange={e => {
+                              const val = parseFloat(e.target.value) || 1.0;
+                              const nextTolerances = {
+                                ...(dimensionSettings.metricTolerances || {}),
+                                [metric.id]: { percent: tol, minDrop: val }
+                              };
+                              handleSaveMetrics(undefined, nextTolerances);
+                            }}
+                            className="w-14 rounded border border-white/10 bg-black/40 px-1.5 py-0.5 text-center text-xs text-white"
+                          />
+                          <span className="text-slate-400">{metric.unit}</span>
+                        </label>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {showAddMetricModal && (
+                <div className="rounded-lg border border-[#14a6d9]/40 bg-[#031120] p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h5 className="text-xs font-bold text-white flex items-center gap-2">
+                      <Plus className="h-4 w-4 text-[#6bd5f7]" />
+                      <span>Add custom sheet metric</span>
+                    </h5>
+                    <button
+                      type="button"
+                      onClick={() => setShowAddMetricModal(false)}
+                      className="text-xs text-slate-400 hover:text-white"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <label className="text-[10px] font-semibold uppercase text-slate-400">
+                      Metric Identifier / Key
+                      <input
+                        type="text"
+                        value={newMetricDraft.id}
+                        onChange={e => setNewMetricDraft(prev => ({ ...prev, id: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '') }))}
+                        placeholder="e.g. reach"
+                        className="mt-1 w-full rounded border border-white/10 bg-[#041628] px-2.5 py-1.5 text-xs text-white placeholder:text-slate-500"
+                      />
+                    </label>
+                    <label className="text-[10px] font-semibold uppercase text-slate-400">
+                      Display Label
+                      <input
+                        type="text"
+                        value={newMetricDraft.label}
+                        onChange={e => setNewMetricDraft(prev => ({ ...prev, label: e.target.value }))}
+                        placeholder="e.g. Unique Reach"
+                        className="mt-1 w-full rounded border border-white/10 bg-[#041628] px-2.5 py-1.5 text-xs text-white placeholder:text-slate-500"
+                      />
+                    </label>
+                    <label className="text-[10px] font-semibold uppercase text-slate-400">
+                      Column Header Pattern (Regex)
+                      <input
+                        type="text"
+                        value={newMetricDraft.columnRegex}
+                        onChange={e => setNewMetricDraft(prev => ({ ...prev, columnRegex: e.target.value }))}
+                        placeholder="e.g. ^reach$ or reach"
+                        className="mt-1 w-full rounded border border-white/10 bg-[#041628] px-2.5 py-1.5 text-xs text-white placeholder:text-slate-500"
+                      />
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      <label className="text-[10px] font-semibold uppercase text-slate-400">
+                        Unit
+                        <select
+                          value={newMetricDraft.unit}
+                          onChange={e => setNewMetricDraft(prev => ({ ...prev, unit: e.target.value }))}
+                          className="mt-1 w-full rounded border border-white/10 bg-[#041628] px-2 py-1.5 text-xs text-white"
+                        >
+                          <option value="$">Currency ($)</option>
+                          <option value="cnt">Count (cnt)</option>
+                          <option value="%">Percent (%)</option>
+                        </select>
+                      </label>
+                      <label className="text-[10px] font-semibold uppercase text-slate-400">
+                        Tol %
+                        <input
+                          type="number"
+                          step="0.1"
+                          value={newMetricDraft.tolerancePercent}
+                          onChange={e => setNewMetricDraft(prev => ({ ...prev, tolerancePercent: parseFloat(e.target.value) || 1.0 }))}
+                          className="mt-1 w-full rounded border border-white/10 bg-[#041628] px-2 py-1.5 text-xs text-white"
+                        />
+                      </label>
+                      <label className="text-[10px] font-semibold uppercase text-slate-400">
+                        Min Drop
+                        <input
+                          type="number"
+                          step="0.5"
+                          value={newMetricDraft.minDrop}
+                          onChange={e => setNewMetricDraft(prev => ({ ...prev, minDrop: parseFloat(e.target.value) || 1.0 }))}
+                          className="mt-1 w-full rounded border border-white/10 bg-[#041628] px-2 py-1.5 text-xs text-white"
+                        />
+                      </label>
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowAddMetricModal(false)}
+                      className="rounded border border-white/10 px-3 py-1.5 text-xs text-slate-300 hover:text-white"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!newMetricDraft.id.trim() || dimensionBusy}
+                      onClick={() => handleAddCustomMetric(newMetricDraft)}
+                      className="rounded border border-[#14a6d9]/40 bg-[#14a6d9]/20 px-3 py-1.5 text-xs font-semibold text-[#6bd5f7] hover:bg-[#14a6d9]/30 disabled:opacity-50"
+                    >
+                      Save Metric
+                    </button>
+                  </div>
+                </div>
+              )}
+            </fieldset>
+          </div>
+
           <div className="border-t border-white/10 pt-3"><h4 className="text-xs font-semibold text-white">Dimension standards</h4>
             {dimensionSettings.dimensionChecksEnabled === false && <p className="mt-1 text-xs text-amber-200">Dimension health checks are globally disabled; individual selections are retained.</p>}
             <p className="mt-1 text-[10px] text-slate-400">Actuals only. Values are trimmed and case-insensitive; blanks and missing columns are reported separately (unless blank cells are set to be ignored). Data is never rewritten. Last standards sync: {formatTimestamp(dimensionSettings.fetchedAt)}; cached for 24 hours.</p>

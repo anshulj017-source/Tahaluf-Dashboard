@@ -63,7 +63,8 @@ export async function GET(request) {
       throw new Error(healthPayload.error || 'Could not load the event health report.');
     }
 
-    const issues = getHealthIssues(healthPayload.sheetHealth || []);
+    const dimensionSettings = await getDimensionSettings();
+    const issues = getHealthIssues(healthPayload.sheetHealth || [], dimensionSettings);
     const digest = await sendDailyHealthDigest(issues);
     return NextResponse.json({
       success: true,

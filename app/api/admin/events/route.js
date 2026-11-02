@@ -55,6 +55,21 @@ function getEventDataStats(source, health) {
     return candidatesList.some(c => itemNorm.includes(c) || c.includes(itemNorm));
   });
 
+  const eventBaselines = {};
+  if (health.metricBaselines) {
+    for (const [key, val] of Object.entries(health.metricBaselines)) {
+      const [evName] = key.split(':::');
+      if (!evName || evName === 'Unknown') {
+        eventBaselines[key] = val;
+      } else {
+        const itemNorm = evName.toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (candidatesList.some(c => itemNorm.includes(c) || c.includes(itemNorm))) {
+          eventBaselines[key] = val;
+        }
+      }
+    }
+  }
+
   return {
     eventDataStatus: source.kind !== 'Actuals'
       ? ((health.rowCount > 0 || health.hasCachedData) ? 'present' : 'missing')
@@ -71,6 +86,7 @@ function getEventDataStats(source, health) {
       : dates.at(-1) || (eventMatches.length === 0 && !health.eventColumn ? health.lastDate || null : null),
     eventNames: eventMatches.map(([name]) => name),
     channelMetrics24h: eventChannelMetrics,
+    metricBaselines: eventBaselines,
     metricDiscrepancies: eventDiscrepancies,
     latest24hDate: health.latest24hDate || null
   };
@@ -168,7 +184,7 @@ async function getEvents(request) {
             lastError: 'COMBINED_COUNTRY_CSV_URL is not configured'
           }),
       ...(source.cacheKey ? getEventDataStats(source, healthByKey[source.cacheKey] || {}) : {}),
-      dimensionHealth: dimensionHealthForSource(source, healthByKey[source.cacheKey]?.dimensionValidation)
+      dimensionHealth: dimensionHealthForSource(source, healthByKey[source.cacheKey]?.dimensionValidation, checkSettings)
     }, checkSettings));
     return NextResponse.json({
       success: true,
