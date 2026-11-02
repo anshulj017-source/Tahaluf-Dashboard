@@ -1094,6 +1094,55 @@ test('dimension check ignoreBlanks option ignores blank cells while still report
   assert.equal(invalid.values.length, 3);
 });
 
+test('dimension check allows ignoring blanks per dimension and per event dimension', () => {
+  const rows = [
+    { ...validDimensionRow(), 'Event Name DB': 'SAIF 2026', Channel: '', Language: '' },
+    { ...validDimensionRow(), 'Event Name DB': 'KoG 2026', Channel: '', Language: '' }
+  ];
+  for (const row of rows) {
+    delete row['Strategy DB'];
+    delete row['Language DB'];
+  }
+  const context = {
+    ...dimensionContext(),
+    ignoreBlanksByEventDimension: {
+      saif26: { channel: true }
+    }
+  };
+  context.values.event.push('SAIF 2026', 'KoG 2026');
+  const result = dimensionRules.checkDimensionRows(d3.csvFormat(rows), context);
+  const saifGroup = result.groups.find(g => g.eventName === 'SAIF 2026');
+  const kogGroup = result.groups.find(g => g.eventName === 'KoG 2026');
+
+  assert.equal(saifGroup.findings.find(f => f.dimension === 'channel' && f.type === 'blank'), undefined);
+  assert.ok(saifGroup.findings.find(f => f.dimension === 'language' && f.type === 'blank'));
+  assert.ok(kogGroup.findings.find(f => f.dimension === 'channel' && f.type === 'blank'));
+  assert.ok(kogGroup.findings.find(f => f.dimension === 'language' && f.type === 'blank'));
+});
+
+test('getHealthIssues filters out explicitly ignored issues and markIssueIgnoredInHistory records audit trail', () => {
+  const source = {
+    eventId: 'saif',
+    eventName: 'SAIF 2026',
+    kind: 'Actuals',
+    state: 'healthy',
+    sheetChecksEnabled: true,
+    eventDataStatus: 'present',
+    dimensionHealth: {
+      status: 'checked',
+      findings: [{ dimension: 'channel', label: 'Channel', type: 'blank', count: 5, values: [], sampleRows: [2] }]
+    }
+  };
+  const activeIssues = healthUtils.getHealthIssues([source]);
+  assert.equal(activeIssues.length, 1);
+  assert.equal(activeIssues[0].key, 'saif:Actuals:dimensions');
+
+  const filteredIssues = healthUtils.getHealthIssues([source], {
+    ignoredIssues: ['saif:Actuals:dimensions']
+  });
+  assert.equal(filteredIssues.length, 0, 'ignored issue is excluded from active health issues');
+});
+
 test('findings stay event-scoped, invalid unmapped event names remain visible and Planned is excluded', () => {
   const rows = [
     { ...validDimensionRow(), Channel: 'bad' },

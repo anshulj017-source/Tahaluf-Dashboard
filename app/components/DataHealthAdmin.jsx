@@ -175,7 +175,7 @@ export default function DataHealthAdmin({
       }
       const nextHealth = result.sheetHealth || [];
       setSheetHealth(nextHealth);
-      onIssueCountChange(getHealthIssues(nextHealth).length);
+      onIssueCountChange(getHealthIssues(nextHealth, dimensionSettings).length);
       setLastCheckedAt(new Date().toISOString());
       setHealthLoadError(null);
     } catch (loadError) {
@@ -284,7 +284,7 @@ export default function DataHealthAdmin({
   const issueCount = actualSources.filter(source => ['stale', 'unavailable', 'storage-error', 'missing-data', 'metric-discrepancy', 'dimension-discrepancy'].includes(getStatus(source))).length;
   const missingDataCount = actualSources.filter(source => source.monitoringEnabled !== false && source.sheetChecksEnabled !== false && (source.eventDataStatus === 'missing' || source.eventRows === 0)).length;
   const totalDiscrepancies = useMemo(() => sheetHealth.reduce((sum, s) => sum + (s.metricDiscrepancies?.length || 0), 0), [sheetHealth]);
-  const currentIssues = useMemo(() => getHealthIssues(sheetHealth), [sheetHealth]);
+  const currentIssues = useMemo(() => getHealthIssues(sheetHealth, dimensionSettings), [sheetHealth, dimensionSettings]);
 
   const refreshSources = async (sources, description) => {
     if (sources.length === 0) {
@@ -568,6 +568,125 @@ export default function DataHealthAdmin({
     }
   };
 
+  const handleIgnoreBlanks = async (dimension, eventId, scope) => {
+    setDimensionBusy(true);
+    setDimensionNotice(null);
+    try {
+      const response = await fetch('/api/admin/health-notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...await getAdminHeaders() },
+        body: JSON.stringify({ action: 'ignore-dimension-blanks', dimension, eventId, scope })
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.error || 'Could not ignore blank values.');
+      if (result.dimensionSettings) {
+        setDimensionSettings(result.dimensionSettings);
+      }
+      setDimensionNotice({
+        type: 'success',
+        text: `Ignored blank values for "${dimension}" ${scope === 'event' && eventId ? `for event "${eventId}"` : 'globally'}. Saved in version history.`
+      });
+      await Promise.all([reloadHealth(true), reloadHistory()]);
+    } catch (ignoreErr) {
+      console.error(ignoreErr);
+      setDimensionNotice({ type: 'error', text: ignoreErr.message });
+    } finally {
+      setDimensionBusy(false);
+    }
+  };
+
+  const handleUnignoreBlanks = async (dimension, eventId, scope) => {
+    setDimensionBusy(true);
+    setDimensionNotice(null);
+    try {
+      const response = await fetch('/api/admin/health-notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...await getAdminHeaders() },
+        body: JSON.stringify({ action: 'unignore-dimension-blanks', dimension, eventId, scope })
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.error || 'Could not restore blank check.');
+      if (result.dimensionSettings) {
+        setDimensionSettings(result.dimensionSettings);
+      }
+      setDimensionNotice({
+        type: 'success',
+        text: `Restored blank checks for "${dimension}" ${scope === 'event' && eventId ? `for event "${eventId}"` : 'globally'}.`
+      });
+      await Promise.all([reloadHealth(true), reloadHistory()]);
+    } catch (err) {
+      console.error(err);
+      setDimensionNotice({ type: 'error', text: err.message });
+    } finally {
+      setDimensionBusy(false);
+    }
+  };
+
+  const handleIgnoreIssue = async (issue, reason = '') => {
+    setDimensionBusy(true);
+    setDimensionNotice(null);
+    try {
+      const response = await fetch('/api/admin/health-notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...await getAdminHeaders() },
+        body: JSON.stringify({
+          action: 'ignore-issue',
+          issueKey: issue.key,
+          eventId: issue.eventId,
+          eventName: issue.eventName,
+          kind: issue.kind,
+          status: issue.status,
+          message: issue.message,
+          category: issue.category,
+          dimensionFindings: issue.dimensionFindings,
+          reason: reason || `Ignored ${issue.category || 'health'} issue: ${issue.status}`
+        })
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.error || 'Could not ignore issue.');
+      if (result.dimensionSettings) {
+        setDimensionSettings(result.dimensionSettings);
+      }
+      setDimensionNotice({
+        type: 'success',
+        text: `Issue "${issue.eventName} (${issue.status})" ignored and recorded in version history. It will not be raised again.`
+      });
+      await Promise.all([reloadHealth(true), reloadHistory()]);
+    } catch (err) {
+      console.error(err);
+      setDimensionNotice({ type: 'error', text: err.message });
+    } finally {
+      setDimensionBusy(false);
+    }
+  };
+
+  const handleUnignoreIssue = async (issueKey) => {
+    setDimensionBusy(true);
+    setDimensionNotice(null);
+    try {
+      const response = await fetch('/api/admin/health-notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...await getAdminHeaders() },
+        body: JSON.stringify({ action: 'unignore-issue', issueKey })
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.error || 'Could not restore issue check.');
+      if (result.dimensionSettings) {
+        setDimensionSettings(result.dimensionSettings);
+      }
+      setDimensionNotice({
+        type: 'success',
+        text: `Restored health check for "${issueKey}". Re-evaluating sources…`
+      });
+      await Promise.all([reloadHealth(true), reloadHistory()]);
+    } catch (err) {
+      console.error(err);
+      setDimensionNotice({ type: 'error', text: err.message });
+    } finally {
+      setDimensionBusy(false);
+    }
+  };
+
   const handleToggleExcludeStandard = async (dimension, value) => {
     setDimensionBusy(true);
     setDimensionNotice(null);
@@ -730,7 +849,7 @@ export default function DataHealthAdmin({
   const overviewPageCount = Math.max(1, Math.ceil(filteredOverviewIssues.length / overviewPageSize));
   const visibleOverviewPage = Math.min(overviewIssuePage, overviewPageCount - 1);
   const visibleOverviewIssues = filteredOverviewIssues.slice(visibleOverviewPage * overviewPageSize, (visibleOverviewPage + 1) * overviewPageSize);
-  const historyOutcome = item => item.resolution === 'checks-disabled' ? 'checks-disabled' : item.resolvedAt ? 'resolved' : 'open';
+  const historyOutcome = item => item.resolution === 'ignored' ? 'ignored' : item.resolution === 'checks-disabled' ? 'checks-disabled' : item.resolvedAt ? 'resolved' : 'open';
   const historyEvents = [...new Set(issueHistory.map(item => item.eventName).filter(Boolean))].sort();
   const filteredHistory = issueHistory.filter(item =>
     (historyCategoryFilter === 'all' || historyCategory(item) === historyCategoryFilter) &&
@@ -811,9 +930,26 @@ export default function DataHealthAdmin({
             </div>
             <ul className="mt-3 space-y-2">
             {visibleOverviewIssues.map(issue => <li key={issue.key} className="rounded-lg border border-white/10 bg-[#031120]/70 p-3">
-              <div className="flex flex-wrap items-center gap-2"><strong className="text-sm text-white">{issue.eventName}</strong><span className="text-xs text-slate-300">{issue.kind} · {issue.category || 'feed'}</span><span className="rounded-full border border-amber-400/30 px-2 py-0.5 text-[10px] text-amber-200">{statusPresentation[issue.status]?.label || issue.status}</span></div>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <strong className="text-sm text-white">{issue.eventName}</strong>
+                  <span className="text-xs text-slate-300">{issue.kind} · {issue.category || 'feed'}</span>
+                  <span className="rounded-full border border-amber-400/30 px-2 py-0.5 text-[10px] text-amber-200">{statusPresentation[issue.status]?.label || issue.status}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    disabled={dimensionBusy}
+                    onClick={() => handleIgnoreIssue(issue)}
+                    className="rounded border border-amber-400/30 bg-amber-500/10 px-2 py-1 text-[11px] font-medium text-amber-200 hover:bg-amber-500/20 disabled:opacity-50"
+                    title="Ignore this issue and record in version history"
+                  >
+                    Ignore issue
+                  </button>
+                </div>
+              </div>
               <p className="mt-1 text-xs leading-relaxed text-amber-100/90">{summarizeIssue(issue)}</p>
-              {historyCategory(issue) === 'dimensions' && issue.dimensionFindings?.length > 0 && <details className="mt-2 text-xs"><summary className="cursor-pointer text-[#6bd5f7]">View dimension findings</summary><div className="mt-2"><DimensionFindings findings={issue.dimensionFindings} standards={dimensionSettings.values} customValues={dimensionSettings.customValues} eventCustomValues={dimensionSettings.eventCustomValues} eventId={issue.eventId} eventName={issue.eventName} onAcceptValue={handleAcceptValue} /></div></details>}
+              {historyCategory(issue) === 'dimensions' && issue.dimensionFindings?.length > 0 && <details className="mt-2 text-xs"><summary className="cursor-pointer text-[#6bd5f7]">View dimension findings</summary><div className="mt-2"><DimensionFindings findings={issue.dimensionFindings} standards={dimensionSettings.values} customValues={dimensionSettings.customValues} eventCustomValues={dimensionSettings.eventCustomValues} ignoreBlanksByDimension={dimensionSettings.ignoreBlanksByDimension || {}} ignoreBlanksByEventDimension={dimensionSettings.ignoreBlanksByEventDimension || {}} eventId={issue.eventId} eventName={issue.eventName} onAcceptValue={handleAcceptValue} onIgnoreBlanks={handleIgnoreBlanks} /></div></details>}
             </li>)}
             </ul>
             <div className="mt-3 flex items-center justify-between text-[10px] text-slate-400">
@@ -862,7 +998,22 @@ export default function DataHealthAdmin({
             return <details key={event.eventId} className="rounded-xl border border-white/10 bg-[#071d33]" open={filteredEvents.length === 1}>
               <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-2 p-3"><span className="font-semibold text-white">{event.eventName}</span><span className="flex flex-wrap gap-2">{event.sources.map(source => { const p = statusPresentation[getStatus(source)] || statusPresentation.unknown; return <span key={source.kind} className={`rounded-full border px-2 py-0.5 text-[10px] ${p.className}`}>{source.kind}: {p.label}</span>; })}<span className="text-xs text-slate-400">{eventIssues.length} issue{eventIssues.length === 1 ? '' : 's'}</span></span></summary>
               <div className="space-y-3 border-t border-white/10 p-3">
-                {eventIssues.map(issue => <div key={issue.key} className="rounded-lg border border-amber-400/20 bg-amber-500/5 p-3 text-xs text-amber-100"><strong>{issue.category || 'feed'} · {issue.status}</strong><p className="mt-1">{summarizeIssue(issue)}</p>{issue.dimensionFindings?.length > 0 && <p className="mt-1 text-[10px] text-slate-400">Expand Dimension checks in the {issue.kind} source below to review findings.</p>}</div>)}
+                {eventIssues.map(issue => <div key={issue.key} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-400/20 bg-amber-500/5 p-3 text-xs text-amber-100">
+                  <div className="min-w-0 flex-1">
+                    <strong>{issue.category || 'feed'} · {issue.status}</strong>
+                    <p className="mt-1">{summarizeIssue(issue)}</p>
+                    {issue.dimensionFindings?.length > 0 && <p className="mt-1 text-[10px] text-slate-400">Expand Dimension checks in the {issue.kind} source below to review findings.</p>}
+                  </div>
+                  <button
+                    type="button"
+                    disabled={dimensionBusy}
+                    onClick={() => handleIgnoreIssue(issue)}
+                    className="rounded border border-amber-400/30 bg-amber-500/10 px-2 py-1 text-[11px] font-medium text-amber-200 hover:bg-amber-500/20 disabled:opacity-50"
+                    title="Ignore this issue and record in version history"
+                  >
+                    Ignore issue
+                  </button>
+                </div>)}
                 <fieldset disabled={settingsLoading || savingEventChecks !== null} className="rounded-lg border border-white/10 bg-[#031120]/60 p-3">
                   <legend className="px-1 text-xs font-semibold text-white">Event monitoring controls</legend>
                   <p className="mb-3 text-[10px] text-slate-400">Applies to this event’s Actuals and Planned sheets. Global category switches take precedence.</p>
@@ -897,7 +1048,7 @@ export default function DataHealthAdmin({
                     {source.state === 'unavailable' && <p className="mt-2 text-[10px] text-red-200">Source unavailable; no current successful refresh. {source.lastError || ''}</p>}
                     {disabledReasons.length > 0 && <p className="mt-2 text-[10px] text-amber-200">Disabled checks: {disabledReasons.join(' ')} Data loading is unaffected.</p>}
                     <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-slate-400"><span>Last success: {formatTimestamp(source.lastSuccessAt)}</span>{source.lastFailureAt && <span className="text-amber-200">Last failure: {formatTimestamp(source.lastFailureAt)}{source.lastError ? ` · ${source.lastError}` : ''}</span>}<span>Rows: {(source.totalRows ?? source.rowCount ?? 0).toLocaleString()}</span>{source.kind === 'Actuals' && <span>Matching event rows: {(source.eventRows || 0).toLocaleString()} {source.eventDataStatus === 'unverified' ? '(event column not available)' : ''}</span>}<span>Date range: {source.firstDataDate || source.lastDataDate ? `${source.firstDataDate || 'Unknown'} – ${source.lastDataDate || 'Unknown'}` : 'No dated rows'}</span></div>
-                    {source.dimensionHealth && <details className="mt-3 rounded-lg border border-white/10 p-2 text-xs"><summary className="cursor-pointer font-semibold text-slate-200">Dimension checks · {source.dimensionHealth.status} · last run {formatTimestamp(source.dimensionHealth.checkedAt)}</summary>{source.dimensionHealth.error && <p className="mt-2 text-amber-200">{source.dimensionHealth.error}</p>}{source.dimensionHealth.findings?.length ? <div className="mt-2"><DimensionFindings findings={source.dimensionHealth.findings} standards={dimensionSettings.values} customValues={dimensionSettings.customValues} eventCustomValues={dimensionSettings.eventCustomValues} eventId={source.eventId} eventName={source.eventName} onAcceptValue={handleAcceptValue} /></div> : <p className="mt-2 text-slate-400">No dimension findings.</p>}</details>}
+                    {source.dimensionHealth && <details className="mt-3 rounded-lg border border-white/10 p-2 text-xs"><summary className="cursor-pointer font-semibold text-slate-200">Dimension checks · {source.dimensionHealth.status} · last run {formatTimestamp(source.dimensionHealth.checkedAt)}</summary>{source.dimensionHealth.error && <p className="mt-2 text-amber-200">{source.dimensionHealth.error}</p>}{source.dimensionHealth.findings?.length ? <div className="mt-2"><DimensionFindings findings={source.dimensionHealth.findings} standards={dimensionSettings.values} customValues={dimensionSettings.customValues} eventCustomValues={dimensionSettings.eventCustomValues} ignoreBlanksByDimension={dimensionSettings.ignoreBlanksByDimension || {}} ignoreBlanksByEventDimension={dimensionSettings.ignoreBlanksByEventDimension || {}} eventId={source.eventId} eventName={source.eventName} onAcceptValue={handleAcceptValue} onIgnoreBlanks={handleIgnoreBlanks} /></div> : <p className="mt-2 text-slate-400">No dimension findings.</p>}</details>}
                     {(source.metricDiscrepancies?.length > 0 || source.channelMetrics24h?.length > 0) && <details className="mt-2 rounded-lg border border-white/10 p-2 text-xs"><summary className="cursor-pointer font-semibold text-slate-200">24-hour channel metrics ({source.metricDiscrepancies?.length || 0} regression{source.metricDiscrepancies?.length === 1 ? '' : 's'})</summary>{source.metricDiscrepancies?.map(item => <p key={item.id} className="mt-2 text-amber-200">{item.channel} · {item.metric}: {item.previousValue} → {item.currentValue} (-{item.dropPercent}%) on {item.date}</p>)}{source.channelMetrics24h?.length > 0 && <p className="mt-2 text-slate-400">{source.channelMetrics24h.length} channel metrics available · latest date {source.latest24hDate || 'unknown'}.</p>}</details>}
                   </article>;
                 })}
@@ -913,18 +1064,45 @@ export default function DataHealthAdmin({
         <div className="grid gap-2 md:grid-cols-3">
           <label className="text-[10px] font-semibold uppercase text-slate-400">Category<select value={historyCategoryFilter} onChange={event => { setHistoryCategoryFilter(event.target.value); setHistoryPage(0); }} className="mt-1 w-full rounded-lg border border-white/10 bg-[#041628] px-3 py-2 text-xs normal-case text-white"><option value="all">All categories</option><option value="feed">Feed / sheet</option><option value="metrics">Metrics</option><option value="dimensions">Dimensions</option></select></label>
           <label className="text-[10px] font-semibold uppercase text-slate-400">Event<select value={historyEventFilter} onChange={event => { setHistoryEventFilter(event.target.value); setHistoryPage(0); }} className="mt-1 w-full rounded-lg border border-white/10 bg-[#041628] px-3 py-2 text-xs normal-case text-white"><option value="all">All events</option>{historyEvents.map(name => <option key={name} value={name}>{name}</option>)}</select></label>
-          <label className="text-[10px] font-semibold uppercase text-slate-400">Outcome<select value={historyOutcomeFilter} onChange={event => { setHistoryOutcomeFilter(event.target.value); setHistoryPage(0); }} className="mt-1 w-full rounded-lg border border-white/10 bg-[#041628] px-3 py-2 text-xs normal-case text-white"><option value="all">All outcomes</option><option value="open">Open</option><option value="resolved">Resolved</option><option value="checks-disabled">Checks disabled</option></select></label>
+          <label className="text-[10px] font-semibold uppercase text-slate-400">Outcome<select value={historyOutcomeFilter} onChange={event => { setHistoryOutcomeFilter(event.target.value); setHistoryPage(0); }} className="mt-1 w-full rounded-lg border border-white/10 bg-[#041628] px-3 py-2 text-xs normal-case text-white"><option value="all">All outcomes</option><option value="open">Open</option><option value="resolved">Resolved</option><option value="checks-disabled">Checks disabled</option><option value="ignored">Ignored</option></select></label>
         </div>
         <div className="rounded-xl border border-white/10 bg-[#071d33]">
           <div className="divide-y divide-white/10">
             {visibleHistory.map(item => <article key={item.id} className="flex flex-wrap items-start justify-between gap-3 p-3">
               <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><strong className="text-sm text-white">{item.eventName}</strong><span className="text-xs text-slate-300">{item.kind} · {historyCategory(item)} · {item.status}</span></div>
                 <p className="mt-1 text-xs text-slate-300">{summarizeIssue(item)}</p>
-                {item.dimensionFindings?.length > 0 && <details className="mt-2 text-xs text-slate-300"><summary className="cursor-pointer text-[#6bd5f7]">View dimension findings</summary><div className="mt-2"><DimensionFindings findings={item.dimensionFindings} standards={dimensionSettings.values} customValues={dimensionSettings.customValues} eventCustomValues={dimensionSettings.eventCustomValues} eventId={item.eventId} eventName={item.eventName} onAcceptValue={handleAcceptValue} /></div></details>}
-                <p className="mt-2 text-[10px] text-slate-500">Detected {formatTimestamp(item.openedAt)}{item.resolvedAt && ` · Resolved ${formatTimestamp(item.resolvedAt)} (${formatDuration(item.openedAt, item.resolvedAt)})`}</p>
+                {item.dimensionFindings?.length > 0 && <details className="mt-2 text-xs text-slate-300"><summary className="cursor-pointer text-[#6bd5f7]">View dimension findings</summary><div className="mt-2"><DimensionFindings findings={item.dimensionFindings} standards={dimensionSettings.values} customValues={dimensionSettings.customValues} eventCustomValues={dimensionSettings.eventCustomValues} ignoreBlanksByDimension={dimensionSettings.ignoreBlanksByDimension || {}} ignoreBlanksByEventDimension={dimensionSettings.ignoreBlanksByEventDimension || {}} eventId={item.eventId} eventName={item.eventName} onAcceptValue={handleAcceptValue} onIgnoreBlanks={handleIgnoreBlanks} /></div></details>}
+                <p className="mt-2 text-[10px] text-slate-500">
+                  Detected {formatTimestamp(item.openedAt)}
+                  {item.resolvedAt && (
+                    item.resolution === 'ignored'
+                      ? ` · Ignored ${formatTimestamp(item.resolvedAt)}${item.resolvedBy ? ` by ${item.resolvedBy}` : ''}`
+                      : ` · Resolved ${formatTimestamp(item.resolvedAt)} (${formatDuration(item.openedAt, item.resolvedAt)})`
+                  )}
+                  {item.notes && <span className="block mt-0.5 text-slate-400">Notes: {item.notes}</span>}
+                </p>
+                {item.resolution === 'ignored' && (
+                  <div className="mt-2">
+                    <button
+                      type="button"
+                      disabled={dimensionBusy}
+                      onClick={() => handleUnignoreIssue(item.key)}
+                      className="rounded border border-[#14a6d9]/40 bg-[#14a6d9]/10 px-2 py-1 text-[10px] font-semibold text-[#6bd5f7] hover:bg-[#14a6d9]/20 disabled:opacity-50"
+                      title="Restore health check for this issue"
+                    >
+                      Restore check
+                    </button>
+                  </div>
+                )}
                 {item.resolutionEmailStatus && <p className="mt-1 text-[10px] text-slate-400">Resolution email: {item.resolutionEmailStatus === 'checks-disabled' ? 'not sent; checks disabled' : item.resolutionEmailStatus === 'accepted' ? `accepted by SMTP ${formatTimestamp(item.resolutionEmailSentAt)} (inbox delivery not verified)` : item.resolutionEmailStatus === 'failed' ? 'failed; retry on a health check after five minutes' : 'pending; requires email and resolution notifications enabled'}</p>}
                 {item.resolutionEmailError && <p role="alert" className="text-[10px] text-amber-300">{item.resolutionEmailError}</p>}
-              </div><span className={`rounded-full border px-2 py-1 text-[10px] font-semibold ${historyOutcome(item) === 'open' ? 'border-rose-400/30 text-rose-200' : 'border-emerald-400/30 text-emerald-200'}`}>{historyOutcome(item) === 'checks-disabled' ? 'Checks disabled' : historyOutcome(item)}</span>
+              </div><span className={`rounded-full border px-2 py-1 text-[10px] font-semibold ${
+                historyOutcome(item) === 'ignored'
+                  ? 'border-amber-400/40 bg-amber-500/10 text-amber-200'
+                  : historyOutcome(item) === 'open'
+                  ? 'border-rose-400/30 text-rose-200'
+                  : 'border-emerald-400/30 text-emerald-200'
+              }`}>{historyOutcome(item) === 'checks-disabled' ? 'Checks disabled' : historyOutcome(item) === 'ignored' ? 'Ignored' : historyOutcome(item)}</span>
             </article>)}
             {visibleHistory.length === 0 && <p className="p-6 text-center text-xs text-slate-400">No issue history matches these filters.</p>}
           </div>
@@ -1235,6 +1413,100 @@ export default function DataHealthAdmin({
                 )}
               </div>
             </div>
+
+            {/* Ignored Issues & Blank Exemptions Manager */}
+            {((dimensionSettings.ignoredIssues?.length || 0) > 0 ||
+              Object.keys(dimensionSettings.ignoreBlanksByDimension || {}).some(k => dimensionSettings.ignoreBlanksByDimension[k]) ||
+              Object.keys(dimensionSettings.ignoreBlanksByEventDimension || {}).length > 0) && (
+              <div className="mt-4 rounded-xl border border-white/10 bg-[#041628]/90 p-4 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-2">
+                  <h4 className="text-xs font-bold text-white flex items-center gap-2">
+                    <span>Ignored Issues & Blank Exemptions</span>
+                    <span className="rounded-full bg-amber-400/20 px-2 py-0.5 text-[10px] font-medium text-amber-200">
+                      Audit Exemptions
+                    </span>
+                  </h4>
+                  <span className="text-[10px] text-slate-400">Recorded in version history</span>
+                </div>
+
+                {/* Ignored blank dimensions (global) */}
+                {Object.keys(dimensionSettings.ignoreBlanksByDimension || {}).some(k => dimensionSettings.ignoreBlanksByDimension[k]) && (
+                  <div className="space-y-1.5">
+                    <div className="text-[11px] font-semibold text-slate-300">Global Blank Exemptions:</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {Object.keys(dimensionSettings.ignoreBlanksByDimension || {})
+                        .filter(k => dimensionSettings.ignoreBlanksByDimension[k])
+                        .map(dim => (
+                          <span key={dim} className="inline-flex items-center gap-1.5 rounded bg-slate-500/20 border border-slate-400/40 px-2.5 py-1 text-xs text-slate-200">
+                            <span>{DIMENSIONS.find(d => d.id === dim)?.label || dim} (Blanks Ignored)</span>
+                            <button
+                              type="button"
+                              disabled={dimensionBusy}
+                              onClick={() => handleUnignoreBlanks(dim, null, 'global')}
+                              className="text-slate-400 hover:text-red-300"
+                              title="Restore blank check"
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Event-specific blank exemptions */}
+                {Object.keys(dimensionSettings.ignoreBlanksByEventDimension || {}).length > 0 && (
+                  <div className="space-y-1.5">
+                    <div className="text-[11px] font-semibold text-slate-300">Event Blank Exemptions:</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {Object.entries(dimensionSettings.ignoreBlanksByEventDimension || {}).flatMap(([evId, dims]) =>
+                        Object.keys(dims || {}).filter(d => dims[d]).map(dim => (
+                          <span key={`${evId}:${dim}`} className="inline-flex items-center gap-1.5 rounded bg-slate-500/20 border border-slate-400/40 px-2.5 py-1 text-xs text-slate-200">
+                            <span>{evId}: {DIMENSIONS.find(d => d.id === dim)?.label || dim} (Blanks Ignored)</span>
+                            <button
+                              type="button"
+                              disabled={dimensionBusy}
+                              onClick={() => handleUnignoreBlanks(dim, evId, 'event')}
+                              className="text-slate-400 hover:text-red-300"
+                              title="Restore blank check"
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Ignored specific issues */}
+                {(dimensionSettings.ignoredIssues || []).length > 0 && (
+                  <div className="space-y-1.5">
+                    <div className="text-[11px] font-semibold text-slate-300">Ignored Health Issues ({dimensionSettings.ignoredIssues.length}):</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {(dimensionSettings.ignoredIssues || []).map(item => {
+                        const key = typeof item === 'string' ? item : item.key;
+                        const label = typeof item === 'object' && item.eventName ? `${item.eventName} (${item.status})` : key;
+                        return (
+                          <span key={key} className="inline-flex items-center gap-1.5 rounded bg-amber-500/10 border border-amber-400/40 px-2.5 py-1 text-xs text-amber-200">
+                            <span>{label}</span>
+                            <button
+                              type="button"
+                              disabled={dimensionBusy}
+                              onClick={() => handleUnignoreIssue(key)}
+                              className="text-amber-400 hover:text-red-300"
+                              title="Restore check for this issue"
+                            >
+                              ×
+                            </button>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </section>
 

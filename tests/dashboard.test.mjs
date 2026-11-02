@@ -1035,6 +1035,10 @@ async function testAnalyticsLogic() {
   assert(typeof updatedSummary.kpis.totalRollbacksAvailable === 'number', 'Summary KPIs include totalRollbacksAvailable');
   assert(Array.isArray(updatedSummary.actionsHistory) && updatedSummary.actionsHistory.length > 0, 'Summary includes complete rollback audit history');
 
+  // Clean up test action so in-memory store remains pristine
+  const liveStore = (await import('../lib/analyticsService.mjs')).getStore();
+  if (liveStore.appliedActions) delete liveStore.appliedActions['enable_compact_grid_mode'];
+
   // Dwell Time & Device Telemetry Checks
   assert(typeof summary.dwellTimes?.summary?.avgSec === 'number', 'Summary contains dwell time for Summary tab');
   assert(typeof summary.dwellTimes?.detailed?.bouncePercent === 'number', 'Summary contains bounce rate for Detailed Grid');

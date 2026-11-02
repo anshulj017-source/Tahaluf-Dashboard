@@ -3,7 +3,9 @@ import {
   getHealthNotificationState,
   saveHealthNotificationSettings,
   sendTestHealthEmail,
-  reconcileDisabledHealthChecks
+  reconcileDisabledHealthChecks,
+  markIssueIgnoredInHistory,
+  markIssueUnignoredInHistory
 } from '../../../../lib/healthNotifications.mjs';
 import { getHealthIssues, normalizeHealthNotificationSettings } from '../../../../lib/healthNotificationUtils.mjs';
 import { isAdminRequest } from '../../../../lib/requireAdminRequest.js';
@@ -18,7 +20,11 @@ import {
   saveCustomValues,
   saveEventCustomValues,
   saveExcludedValues,
-  acceptDimensionValue
+  acceptDimensionValue,
+  ignoreDimensionBlanks,
+  unignoreDimensionBlanks,
+  ignoreHealthIssue,
+  unignoreHealthIssue
 } from '../../../../lib/dimensionMonitoring.mjs';
 import { getEventsConfig } from '../../../../lib/eventsConfig.js';
 
@@ -42,13 +48,14 @@ export async function GET(request) {
   try {
     const state = await getHealthNotificationState();
     let issues = [];
+    const dimensionSettings = await getDimensionSettings();
     if (new URL(request.url).searchParams.get('includeHealth') === 'true') {
       const healthResponse = await getEventsHealth();
       const healthPayload = await healthResponse.json();
       if (!healthResponse.ok || !healthPayload.success) {
         throw new Error(healthPayload.error || 'Could not load event health.');
       }
-      issues = getHealthIssues(healthPayload.sheetHealth || []);
+      issues = getHealthIssues(healthPayload.sheetHealth || [], dimensionSettings);
     }
     return NextResponse.json({
       success: true,
@@ -57,7 +64,7 @@ export async function GET(request) {
       history: [...(state.history || [])].reverse(),
       emailConfigured: isEmailConfigured(),
       updatedAt: state.updatedAt || null,
-      dimensionSettings: await getDimensionSettings()
+      dimensionSettings
     });
   } catch (error) {
     console.error('[HEALTH NOTIFICATIONS] Could not load settings:', error);
@@ -109,6 +116,78 @@ export async function POST(request) {
         value: body.value,
         eventId: body.eventId,
         scope: body.scope
+      });
+      return NextResponse.json({ success: true, dimensionSettings });
+    }
+    if (body.action === 'ignore-dimension-blanks') {
+      const adminEmail = request.headers.get('x-admin-email') || 'Admin';
+      const dimensionSettings = await ignoreDimensionBlanks({
+        dimension: body.dimension,
+        eventId: body.eventId,
+        scope: body.scope,
+        author: adminEmail,
+        reason: body.reason
+      });
+      const issueKey = body.eventId ? `${body.eventId}:Actuals:dimensions` : null;
+      if (issueKey) {
+        await markIssueIgnoredInHistory({
+          issueKey,
+          eventId: body.eventId,
+          eventName: body.eventName || body.eventId,
+          kind: 'Actuals',
+          status: 'dimension-discrepancy',
+          category: 'dimensions',
+          author: adminEmail,
+          reason: body.reason || `Ignored blank values for ${body.dimension} (${body.eventName || body.eventId})`
+        });
+      }
+      return NextResponse.json({ success: true, dimensionSettings });
+    }
+    if (body.action === 'unignore-dimension-blanks') {
+      const adminEmail = request.headers.get('x-admin-email') || 'Admin';
+      const dimensionSettings = await unignoreDimensionBlanks({
+        dimension: body.dimension,
+        eventId: body.eventId,
+        scope: body.scope,
+        author: adminEmail
+      });
+      return NextResponse.json({ success: true, dimensionSettings });
+    }
+    if (body.action === 'ignore-issue') {
+      const adminEmail = request.headers.get('x-admin-email') || 'Admin';
+      const dimensionSettings = await ignoreHealthIssue({
+        issueKey: body.issueKey,
+        eventId: body.eventId,
+        eventName: body.eventName,
+        category: body.category,
+        status: body.status,
+        message: body.message,
+        reason: body.reason,
+        author: adminEmail
+      });
+      await markIssueIgnoredInHistory({
+        issueKey: body.issueKey,
+        eventId: body.eventId,
+        eventName: body.eventName,
+        kind: body.kind,
+        status: body.status,
+        message: body.message,
+        category: body.category,
+        dimensionFindings: body.dimensionFindings,
+        author: adminEmail,
+        reason: body.reason || 'Ignored by administrator'
+      });
+      return NextResponse.json({ success: true, dimensionSettings });
+    }
+    if (body.action === 'unignore-issue') {
+      const adminEmail = request.headers.get('x-admin-email') || 'Admin';
+      const dimensionSettings = await unignoreHealthIssue({
+        issueKey: body.issueKey,
+        author: adminEmail
+      });
+      await markIssueUnignoredInHistory({
+        issueKey: body.issueKey,
+        author: adminEmail
       });
       return NextResponse.json({ success: true, dimensionSettings });
     }

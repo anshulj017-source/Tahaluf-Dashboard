@@ -53,11 +53,15 @@ export default function DimensionFindings({
   standards = {},
   customValues = {},
   eventCustomValues = {},
+  ignoreBlanksByDimension = {},
+  ignoreBlanksByEventDimension = {},
   eventId = null,
   eventName = null,
-  onAcceptValue = null
+  onAcceptValue = null,
+  onIgnoreBlanks = null
 }) {
   const [acceptingKey, setAcceptingKey] = useState(null);
+  const [ignoringKey, setIgnoringKey] = useState(null);
 
   if (!findings.length) return null;
   const grouped = new Map();
@@ -78,6 +82,17 @@ export default function DimensionFindings({
     }
   };
 
+  const handleIgnoreBlanks = async (dimension, targetEventId, scope) => {
+    if (!onIgnoreBlanks) return;
+    const key = `${dimension}:${targetEventId || 'global'}:${scope}`;
+    setIgnoringKey(key);
+    try {
+      await onIgnoreBlanks(dimension, targetEventId, scope);
+    } finally {
+      setIgnoringKey(null);
+    }
+  };
+
   return (
     <div className="space-y-3">
       <p className="text-sm text-amber-100">{grouped.size} dimension{grouped.size === 1 ? '' : 's'} need attention. Counts are per check; the same record may have multiple issues.</p>
@@ -85,11 +100,56 @@ export default function DimensionFindings({
         {[...grouped].map(([id, group]) => <section key={id} aria-label={`${group.label} findings`} className="min-w-0 rounded-xl border border-amber-300/25 bg-[#071d33] p-4">
           <h5 className="text-sm font-bold text-white">{group.label}</h5>
           <ul className="mt-3 space-y-3">
-            {group.findings.map((finding, index) => <li key={`${finding.type}:${index}`} className="rounded-lg border border-white/10 bg-[#031120]/70 p-3">
-              <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                <span className="font-semibold text-amber-200">{labels[finding.type] || finding.type}</span>
-                <span className="rounded-full bg-amber-300/10 px-2 py-1 font-bold tabular-nums text-amber-100">{finding.count.toLocaleString()} record{finding.count === 1 ? '' : 's'}</span>
-              </div>
+            {group.findings.map((finding, index) => {
+              const targetId = finding.eventId || eventId;
+              const isBlanksIgnoredGlobal = Boolean(ignoreBlanksByDimension[id]);
+              const isBlanksIgnoredEvent = Boolean(targetId && ignoreBlanksByEventDimension[targetId]?.[id]);
+              const isBlankType = finding.type === 'blank';
+
+              return (
+              <li key={`${finding.type}:${index}`} className="rounded-lg border border-white/10 bg-[#031120]/70 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                  <span className="font-semibold text-amber-200">{labels[finding.type] || finding.type}</span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full bg-amber-300/10 px-2 py-1 font-bold tabular-nums text-amber-100">{finding.count.toLocaleString()} record{finding.count === 1 ? '' : 's'}</span>
+                    {onIgnoreBlanks && isBlankType && (
+                      <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
+                        {isBlanksIgnoredGlobal ? (
+                          <span className="inline-flex items-center gap-1 rounded bg-slate-500/20 border border-slate-400/40 px-2 py-0.5 font-semibold text-slate-300">
+                            ✓ Blanks ignored globally
+                          </span>
+                        ) : isBlanksIgnoredEvent ? (
+                          <span className="inline-flex items-center gap-1 rounded bg-slate-500/20 border border-slate-400/40 px-2 py-0.5 font-semibold text-slate-300">
+                            ✓ Blanks ignored for {eventName || targetId}
+                          </span>
+                        ) : (
+                          <>
+                            {targetId && (
+                              <button
+                                type="button"
+                                disabled={Boolean(ignoringKey)}
+                                onClick={() => handleIgnoreBlanks(id, targetId, 'event')}
+                                className="rounded border border-amber-400/40 bg-amber-500/10 px-2 py-0.5 font-medium text-amber-200 hover:bg-amber-500/20 disabled:opacity-50"
+                                title={`Ignore blank values for ${group.label} in ${eventName || targetId}`}
+                              >
+                                {ignoringKey === `${id}:${targetId}:event` ? 'Ignoring…' : `Ignore blanks (${eventName || targetId})`}
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              disabled={Boolean(ignoringKey)}
+                              onClick={() => handleIgnoreBlanks(id, null, 'global')}
+                              className="rounded border border-[#14a6d9]/40 bg-[#14a6d9]/10 px-2 py-0.5 font-medium text-[#6bd5f7] hover:bg-[#14a6d9]/20 disabled:opacity-50"
+                              title={`Ignore blank values for ${group.label} globally across all events`}
+                            >
+                              {ignoringKey === `${id}:global:global` ? 'Ignoring…' : 'Ignore blanks globally'}
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
               {finding.values.length > 0 && <div className="mt-2 flex flex-col gap-2">
                 {finding.values.map(value => {
                   const targetId = finding.eventId || eventId;
@@ -161,7 +221,9 @@ export default function DimensionFindings({
                 {finding.eventName && <p className="mt-1 break-words">Event value: {finding.eventName}</p>}
                 {finding.sheetWide && <p className="mt-1 text-amber-200">Unmatched event in a shared sheet; shown for source investigation.</p>}
               </details>
-            </li>)}
+            </li>
+          );
+        })}
           </ul>
           {(standards[id]?.length > 0 || customValues[id]?.length > 0 || (eventId && eventCustomValues[eventId]?.[id]?.length > 0)) && <details className="mt-3 text-xs text-slate-300">
             <summary className="cursor-pointer rounded py-1 font-semibold text-[#6bd5f7]">View allowed values</summary>

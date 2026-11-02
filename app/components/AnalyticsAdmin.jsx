@@ -1694,7 +1694,7 @@ export default function AnalyticsAdmin({ currentUserEmail = '', active = true })
                       filteredActionsHistory.map((item) => {
                         const isApply = item.operation === 'APPLY';
                         const currentStatus = appliedActions[item.actionId]?.status;
-                        const canRevert = currentStatus === 'active';
+                        const isActive = currentStatus === 'active';
                         const isLoading = actionLoadingId === item.actionId;
                         const localTime = formatEventLocalTime(item.timestamp);
 
@@ -1730,22 +1730,41 @@ export default function AnalyticsAdmin({ currentUserEmail = '', active = true })
                               </span>
                             </td>
                             <td className="py-3 px-4 text-right">
-                              {canRevert ? (
-                                <button
-                                  onClick={() => handleAction(item.actionId, false, 'Rollback from Audit History')}
-                                  disabled={isLoading}
-                                  className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-500/15 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 transition-all flex items-center gap-1 ml-auto"
-                                >
-                                  <RotateCcw className="w-3 h-3" /> Revert
-                                </button>
+                              {isApply ? (
+                                isActive ? (
+                                  <button
+                                    onClick={() => handleAction(item.actionId, false, 'Rollback from Audit History')}
+                                    disabled={isLoading}
+                                    className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-500/15 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 transition-all flex items-center gap-1 ml-auto"
+                                    title="Revert this active optimization back to baseline"
+                                  >
+                                    <RotateCcw className="w-3 h-3" /> Revert
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => handleAction(item.actionId, true, 'Re-apply from Audit History')}
+                                    disabled={isLoading}
+                                    className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-[#cedc28]/20 hover:bg-[#cedc28]/30 text-[#cedc28] border border-[#cedc28]/30 transition-all flex items-center gap-1 ml-auto"
+                                    title="Re-apply this optimization"
+                                  >
+                                    <Zap className="w-3 h-3" /> Re-Apply
+                                  </button>
+                                )
                               ) : (
-                                <button
-                                  onClick={() => handleAction(item.actionId, true, 'Re-apply from Audit History')}
-                                  disabled={isLoading}
-                                  className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-[#cedc28]/20 hover:bg-[#cedc28]/30 text-[#cedc28] border border-[#cedc28]/30 transition-all flex items-center gap-1 ml-auto"
-                                >
-                                  <Zap className="w-3 h-3" /> Re-Apply
-                                </button>
+                                !isActive ? (
+                                  <button
+                                    onClick={() => handleAction(item.actionId, true, 'Re-apply from Audit History')}
+                                    disabled={isLoading}
+                                    className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-[#cedc28]/20 hover:bg-[#cedc28]/30 text-[#cedc28] border border-[#cedc28]/30 transition-all flex items-center gap-1 ml-auto"
+                                    title="Undo this rollback and re-apply optimization"
+                                  >
+                                    <Zap className="w-3 h-3" /> Re-Apply
+                                  </button>
+                                ) : (
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 inline-flex items-center gap-1 ml-auto">
+                                    <CheckCircle2 className="w-3 h-3" /> Active
+                                  </span>
+                                )
                               )}
                             </td>
                           </tr>
