@@ -50,6 +50,7 @@ export async function GET(request) {
     return NextResponse.json({ success: false, error: 'Admin access is required.' }, { status: 401 });
   }
   try {
+    await reconcileDisabledHealthChecks();
     const state = await getHealthNotificationState();
     let issues = [];
     const dimensionSettings = await getDimensionSettings();

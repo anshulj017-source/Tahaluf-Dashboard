@@ -11,7 +11,7 @@ import * as FeatureCtx from './DashboardFeatureContext';
 
 const useLowQuotaMode = typeof FeatureCtx.useLowQuotaMode === 'function' ? FeatureCtx.useLowQuotaMode : () => false;
 const useDashboardFeature = typeof FeatureCtx.useDashboardFeature === 'function' ? FeatureCtx.useDashboardFeature : () => true;
-import { DIMENSIONS, AVAILABLE_METRICS as EXPORTED_METRICS, DEFAULT_DIMENSION_SETTINGS } from '../../lib/dimensionStandards.mjs';
+import { DIMENSIONS, AVAILABLE_METRICS as EXPORTED_METRICS, DEFAULT_DIMENSION_SETTINGS, isIssueIgnored } from '../../lib/dimensionStandards.mjs';
 import DimensionFindings from './DimensionFindings';
 import { AdminTabs, useAdminDirtyGuard, useAdminView } from './AdminUI';
 
@@ -54,18 +54,38 @@ const summarizeIssue = (issue) => {
   return issue.message || 'No detail recorded.';
 };
 
-const getStatus = (source) => {
+const getStatus = (source, dimensionSettings = null) => {
   if (source.monitoringEnabled === false) return 'disabled';
   const dimensionChecksActive = source.kind === 'Actuals' && Boolean(source.dimensionHealth) && source.dimensionHealth.status !== 'disabled';
   if (source.sheetChecksEnabled === false && source.metricChecksEnabled === false && !dimensionChecksActive) return 'disabled';
   if (source.sheetChecksEnabled !== false && (source.eventDataStatus === 'missing' || (source.kind === 'Actuals' && source.eventRows === 0 && source.eventDataStatus !== 'present'))) {
-    return 'missing-data';
+    if (!isIssueIgnored({ key: `${source.eventId}:${source.kind}`, eventId: source.eventId, kind: source.kind, category: 'feed', status: 'missing-data' }, dimensionSettings)) {
+      return 'missing-data';
+    }
   }
-  if (source.metricDiscrepancies && source.metricDiscrepancies.length > 0) return 'metric-discrepancy';
+  if (source.metricDiscrepancies && source.metricDiscrepancies.length > 0) {
+    if (!isIssueIgnored({ key: `${source.eventId}:${source.kind}:metrics`, eventId: source.eventId, kind: source.kind, category: 'metrics', status: 'metric-discrepancy' }, dimensionSettings)) {
+      return 'metric-discrepancy';
+    }
+  }
   if (source.sheetChecksEnabled !== false && (source.state === 'stale' || source.state === 'unavailable' || source.state === 'storage-error')) {
-    return source.state;
+    if (!isIssueIgnored({ key: `${source.eventId}:${source.kind}`, eventId: source.eventId, kind: source.kind, category: 'feed', status: source.state }, dimensionSettings)) {
+      return source.state;
+    }
   }
-  if (source.dimensionHealth && source.dimensionHealth.status !== 'disabled' && (source.dimensionHealth.status !== 'checked' || source.dimensionHealth.stale || source.dimensionHealth.findings?.length)) return 'dimension-discrepancy';
+  if (source.dimensionHealth && source.dimensionHealth.status !== 'disabled' && (source.dimensionHealth.status !== 'checked' || source.dimensionHealth.stale || source.dimensionHealth.findings?.length)) {
+    if (!isIssueIgnored({
+      key: `${source.eventId}:${source.kind}:dimensions`,
+      eventId: source.eventId,
+      eventName: source.eventName,
+      kind: source.kind,
+      category: 'dimensions',
+      status: 'dimension-discrepancy',
+      dimensionFindings: source.dimensionHealth.findings
+    }, dimensionSettings)) {
+      return 'dimension-discrepancy';
+    }
+  }
   return source.state || 'unknown';
 };
 
@@ -316,12 +336,16 @@ export default function DataHealthAdmin({
 
   const actualSources = sheetHealth.filter(source => source.kind === 'Actuals');
   const healthyCount = actualSources.filter(source =>
-    getStatus(source) === 'healthy' && source.sheetChecksEnabled !== false && source.eventDataStatus === 'present'
+    getStatus(source, dimensionSettings) === 'healthy' && source.sheetChecksEnabled !== false && source.eventDataStatus === 'present'
   ).length;
-  const issueCount = actualSources.filter(source => ['stale', 'unavailable', 'storage-error', 'missing-data', 'metric-discrepancy', 'dimension-discrepancy'].includes(getStatus(source))).length;
+  const issueCount = actualSources.filter(source => ['stale', 'unavailable', 'storage-error', 'missing-data', 'metric-discrepancy', 'dimension-discrepancy'].includes(getStatus(source, dimensionSettings))).length;
   const missingDataCount = actualSources.filter(source => source.monitoringEnabled !== false && source.sheetChecksEnabled !== false && (source.eventDataStatus === 'missing' || source.eventRows === 0)).length;
   const totalDiscrepancies = useMemo(() => sheetHealth.reduce((sum, s) => sum + (s.metricDiscrepancies?.length || 0), 0), [sheetHealth]);
   const currentIssues = useMemo(() => getHealthIssues(sheetHealth, dimensionSettings), [sheetHealth, dimensionSettings]);
+
+  useEffect(() => {
+    onIssueCountChange(currentIssues.length);
+  }, [currentIssues.length, onIssueCountChange]);
 
   const allVerifiedMetrics = useMemo(() => {
     const list = [];
@@ -1116,8 +1140,8 @@ export default function DataHealthAdmin({
     if (eventKindFilter !== 'all' && !event.sources.some(source => source.kind === eventKindFilter)) return false;
     const issues = currentIssues.filter(issue => issue.eventId === event.eventId);
     if (eventStatusFilter === 'issues' && issues.length === 0) return false;
-    if (eventStatusFilter === 'healthy' && event.sources.every(source => getStatus(source) !== 'healthy')) return false;
-    if (eventStatusFilter === 'disabled' && event.sources.every(source => getStatus(source) !== 'disabled')) return false;
+    if (eventStatusFilter === 'healthy' && event.sources.every(source => getStatus(source, dimensionSettings) !== 'healthy')) return false;
+    if (eventStatusFilter === 'disabled' && event.sources.every(source => getStatus(source, dimensionSettings) !== 'disabled')) return false;
     if (eventCategoryFilter !== 'all' && !issues.some(issue => issue.category === eventCategoryFilter)) return false;
     return true;
   });
@@ -1263,7 +1287,7 @@ export default function DataHealthAdmin({
         {(pacingGuardianAllowed || budgetReconciliationAllowed) && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {pacingGuardianAllowed && (
-              <div className="rounded-xl border border-white/10 bg-[#071d33] p-4 space-y-3">
+              <div id="pacing-guardian" className="rounded-xl border border-white/10 bg-[#071d33] p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <TrendingUp className="h-4 w-4 text-[#cedc28]" />
@@ -1294,7 +1318,7 @@ export default function DataHealthAdmin({
             )}
 
             {budgetReconciliationAllowed && (
-              <div className="rounded-xl border border-white/10 bg-[#071d33] p-4 space-y-3">
+              <div id="budget-reconciliation" className="rounded-xl border border-white/10 bg-[#071d33] p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <ShieldCheck className="h-4 w-4 text-[#14a6d9]" />
@@ -1507,7 +1531,7 @@ export default function DataHealthAdmin({
             const drafts = eventCheckDrafts[event.eventId] || dimensionSettings.eventChecks?.[event.eventId] || {};
             const selectedChecks = { monitoringEnabled: true, sheetChecksEnabled: true, metricChecksEnabled: true, dimensionChecksEnabled: true, ...drafts };
             return <details key={event.eventId} className="rounded-xl border border-white/10 bg-[#071d33]" open={filteredEvents.length === 1}>
-              <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-2 p-3"><span className="font-semibold text-white">{event.eventName}</span><span className="flex flex-wrap gap-2">{event.sources.map(source => { const p = statusPresentation[getStatus(source)] || statusPresentation.unknown; return <span key={source.kind} className={`rounded-full border px-2 py-0.5 text-[10px] ${p.className}`}>{source.kind}: {p.label}</span>; })}<span className="text-xs text-slate-400">{eventIssues.length} issue{eventIssues.length === 1 ? '' : 's'}</span></span></summary>
+              <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-2 p-3"><span className="font-semibold text-white">{event.eventName}</span><span className="flex flex-wrap gap-2">{event.sources.map(source => { const p = statusPresentation[getStatus(source, dimensionSettings)] || statusPresentation.unknown; return <span key={source.kind} className={`rounded-full border px-2 py-0.5 text-[10px] ${p.className}`}>{source.kind}: {p.label}</span>; })}<span className="text-xs text-slate-400">{eventIssues.length} issue{eventIssues.length === 1 ? '' : 's'}</span></span></summary>
               <div className="space-y-3 border-t border-white/10 p-3">
                 {eventIssues.map(issue => <div key={issue.key} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-400/20 bg-amber-500/5 p-3 text-xs text-amber-100">
                   <div className="min-w-0 flex-1">
@@ -1543,7 +1567,7 @@ export default function DataHealthAdmin({
                   <div className="mt-3 flex flex-wrap items-center gap-3"><button type="button" onClick={() => saveEventChecks(event.eventId, selectedChecks)} className="rounded-lg border border-[#14a6d9]/40 px-3 py-2 text-xs font-semibold text-[#6bd5f7] disabled:opacity-50">{savingEventChecks === event.eventId ? 'Saving…' : `Save ${event.eventName} checks`}</button>{eventCheckNotice?.eventId === event.eventId && <span role={eventCheckNotice.error ? 'alert' : 'status'} className={`text-xs ${eventCheckNotice.error ? 'text-red-300' : 'text-lime-300'}`}>{eventCheckNotice.text}</span>}</div>
                 </fieldset>
                 {event.sources.map(source => {
-                  const status = getStatus(source);
+                  const status = getStatus(source, dimensionSettings);
                   const presentation = statusPresentation[status] || statusPresentation.unknown;
                   const isRefreshing = refreshingSheet === `${source.eventId}:${source.kind}`;
                   const disabledReasons = [];
@@ -1643,6 +1667,7 @@ export default function DataHealthAdmin({
           {auditExportAllowed && (
             <button
               type="button"
+              id="audit-trail-export"
               onClick={exportAuditTrailCsv}
               disabled={!issueHistory || issueHistory.length === 0}
               className="inline-flex items-center gap-1.5 rounded-lg border border-[#cedc28]/40 bg-[#cedc28]/10 px-2.5 py-1 text-xs font-semibold text-[#cedc28] hover:bg-[#cedc28]/20 transition disabled:opacity-40"
@@ -1962,7 +1987,7 @@ export default function DataHealthAdmin({
             </fieldset>
             <details className="mt-3 text-[10px] text-slate-400"><summary className="cursor-pointer">View allowed standard values</summary>{DIMENSIONS.map(dimension => <p key={dimension.id} className="mt-2"><strong>{dimension.label}:</strong> {dimensionSettings.values?.[dimension.id]?.join(', ') || 'Standards not loaded'}</p>)}</details>
 
-            <div className="mt-4 rounded-xl border border-white/10 bg-[#041628]/90 p-4 space-y-4">
+            <div id="standards-manager" className="mt-4 rounded-xl border border-white/10 bg-[#041628]/90 p-4 space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-3">
                 <div className="flex-1">
                   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -2358,7 +2383,7 @@ export default function DataHealthAdmin({
 
           {/* Webhook Integrations (Slack / Microsoft Teams / Custom) */}
           {webhookAllowed && (
-            <div className="border-t border-white/10 pt-3 space-y-3">
+            <div id="webhook-integrations" className="border-t border-white/10 pt-3 space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <h4 className="text-xs font-semibold text-white flex items-center gap-2">

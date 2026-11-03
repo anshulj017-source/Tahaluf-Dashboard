@@ -421,7 +421,7 @@ export default function CreativeView({ data, exRate = 1, exSym = '$', formatShor
     <div className="animate-in fade-in duration-500">
       {/* CREATIVE FATIGUE RADAR */}
       {creativeFatigueAllowed && (
-        <div className="mb-4">
+        <div id="creative-fatigue-radar" className="mb-4">
           <CreativeFatigueRadar 
             creatives={creativeTabData}
             exSym={exSym}

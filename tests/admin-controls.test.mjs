@@ -1726,3 +1726,125 @@ test('event monitoring endpoint rejects unauthorized and unknown events before p
   assert.equal(writes, 1);
   assert.equal(reconciles, 1);
 });
+
+test('ignored health issues are completely suppressed from health issues, alerts, and active issues', async () => {
+  const issue = {
+    key: 'bio-cphi-main:Actuals:dimensions',
+    eventId: 'bio-cphi-main',
+    eventName: 'BIO 26 & CPHI 26',
+    kind: 'Actuals',
+    category: 'dimensions',
+    status: 'dimension-discrepancy',
+    message: 'EVENT TYPE: blank, 329 rows'
+  };
+  const settings = {
+    ignoredIssues: [
+      {
+        key: 'bio-cphi-main:Actuals:dimensions',
+        eventId: 'bio-cphi-main',
+        eventName: 'BIO 26 & CPHI 26',
+        category: 'dimensions',
+        status: 'dimension-discrepancy'
+      }
+    ]
+  };
+
+  assert.equal(dimensionRules.isIssueIgnored(issue, settings), true);
+  assert.equal(dimensionRules.isHealthCheckEnabled(issue, settings), false);
+
+  const source = {
+    eventId: 'bio-cphi-main',
+    eventName: 'BIO 26 & CPHI 26',
+    kind: 'Actuals',
+    state: 'healthy',
+    sheetChecksEnabled: true,
+    dimensionHealth: {
+      status: 'checked',
+      findings: [{ label: 'EVENT TYPE', type: 'blank', count: 329, values: [], sampleRows: [1] }]
+    }
+  };
+  const issues = healthUtils.getHealthIssues([source], settings);
+  assert.equal(issues.length, 0);
+
+  const harness = await resolutionHarness();
+  await harness.health.observeHealthSource(issue.key, issue);
+  assert.ok(harness.state().activeIssues[issue.key]);
+  harness.checks(settings);
+  await harness.health.reconcileDisabledHealthChecks();
+  assert.equal(harness.state().activeIssues[issue.key], undefined);
+  assert.equal(harness.state().history[0].resolution, 'ignored');
+});
+
+test('all 36 dashboard features map to explicit navigation routes and sections', async () => {
+  const adminFeatureNavMap = {
+    adminEvents: { section: 'events' },
+    adminHealth: { section: 'health', healthView: 'overview' },
+    adminQuotas: { section: 'quotas', apiView: 'overview' },
+    adminAnalytics: { section: 'analytics', analyticsView: 'overview' },
+    adminUsers: { section: 'users' },
+    adminFeatures: { section: 'features' },
+    pacingGuardian: { section: 'health', healthView: 'overview', scrollId: 'pacing-guardian' },
+    budgetReconciliation: { section: 'health', healthView: 'overview', scrollId: 'budget-reconciliation' },
+    healthWebhooks: { section: 'health', healthView: 'settings', scrollId: 'webhook-integrations' },
+    dimensionExport: { section: 'health', healthView: 'settings', scrollId: 'standards-manager' },
+    bulkDimensionImport: { section: 'health', healthView: 'settings', scrollId: 'standards-manager' },
+    auditExport: { section: 'health', healthView: 'history', scrollId: 'audit-trail-export' },
+    channelSaturation: { section: 'analytics', analyticsView: 'recommendations', scrollId: 'channel-saturation-radar' },
+    advancedPptx: { section: 'analytics', analyticsView: 'overview', scrollId: 'export-pptx-button' },
+  };
+
+  const dashboardFeatureNavMap = {
+    summary: { tab: 'summary' },
+    campaign: { tab: 'campaign' },
+    benchmarkComparison: { tab: 'campaign', scrollId: 'cross-event-benchmarking' },
+    weekly: { tab: 'weekly' },
+    granularTimeline: { tab: 'weekly', scrollId: 'granular-weekly-timeline' },
+    launchForecaster: { tab: 'weekly', scrollId: 'launch-forecaster' },
+    channel: { tab: 'channel' },
+    market: { tab: 'market' },
+    detailed: { tab: 'detailed' },
+    webtraffic: { tab: 'webtraffic' },
+    creative: { tab: 'creative' },
+    creativeFatigue: { tab: 'creative', scrollId: 'creative-fatigue-radar' },
+    aiSummary: { tab: 'summary', subTab: 'commentary', scrollId: 'ai-strategic-intelligence' },
+    budgetSimulator: { tab: 'summary', subTab: 'simulator', scrollId: 'ai-strategic-intelligence' },
+    channelQuadrant: { tab: 'summary', subTab: 'quadrant', scrollId: 'ai-strategic-intelligence' },
+    tv: { mode: 'tv' },
+    tvAutoCycle: { mode: 'tv' },
+    tvCustomization: { mode: 'tv', settingsModal: true },
+    quickJump: { palette: true },
+    currency: { tab: 'summary', scrollId: 'currency-toggle-button' },
+    exports: { tab: 'summary', scrollId: 'dashboard-exports' },
+    healthBanner: { tab: 'summary', scrollId: 'health-alert-banner' },
+  };
+
+  // Ensure every feature in DASHBOARD_FEATURES has an explicit, non-default mapping
+  for (const feature of DASHBOARD_FEATURES) {
+    const isAdmin = adminFeatureNavMap[feature.id];
+    const isDashboard = dashboardFeatureNavMap[feature.id];
+    assert.ok(
+      isAdmin || isDashboard,
+      `Feature ${feature.id} (${feature.name}) must have an explicit navigation route target`
+    );
+
+    if (isAdmin) {
+      assert.ok(
+        ['events', 'health', 'quotas', 'analytics', 'users', 'features'].includes(isAdmin.section),
+        `Admin feature ${feature.id} maps to valid admin section: ${isAdmin.section}`
+      );
+    } else if (isDashboard) {
+      if (isDashboard.tab) {
+        assert.ok(
+          ['summary', 'campaign', 'weekly', 'channel', 'market', 'detailed', 'webtraffic', 'creative'].includes(isDashboard.tab),
+          `Dashboard feature ${feature.id} maps to valid tab: ${isDashboard.tab}`
+        );
+      }
+    }
+  }
+
+  assert.equal(
+    Object.keys(adminFeatureNavMap).length + Object.keys(dashboardFeatureNavMap).length,
+    DASHBOARD_FEATURES.length,
+    'All 36 registered features have dedicated navigation mappings without overlap'
+  );
+});

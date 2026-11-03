@@ -28,6 +28,40 @@ const ALL_ADMIN_SECTIONS = [
 
 const sections = ALL_ADMIN_SECTIONS;
 
+const ADMIN_FEATURE_ROUTES = {
+  adminEvents: { section: 'events' },
+  adminHealth: { section: 'health', healthView: 'overview' },
+  adminQuotas: { section: 'quotas', apiView: 'overview' },
+  adminAnalytics: { section: 'analytics', analyticsView: 'overview' },
+  adminUsers: { section: 'users' },
+  adminFeatures: { section: 'features' },
+  pacingGuardian: { section: 'health', healthView: 'overview', scrollId: 'pacing-guardian' },
+  budgetReconciliation: { section: 'health', healthView: 'overview', scrollId: 'budget-reconciliation' },
+  healthWebhooks: { section: 'health', healthView: 'settings', scrollId: 'webhook-integrations' },
+  dimensionExport: { section: 'health', healthView: 'settings', scrollId: 'standards-manager' },
+  bulkDimensionImport: { section: 'health', healthView: 'settings', scrollId: 'standards-manager' },
+  auditExport: { section: 'health', healthView: 'history', scrollId: 'audit-trail-export' },
+  channelSaturation: { section: 'analytics', analyticsView: 'recommendations', scrollId: 'channel-saturation-radar' },
+  advancedPptx: { section: 'analytics', analyticsView: 'overview', scrollId: 'export-pptx-button' },
+};
+
+function scrollToTarget(targetId) {
+  if (typeof window === 'undefined' || !targetId) return;
+  const tryScroll = (attempts = 0) => {
+    const el = document.getElementById(targetId);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('ring-2', 'ring-[#cedc28]', 'ring-offset-2', 'ring-offset-[#041628]', 'transition-all');
+      setTimeout(() => {
+        el.classList.remove('ring-2', 'ring-[#cedc28]', 'ring-offset-2', 'ring-offset-[#041628]');
+      }, 2500);
+    } else if (attempts < 12) {
+      setTimeout(() => tryScroll(attempts + 1), 120);
+    }
+  };
+  setTimeout(() => tryScroll(0), 100);
+}
+
 export default function AdminView({ 
   active = true, 
   currentUserEmail = '', 
@@ -668,10 +702,23 @@ export default function AdminView({
               isFeatureAllowed={isFeatureAllowed}
               onSaved={onFeaturesSaved}
               onNavigate={(featureId) => {
-                if (featureId === 'dimensionExport' || featureId === 'bulkDimensionImport') {
-                  setActiveSection('health');
-                } else if (featureId === 'adminUsers') {
-                  setActiveSection('users');
+                const adminRoute = ADMIN_FEATURE_ROUTES[featureId];
+                if (adminRoute) {
+                  if (typeof window !== 'undefined') {
+                    try {
+                      const url = new URL(window.location.href);
+                      url.searchParams.set('admin', adminRoute.section);
+                      if (adminRoute.healthView) url.searchParams.set('healthView', adminRoute.healthView);
+                      if (adminRoute.apiView) url.searchParams.set('apiView', adminRoute.apiView);
+                      if (adminRoute.analyticsView) url.searchParams.set('analyticsView', adminRoute.analyticsView);
+                      window.history.replaceState(null, '', url);
+                      window.dispatchEvent(new Event('admin-locationchange'));
+                    } catch {}
+                  }
+                  navigate(adminRoute.section);
+                  if (adminRoute.scrollId) {
+                    scrollToTarget(adminRoute.scrollId);
+                  }
                 } else if (onNavigate) {
                   onNavigate(featureId);
                 }

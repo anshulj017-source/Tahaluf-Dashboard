@@ -38,6 +38,16 @@ export default function AiStrategicIntelligence({
   featureAllowed = () => true
 }) {
   const [activeTab, setActiveTab] = useState('commentary'); // 'commentary' | 'nextsteps' | 'events' | 'portfolio' | 'quadrant' | 'simulator'
+
+  useEffect(() => {
+    const handleSwitch = (e) => {
+      if (e.detail?.tab && ['commentary', 'nextsteps', 'events', 'portfolio', 'quadrant', 'simulator'].includes(e.detail.tab)) {
+        setActiveTab(e.detail.tab);
+      }
+    };
+    window.addEventListener('ai-intelligence-tab', handleSwitch);
+    return () => window.removeEventListener('ai-intelligence-tab', handleSwitch);
+  }, []);
   const [eventSearch, setEventSearch] = useState('');
   const [nextStepEventTypeFilter, setNextStepEventTypeFilter] = useState('All');
   const [nextStepChannelFilter, setNextStepChannelFilter] = useState('All');
@@ -326,7 +336,7 @@ export default function AiStrategicIntelligence({
   }, [allDailyNextSteps, nextStepEventFilter, nextStepChannelFilter, nextStepEventTypeFilter]);
 
   return (
-    <div className="card-surface p-5 sm:p-6 rounded-3xl border border-[#cedc28]/35 bg-gradient-to-r from-[#0a2442]/95 via-[#071b2e] to-[#041628] shadow-2xl relative overflow-hidden export-slide" data-title="AI Strategic Intelligence">
+    <div id="ai-strategic-intelligence" className="card-surface p-5 sm:p-6 rounded-3xl border border-[#cedc28]/35 bg-gradient-to-r from-[#0a2442]/95 via-[#071b2e] to-[#041628] shadow-2xl relative overflow-hidden export-slide" data-title="AI Strategic Intelligence">
       <div className="pattern-overlay absolute inset-0 z-0 pointer-events-none opacity-20"></div>
 
       <div className="relative z-10 flex flex-col gap-5">
@@ -460,6 +470,7 @@ export default function AiStrategicIntelligence({
 
               {featureAllowed('channelQuadrant') && (
                 <button
+                  id="channel-quadrant"
                   onClick={() => setActiveTab('quadrant')}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
                     activeTab === 'quadrant'
@@ -474,6 +485,7 @@ export default function AiStrategicIntelligence({
 
               {featureAllowed('budgetSimulator') && (
                 <button
+                  id="budget-simulator"
                   onClick={() => setActiveTab('simulator')}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
                     activeTab === 'simulator'

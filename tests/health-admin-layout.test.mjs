@@ -6,7 +6,7 @@ import { createRequire } from 'node:module';
 import ts from 'typescript';
 import React from 'react';
 import { DEFAULT_HEALTH_NOTIFICATION_SETTINGS, getHealthIssues } from '../lib/healthNotificationUtils.mjs';
-import { DEFAULT_DIMENSION_SETTINGS } from '../lib/dimensionStandards.mjs';
+import { DEFAULT_DIMENSION_SETTINGS, isIssueIgnored } from '../lib/dimensionStandards.mjs';
 
 const require = createRequire(import.meta.url);
 
@@ -189,7 +189,8 @@ async function setupHealthAdmin(sourceFixture, { delaySettings = false, globalCh
     '../../lib/dimensionStandards.mjs': {
       DEFAULT_DIMENSION_SETTINGS,
       DIMENSIONS: [{ id: 'geo', label: 'Geo' }],
-      AVAILABLE_METRICS: [{ id: 'cost', label: 'Cost / Spend', unit: '$' }]
+      AVAILABLE_METRICS: [{ id: 'cost', label: 'Cost / Spend', unit: '$' }],
+      isIssueIgnored: typeof isIssueIgnored === 'function' ? isIssueIgnored : () => false
     },
     './DimensionFindings': ({ findings = [] }) => React.createElement(
       'div',

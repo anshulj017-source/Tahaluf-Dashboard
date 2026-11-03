@@ -168,7 +168,7 @@ async function getSheet(request) {
     } catch (error) {
       console.error('[SHEET CACHE] Could not record sheet failure:', error);
     }
-    if (cached && cached.data) {
+    if (cached && cached.data && !cached.data.startsWith('Loading...') && !cached.data.startsWith('<!DOCTYPE') && !cached.data.startsWith('<html') && !getSpreadsheetFormulaError(cached.data)) {
       console.warn(`[CACHE RESILIENCE] ${reason} for ${url}. Serving stale cached data as fallback.`);
       return {
         text: cached.data,

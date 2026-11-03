@@ -848,6 +848,7 @@ export default function AnalyticsAdmin({ currentUserEmail = '', active = true })
 
           <button
             type="button"
+            id="export-pptx-button"
             onClick={() => {
               if (advancedPptxAllowed) {
                 setShowPptxModal(true);
@@ -1146,7 +1147,7 @@ export default function AnalyticsAdmin({ currentUserEmail = '', active = true })
 
           {/* Channel Saturation & Diminishing Returns Radar (Admin Feature) */}
           {channelSaturationAllowed && (
-            <div className="card-surface p-5 rounded-2xl border border-white/10 shadow-lg space-y-4 bg-[#0a2442]">
+            <div id="channel-saturation-radar" className="card-surface p-5 rounded-2xl border border-white/10 shadow-lg space-y-4 bg-[#0a2442]">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <TrendingUp className="w-5 h-5 text-[#cedc28]" />

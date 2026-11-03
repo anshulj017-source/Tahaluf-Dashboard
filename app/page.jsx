@@ -101,6 +101,23 @@ const normalizeMarket = (marketName) => {
   return aliases[upperName] || cleanName;
 };
 
+function scrollToTarget(targetId) {
+  if (typeof window === 'undefined' || !targetId) return;
+  const tryScroll = (attempts = 0) => {
+    const el = document.getElementById(targetId);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('ring-2', 'ring-[#cedc28]', 'ring-offset-2', 'ring-offset-[#041628]', 'transition-all');
+      setTimeout(() => {
+        el.classList.remove('ring-2', 'ring-[#cedc28]', 'ring-offset-2', 'ring-offset-[#041628]');
+      }, 2500);
+    } else if (attempts < 12) {
+      setTimeout(() => tryScroll(attempts + 1), 120);
+    }
+  };
+  setTimeout(() => tryScroll(0), 100);
+}
+
 // --- COMPONENTS ---
 const MetricCard = ({ label, value, color, icon: Icon, definition, subContent, onClick }) => (
   <div 
@@ -2677,30 +2694,34 @@ export default function App() {
           </div>
           
           {featureAllowed('launchForecaster') && (
-            <TargetPacingForecaster 
-              eventName={activeEventContext}
-              deliveredCost={weekTotals.spend || 0}
-              plannedBudget={plannedData.filter(p => p.eventName === activeEventContext || p.event === activeEventContext || (p.sourceName && p.sourceName.toLowerCase().includes(activeEventContext.toLowerCase()))).reduce((sum, p) => sum + (Number(p.budget || p.Budget || p.spend || p.Spend || 0)), 0)}
-              launchDateStr={eventsConfiguration?.find(e => e.name === activeEventContext || e.id === activeEventContext)?.launchDate || ''}
-              startDateStr={eventsConfiguration?.find(e => e.name === activeEventContext || e.id === activeEventContext)?.startDate || ''}
-              exSym={exSym}
-              exRate={exRate}
-              formatShort={formatShort}
-            />
+            <div id="launch-forecaster">
+              <TargetPacingForecaster 
+                eventName={activeEventContext}
+                deliveredCost={weekTotals.spend || 0}
+                plannedBudget={plannedData.filter(p => p.eventName === activeEventContext || p.event === activeEventContext || (p.sourceName && p.sourceName.toLowerCase().includes(activeEventContext.toLowerCase()))).reduce((sum, p) => sum + (Number(p.budget || p.Budget || p.spend || p.Spend || 0)), 0)}
+                launchDateStr={eventsConfiguration?.find(e => e.name === activeEventContext || e.id === activeEventContext)?.launchDate || ''}
+                startDateStr={eventsConfiguration?.find(e => e.name === activeEventContext || e.id === activeEventContext)?.startDate || ''}
+                exSym={exSym}
+                exRate={exRate}
+                formatShort={formatShort}
+              />
+            </div>
           )}
 
           {featureAllowed('granularTimeline') && (
-            <GranularWeeklyPacing 
-              eventName={activeEventContext}
-              eventTimeline={eventWeekTimelines[activeEventContext] || eventWeekTimelines[activeEventContext.toUpperCase()] || []}
-              weeklyData={weeklyMetricsData}
-              plannedData={plannedData.filter(p => p.eventName === activeEventContext || p.event === activeEventContext || (p.sourceName && p.sourceName.toLowerCase().includes(activeEventContext.toLowerCase())))}
-              selectedWeeks={localWeeklyViewWeeks}
-              onSelectWeek={(w) => setLocalWeeklyViewWeeks(w === 'All' ? ['All'] : [w])}
-              currency={currency}
-              exRate={exRate}
-              exSym={exSym}
-            />
+            <div id="granular-weekly-timeline">
+              <GranularWeeklyPacing 
+                eventName={activeEventContext}
+                eventTimeline={eventWeekTimelines[activeEventContext] || eventWeekTimelines[activeEventContext.toUpperCase()] || []}
+                weeklyData={weeklyMetricsData}
+                plannedData={plannedData.filter(p => p.eventName === activeEventContext || p.event === activeEventContext || (p.sourceName && p.sourceName.toLowerCase().includes(activeEventContext.toLowerCase())))}
+                selectedWeeks={localWeeklyViewWeeks}
+                onSelectWeek={(w) => setLocalWeeklyViewWeeks(w === 'All' ? ['All'] : [w])}
+                currency={currency}
+                exRate={exRate}
+                exSym={exSym}
+              />
+            </div>
           )}
 
           <div className="card-surface p-6 rounded-3xl border border-[#cedc28]/10 shadow-lg relative z-20 overflow-visible">
@@ -2748,6 +2769,7 @@ export default function App() {
               <div className="flex items-center justify-center gap-3 mb-8">
                 <button
                   type="button"
+                  id="cross-event-benchmarking"
                   onClick={() => {
                     React.startTransition(() => {
                       setFilterEvents(uniqueEvents);
@@ -3486,7 +3508,7 @@ export default function App() {
               )}
 
               {userRole !== 'non-finance' && featureAllowed('currency') && (
-                <div className="flex items-center justify-between px-1">
+                <div id="currency-toggle-button" className="flex items-center justify-between px-1">
                   <span className="text-[11px] font-bold text-[#14a6d9] uppercase tracking-wider">Currency</span>
                   <div className="flex bg-[#041628] p-0.5 rounded-lg border border-[#cedc28]/20 w-[110px]">
                     <button onClick={() => { setCurrency('USD'); trackCurrencyToggle('USD', userEmail); }} className={`flex-1 px-2 py-1 text-[11px] font-bold rounded-md transition-colors ${currency === 'USD' ? 'bg-[#cedc28] text-[#1a302e]' : 'text-slate-400 hover:text-white'}`}>USD</button>
@@ -3703,23 +3725,109 @@ export default function App() {
             onEventsSaved={setEventsConfiguration}
             onSignOut={handleSignOut}
             onNavigate={(featureId) => {
+              const adminRoute = {
+                adminEvents: { section: 'events' },
+                adminHealth: { section: 'health', healthView: 'overview' },
+                adminQuotas: { section: 'quotas', apiView: 'overview' },
+                adminAnalytics: { section: 'analytics', analyticsView: 'overview' },
+                adminUsers: { section: 'users' },
+                adminFeatures: { section: 'features' },
+                pacingGuardian: { section: 'health', healthView: 'overview', scrollId: 'pacing-guardian' },
+                budgetReconciliation: { section: 'health', healthView: 'overview', scrollId: 'budget-reconciliation' },
+                healthWebhooks: { section: 'health', healthView: 'settings', scrollId: 'webhook-integrations' },
+                dimensionExport: { section: 'health', healthView: 'settings', scrollId: 'standards-manager' },
+                bulkDimensionImport: { section: 'health', healthView: 'settings', scrollId: 'standards-manager' },
+                auditExport: { section: 'health', healthView: 'history', scrollId: 'audit-trail-export' },
+                channelSaturation: { section: 'analytics', analyticsView: 'recommendations', scrollId: 'channel-saturation-radar' },
+                advancedPptx: { section: 'analytics', analyticsView: 'overview', scrollId: 'export-pptx-button' },
+              }[featureId];
+
+              if (adminRoute && canAccessAdmin) {
+                if (typeof window !== 'undefined') {
+                  try {
+                    const url = new URL(window.location.href);
+                    url.searchParams.set('admin', adminRoute.section);
+                    if (adminRoute.healthView) url.searchParams.set('healthView', adminRoute.healthView);
+                    if (adminRoute.apiView) url.searchParams.set('apiView', adminRoute.apiView);
+                    if (adminRoute.analyticsView) url.searchParams.set('analyticsView', adminRoute.analyticsView);
+                    window.history.replaceState(null, '', url);
+                    window.dispatchEvent(new Event('admin-locationchange'));
+                  } catch {}
+                }
+                setActiveTab('admin');
+                if (adminRoute.scrollId) {
+                  scrollToTarget(adminRoute.scrollId);
+                }
+                return;
+              }
+
               if (typeof window !== 'undefined') {
                 try {
                   const url = new URL(window.location.href);
                   if (url.searchParams.has('admin')) {
                     url.searchParams.delete('admin');
+                    url.searchParams.delete('healthView');
+                    url.searchParams.delete('apiView');
+                    url.searchParams.delete('analyticsView');
                     window.history.replaceState(null, '', url.pathname + (url.search ? url.search : ''));
                   }
                 } catch {}
               }
-              if (['summary', 'campaign', 'weekly', 'channel', 'market', 'detailed', 'webtraffic', 'creative'].includes(featureId)) {
-                setActiveTab(featureId);
-              } else if (featureId === 'aiSummary' || featureId === 'budgetSimulator' || featureId === 'channelQuadrant') {
+
+              if (featureId === 'summary') {
                 setActiveTab('summary');
+                if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
+              } else if (featureId === 'campaign') {
+                setActiveTab('campaign');
+                if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
+              } else if (featureId === 'benchmarkComparison') {
+                setActiveTab('campaign');
+                scrollToTarget('cross-event-benchmarking');
+              } else if (featureId === 'weekly') {
+                setActiveTab('weekly');
+                if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
+              } else if (featureId === 'granularTimeline') {
+                setActiveTab('weekly');
+                scrollToTarget('granular-weekly-timeline');
               } else if (featureId === 'launchForecaster') {
                 setActiveTab('weekly');
+                scrollToTarget('launch-forecaster');
+              } else if (featureId === 'channel') {
+                setActiveTab('channel');
+                if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
+              } else if (featureId === 'market') {
+                setActiveTab('market');
+                if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
+              } else if (featureId === 'detailed') {
+                setActiveTab('detailed');
+                if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
+              } else if (featureId === 'webtraffic') {
+                setActiveTab('webtraffic');
+                if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
+              } else if (featureId === 'creative') {
+                setActiveTab('creative');
+                if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
               } else if (featureId === 'creativeFatigue') {
                 setActiveTab('creative');
+                scrollToTarget('creative-fatigue-radar');
+              } else if (featureId === 'aiSummary') {
+                setActiveTab('summary');
+                if (typeof window !== 'undefined') {
+                  window.dispatchEvent(new CustomEvent('ai-intelligence-tab', { detail: { tab: 'commentary' } }));
+                }
+                scrollToTarget('ai-strategic-intelligence');
+              } else if (featureId === 'budgetSimulator') {
+                setActiveTab('summary');
+                if (typeof window !== 'undefined') {
+                  window.dispatchEvent(new CustomEvent('ai-intelligence-tab', { detail: { tab: 'simulator' } }));
+                }
+                scrollToTarget('ai-strategic-intelligence');
+              } else if (featureId === 'channelQuadrant') {
+                setActiveTab('summary');
+                if (typeof window !== 'undefined') {
+                  window.dispatchEvent(new CustomEvent('ai-intelligence-tab', { detail: { tab: 'quadrant' } }));
+                }
+                scrollToTarget('ai-strategic-intelligence');
               } else if (featureId === 'tv' || featureId === 'tvAutoCycle') {
                 setActiveTab('summary');
                 setTvMode(true);
@@ -3730,8 +3838,15 @@ export default function App() {
               } else if (featureId === 'quickJump') {
                 setActiveTab('summary');
                 setIsQuickJumpOpen(true);
-              } else if (featureId === 'currency' || featureId === 'exports' || featureId === 'healthBanner') {
+              } else if (featureId === 'currency') {
                 setActiveTab('summary');
+                scrollToTarget('currency-toggle-button');
+              } else if (featureId === 'exports') {
+                setActiveTab('summary');
+                scrollToTarget('dashboard-exports');
+              } else if (featureId === 'healthBanner') {
+                setActiveTab('summary');
+                scrollToTarget('health-alert-banner');
               } else {
                 setActiveTab('summary');
               }
@@ -3744,14 +3859,16 @@ export default function App() {
           <ReactTooltip id="market-tooltip" className="z-50" style={{ backgroundColor: '#0a2442', color: '#eef7f5', border: '1px solid #cedc2830', borderRadius: '8px', zIndex: 1000 }} />
           <div className="absolute top-0 right-0 w-full h-[500px] bg-gradient-to-br from-[#062f2e]/20 via-transparent to-transparent pointer-events-none -z-10"></div>
           {featureAllowed('healthBanner') && !tvMode && (
-            <HealthAlertBanner onOpenHealthMonitor={() => {
-              const url = new URL(window.location.href);
-              url.searchParams.set('admin', 'health');
-              url.searchParams.set('healthView', 'overview');
-              window.history.replaceState(null, '', url);
-              window.dispatchEvent(new Event('admin-locationchange'));
-              setActiveTab('admin');
-            }} />
+            <div id="health-alert-banner">
+              <HealthAlertBanner onOpenHealthMonitor={() => {
+                const url = new URL(window.location.href);
+                url.searchParams.set('admin', 'health');
+                url.searchParams.set('healthView', 'overview');
+                window.history.replaceState(null, '', url);
+                window.dispatchEvent(new Event('admin-locationchange'));
+                setActiveTab('admin');
+              }} />
+            </div>
           )}
           
           {/* 1. Persona Simulation Active Banner */}
