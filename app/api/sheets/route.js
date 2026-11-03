@@ -251,7 +251,8 @@ async function getSheet(request) {
         const checkSettings = await getDimensionSettings();
         const sources = (await getConfiguredSourcesByCacheKey()).get(cacheKey) || [];
         dataSummary = summarizeSheetData(text, {
-          metricChecksEnabled: checkSettings.metricChecksEnabled !== false && sources.some(source => eventHealthChecks(source.eventId, checkSettings).metricChecksEnabled)
+          metricChecksEnabled: checkSettings.metricChecksEnabled !== false && sources.some(source => eventHealthChecks(source.eventId, checkSettings).metricChecksEnabled),
+          activityChecksEnabled: checkSettings.activityChecksEnabled !== false && sources.some(source => eventHealthChecks(source.eventId, checkSettings).activityChecksEnabled)
         });
         if (sources.some(source => source.kind === 'Actuals' && eventHealthChecks(source.eventId, checkSettings).dimensionChecksEnabled)) {
           dataSummary.dimensionValidation = await summarizeDimensions(text);

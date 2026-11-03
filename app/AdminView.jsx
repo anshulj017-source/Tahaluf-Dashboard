@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Trash2, UserPlus, Shield, User, RefreshCw, CheckCircle2, Key, Layers, Activity, Users as UsersIcon, BarChart3, Gauge, ChevronDown, LogOut, ArrowLeft, Globe, History, Plus, X, RotateCcw } from 'lucide-react';
 import EventsAdmin from './components/EventsAdmin';
 import DataHealthAdmin from './components/DataHealthAdmin';
@@ -162,6 +162,9 @@ export default function AdminView({
   }, []);
   useEffect(() => { setVisited(current => ({ ...current, [activeSection]: true })); }, [activeSection]);
 
+  const activeSectionRef = useRef(activeSection);
+  activeSectionRef.current = activeSection;
+
   // Synchronize sidebar health alert badge from server health-notifications
   useEffect(() => {
     let cancelled = false;
@@ -173,7 +176,11 @@ export default function AdminView({
           const data = await res.json();
           if (!cancelled && data.success) {
             setDashboardAlertsEnabled(data.settings?.dashboardEnabled !== false);
-            setHealthIssueCount((data.issues || []).length);
+            // When actively on the Health Monitor section, DataHealthAdmin authoritatively
+            // manages healthIssueCount via onIssueCountChange to guarantee consistency with the view.
+            if (activeSectionRef.current !== 'health') {
+              setHealthIssueCount((data.issues || []).length);
+            }
           }
         }
       } catch {}

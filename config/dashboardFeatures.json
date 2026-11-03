@@ -31,7 +31,13 @@
     "adminQuotas": "admin_only",
     "adminAnalytics": "admin_only",
     "adminUsers": "super_admin_only",
-    "adminFeatures": "super_admin_only"
+    "adminFeatures": "super_admin_only",
+    "pacingGuardian": "admin_only",
+    "budgetReconciliation": "admin_only",
+    "healthWebhooks": "admin_only",
+    "channelSaturation": "admin_only",
+    "auditExport": "admin_only",
+    "advancedPptx": "admin_only"
   },
   "customUsers": {},
   "featureUpdated": {
@@ -153,6 +159,30 @@
     },
     "adminFeatures": {
       "updatedAt": "2026-10-31T12:19:00.000Z",
+      "updatedBy": "System Baseline"
+    },
+    "pacingGuardian": {
+      "updatedAt": "2026-11-02T22:50:00.000Z",
+      "updatedBy": "System Baseline"
+    },
+    "budgetReconciliation": {
+      "updatedAt": "2026-11-02T22:50:00.000Z",
+      "updatedBy": "System Baseline"
+    },
+    "healthWebhooks": {
+      "updatedAt": "2026-11-02T22:50:00.000Z",
+      "updatedBy": "System Baseline"
+    },
+    "channelSaturation": {
+      "updatedAt": "2026-11-02T22:50:00.000Z",
+      "updatedBy": "System Baseline"
+    },
+    "auditExport": {
+      "updatedAt": "2026-11-02T22:50:00.000Z",
+      "updatedBy": "System Baseline"
+    },
+    "advancedPptx": {
+      "updatedAt": "2026-11-02T22:50:00.000Z",
       "updatedBy": "System Baseline"
     }
   }

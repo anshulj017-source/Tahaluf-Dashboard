@@ -55,6 +55,12 @@ function getEventDataStats(source, health) {
     return candidatesList.some(c => itemNorm.includes(c) || c.includes(itemNorm));
   });
 
+  const eventActivityAnomalies = (health.activityAnomalies || []).filter(item => {
+    if (!item.eventName || item.eventName === 'Unknown') return true;
+    const itemNorm = item.eventName.toLowerCase().replace(/[^a-z0-9]/g, '');
+    return candidatesList.some(c => itemNorm.includes(c) || c.includes(itemNorm));
+  });
+
   const eventBaselines = {};
   if (health.metricBaselines) {
     for (const [key, val] of Object.entries(health.metricBaselines)) {
@@ -88,6 +94,7 @@ function getEventDataStats(source, health) {
     channelMetrics24h: eventChannelMetrics,
     metricBaselines: eventBaselines,
     metricDiscrepancies: eventDiscrepancies,
+    activityAnomalies: eventActivityAnomalies,
     latest24hDate: health.latest24hDate || null
   };
 }
@@ -156,7 +163,8 @@ async function getEvents(request) {
               if (text && text.length > 50 && !text.includes('<!DOCTYPE html')) {
                 const sharedSources = dataSources.filter(item => item.cacheKey === source.cacheKey);
                 const summary = summarizeSheetData(text, {
-                  metricChecksEnabled: sharedSources.some(item => eventHealthChecks(item.eventId, checkSettings).metricChecksEnabled)
+                  metricChecksEnabled: sharedSources.some(item => eventHealthChecks(item.eventId, checkSettings).metricChecksEnabled),
+                  activityChecksEnabled: sharedSources.some(item => eventHealthChecks(item.eventId, checkSettings).activityChecksEnabled)
                 });
                 if (sharedSources.some(item => item.kind === 'Actuals' && eventHealthChecks(item.eventId, checkSettings).dimensionChecksEnabled)) {
                   summary.dimensionValidation = await summarizeDimensions(text);

@@ -40,7 +40,7 @@ export async function GET(request) {
     const checkSettings = await getDimensionSettings();
     const sources = config.events.filter(event => {
       const checks = eventHealthChecks(event.id, checkSettings);
-      return checks.sheetChecksEnabled || checks.metricChecksEnabled || checks.dimensionChecksEnabled;
+      return checks.sheetChecksEnabled || checks.metricChecksEnabled || checks.dimensionChecksEnabled || checks.activityChecksEnabled;
     }).flatMap(event => [
       { eventId: event.id, name: event.name, kind: 'Actuals', gid: event.gid || '' },
       ...(event.plannedGid

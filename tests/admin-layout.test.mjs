@@ -34,6 +34,11 @@ function hookHarness() {
       if (!(index in values)) values[index] = typeof initial === 'function' ? initial() : initial;
       return [values[index], next => { values[index] = typeof next === 'function' ? next(values[index]) : next; }];
     },
+    useRef(initial) {
+      const index = cursor++;
+      if (!(index in values)) values[index] = { current: initial };
+      return values[index];
+    },
     useEffect(callback, deps) {
       const index = cursor++;
       if (!dependencies[index] || deps.some((value, i) => value !== dependencies[index][i])) {

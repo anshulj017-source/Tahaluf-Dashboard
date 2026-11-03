@@ -790,6 +790,8 @@ export default function App() {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [activeTab, setActiveTab] = useState('summary');
   const [adminVisited, setAdminVisited] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [isRefreshingData, setIsRefreshingData] = useState(false);
   const isAdminRole = userRole === 'admin' || userRole === 'super_admin';
   const initialAdminSyncedRef = useRef(false);
 
@@ -1493,9 +1495,11 @@ export default function App() {
       setLoadingProgress(28);
       setLoadingStatus(`Connecting to ${activeEvents.length} live event streams...`);
 
+      const isForceRefresh = refreshTrigger > 0;
+
       // Fetch actuals for active events
       const actualsPromises = activeEvents.map(ev => {
-        const url = BASE_URL + (ev.gid ? `&gid=${ev.gid}` : '');
+        const url = BASE_URL + (ev.gid ? `&gid=${ev.gid}` : '') + (isForceRefresh ? '&refresh=true' : '');
         return fetchCsvSafe(url).then(rawRows => {
           trackStreamProgress(ev.name, 'actuals');
           let rows = rawRows;
@@ -1516,7 +1520,7 @@ export default function App() {
       const plannedPromises = activeEvents
         .filter(ev => ev.plannedGid)
         .map(ev => {
-          const url = BASE_URL + `&gid=${ev.plannedGid}`;
+          const url = BASE_URL + `&gid=${ev.plannedGid}` + (isForceRefresh ? '&refresh=true' : '');
           if (ev.plannedType === 'blackhat-text' || ev.id === 'black-hat') {
             return d3.text(url).catch(() => '').then(text => {
               trackStreamProgress('Black Hat', 'targets');
@@ -1660,16 +1664,16 @@ export default function App() {
       setLoadingProgress(100);
       setLoadingStatus('Ready! Rendering visualizations...');
       setLoading(false);
+      setIsRefreshingData(false);
     };
 
     loadDashboardData().catch(err => {
       console.error(err);
       setLoadingProgress(100);
       setLoading(false);
+      setIsRefreshingData(false);
     });
-  }, [isAuthenticated, userRole, simulatingStandardUser]);
-
-  
+  }, [isAuthenticated, userRole, simulatingStandardUser, refreshTrigger]);
 
   const resetFilters = () => {
     setFilterCampaigns(['All']);
@@ -1685,6 +1689,12 @@ export default function App() {
     setFilterWeeks(['All']);
     setSelectedEvent(null);
     setDateRange({ start: '', end: '', preset: 'auto' });
+  };
+
+  const handleRefreshAll = () => {
+    resetFilters();
+    setIsRefreshingData(true);
+    setRefreshTrigger(t => t + 1);
   };
 
   const uniqueCampaigns = useMemo(() => Array.from(new Set(adData.map(d => d.campaignName))).sort(), [adData]);
@@ -3330,11 +3340,13 @@ export default function App() {
                 </button>
               )}
               <button 
-                onClick={resetFilters} 
-                title="Reset Filters" 
-                className="h-[28px] xl:h-[30px] w-[28px] xl:w-[30px] bg-[#cedc28]/10 border border-[#cedc28]/50 text-[#cedc28] rounded-lg hover:bg-[#cedc28]/20 hover:text-white transition-colors flex items-center justify-center shrink-0"
+                onClick={handleRefreshAll} 
+                disabled={isRefreshingData || loading}
+                title="Refresh Live Data & Reset Filters" 
+                className="h-[28px] xl:h-[30px] px-2.5 bg-[#cedc28]/10 border border-[#cedc28]/50 text-[#cedc28] rounded-lg hover:bg-[#cedc28]/20 hover:text-white transition-colors flex items-center gap-1.5 text-[10px] font-bold shrink-0 disabled:opacity-50"
               >
-                <RefreshCw className="w-3.5 h-3.5"/>
+                <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingData ? 'animate-spin' : ''}`}/>
+                <span>{isRefreshingData ? 'Refreshing…' : 'Refresh'}</span>
               </button>
             </div>
           </div>
@@ -3404,11 +3416,12 @@ export default function App() {
                 )}
               </button>
               <button 
-                onClick={resetFilters} 
-                title="Reset Filters" 
-                className="h-[32px] w-[32px] bg-[#cedc28]/10 border border-[#cedc28]/50 text-[#cedc28] rounded-lg hover:bg-[#cedc28]/20 transition-colors flex items-center justify-center shrink-0"
+                onClick={handleRefreshAll} 
+                disabled={isRefreshingData || loading}
+                title="Refresh Live Data & Reset Filters" 
+                className="h-[32px] px-2 bg-[#cedc28]/10 border border-[#cedc28]/50 text-[#cedc28] rounded-lg hover:bg-[#cedc28]/20 transition-colors flex items-center justify-center shrink-0 disabled:opacity-50"
               >
-                <RefreshCw className="w-3.5 h-3.5"/>
+                <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingData ? 'animate-spin' : ''}`}/>
               </button>
             </div>
           </div>

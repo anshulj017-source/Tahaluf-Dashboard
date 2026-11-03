@@ -55,7 +55,7 @@ export async function GET(request) {
     let issues = [];
     const dimensionSettings = await getDimensionSettings();
     if (new URL(request.url).searchParams.get('includeHealth') === 'true') {
-      const healthResponse = await getEventsHealth();
+      const healthResponse = await getEventsHealth(new Request('http://localhost/api/admin/events?inspectOnly=true'));
       const healthPayload = await healthResponse.json();
       if (!healthResponse.ok || !healthPayload.success) {
         throw new Error(healthPayload.error || 'Could not load event health.');
@@ -70,6 +70,13 @@ export async function GET(request) {
       emailConfigured: isEmailConfigured(),
       updatedAt: state.updatedAt || null,
       dimensionSettings
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+        'Surrogate-Control': 'no-store'
+      }
     });
   } catch (error) {
     console.error('[HEALTH NOTIFICATIONS] Could not load settings:', error);

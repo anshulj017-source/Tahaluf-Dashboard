@@ -68,6 +68,12 @@ const getStatus = (source, dimensionSettings = null) => {
       return 'metric-discrepancy';
     }
   }
+  if (source.activityChecksEnabled !== false && source.activityAnomalies && source.activityAnomalies.length > 0) {
+    const activeAnomalies = source.activityAnomalies.filter(a => !isIssueIgnored({ key: `${source.eventId}:${source.kind}:activity:${a.id || a.type}`, eventId: source.eventId, kind: source.kind, category: 'activity', status: a.type }, dimensionSettings));
+    if (activeAnomalies.length > 0) {
+      return activeAnomalies[0].type;
+    }
+  }
   if (source.sheetChecksEnabled !== false && (source.state === 'stale' || source.state === 'unavailable' || source.state === 'storage-error')) {
     if (!isIssueIgnored({ key: `${source.eventId}:${source.kind}`, eventId: source.eventId, kind: source.kind, category: 'feed', status: source.state }, dimensionSettings)) {
       return source.state;
@@ -97,6 +103,8 @@ const statusPresentation = {
   'storage-error': { label: 'Storage issue', className: 'text-red-300 border-red-400/30 bg-red-500/10' },
   'missing-data': { label: 'No event rows', className: 'text-red-300 border-red-400/30 bg-red-500/10' },
   'metric-discrepancy': { label: 'Metric Discrepancy', className: 'text-amber-300 border-amber-400/40 bg-amber-500/10' },
+  'spend-cliff': { label: 'Spend Cliff Detected', className: 'text-amber-300 border-amber-400/40 bg-amber-500/10' },
+  'activity-halt': { label: 'Activity Halted / Paused', className: 'text-red-300 border-red-400/40 bg-red-500/10' },
   'dimension-discrepancy': { label: 'Dimension Check', className: 'text-amber-300 border-amber-400/40 bg-amber-500/10' },
   'dimension-unavailable': { label: 'Dimension Check Unavailable', className: 'text-amber-300 border-amber-400/40 bg-amber-500/10' },
   unknown: { label: 'Not checked', className: 'text-gray-300 border-gray-500/30 bg-gray-500/10' }
@@ -154,7 +162,7 @@ export default function DataHealthAdmin({
   const [dimensionSettings, setDimensionSettings] = useState(DEFAULT_DIMENSION_SETTINGS);
   const [dimensionBusy, setDimensionBusy] = useState(false);
   const [dimensionNotice, setDimensionNotice] = useState(null);
-  const [checkDraft, setCheckDraft] = useState({ metricChecksEnabled: true, dimensionChecksEnabled: true, ignoreBlanks: false });
+  const [checkDraft, setCheckDraft] = useState({ metricChecksEnabled: true, dimensionChecksEnabled: true, activityChecksEnabled: true, ignoreBlanks: false });
   const [eventCheckDrafts, setEventCheckDrafts] = useState({});
   const [savingEventChecks, setSavingEventChecks] = useState(null);
   const [eventCheckNotice, setEventCheckNotice] = useState(null);
@@ -210,6 +218,7 @@ export default function DataHealthAdmin({
     enabledDimensions: dimensionSettings.enabledDimensions,
     metricChecksEnabled: checkDraft.metricChecksEnabled,
     dimensionChecksEnabled: checkDraft.dimensionChecksEnabled,
+    activityChecksEnabled: checkDraft.activityChecksEnabled,
     ignoreBlanks: Boolean(checkDraft.ignoreBlanks)
   });
   const settingsDirty = !settingsLoading && (JSON.stringify(settings) !== JSON.stringify(savedSettings) || Boolean(recipientDraft.trim()));
@@ -301,6 +310,7 @@ export default function DataHealthAdmin({
             setCheckDraft({
               metricChecksEnabled: nextDimensions.metricChecksEnabled !== false,
               dimensionChecksEnabled: nextDimensions.dimensionChecksEnabled !== false,
+              activityChecksEnabled: nextDimensions.activityChecksEnabled !== false,
               ignoreBlanks: Boolean(nextDimensions.ignoreBlanks)
             });
           }
@@ -308,6 +318,7 @@ export default function DataHealthAdmin({
             enabledDimensions: (result.dimensionSettings || DEFAULT_DIMENSION_SETTINGS).enabledDimensions,
             metricChecksEnabled: result.dimensionSettings?.metricChecksEnabled !== false,
             dimensionChecksEnabled: result.dimensionSettings?.dimensionChecksEnabled !== false,
+            activityChecksEnabled: result.dimensionSettings?.activityChecksEnabled !== false,
             ignoreBlanks: Boolean(result.dimensionSettings?.ignoreBlanks)
           }));
         }
@@ -337,13 +348,17 @@ export default function DataHealthAdmin({
   const healthyCount = actualSources.filter(source =>
     getStatus(source, dimensionSettings) === 'healthy' && source.sheetChecksEnabled !== false && source.eventDataStatus === 'present'
   ).length;
-  const issueCount = actualSources.filter(source => ['stale', 'unavailable', 'storage-error', 'missing-data', 'metric-discrepancy', 'dimension-discrepancy'].includes(getStatus(source, dimensionSettings))).length;
+  const issueCount = actualSources.filter(source => ['stale', 'unavailable', 'storage-error', 'missing-data', 'metric-discrepancy', 'dimension-discrepancy', 'spend-cliff', 'activity-halt'].includes(getStatus(source, dimensionSettings))).length;
   const missingDataCount = actualSources.filter(source => source.monitoringEnabled !== false && source.sheetChecksEnabled !== false && (source.eventDataStatus === 'missing' || source.eventRows === 0)).length;
   const totalDiscrepancies = useMemo(() => sheetHealth.reduce((sum, s) => sum + (s.metricDiscrepancies?.length || 0), 0), [sheetHealth]);
   const currentIssues = useMemo(() => {
     if (settingsLoading) return [];
     return getHealthIssues(sheetHealth, dimensionSettings);
   }, [sheetHealth, dimensionSettings, settingsLoading]);
+
+  const activeActivityIssues = useMemo(() => {
+    return currentIssues.filter(i => i.category === 'activity' || ['spend-cliff', 'activity-halt'].includes(i.status));
+  }, [currentIssues]);
 
   useEffect(() => {
     onIssueCountChange(currentIssues.length);
@@ -1161,6 +1176,10 @@ export default function DataHealthAdmin({
       if (dimensionSettings.dimensionChecksEnabled === false) return 'Dimension checks are globally disabled.';
       if (draft.dimensionChecksEnabled === false || event.sources.find(source => source.kind === 'Actuals')?.dimensionHealth?.status === 'disabled') return 'Dimension checks are disabled for this event.';
     }
+    if (key === 'activityChecksEnabled') {
+      if (dimensionSettings.activityChecksEnabled === false) return 'Activity checks are globally disabled.';
+      if (draft.activityChecksEnabled === false || event.sources.every(source => source.activityChecksEnabled === false)) return 'Activity checks are disabled for this event.';
+    }
     return '';
   };
 
@@ -1293,28 +1312,44 @@ export default function DataHealthAdmin({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <TrendingUp className="h-4 w-4 text-[#cedc28]" />
-                    <strong className="text-xs font-bold text-white">Pacing Guardian: Spend Surge Radar</strong>
+                    <strong className="text-xs font-bold text-white">Pacing Guardian: Spend Surge & Activity Radar</strong>
                   </div>
-                  <span className="rounded-full bg-[#cedc28]/20 px-2 py-0.5 text-[10px] font-bold text-[#cedc28] border border-[#cedc28]/30">
-                    Active
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold border ${activeActivityIssues.length > 0 ? 'bg-red-500/20 text-red-300 border-red-500/40' : 'bg-[#cedc28]/20 text-[#cedc28] border-[#cedc28]/30'}`}>
+                    {activeActivityIssues.length > 0 ? `${activeActivityIssues.length} Anomaly Alert${activeActivityIssues.length === 1 ? '' : 's'}` : 'Active'}
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-400">
-                  Continuous runway monitoring watching for velocity spikes (≥150% jump) or runaway media spend burn.
+                  Continuous runway monitoring watching for velocity spikes (≥150% jump), activity halts (0 spend), or sudden spend cliffs (≥40% drop).
                 </p>
-                <div className="rounded-lg border border-white/5 bg-[#031120] p-3 space-y-1.5 text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Surge Status:</span>
-                    <span className="font-semibold text-lime-300">✓ All Campaigns Within Tolerance</span>
-                  </div>
-                  <div className="flex items-center justify-between text-[11px]">
-                    <span className="text-slate-500">Runaway Alert Threshold:</span>
-                    <span className="font-mono text-slate-300">≥ +150% jump & ≥ $200 min spend</span>
-                  </div>
-                  <div className="flex items-center justify-between text-[11px]">
-                    <span className="text-slate-500">CPC Volatility Corridor:</span>
-                    <span className="font-mono text-slate-300">±100% historical baseline</span>
-                  </div>
+                <div className="rounded-lg border border-white/5 bg-[#031120] p-3 space-y-2 text-xs">
+                  {activeActivityIssues.length > 0 ? (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-400">Pacing Status:</span>
+                        <span className="font-semibold text-rose-300">⚠️ {activeActivityIssues.length} Delivery Dropout / Cliff Detected</span>
+                      </div>
+                      {activeActivityIssues.slice(0, 3).map(issue => (
+                        <div key={issue.key} className="rounded bg-rose-500/10 border border-rose-500/20 p-2 text-[11px] text-rose-200">
+                          <strong className="text-white">{issue.eventName}:</strong> {issue.message}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-400">Surge & Pause Status:</span>
+                        <span className="font-semibold text-lime-300">✓ All Campaigns Within Tolerance</span>
+                      </div>
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-slate-500">Spend Cliff Threshold:</span>
+                        <span className="font-mono text-slate-300">≥ 40% drop vs 5-day baseline</span>
+                      </div>
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-slate-500">Runaway Alert Threshold:</span>
+                        <span className="font-mono text-slate-300">≥ +150% jump & ≥ $200 min spend</span>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             )}
@@ -1531,7 +1566,7 @@ export default function DataHealthAdmin({
           {filteredEvents.map(event => {
             const eventIssues = currentIssues.filter(issue => issue.eventId === event.eventId);
             const drafts = eventCheckDrafts[event.eventId] || dimensionSettings.eventChecks?.[event.eventId] || {};
-            const selectedChecks = { monitoringEnabled: true, sheetChecksEnabled: true, metricChecksEnabled: true, dimensionChecksEnabled: true, ...drafts };
+            const selectedChecks = { monitoringEnabled: true, sheetChecksEnabled: true, metricChecksEnabled: true, dimensionChecksEnabled: true, activityChecksEnabled: true, ...drafts };
             return <details key={event.eventId} className="rounded-xl border border-white/10 bg-[#071d33]" open={filteredEvents.length === 1}>
               <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-2 p-3"><span className="font-semibold text-white">{event.eventName}</span><span className="flex flex-wrap gap-2">{event.sources.map(source => { const p = statusPresentation[getStatus(source, dimensionSettings)] || statusPresentation.unknown; return <span key={source.kind} className={`rounded-full border px-2 py-0.5 text-[10px] ${p.className}`}>{source.kind}: {p.label}</span>; })}<span className="text-xs text-slate-400">{eventIssues.length} issue{eventIssues.length === 1 ? '' : 's'}</span></span></summary>
               <div className="space-y-3 border-t border-white/10 p-3">
@@ -1557,11 +1592,12 @@ export default function DataHealthAdmin({
                   <div className="grid gap-3 sm:grid-cols-2">
                     {[
                       ['monitoringEnabled', 'Monitor this event'], ['sheetChecksEnabled', 'Sheet availability and event rows'],
-                      ['metricChecksEnabled', 'Metric checks'], ['dimensionChecksEnabled', 'Dimension checks (Actuals)']
+                      ['metricChecksEnabled', 'Metric checks'], ['dimensionChecksEnabled', 'Dimension checks (Actuals)'],
+                      ['activityChecksEnabled', 'Activity & campaign pause checks']
                     ].map(([key, label]) => {
                       const reason = eventCheckReason(event, key);
                       return <label key={key} className="flex items-start gap-2 text-xs text-slate-200">
-                        <input type="checkbox" aria-label={`${event.eventName}: ${label}`} checked={selectedChecks[key] !== false} disabled={key !== 'monitoringEnabled' && selectedChecks.monitoringEnabled === false} onChange={change => setEventCheckDrafts(previous => ({ ...previous, [event.eventId]: { monitoringEnabled: true, sheetChecksEnabled: true, metricChecksEnabled: true, dimensionChecksEnabled: true, ...selectedChecks, [key]: change.target.checked } }))} className="mt-0.5 accent-[#cedc28]" />
+                        <input type="checkbox" aria-label={`${event.eventName}: ${label}`} checked={selectedChecks[key] !== false} disabled={key !== 'monitoringEnabled' && selectedChecks.monitoringEnabled === false} onChange={change => setEventCheckDrafts(previous => ({ ...previous, [event.eventId]: { monitoringEnabled: true, sheetChecksEnabled: true, metricChecksEnabled: true, dimensionChecksEnabled: true, activityChecksEnabled: true, ...selectedChecks, [key]: change.target.checked } }))} className="mt-0.5 accent-[#cedc28]" />
                         <span>{label}{reason && <span className="mt-0.5 block text-[10px] text-amber-200">Effective status: {reason}</span>}</span>
                       </label>;
                     })}
@@ -1733,7 +1769,7 @@ export default function DataHealthAdmin({
         <section className="space-y-3 rounded-xl border border-white/10 bg-[#071d33] p-4">
           <div><h3 className="text-sm font-bold text-white">Global checks and standards</h3><p className="mt-1 text-xs text-slate-400">Category switches take precedence over event settings. Disabling checks stops validation and related alerts, not data loading. Sheet availability checks continue unless disabled per event.</p></div>
           <fieldset disabled={dimensionBusy || settingsLoading} className="space-y-3"><legend className="sr-only">Global health checks</legend>
-            <div className="grid gap-2 sm:grid-cols-3">{[['metricChecksEnabled', 'Enable metric health checks'], ['dimensionChecksEnabled', 'Enable dimension health checks'], ['ignoreBlanks', 'Ignore blank values in dimension checks']].map(([key, label]) => <label key={key} className="flex items-center gap-2 rounded-lg border border-white/10 p-3 text-xs text-white"><input type="checkbox" checked={Boolean(checkDraft[key])} onChange={event => setCheckDraft(previous => ({ ...previous, [key]: event.target.checked }))} className="accent-[#cedc28]" />{label}</label>)}</div>
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">{[['metricChecksEnabled', 'Enable metric health checks'], ['dimensionChecksEnabled', 'Enable dimension health checks'], ['activityChecksEnabled', 'Enable activity pause & spend cliff checks'], ['ignoreBlanks', 'Ignore blank values in dimension checks']].map(([key, label]) => <label key={key} className="flex items-center gap-2 rounded-lg border border-white/10 p-3 text-xs text-white"><input type="checkbox" checked={Boolean(checkDraft[key])} onChange={event => setCheckDraft(previous => ({ ...previous, [key]: event.target.checked }))} className="accent-[#cedc28]" />{label}</label>)}</div>
             <button type="button" onClick={() => updateDimensions('save-health-checks')} className="rounded-lg border border-[#14a6d9]/40 px-3 py-2 text-xs font-semibold text-[#6bd5f7]">Save global checks</button>
           </fieldset>
           {dimensionNotice && <p role={dimensionNotice.type === 'error' ? 'alert' : 'status'} className={`text-xs ${dimensionNotice.type === 'error' ? 'text-red-300' : 'text-lime-200'}`}>{dimensionNotice.text}</p>}
@@ -2377,7 +2413,7 @@ export default function DataHealthAdmin({
             <label className="flex items-center gap-2 rounded-lg border border-white/10 p-3 text-xs text-slate-200"><input type="checkbox" checked={settings.dashboardEnabled} onChange={event => { const dashboardEnabled = event.target.checked; setSettings(previous => ({ ...previous, dashboardEnabled })); onDashboardAlertsEnabledChange(dashboardEnabled); }} disabled={settingsLoading} className="accent-[#cedc28]" />Show in-dashboard alerts to admins</label>
             <label className="flex items-center gap-2 rounded-lg border border-white/10 p-3 text-xs text-slate-200"><input type="checkbox" checked={settings.emailEnabled} onChange={event => setSettings(previous => ({ ...previous, emailEnabled: event.target.checked }))} disabled={settingsLoading} className="accent-[#cedc28]" />Send email notifications</label>
             <label className="flex items-start gap-2 rounded-lg border border-white/10 p-3 text-xs text-slate-200"><input type="checkbox" checked={settings.sendResolutionEmail !== false} onChange={event => setSettings(previous => ({ ...previous, sendResolutionEmail: event.target.checked }))} disabled={settingsLoading || !settings.emailEnabled} className="mt-0.5 accent-[#cedc28]" /><span>Send resolution email<span className="mt-1 block text-[10px] text-slate-400">Only when an issue alert was previously dispatched.</span></span></label>
-            {[[ 'metricEmailEnabled', 'Email metric issues' ], [ 'dimensionEmailEnabled', 'Email dimension issues' ]].map(([key, label]) => <label key={key} className="flex items-center gap-2 rounded-lg border border-white/10 p-3 text-xs text-slate-200"><input type="checkbox" checked={settings[key] !== false} disabled={settingsLoading || !settings.emailEnabled} onChange={event => setSettings(previous => ({ ...previous, [key]: event.target.checked }))} className="accent-[#cedc28]" />{label}</label>)}
+            {[[ 'metricEmailEnabled', 'Email metric issues' ], [ 'dimensionEmailEnabled', 'Email dimension issues' ], [ 'activityEmailEnabled', 'Email activity pause & spend cliff issues' ]].map(([key, label]) => <label key={key} className="flex items-center gap-2 rounded-lg border border-white/10 p-3 text-xs text-slate-200"><input type="checkbox" checked={settings[key] !== false} disabled={settingsLoading || !settings.emailEnabled} onChange={event => setSettings(previous => ({ ...previous, [key]: event.target.checked }))} className="accent-[#cedc28]" />{label}</label>)}
             <label className="text-[10px] font-semibold uppercase text-slate-400">Email frequency<select value={settings.frequency} onChange={event => setSettings(previous => ({ ...previous, frequency: event.target.value }))} disabled={settingsLoading || !settings.emailEnabled} className="mt-1 w-full rounded-lg border border-white/10 bg-[#041628] px-3 py-2 text-xs normal-case text-white"><option value="immediate">Immediate when detected</option><option value="daily">Daily digest</option><option value="immediate_and_daily">Immediate + daily digest</option></select></label>
             <label className="text-[10px] font-semibold uppercase text-slate-400">Alert delay<select value={settings.alertDelayMinutes ?? 5} onChange={event => setSettings(previous => ({ ...previous, alertDelayMinutes: Number(event.target.value) }))} disabled={settingsLoading || !settings.emailEnabled || settings.frequency === 'daily'} className="mt-1 w-full rounded-lg border border-white/10 bg-[#041628] px-3 py-2 text-xs normal-case text-white">{[0, 1, 2, 3, 4, 5, 10, 15, 20, 25, 30].map(minutes => <option key={minutes} value={minutes}>{minutes === 0 ? 'Immediate (0 min)' : `After ${minutes} minute${minutes === 1 ? '' : 's'}${minutes === 5 ? ' (default)' : ''}`}</option>)}</select></label>
           </div>

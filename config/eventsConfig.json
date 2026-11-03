@@ -1,6 +1,6 @@
 {
-  "version": "v1.0.445",
-  "lastUpdated": "2026-10-31T21:20:38.567Z",
+  "version": "v1.0.648",
+  "lastUpdated": "2026-11-03T03:54:35.108Z",
   "updatedBy": "Automated Test Cleanup",
   "events": [
     {
@@ -136,8 +136,8 @@
         "tiktok": true,
         "x": true
       },
-      "status": "active",
-      "visibility": "public",
+      "status": "admin_only",
+      "visibility": "admin_only",
       "business": "B2B"
     },
     {

@@ -1326,7 +1326,8 @@ test('dimension settings cache standards for a day, coalesces fetches and retain
 test('new category email preferences default enabled and filter immediate, digest and resolution sends', async () => {
   assert.equal(healthUtils.normalizeHealthNotificationSettings({}).metricEmailEnabled, true);
   assert.equal(healthUtils.normalizeHealthNotificationSettings({}).dimensionEmailEnabled, true);
-  for (const [category, setting] of [['metrics', 'metricEmailEnabled'], ['dimensions', 'dimensionEmailEnabled']]) {
+  assert.equal(healthUtils.normalizeHealthNotificationSettings({}).activityEmailEnabled, true);
+  for (const [category, setting] of [['metrics', 'metricEmailEnabled'], ['dimensions', 'dimensionEmailEnabled'], ['activity', 'activityEmailEnabled']]) {
     const harness = await resolutionHarness();
     const issue = { ...recoveryIssue, key: `${recoveryIssue.key}:${category}`, category };
     await harness.health.saveHealthNotificationSettings({ ...harness.state().settings, [setting]: false });
@@ -1406,8 +1407,9 @@ test('Health Monitor renders all selected dimensions and independent enabled cat
   for (const dimension of dimensionRules.DIMENSIONS) assert.ok(html.includes(dimension.label), dimension.id);
   assert.ok(html.includes('Enable metric health checks'));
   assert.ok(html.includes('Enable dimension health checks'));
+  assert.ok(html.includes('spend cliff checks'));
   assert.ok(html.includes('Save global checks'));
-  assert.equal((html.match(/checked=""/g) || []).length, 22, '11 dimensions, 4 metrics, two global checks and five email/dashboard controls default checked');
+  assert.equal((html.match(/checked=""/g) || []).length, 24, '11 dimensions, 4 metrics, three global checks and six email/dashboard controls default checked');
 });
 
 test('dimension settings endpoints enforce admin auth and validate selections without touching email settings', async () => {
@@ -1847,4 +1849,84 @@ test('all 36 dashboard features map to explicit navigation routes and sections',
     DASHBOARD_FEATURES.length,
     'All 36 registered features have dedicated navigation mappings without overlap'
   );
+});
+
+test('Activity Pause & Spend Cliff Radar detects delivery drops and activity halts', async () => {
+  const { detectActivityAnomalies } = await import('../lib/metricIntegrity.mjs');
+  const { eventHealthChecks, applyHealthCheckSettings } = await import('../lib/dimensionStandards.mjs');
+
+  // Test 1: Spend Cliff detection (>= 40% drop)
+  const mockCsvCliff = [
+    'Date,Event Name DB,Channel,Spend,Impressions,Clicks',
+    '2026-10-28,Black Hat,Meta,500,50000,500',
+    '2026-10-28,Black Hat,Google Ads,1000,100000,1000',
+    '2026-10-29,Black Hat,Meta,500,50000,500',
+    '2026-10-29,Black Hat,Google Ads,1000,100000,1000',
+    '2026-10-30,Black Hat,Meta,500,50000,500',
+    '2026-10-30,Black Hat,Google Ads,1000,100000,1000',
+    '2026-10-31,Black Hat,Meta,500,50000,500',
+    '2026-10-31,Black Hat,Google Ads,1000,100000,1000',
+    '2026-11-01,Black Hat,Meta,500,50000,500',
+    '2026-11-01,Black Hat,Google Ads,1000,100000,1000',
+    // Yesterday: severe drop from $1500 to $400 (73.3% drop)
+    '2026-11-02,Black Hat,Meta,100,10000,100',
+    '2026-11-02,Black Hat,Google Ads,300,30000,300'
+  ].join('\n');
+
+  const cliffResult = detectActivityAnomalies(mockCsvCliff, 'Black Hat', { excludePartialCurrentDay: false });
+  assert.equal(cliffResult.activityAnomalies.length, 1);
+  const anomaly = cliffResult.activityAnomalies[0];
+  assert.equal(anomaly.type, 'spend-cliff');
+  assert.equal(anomaly.eventName, 'Black Hat');
+  assert.equal(anomaly.date, '2026-11-02');
+  assert.equal(anomaly.baselineSpend, 1500);
+  assert.equal(anomaly.currentSpend, 400);
+  assert.equal(anomaly.dropPercent, 73.3);
+  assert.ok(anomaly.message.includes('Spend Cliff Detected'));
+
+  // Test 2: Activity Halt detection (100% pause / 0 spend)
+  const mockCsvHalt = [
+    'Date,Event Name DB,Channel,Spend,Impressions,Clicks',
+    '2026-10-28,GSTS 26,Meta,600,60000,600',
+    '2026-10-29,GSTS 26,Meta,600,60000,600',
+    '2026-10-30,GSTS 26,Meta,600,60000,600',
+    '2026-10-31,GSTS 26,Meta,600,60000,600',
+    '2026-11-01,GSTS 26,Meta,600,60000,600',
+    '2026-11-02,GSTS 26,Meta,0,0,0'
+  ].join('\n');
+
+  const haltResult = detectActivityAnomalies(mockCsvHalt, 'GSTS 26', { excludePartialCurrentDay: false });
+  assert.equal(haltResult.activityAnomalies.length, 1);
+  assert.equal(haltResult.activityAnomalies[0].type, 'activity-halt');
+  assert.equal(haltResult.activityAnomalies[0].severity, 'critical');
+  assert.equal(haltResult.activityAnomalies[0].currentSpend, 0);
+
+  // Test 3: getHealthIssues converts anomalies to category: 'activity' issues
+  const source = {
+    eventId: 'black-hat',
+    eventName: 'Black Hat',
+    kind: 'Actuals',
+    monitoringEnabled: true,
+    activityChecksEnabled: true,
+    activityAnomalies: cliffResult.activityAnomalies
+  };
+  const issues = healthUtils.getHealthIssues([source]);
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0].category, 'activity');
+  assert.equal(issues[0].status, 'spend-cliff');
+  assert.ok(issues[0].key.includes('activity:Black Hat:spend-cliff:2026-11-02'));
+
+  // Test 4: eventHealthChecks respects activityChecksEnabled override
+  const checksActive = eventHealthChecks('black-hat', { activityChecksEnabled: true });
+  assert.equal(checksActive.activityChecksEnabled, true);
+
+  const checksDisabled = eventHealthChecks('black-hat', {
+    eventChecks: { 'black-hat': { activityChecksEnabled: false } }
+  });
+  assert.equal(checksDisabled.activityChecksEnabled, false);
+
+  const disabledSource = applyHealthCheckSettings(source, {
+    eventChecks: { 'black-hat': { activityChecksEnabled: false } }
+  });
+  assert.deepEqual(disabledSource.activityAnomalies, []);
 });
