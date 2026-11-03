@@ -1929,4 +1929,31 @@ test('Activity Pause & Spend Cliff Radar detects delivery drops and activity hal
     eventChecks: { 'black-hat': { activityChecksEnabled: false } }
   });
   assert.deepEqual(disabledSource.activityAnomalies, []);
+
+  // Test 5: Multi-event dataset where an event has 0 rows on target evaluation date triggers activity-halt
+  const mockMultiEvent = [
+    'Date,Event Name DB,Channel,Spend,Impressions,Clicks',
+    // Black Hat active on both 2026-11-01 and 2026-11-02
+    '2026-10-28,Black Hat,Meta,500,50000,500',
+    '2026-10-29,Black Hat,Meta,500,50000,500',
+    '2026-10-30,Black Hat,Meta,500,50000,500',
+    '2026-10-31,Black Hat,Meta,500,50000,500',
+    '2026-11-01,Black Hat,Meta,500,50000,500',
+    '2026-11-02,Black Hat,Meta,500,50000,500',
+    // GSTS 26 active up to 2026-11-01, but completely paused (0 rows) on 2026-11-02
+    '2026-10-28,GSTS 26,Meta,800,80000,800',
+    '2026-10-29,GSTS 26,Meta,800,80000,800',
+    '2026-10-30,GSTS 26,Meta,800,80000,800',
+    '2026-10-31,GSTS 26,Meta,800,80000,800',
+    '2026-11-01,GSTS 26,Meta,800,80000,800'
+  ].join('\n');
+
+  const multiResult = detectActivityAnomalies(mockMultiEvent, '', { excludePartialCurrentDay: false });
+  const gstsAnomaly = multiResult.activityAnomalies.find(a => a.eventName === 'GSTS 26');
+  assert.ok(gstsAnomaly, 'GSTS 26 must have an activity anomaly when 0 rows are logged on target date');
+  assert.equal(gstsAnomaly.type, 'activity-halt');
+  assert.equal(gstsAnomaly.date, '2026-11-02');
+  assert.equal(gstsAnomaly.currentSpend, 0);
+  assert.equal(gstsAnomaly.currentRows, 0);
+  assert.equal(gstsAnomaly.dropPercent, 100);
 });

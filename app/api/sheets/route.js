@@ -250,9 +250,11 @@ async function getSheet(request) {
       try {
         const checkSettings = await getDimensionSettings();
         const sources = (await getConfiguredSourcesByCacheKey()).get(cacheKey) || [];
+        const defaultEventName = sources[0]?.eventName || sources[0]?.name || '';
         dataSummary = summarizeSheetData(text, {
           metricChecksEnabled: checkSettings.metricChecksEnabled !== false && sources.some(source => eventHealthChecks(source.eventId, checkSettings).metricChecksEnabled),
-          activityChecksEnabled: checkSettings.activityChecksEnabled !== false && sources.some(source => eventHealthChecks(source.eventId, checkSettings).activityChecksEnabled)
+          activityChecksEnabled: checkSettings.activityChecksEnabled !== false && sources.some(source => eventHealthChecks(source.eventId, checkSettings).activityChecksEnabled),
+          defaultEventName
         });
         if (sources.some(source => source.kind === 'Actuals' && eventHealthChecks(source.eventId, checkSettings).dimensionChecksEnabled)) {
           dataSummary.dimensionValidation = await summarizeDimensions(text);

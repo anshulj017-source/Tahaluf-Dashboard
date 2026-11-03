@@ -2,8 +2,8 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Activity, AlertCircle, Bell, Download, FileSpreadsheet, Mail, Plus, RefreshCw, Save, Trash2, Upload,
-  Check, HelpCircle, Info, Search, Filter, Globe, TrendingUp, Layers, ShieldCheck
+  Activity, AlertCircle, AlertOctagon, Bell, Download, FileSpreadsheet, Mail, Plus, RefreshCw, Save, Trash2, Upload,
+  Check, HelpCircle, Info, Search, Filter, Globe, TrendingUp, TrendingDown, Layers, ShieldCheck
 } from 'lucide-react';
 import { auth } from '../../lib/firebase';
 import { DEFAULT_HEALTH_NOTIFICATION_SETTINGS, getHealthIssues } from '../../lib/healthNotificationUtils.mjs';
@@ -104,7 +104,7 @@ const statusPresentation = {
   'missing-data': { label: 'No event rows', className: 'text-red-300 border-red-400/30 bg-red-500/10' },
   'metric-discrepancy': { label: 'Metric Discrepancy', className: 'text-amber-300 border-amber-400/40 bg-amber-500/10' },
   'spend-cliff': { label: 'Spend Cliff Detected', className: 'text-amber-300 border-amber-400/40 bg-amber-500/10' },
-  'activity-halt': { label: 'Activity Halted / Paused', className: 'text-red-300 border-red-400/40 bg-red-500/10' },
+  'activity-halt': { label: 'Activity Halted (Spend $0)', className: 'text-red-300 border-red-500/40 bg-red-500/20' },
   'dimension-discrepancy': { label: 'Dimension Check', className: 'text-amber-300 border-amber-400/40 bg-amber-500/10' },
   'dimension-unavailable': { label: 'Dimension Check Unavailable', className: 'text-amber-300 border-amber-400/40 bg-amber-500/10' },
   unknown: { label: 'Not checked', className: 'text-gray-300 border-gray-500/30 bg-gray-500/10' }
@@ -1254,7 +1254,7 @@ export default function DataHealthAdmin({
           {currentIssues.length ? <>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
               <label className="text-[10px] font-semibold uppercase text-slate-400">Event<select value={overviewEventFilter} onChange={event => { setOverviewEventFilter(event.target.value); setOverviewIssuePage(0); }} className="mt-1 w-full rounded-lg border border-white/10 bg-[#041628] px-3 py-2 text-xs normal-case text-white"><option value="all">All events</option>{overviewEvents.map(name => <option key={name} value={name}>{name}</option>)}</select></label>
-              <label className="text-[10px] font-semibold uppercase text-slate-400">Issue category<select value={overviewCategoryFilter} onChange={event => { setOverviewCategoryFilter(event.target.value); setOverviewIssuePage(0); }} className="mt-1 w-full rounded-lg border border-white/10 bg-[#041628] px-3 py-2 text-xs normal-case text-white"><option value="all">All categories</option><option value="feed">Feed / sheet</option><option value="metrics">Metrics</option><option value="dimensions">Dimensions</option></select></label>
+              <label className="text-[10px] font-semibold uppercase text-slate-400">Issue category<select value={overviewCategoryFilter} onChange={event => { setOverviewCategoryFilter(event.target.value); setOverviewIssuePage(0); }} className="mt-1 w-full rounded-lg border border-white/10 bg-[#041628] px-3 py-2 text-xs normal-case text-white"><option value="all">All categories</option><option value="feed">Feed / sheet</option><option value="metrics">Metrics</option><option value="dimensions">Dimensions</option><option value="activity">Activity & Velocity</option></select></label>
             </div>
             <ul className="mt-3 space-y-2">
             {visibleOverviewIssues.map(issue => <li key={issue.key} className="rounded-lg border border-white/10 bg-[#031120]/70 p-3">
@@ -1262,7 +1262,7 @@ export default function DataHealthAdmin({
                 <div className="flex flex-wrap items-center gap-2">
                   <strong className="text-sm text-white">{issue.eventName}</strong>
                   <span className="text-xs text-slate-300">{issue.kind} · {issue.category || 'feed'}</span>
-                  <span className="rounded-full border border-amber-400/30 px-2 py-0.5 text-[10px] text-amber-200">{statusPresentation[issue.status]?.label || issue.status}</span>
+                  <span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${statusPresentation[issue.status]?.className || 'border-amber-400/30 text-amber-200'}`}>{statusPresentation[issue.status]?.label || issue.status}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <button
@@ -1276,6 +1276,17 @@ export default function DataHealthAdmin({
                   </button>
                 </div>
               </div>
+              {issue.status === 'activity-halt' ? (
+                <div className="mt-1.5 flex items-center gap-1.5 text-xs font-bold text-red-400">
+                  <AlertOctagon className="h-3.5 w-3.5 shrink-0" />
+                  <span>Complete Delivery Pause: Daily spend dropped to $0.00</span>
+                </div>
+              ) : issue.status === 'spend-cliff' ? (
+                <div className="mt-1.5 flex items-center gap-1.5 text-xs font-bold text-amber-300">
+                  <TrendingDown className="h-3.5 w-3.5 shrink-0" />
+                  <span>Severe Spend Cliff: Velocity dropped ≥ 40% vs baseline</span>
+                </div>
+              ) : null}
               <p className="mt-1 text-xs leading-relaxed text-amber-100/90">{summarizeIssue(issue)}</p>
               {historyCategory(issue) === 'dimensions' && issue.dimensionFindings?.length > 0 && <details className="mt-2 text-xs"><summary className="cursor-pointer text-[#6bd5f7]">View dimension findings</summary><div className="mt-2"><DimensionFindings findings={issue.dimensionFindings} standards={dimensionSettings.values} customValues={dimensionSettings.customValues} eventCustomValues={dimensionSettings.eventCustomValues} ignoreBlanksByDimension={dimensionSettings.ignoreBlanksByDimension || {}} ignoreBlanksByEventDimension={dimensionSettings.ignoreBlanksByEventDimension || {}} eventId={issue.eventId} eventName={issue.eventName} onAcceptValue={handleAcceptValue} onIgnoreBlanks={handleIgnoreBlanks} /></div></details>}
             </li>)}

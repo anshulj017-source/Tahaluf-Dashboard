@@ -162,9 +162,11 @@ async function getEvents(request) {
               const text = await res.text();
               if (text && text.length > 50 && !text.includes('<!DOCTYPE html')) {
                 const sharedSources = dataSources.filter(item => item.cacheKey === source.cacheKey);
+                const defaultEventName = sharedSources[0]?.eventName || sharedSources[0]?.name || source.eventName || '';
                 const summary = summarizeSheetData(text, {
                   metricChecksEnabled: sharedSources.some(item => eventHealthChecks(item.eventId, checkSettings).metricChecksEnabled),
-                  activityChecksEnabled: sharedSources.some(item => eventHealthChecks(item.eventId, checkSettings).activityChecksEnabled)
+                  activityChecksEnabled: sharedSources.some(item => eventHealthChecks(item.eventId, checkSettings).activityChecksEnabled),
+                  defaultEventName
                 });
                 if (sharedSources.some(item => item.kind === 'Actuals' && eventHealthChecks(item.eventId, checkSettings).dimensionChecksEnabled)) {
                   summary.dimensionValidation = await summarizeDimensions(text);
