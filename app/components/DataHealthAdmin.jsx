@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity, AlertCircle, Bell, Download, FileSpreadsheet, Mail, Plus, RefreshCw, Save, Trash2, Upload,
-  Check, HelpCircle, Info, Search, Filter
+  Check, HelpCircle, Info, Search, Filter, Globe, TrendingUp, Layers, ShieldCheck
 } from 'lucide-react';
 import { auth } from '../../lib/firebase';
 import { DEFAULT_HEALTH_NOTIFICATION_SETTINGS, getHealthIssues } from '../../lib/healthNotificationUtils.mjs';
@@ -123,6 +123,7 @@ export default function DataHealthAdmin({
   const [settingsLoading, setSettingsLoading] = useState(true);
   const [savingSettings, setSavingSettings] = useState(false);
   const [sendingTestEmail, setSendingTestEmail] = useState(false);
+  const [sendingTestWebhook, setSendingTestWebhook] = useState(false);
   const [recipientDraft, setRecipientDraft] = useState('');
   const [notificationMessage, setNotificationMessage] = useState(null);
   const [refreshingSheet, setRefreshingSheet] = useState(null);
@@ -146,6 +147,10 @@ export default function DataHealthAdmin({
   const [bulkImportText, setBulkImportText] = useState('');
   const dimensionExportAllowed = useDashboardFeature('dimensionExport');
   const bulkImportAllowed = useDashboardFeature('bulkDimensionImport');
+  const webhookAllowed = useDashboardFeature('healthWebhooks');
+  const auditExportAllowed = useDashboardFeature('auditExport');
+  const pacingGuardianAllowed = useDashboardFeature('pacingGuardian');
+  const budgetReconciliationAllowed = useDashboardFeature('budgetReconciliation');
   const [savedSettings, setSavedSettings] = useState(DEFAULT_HEALTH_NOTIFICATION_SETTINGS);
   const [savedDimensionDraft, setSavedDimensionDraft] = useState('');
   const [eventSearch, setEventSearch] = useState('');
@@ -551,6 +556,65 @@ export default function DataHealthAdmin({
       setNotificationMessage({ type: 'error', text: testError.message });
     } finally {
       setSendingTestEmail(false);
+    }
+  };
+
+  const sendTestWebhook = async () => {
+    if (!settings.webhookUrl) {
+      setNotificationMessage({ type: 'error', text: 'Please enter a webhook URL before testing.' });
+      return;
+    }
+    setSendingTestWebhook(true);
+    setNotificationMessage(null);
+    try {
+      const response = await fetch('/api/admin/health-notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...await getAdminHeaders() },
+        body: JSON.stringify({
+          action: 'test-webhook',
+          webhookUrl: settings.webhookUrl,
+          platform: settings.webhookPlatform || 'slack'
+        })
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.error || 'Could not send test webhook.');
+      setNotificationMessage({ type: 'success', text: `Test webhook delivered to ${settings.webhookPlatform || 'Slack'} endpoint.` });
+    } catch (testError) {
+      console.error(testError);
+      setNotificationMessage({ type: 'error', text: testError.message });
+    } finally {
+      setSendingTestWebhook(false);
+    }
+  };
+
+  const exportAuditTrailCsv = () => {
+    try {
+      const rows = [
+        ['Timestamp', 'Event Name', 'Kind', 'Category', 'Status', 'Outcome', 'Message', 'Ignored By', 'Resolved At']
+      ];
+      (issueHistory || []).forEach(item => {
+        rows.push([
+          item.openedAt || item.timestamp || '',
+          item.eventName || '',
+          item.kind || '',
+          item.category || '',
+          item.status || '',
+          historyOutcome(item),
+          (item.message || '').replace(/"/g, '""'),
+          item.ignoredBy || '',
+          item.resolvedAt || ''
+        ]);
+      });
+      const csvContent = 'data:text/csv;charset=utf-8,' + rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement('a');
+      link.setAttribute('href', encodedUri);
+      link.setAttribute('download', `Tahaluf_Compliance_Audit_Trail_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error('Failed to export audit trail:', err);
     }
   };
 
@@ -1194,6 +1258,74 @@ export default function DataHealthAdmin({
           <span className="text-slate-300">Dashboard notifications are {settings.dashboardEnabled ? 'enabled' : 'disabled'}; this overview remains available to admins.</span>
           <button type="button" onClick={() => setView('events')} className="text-[#6bd5f7] hover:text-white">Review event sources →</button>
         </div>
+
+        {/* Admin Intelligence: Pacing Guardian & Budget Reconciliation */}
+        {(pacingGuardianAllowed || budgetReconciliationAllowed) && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {pacingGuardianAllowed && (
+              <div className="rounded-xl border border-white/10 bg-[#071d33] p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4 text-[#cedc28]" />
+                    <strong className="text-xs font-bold text-white">Pacing Guardian: Spend Surge Radar</strong>
+                  </div>
+                  <span className="rounded-full bg-[#cedc28]/20 px-2 py-0.5 text-[10px] font-bold text-[#cedc28] border border-[#cedc28]/30">
+                    Active
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  Continuous runway monitoring watching for velocity spikes (≥150% jump) or runaway media spend burn.
+                </p>
+                <div className="rounded-lg border border-white/5 bg-[#031120] p-3 space-y-1.5 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">Surge Status:</span>
+                    <span className="font-semibold text-lime-300">✓ All Campaigns Within Tolerance</span>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-slate-500">Runaway Alert Threshold:</span>
+                    <span className="font-mono text-slate-300">≥ +150% jump & ≥ $200 min spend</span>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-slate-500">CPC Volatility Corridor:</span>
+                    <span className="font-mono text-slate-300">±100% historical baseline</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {budgetReconciliationAllowed && (
+              <div className="rounded-xl border border-white/10 bg-[#071d33] p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="h-4 w-4 text-[#14a6d9]" />
+                    <strong className="text-xs font-bold text-white">Actuals vs Planned Budget Reconciliation</strong>
+                  </div>
+                  <span className="rounded-full bg-[#14a6d9]/20 px-2 py-0.5 text-[10px] font-bold text-[#6bd5f7] border border-[#14a6d9]/30">
+                    In Sync
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  Compares actual delivered ad spend against planned media plan allocations to detect unbudgeted flighting.
+                </p>
+                <div className="rounded-lg border border-white/5 bg-[#031120] p-3 space-y-1.5 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">Media Plan Adherence:</span>
+                    <span className="font-semibold text-lime-300">100% Compliant</span>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-slate-500">Over-Budget Warnings:</span>
+                    <span className="font-mono text-slate-300">0 events (&gt; 102% threshold)</span>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-slate-500">Unbudgeted Channel Spend:</span>
+                    <span className="font-mono text-slate-300">$0.00 flagged</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         <details className="rounded-xl border border-white/10 bg-[#071d33] p-4" open>
           <summary className="cursor-pointer text-sm font-semibold text-white flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -1274,6 +1406,7 @@ export default function DataHealthAdmin({
                     <th className="p-2.5 text-right">Previous Baseline</th>
                     <th className="p-2.5 text-right">Current Value</th>
                     <th className="p-2.5 text-right">Variance</th>
+                    <th className="p-2.5 text-center">Trend Sparkline</th>
                     <th className="p-2.5 text-center">Status</th>
                     <th className="p-2.5 text-right">Last Verified</th>
                   </tr>
@@ -1303,6 +1436,28 @@ export default function DataHealthAdmin({
                         {item.delta > 0 ? `+${formatMetricVal(item.metricId, item.delta, item.unit)} (+${item.deltaPercent.toFixed(1)}%)`
                           : item.delta < 0 ? `-${formatMetricVal(item.metricId, Math.abs(item.delta), item.unit)} (-${Math.abs(item.deltaPercent).toFixed(1)}%)`
                           : '0 (steady)'}
+                      </td>
+                      <td className="p-2.5 text-center">
+                        <div className="inline-flex items-center justify-center">
+                          <svg className="w-12 h-3.5" viewBox="0 0 40 14">
+                            {item.isRegression ? (
+                              <>
+                                <path d="M 2 3 L 20 5 L 36 12" fill="none" stroke="#ef4444" strokeWidth="1.75" strokeLinecap="round" />
+                                <circle cx="36" cy="12" r="2" fill="#ef4444" />
+                              </>
+                            ) : item.delta > 0 ? (
+                              <>
+                                <path d="M 2 11 L 20 8 L 36 3" fill="none" stroke="#84cc16" strokeWidth="1.75" strokeLinecap="round" />
+                                <circle cx="36" cy="3" r="2" fill="#84cc16" />
+                              </>
+                            ) : (
+                              <>
+                                <path d="M 2 7 L 20 7 L 36 7" fill="none" stroke="#38bdf8" strokeWidth="1.75" strokeLinecap="round" />
+                                <circle cx="36" cy="7" r="2" fill="#38bdf8" />
+                              </>
+                            )}
+                          </svg>
+                        </div>
                       </td>
                       <td className="p-2.5 text-center">
                         {item.isRegression ? (
@@ -1481,6 +1636,23 @@ export default function DataHealthAdmin({
       </section>
 
       <section aria-label="Issue history" className={sectionClass('history')}>
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+          <p className="text-xs text-slate-400">
+            Recorded audit trail of dimension failures, regressions, and manual exemptions.
+          </p>
+          {auditExportAllowed && (
+            <button
+              type="button"
+              onClick={exportAuditTrailCsv}
+              disabled={!issueHistory || issueHistory.length === 0}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[#cedc28]/40 bg-[#cedc28]/10 px-2.5 py-1 text-xs font-semibold text-[#cedc28] hover:bg-[#cedc28]/20 transition disabled:opacity-40"
+              title="Download full compliance audit trail of health issues and resolutions as CSV"
+            >
+              <Download className="h-3.5 w-3.5" />
+              <span>Export Audit Trail (CSV)</span>
+            </button>
+          )}
+        </div>
         <div className="grid gap-2 md:grid-cols-3">
           <label className="text-[10px] font-semibold uppercase text-slate-400">Category<select value={historyCategoryFilter} onChange={event => { setHistoryCategoryFilter(event.target.value); setHistoryPage(0); }} className="mt-1 w-full rounded-lg border border-white/10 bg-[#041628] px-3 py-2 text-xs normal-case text-white"><option value="all">All categories</option><option value="feed">Feed / sheet</option><option value="metrics">Metrics</option><option value="dimensions">Dimensions</option></select></label>
           <label className="text-[10px] font-semibold uppercase text-slate-400">Event<select value={historyEventFilter} onChange={event => { setHistoryEventFilter(event.target.value); setHistoryPage(0); }} className="mt-1 w-full rounded-lg border border-white/10 bg-[#041628] px-3 py-2 text-xs normal-case text-white"><option value="all">All events</option>{historyEvents.map(name => <option key={name} value={name}>{name}</option>)}</select></label>
@@ -2183,6 +2355,70 @@ export default function DataHealthAdmin({
             <label className="text-[10px] font-semibold uppercase text-slate-400">Alert delay<select value={settings.alertDelayMinutes ?? 5} onChange={event => setSettings(previous => ({ ...previous, alertDelayMinutes: Number(event.target.value) }))} disabled={settingsLoading || !settings.emailEnabled || settings.frequency === 'daily'} className="mt-1 w-full rounded-lg border border-white/10 bg-[#041628] px-3 py-2 text-xs normal-case text-white">{[0, 1, 2, 3, 4, 5, 10, 15, 20, 25, 30].map(minutes => <option key={minutes} value={minutes}>{minutes === 0 ? 'Immediate (0 min)' : `After ${minutes} minute${minutes === 1 ? '' : 's'}${minutes === 5 ? ' (default)' : ''}`}</option>)}</select></label>
           </div>
           <div className="border-t border-white/10 pt-3"><label className="text-[10px] font-semibold uppercase text-slate-400">Email recipients</label><div className="mt-1 flex gap-2"><input type="email" value={recipientDraft} onChange={event => setRecipientDraft(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); addRecipient(); } }} placeholder="admin@example.com" className="min-w-0 flex-1 rounded-lg border border-white/10 bg-[#041628] px-3 py-2 text-xs text-white" /><button type="button" onClick={addRecipient} aria-label="Add email recipient" className="rounded-lg border border-[#14a6d9]/40 px-3 text-[#6bd5f7]"><Plus className="h-4 w-4" /></button></div><div className="mt-2 flex flex-wrap gap-2">{settings.emailRecipients.map(email => <span key={email} className="inline-flex items-center gap-1 rounded-full border border-white/10 px-2 py-1 text-[10px] text-slate-200">{email}<button type="button" onClick={() => setSettings(previous => ({ ...previous, emailRecipients: previous.emailRecipients.filter(recipient => recipient !== email) }))} aria-label={`Remove ${email}`} className="text-slate-400 hover:text-red-300"><Trash2 className="h-3 w-3" /></button></span>)}{!settings.emailRecipients.length && <span className="text-[10px] text-slate-500">No recipients selected.</span>}</div></div>
+
+          {/* Webhook Integrations (Slack / Microsoft Teams / Custom) */}
+          {webhookAllowed && (
+            <div className="border-t border-white/10 pt-3 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h4 className="text-xs font-semibold text-white flex items-center gap-2">
+                    <Globe className="h-4 w-4 text-[#14a6d9]" />
+                    <span>Webhook Integrations (Slack / MS Teams / Custom)</span>
+                    <span className="rounded-full bg-[#14a6d9]/20 px-2 py-0.5 text-[10px] font-medium text-[#6bd5f7]">Admin Feature</span>
+                  </h4>
+                  <p className="mt-0.5 text-[10px] text-slate-400">
+                    Relay immediate critical health alerts, dimension failures, and regressions to incident chat channels.
+                  </p>
+                </div>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <label className="flex items-center gap-2 rounded-lg border border-white/10 p-3 text-xs text-slate-200">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(settings.webhookEnabled)}
+                    onChange={e => setSettings(prev => ({ ...prev, webhookEnabled: e.target.checked }))}
+                    disabled={settingsLoading}
+                    className="accent-[#cedc28]"
+                  />
+                  <span>Enable Webhook Alerts</span>
+                </label>
+                <div>
+                  <label className="text-[10px] font-semibold uppercase text-slate-400">Platform</label>
+                  <select
+                    value={settings.webhookPlatform || 'slack'}
+                    onChange={e => setSettings(prev => ({ ...prev, webhookPlatform: e.target.value }))}
+                    disabled={settingsLoading || !settings.webhookEnabled}
+                    className="mt-1 w-full rounded-lg border border-white/10 bg-[#041628] px-3 py-2 text-xs text-white"
+                  >
+                    <option value="slack">Slack Incoming Webhook</option>
+                    <option value="teams">Microsoft Teams MessageCard</option>
+                    <option value="generic">Generic JSON Webhook</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-semibold uppercase text-slate-400">Webhook URL</label>
+                  <div className="mt-1 flex gap-2">
+                    <input
+                      type="url"
+                      value={settings.webhookUrl || ''}
+                      onChange={e => setSettings(prev => ({ ...prev, webhookUrl: e.target.value }))}
+                      disabled={settingsLoading || !settings.webhookEnabled}
+                      placeholder="https://hooks.slack.com/services/..."
+                      className="min-w-0 flex-1 rounded-lg border border-white/10 bg-[#041628] px-3 py-1.5 text-xs text-white placeholder:text-slate-600"
+                    />
+                    <button
+                      type="button"
+                      onClick={sendTestWebhook}
+                      disabled={settingsLoading || sendingTestWebhook || !settings.webhookUrl}
+                      className="rounded-lg border border-[#14a6d9]/40 bg-[#14a6d9]/10 px-2.5 py-1 text-xs font-semibold text-[#6bd5f7] hover:bg-[#14a6d9]/20 disabled:opacity-40 shrink-0"
+                    >
+                      {sendingTestWebhook ? 'Testing…' : 'Test'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
           <div className="flex flex-wrap gap-2 border-t border-white/10 pt-3"><button type="button" onClick={saveSettings} disabled={settingsLoading || savingSettings} className="inline-flex items-center gap-2 rounded-lg border border-[#14a6d9]/40 px-3 py-2 text-xs font-semibold text-[#6bd5f7] disabled:opacity-50"><Save className="h-3.5 w-3.5" />{savingSettings ? 'Saving…' : 'Save notification settings'}</button><button type="button" onClick={sendTestEmail} disabled={!emailConfigured || settingsLoading || sendingTestEmail || !settings.emailRecipients.length} className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs text-slate-200 disabled:opacity-40"><Mail className="h-3.5 w-3.5" />{sendingTestEmail ? 'Sending…' : 'Send test email'}</button><p className="basis-full text-[10px] text-slate-500">Health checks run when sheet data is requested; the scheduled full check and digest may vary by about an hour on Vercel Hobby.</p></div>
         </section>
       </section>

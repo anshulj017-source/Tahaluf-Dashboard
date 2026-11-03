@@ -4,12 +4,15 @@ import {
   generateStrategicCommentary,
   computeChannelQuadrants,
   simulateBudgetReallocation,
+  calculateChannelSaturationCurves,
   computeLaunchForecast,
   computeCreativeFatigue,
   computeEventsBreakdown,
   computePortfolioBreakdown,
   computeDailyNextSteps
 } from '../lib/algorithmicIntelligence.mjs';
+import { checkPacingSurges } from '../lib/metricIntegrity.mjs';
+import { reconcileBudgetActuals } from '../lib/budgetReconciliation.mjs';
 
 test('Algorithmic Intelligence: Strategic Commentary Generation', () => {
   const empty = generateStrategicCommentary([], []);
@@ -190,5 +193,70 @@ test('Algorithmic Intelligence: Daily Next Steps by Event, Channel, and Event Ty
   assert.equal(bhStep.eventType, 'Exprom');
   assert(bhStep.dailyAction.includes('LinkedIn') || bhStep.dailyAction.includes('company size'));
 });
+
+test('Algorithmic Intelligence: Channel Saturation & Diminishing Returns Curves', () => {
+  const empty = calculateChannelSaturationCurves([]);
+  assert.equal(empty.channels.length, 0);
+  assert.equal(empty.overallSaturation, 0);
+
+  const sampleAggregates = [
+    { channel: 'Meta Ads', cost: 120000, purchases: 2000, clicks: 50000 }, // CPA: $60
+    { channel: 'Google Search', cost: 40000, purchases: 2500, clicks: 35000 }, // CPA: $16
+    { channel: 'TikTok Ads', cost: 15000, purchases: 1200, clicks: 20000 }, // CPA: $12.50
+    { channel: 'Snapchat', cost: 8000, purchases: 200, clicks: 8000 } // CPA: $40
+  ];
+
+  const analysis = calculateChannelSaturationCurves(sampleAggregates);
+  assert.equal(analysis.channels.length, 4);
+  assert.ok(analysis.overallSaturation > 0, 'Computes overall saturation index');
+
+  const meta = analysis.channels.find(c => c.channel === 'Meta Ads');
+  assert.ok(meta);
+  assert.ok(meta.saturationIndex >= 60, 'Flags high spend and high CPA channel as approaching or saturated');
+
+  const tiktok = analysis.channels.find(c => c.channel === 'TikTok Ads');
+  assert.ok(tiktok);
+  assert.ok(tiktok.saturationIndex <= 50, 'Low spend with strong CPA shows low saturation');
+  assert.equal(tiktok.status, 'underfunded');
+  assert.ok(tiktok.marginalEfficiency > 1.0, 'Reports headroom multiplier > 1');
+});
+
+test('Algorithmic Governance: Pacing Guardian Surge & Runaway Media Detection', () => {
+  const previousBaselines = {
+    'KoG 26:::Meta:::2026-11-02': { cost: 1000, clicks: 500 },
+    'Black Hat:::Google:::2026-11-02': { cost: 5000, clicks: 2000 }
+  };
+
+  const currentMetrics = [
+    { eventName: 'KoG 26', channel: 'Meta', date: '2026-11-02', cost: 3000 }, // 200% surge, delta $2000
+    { eventName: 'Black Hat', channel: 'Google', date: '2026-11-02', cost: 5200 } // 4% normal change
+  ];
+
+  const surges = checkPacingSurges(currentMetrics, previousBaselines);
+  assert.equal(surges.length, 1);
+  assert.equal(surges[0].eventName, 'KoG 26');
+  assert.equal(surges[0].channel, 'Meta');
+  assert.equal(surges[0].type, 'spend-surge');
+  assert.ok(surges[0].surgePercent >= 150);
+});
+
+test('Algorithmic Governance: Actuals vs Planned Budget Reconciliation', () => {
+  const actuals = [
+    { 'Event Name DB': 'KoG 26', 'Channel': 'Meta', 'Cost': 25000 },
+    { 'Event Name DB': 'KoG 26', 'Channel': 'Snapchat', 'Cost': 4000 } // Unbudgeted
+  ];
+
+  const planned = [
+    { 'Event Name DB': 'KoG 26', 'Channel': 'Meta', 'Planned Budget': 20000 } // Planned 20k, spent 25k -> over budget
+  ];
+
+  const recon = reconcileBudgetActuals(actuals, planned);
+  assert.equal(recon.reconciledEvents.length, 1);
+  assert.equal(recon.overBudgetFindings.length, 1);
+  assert.equal(recon.unbudgetedFindings.length, 1);
+  assert.equal(recon.reconciledEvents[0].status, 'over-budget');
+  assert.equal(recon.unbudgetedFindings[0].channel, 'Snapchat');
+});
+
 
 

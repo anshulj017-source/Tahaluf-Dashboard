@@ -61,7 +61,8 @@ async function harness({ snapshot = {}, lowQuota = false, active = true } = {}) 
     require: name => name === 'react' ? hooks
       : name === '../../lib/firebase' ? { auth: { currentUser: null } }
       : name === '../../lib/authConstants.mjs' ? { isRootSuperAdmin: (e) => (e || '').toLowerCase() === 'fehmatics@gmail.com' }
-      : name === './DashboardFeatureContext' ? { useLowQuotaMode: () => lowQuota }
+      : name === './DashboardFeatureContext' ? { useLowQuotaMode: () => lowQuota, useDashboardFeature: () => true }
+      : name === './PptxExportModal' ? () => null
       : name === './AdminUI' ? adminUI : require(name),
     document: { visibilityState: 'visible', addEventListener() {}, removeEventListener() {} },
     setInterval: (fn, delay) => { const id = timers.size + 1; timers.set(id, { fn, delay }); return id; },

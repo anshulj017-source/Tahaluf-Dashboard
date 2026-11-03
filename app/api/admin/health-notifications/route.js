@@ -3,6 +3,7 @@ import {
   getHealthNotificationState,
   saveHealthNotificationSettings,
   sendTestHealthEmail,
+  sendTestWebhook,
   reconcileDisabledHealthChecks,
   markIssueIgnoredInHistory,
   markIssueUnignoredInHistory
@@ -216,6 +217,10 @@ export async function POST(request) {
     if (body.action === 'test-email') {
       await sendTestHealthEmail(body.recipient || '');
       return NextResponse.json({ success: true, message: 'Test email sent.' });
+    }
+    if (body.action === 'test-webhook') {
+      const ok = await sendTestWebhook(body.webhookUrl, body.webhookPlatform);
+      return NextResponse.json({ success: ok, message: ok ? 'Test webhook delivered successfully.' : 'Webhook endpoint returned an error or timed out.' });
     }
     if (body.action !== 'save') {
       return NextResponse.json({ success: false, error: 'Unknown notification settings action.' }, { status: 400 });

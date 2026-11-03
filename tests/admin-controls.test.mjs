@@ -604,7 +604,12 @@ test('super_admin_only and custom_users permissions enforce strict role and user
 test('audit enhancements features default to admin_only and obey permissions', async () => {
   const { extractChannelMetrics24h, checkMetricDiscrepancies } = await import('../lib/metricIntegrity.mjs');
   
-  const newFeatureIds = ['quickJump', 'dimensionExport', 'bulkDimensionImport', 'tvCustomization', 'budgetSimulator', 'channelQuadrant', 'launchForecaster', 'creativeFatigue'];
+  const newFeatureIds = [
+    'quickJump', 'dimensionExport', 'bulkDimensionImport', 'tvCustomization',
+    'budgetSimulator', 'channelQuadrant', 'launchForecaster', 'creativeFatigue',
+    'pacingGuardian', 'budgetReconciliation', 'healthWebhooks', 'channelSaturation',
+    'auditExport', 'advancedPptx'
+  ];
   for (const id of newFeatureIds) {
     const feature = DASHBOARD_FEATURES.find(f => f.id === id);
     assert.ok(feature, `Feature ${id} is registered in DASHBOARD_FEATURES`);
