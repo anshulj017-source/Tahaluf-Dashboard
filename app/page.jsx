@@ -5,7 +5,7 @@ import {
   TrendingUp, Globe, Layers, Activity, DollarSign, MousePointer2, 
   Eye, EyeOff, Shield, Zap, LayoutDashboard, ChevronDown, Search, Check, ShoppingCart,
   TableProperties, MonitorPlay, BarChart3, Smartphone, List, Download, RefreshCw, Users, Calendar, LayoutTemplate, PieChart, Grid, Map as MapIcon, LogOut,
-  Sparkles, Menu, X, SlidersHorizontal, Tv, Maximize2, Minimize2, MoreHorizontal, Settings
+  Sparkles, Menu, X, SlidersHorizontal, Tv, Maximize2, Minimize2, MoreHorizontal, Settings, Bell
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, AreaChart, Area } from 'recharts';
 import { ComposableMap, Geographies, Geography, ZoomableGroup } from 'react-simple-maps';
@@ -792,6 +792,8 @@ export default function App() {
   const [adminVisited, setAdminVisited] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [isRefreshingData, setIsRefreshingData] = useState(false);
+  const [healthAlertCount, setHealthAlertCount] = useState(0);
+  const [healthModalOpen, setHealthModalOpen] = useState(false);
   const isAdminRole = userRole === 'admin' || userRole === 'super_admin';
   const initialAdminSyncedRef = useRef(false);
 
@@ -3338,6 +3340,17 @@ export default function App() {
                   <span className="inline font-bold">TV</span>
                 </button>
               )}
+              {healthAlertCount > 0 && (featureAllowed('healthAlertPopup') || featureAllowed('healthBanner')) && (
+                <button
+                  type="button"
+                  onClick={() => setHealthModalOpen(true)}
+                  title={`${healthAlertCount} active data health alert${healthAlertCount === 1 ? '' : 's'}. Click to view details.`}
+                  className="h-[28px] xl:h-[30px] px-2.5 bg-rose-500/20 border border-rose-500/60 text-rose-300 rounded-lg hover:bg-rose-500/30 hover:text-white transition-all flex items-center gap-1.5 text-[10px] font-bold shadow-sm shrink-0 animate-pulse cursor-pointer"
+                >
+                  <Bell className="w-3.5 h-3.5 text-rose-400" />
+                  <span>{healthAlertCount} Alert{healthAlertCount === 1 ? '' : 's'}</span>
+                </button>
+              )}
               <button 
                 onClick={handleRefreshAll} 
                 disabled={isRefreshingData || loading}
@@ -3414,6 +3427,17 @@ export default function App() {
                   </span>
                 )}
               </button>
+              {healthAlertCount > 0 && (featureAllowed('healthAlertPopup') || featureAllowed('healthBanner')) && (
+                <button
+                  type="button"
+                  onClick={() => setHealthModalOpen(true)}
+                  title={`${healthAlertCount} active data health alert${healthAlertCount === 1 ? '' : 's'}. Click to view details.`}
+                  className="h-[32px] px-2 bg-rose-500/20 border border-rose-500/60 text-rose-300 rounded-lg hover:bg-rose-500/30 hover:text-white transition-all flex items-center gap-1 text-[10px] font-bold shrink-0 animate-pulse cursor-pointer"
+                >
+                  <Bell className="w-3.5 h-3.5 text-rose-400" />
+                  <span>{healthAlertCount}</span>
+                </button>
+              )}
               <button 
                 onClick={handleRefreshAll} 
                 disabled={isRefreshingData || loading}
@@ -3856,7 +3880,7 @@ export default function App() {
               } else if (featureId === 'exports') {
                 setActiveTab('summary');
                 scrollToTarget('dashboard-exports');
-              } else if (featureId === 'healthBanner') {
+              } else if (featureId === 'healthBanner' || featureId === 'healthAlertPopup') {
                 setActiveTab('summary');
                 scrollToTarget('health-alert-banner');
               } else {
@@ -3870,16 +3894,22 @@ export default function App() {
         <main className="flex-1 overflow-y-auto p-3 sm:p-5 md:p-6 lg:p-8 pb-24 lg:pb-8 custom-scrollbar touch-scroll relative z-10">
           <ReactTooltip id="market-tooltip" className="z-50" style={{ backgroundColor: '#0a2442', color: '#eef7f5', border: '1px solid #cedc2830', borderRadius: '8px', zIndex: 1000 }} />
           <div className="absolute top-0 right-0 w-full h-[500px] bg-gradient-to-br from-[#062f2e]/20 via-transparent to-transparent pointer-events-none -z-10"></div>
-          {featureAllowed('healthBanner') && !tvMode && (
+          {(featureAllowed('healthAlertPopup') || featureAllowed('healthBanner')) && !tvMode && (
             <div id="health-alert-banner">
-              <HealthAlertBanner onOpenHealthMonitor={() => {
-                const url = new URL(window.location.href);
-                url.searchParams.set('admin', 'health');
-                url.searchParams.set('healthView', 'overview');
-                window.history.replaceState(null, '', url);
-                window.dispatchEvent(new Event('admin-locationchange'));
-                setActiveTab('admin');
-              }} />
+              <HealthAlertBanner 
+                isAdmin={canAccessAdmin}
+                isModalOpen={healthModalOpen}
+                onToggleModal={setHealthModalOpen}
+                onAlertCountChange={setHealthAlertCount}
+                onOpenHealthMonitor={() => {
+                  const url = new URL(window.location.href);
+                  url.searchParams.set('admin', 'health');
+                  url.searchParams.set('healthView', 'overview');
+                  window.history.replaceState(null, '', url);
+                  window.dispatchEvent(new Event('admin-locationchange'));
+                  setActiveTab('admin');
+                }} 
+              />
             </div>
           )}
           

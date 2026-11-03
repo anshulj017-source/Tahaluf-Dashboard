@@ -1818,6 +1818,7 @@ test('all 36 dashboard features map to explicit navigation routes and sections',
     currency: { tab: 'summary', scrollId: 'currency-toggle-button' },
     exports: { tab: 'summary', scrollId: 'dashboard-exports' },
     healthBanner: { tab: 'summary', scrollId: 'health-alert-banner' },
+    healthAlertPopup: { tab: 'summary', scrollId: 'health-alert-banner' },
   };
 
   // Ensure every feature in DASHBOARD_FEATURES has an explicit, non-default mapping
@@ -1956,4 +1957,82 @@ test('Activity Pause & Spend Cliff Radar detects delivery drops and activity hal
   assert.equal(gstsAnomaly.currentSpend, 0);
   assert.equal(gstsAnomaly.currentRows, 0);
   assert.equal(gstsAnomaly.dropPercent, 100);
+});
+
+test('healthAlertPopup feature and /api/health-alerts delivery for non-admin viewers', async () => {
+  const { DASHBOARD_FEATURES, isFeatureEnabled } = await import('../lib/dashboardFeatures.mjs');
+  const { isIssueIgnored } = await import('../lib/dimensionStandards.mjs');
+
+  // 1. healthAlertPopup is registered and NOT hardcoded to adminOnly (can be enabled for standard viewers)
+  const popupFeat = DASHBOARD_FEATURES.find(f => f.id === 'healthAlertPopup');
+  assert.ok(popupFeat, 'healthAlertPopup feature is registered in DASHBOARD_FEATURES');
+  assert.equal(popupFeat.adminOnly, undefined, 'healthAlertPopup can be enabled for standard viewers');
+  assert.equal(popupFeat.defaultMode, 'public', 'healthAlertPopup defaults to public for all users');
+
+  // Verify standard user can access when public
+  const publicConfig = { modes: { healthAlertPopup: 'public' } };
+  assert.equal(isFeatureEnabled(publicConfig, 'healthAlertPopup', 'standard'), true);
+
+  // Verify can be set to admin_only
+  const adminOnlyConfig = { modes: { healthAlertPopup: 'admin_only' } };
+  assert.equal(isFeatureEnabled(adminOnlyConfig, 'healthAlertPopup', 'standard'), false);
+  assert.equal(isFeatureEnabled(adminOnlyConfig, 'healthAlertPopup', 'admin'), true);
+
+  // 2. /api/health-alerts formats clean headlines and 1-2 line summaries
+  const mockSheetHealth = [
+    {
+      eventId: 'gsts-26',
+      eventName: 'GSTS 26',
+      kind: 'Actuals',
+      activityAnomalies: [
+        {
+          id: 'GSTS 26:activity-halt:2026-11-02',
+          eventName: 'GSTS 26',
+          type: 'activity-halt',
+          severity: 'critical',
+          date: '2026-11-02',
+          dropPercent: 100,
+          message: 'Activity Halted: All campaign delivery stopped for GSTS 26 on 2026-11-02. Spend dropped to $0.00 across 0 rows (trailing baseline: $800/day across 800 rows).'
+        }
+      ]
+    },
+    {
+      eventId: 'black-hat',
+      eventName: 'Black Hat',
+      kind: 'Actuals',
+      activityAnomalies: [
+        {
+          id: 'Black Hat:spend-cliff:2026-11-02',
+          eventName: 'Black Hat',
+          type: 'spend-cliff',
+          severity: 'warning',
+          date: '2026-11-02',
+          dropPercent: 74.5,
+          message: 'Spend Cliff Detected: Black Hat daily spend dropped by 74.5% ($1,883 → $480.68) on 2026-11-02. Active delivery rows dropped from 35 to 13. Paused/reduced channels: Meta (-73%), Google Ads (-77%).'
+        }
+      ]
+    }
+  ];
+
+  const { getHealthIssues } = await import('../lib/healthNotificationUtils.mjs');
+  const issues = getHealthIssues(mockSheetHealth);
+  assert.equal(issues.length, 2);
+
+  const haltIssue = issues.find(i => i.status === 'activity-halt');
+  assert.ok(haltIssue);
+  assert.equal(haltIssue.severity, 'critical');
+  assert.ok(haltIssue.message.includes('Activity Halted'));
+
+  const cliffIssue = issues.find(i => i.status === 'spend-cliff');
+  assert.ok(cliffIssue);
+  assert.equal(cliffIssue.severity, 'warning');
+  assert.ok(cliffIssue.message.includes('Spend Cliff Detected'));
+
+  // 3. Ignored issues are cleanly filtered out
+  const settingsWithIgnore = {
+    ignoredIssues: [{ key: haltIssue.key }]
+  };
+  const filteredIssues = getHealthIssues(mockSheetHealth, settingsWithIgnore);
+  assert.equal(filteredIssues.length, 1);
+  assert.equal(filteredIssues[0].status, 'spend-cliff');
 });

@@ -361,8 +361,10 @@ export default function DataHealthAdmin({
   }, [currentIssues]);
 
   useEffect(() => {
-    onIssueCountChange(currentIssues.length);
-  }, [currentIssues, onIssueCountChange]);
+    if (active) {
+      onIssueCountChange(currentIssues.length);
+    }
+  }, [active, currentIssues, onIssueCountChange]);
 
   const allVerifiedMetrics = useMemo(() => {
     const list = [];

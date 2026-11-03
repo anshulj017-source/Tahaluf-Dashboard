@@ -26,6 +26,7 @@
     "creativeFatigue": "admin_only",
     "tvCustomization": "admin_only",
     "healthBanner": "admin_only",
+    "healthAlertPopup": "public",
     "adminEvents": "admin_only",
     "adminHealth": "admin_only",
     "adminQuotas": "admin_only",
@@ -135,6 +136,10 @@
     },
     "healthBanner": {
       "updatedAt": "2026-10-29T09:37:00.000Z",
+      "updatedBy": "System Baseline"
+    },
+    "healthAlertPopup": {
+      "updatedAt": "2026-11-03T15:30:00.000Z",
       "updatedBy": "System Baseline"
     },
     "adminEvents": {
