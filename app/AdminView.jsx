@@ -161,6 +161,30 @@ export default function AdminView({
     return () => window.removeEventListener('admin-dirty', updateDirty);
   }, []);
   useEffect(() => { setVisited(current => ({ ...current, [activeSection]: true })); }, [activeSection]);
+
+  // Synchronize sidebar health alert badge from server health-notifications
+  useEffect(() => {
+    let cancelled = false;
+    const syncHealthBadge = async () => {
+      try {
+        const headers = await getAdminHeaders();
+        const res = await fetch('/api/admin/health-notifications?includeHealth=true', { headers });
+        if (res.ok) {
+          const data = await res.json();
+          if (!cancelled && data.success) {
+            setDashboardAlertsEnabled(data.settings?.dashboardEnabled !== false);
+            setHealthIssueCount((data.issues || []).length);
+          }
+        }
+      } catch {}
+    };
+    syncHealthBadge();
+    const interval = setInterval(syncHealthBadge, 60_000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, []);
   const navigate = section => {
     // Only prompt when navigating AWAY from the section that currently has unacknowledged dirty changes
     if (section !== activeSection && dirtyScopes[activeSection] && !acknowledgedDraftSections.has(activeSection)) {

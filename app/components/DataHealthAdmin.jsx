@@ -232,7 +232,6 @@ export default function DataHealthAdmin({
       }
       const nextHealth = result.sheetHealth || [];
       setSheetHealth(nextHealth);
-      onIssueCountChange(getHealthIssues(nextHealth, dimensionSettings).length);
       setLastCheckedAt(new Date().toISOString());
       setHealthLoadError(null);
     } catch (loadError) {
@@ -242,7 +241,7 @@ export default function DataHealthAdmin({
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [onIssueCountChange]);
+  }, []);
 
   const reloadHistory = useCallback(async () => {
     try {
@@ -341,11 +340,14 @@ export default function DataHealthAdmin({
   const issueCount = actualSources.filter(source => ['stale', 'unavailable', 'storage-error', 'missing-data', 'metric-discrepancy', 'dimension-discrepancy'].includes(getStatus(source, dimensionSettings))).length;
   const missingDataCount = actualSources.filter(source => source.monitoringEnabled !== false && source.sheetChecksEnabled !== false && (source.eventDataStatus === 'missing' || source.eventRows === 0)).length;
   const totalDiscrepancies = useMemo(() => sheetHealth.reduce((sum, s) => sum + (s.metricDiscrepancies?.length || 0), 0), [sheetHealth]);
-  const currentIssues = useMemo(() => getHealthIssues(sheetHealth, dimensionSettings), [sheetHealth, dimensionSettings]);
+  const currentIssues = useMemo(() => {
+    if (settingsLoading) return [];
+    return getHealthIssues(sheetHealth, dimensionSettings);
+  }, [sheetHealth, dimensionSettings, settingsLoading]);
 
   useEffect(() => {
     onIssueCountChange(currentIssues.length);
-  }, [currentIssues.length, onIssueCountChange]);
+  }, [currentIssues, onIssueCountChange]);
 
   const allVerifiedMetrics = useMemo(() => {
     const list = [];
