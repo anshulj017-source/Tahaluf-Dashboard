@@ -1692,7 +1692,6 @@ export default function App() {
   };
 
   const handleRefreshAll = () => {
-    resetFilters();
     setIsRefreshingData(true);
     setRefreshTrigger(t => t + 1);
   };
@@ -3342,7 +3341,7 @@ export default function App() {
               <button 
                 onClick={handleRefreshAll} 
                 disabled={isRefreshingData || loading}
-                title="Refresh Live Data & Reset Filters" 
+                title="Refresh Live Data" 
                 className="h-[28px] xl:h-[30px] px-2.5 bg-[#cedc28]/10 border border-[#cedc28]/50 text-[#cedc28] rounded-lg hover:bg-[#cedc28]/20 hover:text-white transition-colors flex items-center gap-1.5 text-[10px] font-bold shrink-0 disabled:opacity-50"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingData ? 'animate-spin' : ''}`}/>
@@ -3418,7 +3417,7 @@ export default function App() {
               <button 
                 onClick={handleRefreshAll} 
                 disabled={isRefreshingData || loading}
-                title="Refresh Live Data & Reset Filters" 
+                title="Refresh Live Data" 
                 className="h-[32px] px-2 bg-[#cedc28]/10 border border-[#cedc28]/50 text-[#cedc28] rounded-lg hover:bg-[#cedc28]/20 transition-colors flex items-center justify-center shrink-0 disabled:opacity-50"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingData ? 'animate-spin' : ''}`}/>
