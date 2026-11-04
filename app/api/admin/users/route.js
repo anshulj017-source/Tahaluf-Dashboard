@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
-import { getFirebaseAdmin } from '../../../../lib/firebaseAdmin';
-import { isAdminRequest, isSuperAdminRequest } from '../../../../lib/requireAdminRequest';
+import { getFirebaseAdmin } from '../../../../lib/firebaseAdmin.js';
+import { isAdminRequest, isSuperAdminRequest } from '../../../../lib/requireAdminRequest.js';
 import { readAdminSetting, updateAdminSetting } from '../../../../lib/adminSettingsStore.mjs';
 import { DEFAULT_FEATURE_CONFIG, isFeatureEnabled } from '../../../../lib/dashboardFeatures.mjs';
 import { getCollectionName } from '../../../../lib/firestoreCollections.mjs';
+import { isProtectedSuperAdmin, PROTECTED_SUPER_ADMINS } from '../../../../lib/authConstants.mjs';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -62,6 +63,19 @@ async function appendUserAccessHistory(entry) {
   }
 }
 
+async function resolveTargetEmail(adminAuth, userDoc, uid) {
+  const storedEmail = userDoc?.data()?.email;
+  if (typeof storedEmail === 'string' && storedEmail.trim()) return storedEmail;
+
+  try {
+    const userRecord = await adminAuth.getUser(uid);
+    return userRecord.email || uid;
+  } catch (error) {
+    if (error?.code === 'auth/user-not-found') return uid;
+    throw error;
+  }
+}
+
 export async function GET(req) {
   try {
     if (!await canAccessUserManagement(req)) {
@@ -95,16 +109,23 @@ export async function GET(req) {
       };
     });
 
-    // Ensure root Super Admin (fehmatics@gmail.com) is listed in User Accounts
-    if (!users.some(u => u.email?.toLowerCase() === 'fehmatics@gmail.com')) {
-      const rootDoc = Array.from(userRolesMap.values()).find(d => d.email?.toLowerCase() === 'fehmatics@gmail.com') || {};
+    for (const account of PROTECTED_SUPER_ADMINS) {
+      const existingUser = users.find(user => user.email?.toLowerCase().trim() === account.email);
+      if (existingUser) {
+        existingUser.role = 'super_admin';
+        existingUser.isFixed = true;
+        continue;
+      }
+
+      const accountDoc = Array.from(userRolesMap.values())
+        .find(data => data.email?.toLowerCase().trim() === account.email) || {};
       users.unshift({
-        uid: 'root_super_admin_fehmatics',
-        email: 'fehmatics@gmail.com',
+        uid: account.uid,
+        email: account.email,
         role: 'super_admin',
         isFixed: true,
-        lastSignInTime: rootDoc.lastActive || new Date().toISOString(),
-        creationTime: '2026-01-01T00:00:00.000Z'
+        lastSignInTime: accountDoc.lastActive || null,
+        creationTime: accountDoc.createdAt || account.creationTime
       });
     }
 
@@ -275,6 +296,10 @@ export async function POST(req) {
     const normalizedEmail = email.toLowerCase().trim();
     const assignedRole = role || 'standard';
 
+    if (isProtectedSuperAdmin(normalizedEmail)) {
+      return NextResponse.json({ error: 'Protected Super Admin accounts cannot be created here.' }, { status: 400 });
+    }
+
     if (assignedRole === 'super_admin' && !await isSuperAdminRequest(req)) {
       return NextResponse.json({ error: 'Super Admin access required to create Super Admin accounts.' }, { status: 403 });
     }
@@ -327,11 +352,11 @@ export async function PUT(req) {
 
     const userDoc = await adminDb.collection(getCollectionName('users')).doc(uid).get().catch(() => null);
     const prevRole = userDoc?.data()?.role || 'standard';
-    const targetEmail = userDoc?.data()?.email || uid;
+    const targetEmail = await resolveTargetEmail(adminAuth, userDoc, uid);
 
-    if (uid === 'root_super_admin_fehmatics' || targetEmail?.toLowerCase() === 'fehmatics@gmail.com') {
+    if (isProtectedSuperAdmin(targetEmail, uid)) {
       if (role && role !== 'super_admin') {
-        return NextResponse.json({ error: 'System Root Super Admin role cannot be modified.' }, { status: 400 });
+        return NextResponse.json({ error: 'Protected Super Admin role cannot be modified.' }, { status: 400 });
       }
     }
 
@@ -395,10 +420,10 @@ export async function DELETE(req) {
     }
 
     const userDoc = await adminDb.collection(getCollectionName('users')).doc(uid).get().catch(() => null);
-    const targetEmail = userDoc?.data()?.email || uid;
+    const targetEmail = await resolveTargetEmail(adminAuth, userDoc, uid);
 
-    if (uid === 'root_super_admin_fehmatics' || targetEmail?.toLowerCase() === 'fehmatics@gmail.com') {
-      return NextResponse.json({ error: 'System Root Super Admin account cannot be deleted.' }, { status: 400 });
+    if (isProtectedSuperAdmin(targetEmail, uid)) {
+      return NextResponse.json({ error: 'Protected Super Admin accounts cannot be deleted.' }, { status: 400 });
     }
 
     await adminAuth.deleteUser(uid);

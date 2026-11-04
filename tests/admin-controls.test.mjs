@@ -6,6 +6,7 @@ import path from 'node:path';
 import vm from 'node:vm';
 import { createRequire } from 'node:module';
 import ts from 'typescript';
+import * as firestoreCollections from '../lib/firestoreCollections.mjs';
 import {
   DASHBOARD_FEATURES, DEFAULT_FEATURE_CONFIG, FEATURE_MODES,
   isFeatureEnabled, validateFeatureModes
@@ -26,6 +27,7 @@ const require = createRequire(import.meta.url);
 
 async function loadInstrumentedModule(relativePath, overrides = {}, globals = {}) {
   const file = new URL(relativePath, import.meta.url);
+  const localRequire = createRequire(file);
   const source = await fs.readFile(file, 'utf8');
   const compiled = ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true, jsx: ts.JsxEmit.React }
@@ -33,7 +35,11 @@ async function loadInstrumentedModule(relativePath, overrides = {}, globals = {}
   const sandboxModule = { exports: {} };
   vm.runInNewContext(compiled, {
     module: sandboxModule, exports: sandboxModule.exports,
-    require: name => Object.hasOwn(overrides, name) ? overrides[name] : require(name),
+    require: name => {
+      if (Object.hasOwn(overrides, name)) return overrides[name];
+      if (name.endsWith('/firestoreCollections.mjs') || name === './firestoreCollections.mjs') return firestoreCollections;
+      return localRequire(name);
+    },
     process, console, structuredClone, URL, setTimeout, clearTimeout, ...globals
   }, { filename: file.pathname });
   return sandboxModule.exports;
