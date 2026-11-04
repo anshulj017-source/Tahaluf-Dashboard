@@ -4,6 +4,7 @@ import { isRootSuperAdmin } from '../../../../lib/authConstants.mjs';
 import { getFirebaseAdmin } from '../../../../lib/firebaseAdmin.js';
 import { getAnalyticsSummary, resetAnalyticsData } from '../../../../lib/analyticsService.mjs';
 import { observeApiRequest, withUsageScope } from '../../../../lib/apiUsage.mjs';
+import { getCollectionName } from '../../../../lib/firestoreCollections.mjs';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -27,7 +28,7 @@ async function checkAdmin(req) {
     const userRecord = await adminAuth.getUserByEmail(email).catch(() => null);
     if (!userRecord) return false;
 
-    const userDoc = await adminDb.collection('users').doc(userRecord.uid).get().catch(() => null);
+    const userDoc = await adminDb.collection(getCollectionName('users')).doc(userRecord.uid).get().catch(() => null);
     const data = userDoc?.data() || {};
     return data.role === 'admin' || data.role === 'super_admin' || data.isAdmin === true;
   } catch {

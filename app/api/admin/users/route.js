@@ -3,6 +3,7 @@ import { getFirebaseAdmin } from '../../../../lib/firebaseAdmin';
 import { isAdminRequest, isSuperAdminRequest } from '../../../../lib/requireAdminRequest';
 import { readAdminSetting, updateAdminSetting } from '../../../../lib/adminSettingsStore.mjs';
 import { DEFAULT_FEATURE_CONFIG, isFeatureEnabled } from '../../../../lib/dashboardFeatures.mjs';
+import { getCollectionName } from '../../../../lib/firestoreCollections.mjs';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -74,7 +75,7 @@ export async function GET(req) {
     ]);
 
     // Fetch all user roles from Firestore in a single query instead of sequential roundtrips
-    const usersSnapshot = await adminDb.collection('users').get().catch(() => null);
+    const usersSnapshot = await adminDb.collection(getCollectionName('users')).get().catch(() => null);
     const userRolesMap = new Map();
     if (usersSnapshot && !usersSnapshot.empty) {
       usersSnapshot.forEach(doc => {
@@ -221,7 +222,7 @@ export async function POST(req) {
       if (targetAction.action === 'ROLE_UPDATE' && targetAction.uid && targetAction.previousState?.role) {
         const targetUid = targetAction.uid;
         const restoredRole = targetAction.previousState.role;
-        await adminDb.collection('users').doc(targetUid).set({
+        await adminDb.collection(getCollectionName('users')).doc(targetUid).set({
           role: restoredRole,
           updatedAt: new Date().toISOString()
         }, { merge: true });
@@ -283,7 +284,7 @@ export async function POST(req) {
       password,
     });
 
-    await adminDb.collection('users').doc(userRecord.uid).set({
+    await adminDb.collection(getCollectionName('users')).doc(userRecord.uid).set({
       email: normalizedEmail,
       role: assignedRole,
       createdAt: new Date().toISOString()
@@ -324,7 +325,7 @@ export async function PUT(req) {
       return NextResponse.json({ error: 'UID is required' }, { status: 400 });
     }
 
-    const userDoc = await adminDb.collection('users').doc(uid).get().catch(() => null);
+    const userDoc = await adminDb.collection(getCollectionName('users')).doc(uid).get().catch(() => null);
     const prevRole = userDoc?.data()?.role || 'standard';
     const targetEmail = userDoc?.data()?.email || uid;
 
@@ -339,7 +340,7 @@ export async function PUT(req) {
         return NextResponse.json({ error: 'Super Admin access required to assign Super Admin role.' }, { status: 403 });
       }
 
-      await adminDb.collection('users').doc(uid).set({
+      await adminDb.collection(getCollectionName('users')).doc(uid).set({
         role: role,
         updatedAt: new Date().toISOString()
       }, { merge: true });
@@ -393,7 +394,7 @@ export async function DELETE(req) {
       return NextResponse.json({ error: 'UID is required' }, { status: 400 });
     }
 
-    const userDoc = await adminDb.collection('users').doc(uid).get().catch(() => null);
+    const userDoc = await adminDb.collection(getCollectionName('users')).doc(uid).get().catch(() => null);
     const targetEmail = userDoc?.data()?.email || uid;
 
     if (uid === 'root_super_admin_fehmatics' || targetEmail?.toLowerCase() === 'fehmatics@gmail.com') {
@@ -401,7 +402,7 @@ export async function DELETE(req) {
     }
 
     await adminAuth.deleteUser(uid);
-    await adminDb.collection('users').doc(uid).delete();
+    await adminDb.collection(getCollectionName('users')).doc(uid).delete();
 
     await appendUserAccessHistory({
       author: adminEmail,

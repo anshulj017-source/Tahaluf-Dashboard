@@ -6,6 +6,14 @@ export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 
 BACKUP_URL="https://github.com/itsjohn9-cell/backupdashboard.git"
 REPO="$(git rev-parse --show-toplevel)"
+
+# Security guard: verify this script ONLY executes for Tahaluf Dashboard
+ORIGIN_URL="$(git -C "$REPO" remote get-url origin 2>/dev/null || echo "")"
+if [[ ! "$ORIGIN_URL" =~ (Tahaluf-Dashboard|tahaluf-dashboard) ]]; then
+  echo "[backup] ERROR: backupdashboard is strictly reserved for Tahaluf Dashboard only!" >&2
+  echo "[backup] Refusing to mirror from origin: $ORIGIN_URL" >&2
+  exit 1
+fi
 GIT_DIR_ABS="$(git rev-parse --absolute-git-dir)"
 MIRROR="$GIT_DIR_ABS/backup-mirror"
 SHA="$(git rev-parse "${1:-HEAD}")"

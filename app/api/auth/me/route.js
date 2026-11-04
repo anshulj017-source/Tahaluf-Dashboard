@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getFirebaseAdmin } from '../../../../lib/firebaseAdmin.js';
 import { isRootSuperAdmin } from '../../../../lib/authConstants.mjs';
+import { getCollectionName } from '../../../../lib/firestoreCollections.mjs';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -44,7 +45,7 @@ export async function GET(request) {
 
     // Lookup user in Firestore by UID
     if (uid) {
-      const userDoc = await adminDb.collection('users').doc(uid).get().catch(() => null);
+      const userDoc = await adminDb.collection(getCollectionName('users')).doc(uid).get().catch(() => null);
       if (userDoc && userDoc.exists) {
         const data = userDoc.data() || {};
         const role = data.role || (data.isAdmin ? 'admin' : 'standard');
@@ -54,7 +55,7 @@ export async function GET(request) {
 
     // Lookup user in Firestore by Email if UID lookup didn't match
     if (email) {
-      const emailQuery = await adminDb.collection('users').where('email', '==', email).limit(1).get().catch(() => null);
+      const emailQuery = await adminDb.collection(getCollectionName('users')).where('email', '==', email).limit(1).get().catch(() => null);
       if (emailQuery && !emailQuery.empty) {
         const data = emailQuery.docs[0].data() || {};
         const role = data.role || (data.isAdmin ? 'admin' : 'standard');
@@ -70,7 +71,7 @@ export async function GET(request) {
     const assignedDefaultRole = matchedRule?.role || 'standard';
 
     if (uid && email) {
-      await adminDb.collection('users').doc(uid).set({
+      await adminDb.collection(getCollectionName('users')).doc(uid).set({
         email,
         role: assignedDefaultRole,
         createdAt: new Date().toISOString(),
