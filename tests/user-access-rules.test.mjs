@@ -5,6 +5,8 @@ import vm from 'node:vm';
 import { createRequire } from 'node:module';
 import ts from 'typescript';
 import { readAdminSetting, updateAdminSetting } from '../lib/adminSettingsStore.mjs';
+import { getCollectionName } from '../lib/firestoreCollections.mjs';
+import { isProtectedSuperAdmin, PROTECTED_SUPER_ADMINS } from '../lib/authConstants.mjs';
 
 const require = createRequire(import.meta.url);
 
@@ -51,6 +53,9 @@ test('User Access Domain Rules and Audit History API', async (t) => {
     { uid: 'u1', email: 'alice@tahaluf.com', role: 'admin', lastSignInTime: '2026-10-30T10:00:00Z' },
     { uid: 'u2', email: 'bob@example.com', role: 'standard', lastSignInTime: '2026-10-30T11:00:00Z' }
   ];
+  const authOnlyUsers = [
+    { uid: 'analyticsum-auth-id', email: 'analyticsum2019@gmail.com', role: 'standard', lastSignInTime: '2026-10-30T12:00:00Z' }
+  ];
 
   const mockDb = {
     collection: () => ({
@@ -59,10 +64,12 @@ test('User Access Domain Rules and Audit History API', async (t) => {
         forEach: (fn) => mockUsers.forEach(u => fn({ id: u.uid, data: () => ({ ...u }) }))
       }),
       doc: (id) => ({
-        get: async () => ({
-          exists: true,
-          data: () => mockUsers.find(u => u.uid === id) || { email: `${id}@example.com` }
-        }),
+        get: async () => {
+          const user = mockUsers.find(u => u.uid === id);
+          return user
+            ? { exists: true, data: () => ({ ...user }) }
+            : { exists: false, data: () => undefined };
+        },
         set: async (data, opts) => {
           const idx = mockUsers.findIndex(u => u.uid === id);
           if (idx >= 0) {
@@ -81,12 +88,19 @@ test('User Access Domain Rules and Audit History API', async (t) => {
 
   const mockAuth = {
     listUsers: async () => ({
-      users: mockUsers.map(u => ({
+      users: [...mockUsers, ...authOnlyUsers].map(u => ({
         uid: u.uid,
         email: u.email,
         metadata: { lastSignInTime: u.lastSignInTime }
       }))
     }),
+    getUser: async (uid) => {
+      const user = [...mockUsers, ...authOnlyUsers].find(u => u.uid === uid);
+      if (user) return user;
+      const error = new Error('User not found');
+      error.code = 'auth/user-not-found';
+      throw error;
+    },
     createUser: async ({ email }) => {
       const user = { uid: `new_${Date.now()}`, email, role: 'standard' };
       mockUsers.push(user);
@@ -112,10 +126,12 @@ test('User Access Domain Rules and Audit History API', async (t) => {
   const { DEFAULT_FEATURE_CONFIG, isFeatureEnabled } = await import('../lib/dashboardFeatures.mjs');
 
   const route = await loadInstrumentedModule('../app/api/admin/users/route.js', {
-    '../../../../lib/firebaseAdmin': mockFirebase,
-    '../../../../lib/requireAdminRequest': mockRequireAdmin,
+    '../../../../lib/firebaseAdmin.js': mockFirebase,
+    '../../../../lib/requireAdminRequest.js': mockRequireAdmin,
     '../../../../lib/adminSettingsStore.mjs': { readAdminSetting, updateAdminSetting },
     '../../../../lib/dashboardFeatures.mjs': { DEFAULT_FEATURE_CONFIG, isFeatureEnabled },
+    '../../../../lib/firestoreCollections.mjs': { getCollectionName },
+    '../../../../lib/authConstants.mjs': { isProtectedSuperAdmin, PROTECTED_SUPER_ADMINS },
     'next/server': {
       NextResponse: {
         json: (data, init = {}) => ({
@@ -204,25 +220,30 @@ test('User Access Domain Rules and Audit History API', async (t) => {
     assert.equal(targetUser.role, origRole, 'Role should be rolled back to original in storage');
   });
 
-  await t.test('Root Super Admin fehmatics@gmail.com is permanently visible and protected', async () => {
+  await t.test('protected Super Admin accounts are permanently visible and protected', async () => {
     const req = mockRequest('http://localhost:3000/api/admin/users');
     const res = await route.GET(req);
     assert.equal(res.status, 200);
     const data = await res.json();
-    const rootAdmin = data.users.find(u => u.email === 'fehmatics@gmail.com');
-    assert.ok(rootAdmin, 'fehmatics@gmail.com must be listed in users');
-    assert.equal(rootAdmin.role, 'super_admin');
-    assert.equal(rootAdmin.isFixed, true);
+    for (const email of ['fehmatics@gmail.com', 'analyticsum2019@gmail.com']) {
+      const rootAdmin = data.users.find(user => user.email === email);
+      assert.ok(rootAdmin, `${email} must be listed in users`);
+      assert.equal(rootAdmin.role, 'super_admin');
+      assert.equal(rootAdmin.isFixed, true);
 
-    // Attempting to delete root super admin should fail
-    const delReq = mockRequest('http://localhost:3000/api/admin/users', 'DELETE', { uid: rootAdmin.uid });
-    const delRes = await route.DELETE(delReq);
-    assert.equal(delRes.status, 400);
+      const delReq = mockRequest('http://localhost:3000/api/admin/users', 'DELETE', { uid: rootAdmin.uid });
+      assert.equal((await route.DELETE(delReq)).status, 400, `${email} must not be deletable`);
 
-    // Attempting to demote root super admin should fail
-    const putReq = mockRequest('http://localhost:3000/api/admin/users', 'PUT', { uid: rootAdmin.uid, role: 'standard' });
-    const putRes = await route.PUT(putReq);
-    assert.equal(putRes.status, 400);
+      const putReq = mockRequest('http://localhost:3000/api/admin/users', 'PUT', { uid: rootAdmin.uid, role: 'standard' });
+      assert.equal((await route.PUT(putReq)).status, 400, `${email} must not be demotable`);
+    }
+
+    const createReq = mockRequest('http://localhost:3000/api/admin/users', 'POST', {
+      email: 'ANALYTICSUM2019@gmail.com',
+      password: 'irrelevant-test-value',
+      role: 'super_admin'
+    });
+    assert.equal((await route.POST(createReq)).status, 400, 'protected accounts must not be recreated');
   });
 
   await t.test('admin@tahaluf.com is a standard user manageable in UI', async () => {

@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 import vm from 'node:vm';
 import { createRequire } from 'node:module';
 import ts from 'typescript';
+import * as firestoreCollections from '../lib/firestoreCollections.mjs';
 import * as quotaAlertRules from '../lib/quotaAlertRules.mjs';
 import { createQuotaAlertDispatcher } from '../lib/quotaAlerts.mjs';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -378,6 +379,7 @@ async function load(relativePath, overrides, globals = {}) {
     ...overrides
   };
   const file = new URL(relativePath, import.meta.url);
+  const localRequire = createRequire(file);
   const source = await fs.readFile(file, 'utf8');
   const compiled = ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true, jsx: ts.JsxEmit.React }
@@ -385,7 +387,11 @@ async function load(relativePath, overrides, globals = {}) {
   const sandboxModule = { exports: {} };
   vm.runInNewContext(compiled, {
     module: sandboxModule, exports: sandboxModule.exports,
-    require: name => Object.hasOwn(overrides, name) ? overrides[name] : require(name),
+    require: name => {
+      if (Object.hasOwn(overrides, name)) return overrides[name];
+      if (name.endsWith('/firestoreCollections.mjs') || name === './firestoreCollections.mjs') return firestoreCollections;
+      return localRequire(name);
+    },
     process, console, structuredClone, ...globals
   }, { filename: file.pathname });
   return sandboxModule.exports;
