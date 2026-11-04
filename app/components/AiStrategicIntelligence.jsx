@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Sparkles, TrendingUp, AlertTriangle, Lightbulb, Activity, 
   Sliders, RefreshCw, Layers, Shield, ArrowUpRight, BarChart3, CheckCircle2,
