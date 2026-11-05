@@ -6,7 +6,7 @@ import {
   Check, HelpCircle, Info, Search, Filter, Globe, TrendingUp, TrendingDown, Layers, ShieldCheck
 } from 'lucide-react';
 import { auth } from '../../lib/firebase';
-import { ALLOWED_DAILY_ALERT_LIMITS, ALLOWED_NOTIFICATION_BATCH_WINDOWS, DEFAULT_HEALTH_NOTIFICATION_SETTINGS, getHealthIssues } from '../../lib/healthNotificationUtils.mjs';
+import { ALLOWED_DAILY_ALERT_LIMITS, ALLOWED_NOTIFICATION_BATCH_WINDOWS, DEFAULT_HEALTH_NOTIFICATION_SETTINGS, getHealthIssues, mergeHealthIssues } from '../../lib/healthNotificationUtils.mjs';
 import * as FeatureCtx from './DashboardFeatureContext';
 
 const useLowQuotaMode = typeof FeatureCtx.useLowQuotaMode === 'function' ? FeatureCtx.useLowQuotaMode : () => false;
@@ -372,12 +372,10 @@ export default function DataHealthAdmin({
   const currentIssues = useMemo(() => {
     if (settingsLoading) return [];
     const detectedIssues = getHealthIssues(sheetHealth, dimensionSettings);
-    const activeGroups = new Set(detectedIssues.map(issue => `${issue.eventId}:${issue.kind}:${issue.category}`));
     const retainedIssues = persistedIssues.filter(issue =>
-      !activeGroups.has(`${issue.eventId}:${issue.kind}:${issue.category}`) &&
       !isIssueIgnored(issue, dimensionSettings)
     );
-    return [...detectedIssues, ...retainedIssues];
+    return mergeHealthIssues(detectedIssues, retainedIssues);
   }, [sheetHealth, dimensionSettings, persistedIssues, settingsLoading]);
 
   const activeActivityIssues = useMemo(() => {

@@ -8,7 +8,7 @@ import {
   markIssueIgnoredInHistory,
   markIssueUnignoredInHistory
 } from '../../../../lib/healthNotifications.mjs';
-import { getHealthIssues, normalizeHealthNotificationSettings } from '../../../../lib/healthNotificationUtils.mjs';
+import { getHealthIssues, mergeHealthIssues, normalizeHealthNotificationSettings } from '../../../../lib/healthNotificationUtils.mjs';
 import { isAdminRequest } from '../../../../lib/requireAdminRequest.js';
 import { GET as getEventsHealth } from '../events/route.js';
 import { getSmtpTransportConfig } from '../../../../lib/healthEmailTransport.mjs';
@@ -54,22 +54,20 @@ export async function GET(request) {
     await reconcileDisabledHealthChecks();
     const state = await getHealthNotificationState();
     const dimensionSettings = await getDimensionSettings();
-    let issues = Object.values(state.activeIssues || {})
+    const persistedIssues = Object.values(state.activeIssues || {})
       .map(item => item.issue)
       .filter(Boolean);
+    let issues = persistedIssues;
     if (new URL(request.url).searchParams.get('includeHealth') === 'true') {
       const healthResponse = await getEventsHealth(new Request('http://localhost/api/admin/events?inspectOnly=true'));
       const healthPayload = await healthResponse.json();
       if (!healthResponse.ok || !healthPayload.success) {
         throw new Error(healthPayload.error || 'Could not load event health.');
       }
-      issues = getHealthIssues(healthPayload.sheetHealth || [], dimensionSettings);
       const currentIssues = getHealthIssues(healthPayload.sheetHealth || [], dimensionSettings);
-      const currentGroups = new Set(currentIssues.map(issue => `${issue.eventId}:${issue.kind}:${issue.category}`));
-      const retainedIssues = issues.filter(issue =>
-        !currentGroups.has(`${issue.eventId}:${issue.kind}:${issue.category}`)
-      );
-      issues = [...currentIssues, ...retainedIssues];
+      issues = mergeHealthIssues(currentIssues, persistedIssues);
+    } else {
+      issues = mergeHealthIssues([], persistedIssues);
     }
     return NextResponse.json({
       success: true,
