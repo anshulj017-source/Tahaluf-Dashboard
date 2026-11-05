@@ -11,7 +11,13 @@ import * as FeatureCtx from './DashboardFeatureContext';
 
 const useLowQuotaMode = typeof FeatureCtx.useLowQuotaMode === 'function' ? FeatureCtx.useLowQuotaMode : () => false;
 const useDashboardFeature = typeof FeatureCtx.useDashboardFeature === 'function' ? FeatureCtx.useDashboardFeature : () => true;
-import { DIMENSIONS, AVAILABLE_METRICS as EXPORTED_METRICS, DEFAULT_DIMENSION_SETTINGS, isIssueIgnored } from '../../lib/dimensionStandards.mjs';
+import {
+  DIMENSIONS,
+  AVAILABLE_METRICS as EXPORTED_METRICS,
+  DEFAULT_DIMENSION_SETTINGS,
+  isHealthIssueIgnoreActive,
+  isIssueIgnored
+} from '../../lib/dimensionStandards.mjs';
 import DimensionFindings from './DimensionFindings';
 import { AdminTabs, useAdminDirtyGuard, useAdminView } from './AdminUI';
 
@@ -55,6 +61,7 @@ const summarizeIssue = (issue) => {
 };
 
 const getStatus = (source, dimensionSettings = null) => {
+  if (source.eventStatus === 'paused' || source.eventStatus === 'ended') return source.eventStatus;
   if (source.monitoringEnabled === false) return 'disabled';
   const dimensionChecksActive = source.kind === 'Actuals' && Boolean(source.dimensionHealth) && source.dimensionHealth.status !== 'disabled';
   if (source.sheetChecksEnabled === false && source.metricChecksEnabled === false && !dimensionChecksActive) return 'disabled';
@@ -97,6 +104,8 @@ const getStatus = (source, dimensionSettings = null) => {
 
 const statusPresentation = {
   disabled: { label: 'Checks disabled', className: 'text-gray-300 border-gray-500/30 bg-gray-500/10' },
+  paused: { label: 'Event paused', className: 'text-amber-300 border-amber-400/40 bg-amber-500/10' },
+  ended: { label: 'Event ended', className: 'text-slate-300 border-slate-400/40 bg-slate-500/10' },
   healthy: { label: 'Healthy', className: 'text-lime-300 border-lime-400/30 bg-lime-500/10' },
   stale: { label: 'Serving saved data', className: 'text-amber-300 border-amber-400/30 bg-amber-500/10' },
   unavailable: { label: 'Unavailable', className: 'text-red-300 border-red-400/30 bg-red-500/10' },
@@ -147,6 +156,8 @@ export default function DataHealthAdmin({
   const [settings, setSettings] = useState(DEFAULT_HEALTH_NOTIFICATION_SETTINGS);
   const [emailConfigured, setEmailConfigured] = useState(false);
   const [issueHistory, setIssueHistory] = useState([]);
+  const [persistedIssues, setPersistedIssues] = useState([]);
+  const [ignoreDurationDays, setIgnoreDurationDays] = useState(1);
   const [loading, setLoading] = useState(true);
   const [settingsLoading, setSettingsLoading] = useState(true);
   const [savingSettings, setSavingSettings] = useState(false);
@@ -256,7 +267,10 @@ export default function DataHealthAdmin({
     try {
       const response = await fetch('/api/admin/health-notifications', { headers: await getAdminHeaders() });
       const result = await response.json();
-      if (response.ok && result.success) setIssueHistory(result.history || []);
+      if (response.ok && result.success) {
+        setIssueHistory(result.history || []);
+        setPersistedIssues(result.issues || []);
+      }
     } catch (historyError) {
       console.error(historyError);
     }
@@ -353,8 +367,14 @@ export default function DataHealthAdmin({
   const totalDiscrepancies = useMemo(() => sheetHealth.reduce((sum, s) => sum + (s.metricDiscrepancies?.length || 0), 0), [sheetHealth]);
   const currentIssues = useMemo(() => {
     if (settingsLoading) return [];
-    return getHealthIssues(sheetHealth, dimensionSettings);
-  }, [sheetHealth, dimensionSettings, settingsLoading]);
+    const detectedIssues = getHealthIssues(sheetHealth, dimensionSettings);
+    const activeGroups = new Set(detectedIssues.map(issue => `${issue.eventId}:${issue.kind}:${issue.category}`));
+    const retainedIssues = persistedIssues.filter(issue =>
+      !activeGroups.has(`${issue.eventId}:${issue.kind}:${issue.category}`) &&
+      !isIssueIgnored(issue, dimensionSettings)
+    );
+    return [...detectedIssues, ...retainedIssues];
+  }, [sheetHealth, dimensionSettings, persistedIssues, settingsLoading]);
 
   const activeActivityIssues = useMemo(() => {
     return currentIssues.filter(i => i.category === 'activity' || ['spend-cliff', 'activity-halt'].includes(i.status));
@@ -915,7 +935,7 @@ export default function DataHealthAdmin({
     }
   };
 
-  const handleIgnoreIssue = async (issue, reason = '') => {
+  const handleIgnoreIssue = async (issue, reason = '', durationDays = ignoreDurationDays) => {
     setDimensionBusy(true);
     setDimensionNotice(null);
     try {
@@ -932,7 +952,8 @@ export default function DataHealthAdmin({
           message: issue.message,
           category: issue.category,
           dimensionFindings: issue.dimensionFindings,
-          reason: reason || `Ignored ${issue.category || 'health'} issue: ${issue.status}`
+          reason: reason || `Ignored ${issue.category || 'health'} issue: ${issue.status} for ${durationDays} day${durationDays === 1 ? '' : 's'}`,
+          durationDays
         })
       });
       const result = await response.json();
@@ -942,7 +963,7 @@ export default function DataHealthAdmin({
       }
       setDimensionNotice({
         type: 'success',
-        text: `Issue "${issue.eventName} (${issue.status})" ignored and recorded in version history. It will not be raised again.`
+        text: `Issue "${issue.eventName} (${issue.status})" ignored for ${durationDays} day${durationDays === 1 ? '' : 's'}. It will be checked again automatically after the ignore period.`
       });
       await Promise.all([reloadHealth(true), reloadHistory()]);
     } catch (err) {
@@ -1132,6 +1153,41 @@ export default function DataHealthAdmin({
     }
   };
 
+  const setEventActivityStatus = async (event, status) => {
+    setDimensionBusy(true);
+    setEventCheckNotice(null);
+    try {
+      const actuals = event.sources.find(source => source.kind === 'Actuals');
+      const response = await fetch('/api/admin/health-notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...await getAdminHeaders() },
+        body: JSON.stringify({
+          action: 'set-event-activity-status',
+          eventId: event.eventId,
+          status,
+          lastDataDate: actuals?.lastDataDate || null,
+          eventRows: actuals?.eventRows || 0
+        })
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.error || 'Could not update event activity status.');
+      setDimensionSettings(result.dimensionSettings);
+      await Promise.all([reloadHealth(true), reloadHistory()]);
+      setEventCheckNotice({
+        eventId: event.eventId,
+        error: false,
+        text: status === 'active'
+          ? 'Event alerts resumed.'
+          : `Event alerts ignored while marked ${status}. New event data will resume checks automatically.`
+      });
+    } catch (statusError) {
+      console.error(statusError);
+      setEventCheckNotice({ eventId: event.eventId, error: true, text: statusError.message });
+    } finally {
+      setDimensionBusy(false);
+    }
+  };
+
   const historyCategory = item => item.category || (item.dimensionFindings?.length || String(item.status || '').includes('dimension') ? 'dimensions' : String(item.status || '').includes('metric') ? 'metrics' : 'feed');
   const overviewEvents = [...new Set(currentIssues.map(issue => issue.eventName).filter(Boolean))].sort();
   const filteredOverviewIssues = currentIssues.filter(issue =>
@@ -1153,6 +1209,7 @@ export default function DataHealthAdmin({
   const historyPageCount = Math.max(1, Math.ceil(filteredHistory.length / historyPageSize));
   const visibleHistoryPage = Math.min(historyPage, historyPageCount - 1);
   const visibleHistory = filteredHistory.slice(visibleHistoryPage * historyPageSize, (visibleHistoryPage + 1) * historyPageSize);
+  const activeIgnoredIssues = (dimensionSettings.ignoredIssues || []).filter(entry => isHealthIssueIgnoreActive(entry));
   const filteredEvents = eventGroups.filter(event => {
     const query = eventSearch.trim().toLowerCase();
     if (query && !event.eventName.toLowerCase().includes(query) && !event.eventId.toLowerCase().includes(query)) return false;
@@ -1226,7 +1283,7 @@ export default function DataHealthAdmin({
             <ul className="list-disc list-inside space-y-1 text-[11px] text-slate-300">
               <li><strong>Monitored Metrics:</strong> Enable/disable metrics, adjust drop tolerances, or add custom metrics.</li>
               <li><strong>Monitored Dimensions:</strong> Select dimensions to validate and add custom accepted values.</li>
-              <li><strong>Issue Suppression:</strong> Ignore blanks or specific raised issues permanently.</li>
+              <li><strong>Issue Suppression:</strong> Ignore individual issues for up to five days; event-level pauses and endings automatically clear when new Actuals data arrives.</li>
             </ul>
           </div>
         </div>
@@ -1267,14 +1324,20 @@ export default function DataHealthAdmin({
                   <span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${statusPresentation[issue.status]?.className || 'border-amber-400/30 text-amber-200'}`}>{statusPresentation[issue.status]?.label || issue.status}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
+                  <label className="flex items-center gap-1 text-[10px] text-slate-400">
+                    <span>Ignore</span>
+                    <select aria-label={`Ignore ${issue.eventName} for`} value={ignoreDurationDays} onChange={event => setIgnoreDurationDays(Number(event.target.value))} className="rounded border border-white/10 bg-[#041628] px-1.5 py-1 text-[11px] text-white">
+                      {[1, 2, 3, 4, 5].map(days => <option key={days} value={days}>{days} day{days === 1 ? '' : 's'}</option>)}
+                    </select>
+                  </label>
                   <button
                     type="button"
                     disabled={dimensionBusy}
-                    onClick={() => handleIgnoreIssue(issue)}
+                    onClick={() => handleIgnoreIssue(issue, '', ignoreDurationDays)}
                     className="rounded border border-amber-400/30 bg-amber-500/10 px-2 py-1 text-[11px] font-medium text-amber-200 hover:bg-amber-500/20 disabled:opacity-50"
                     title="Ignore this issue and record in version history"
                   >
-                    Ignore issue
+                    Ignore
                   </button>
                 </div>
               </div>
@@ -1580,6 +1643,8 @@ export default function DataHealthAdmin({
             const eventIssues = currentIssues.filter(issue => issue.eventId === event.eventId);
             const drafts = eventCheckDrafts[event.eventId] || dimensionSettings.eventChecks?.[event.eventId] || {};
             const selectedChecks = { monitoringEnabled: true, sheetChecksEnabled: true, metricChecksEnabled: true, dimensionChecksEnabled: true, activityChecksEnabled: true, ...drafts };
+            const eventActivityStatus = event.sources.find(source => source.kind === 'Actuals')?.eventStatus ||
+              dimensionSettings.eventStatuses?.[event.eventId]?.status || 'active';
             return <details key={event.eventId} className="rounded-xl border border-white/10 bg-[#071d33]" open={filteredEvents.length === 1}>
               <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-2 p-3"><span className="font-semibold text-white">{event.eventName}</span><span className="flex flex-wrap gap-2">{event.sources.map(source => { const p = statusPresentation[getStatus(source, dimensionSettings)] || statusPresentation.unknown; return <span key={source.kind} className={`rounded-full border px-2 py-0.5 text-[10px] ${p.className}`}>{source.kind}: {p.label}</span>; })}<span className="text-xs text-slate-400">{eventIssues.length} issue{eventIssues.length === 1 ? '' : 's'}</span></span></summary>
               <div className="space-y-3 border-t border-white/10 p-3">
@@ -1589,14 +1654,20 @@ export default function DataHealthAdmin({
                     <p className="mt-1">{summarizeIssue(issue)}</p>
                     {issue.dimensionFindings?.length > 0 && <p className="mt-1 text-[10px] text-slate-400">Expand Dimension checks in the {issue.kind} source below to review findings.</p>}
                   </div>
+                  <label className="flex items-center gap-1 text-[10px] text-slate-400">
+                    <span>Ignore</span>
+                    <select aria-label={`Ignore ${issue.eventName} for`} value={ignoreDurationDays} onChange={change => setIgnoreDurationDays(Number(change.target.value))} className="rounded border border-white/10 bg-[#041628] px-1.5 py-1 text-[11px] text-white">
+                      {[1, 2, 3, 4, 5].map(days => <option key={days} value={days}>{days} day{days === 1 ? '' : 's'}</option>)}
+                    </select>
+                  </label>
                   <button
                     type="button"
                     disabled={dimensionBusy}
-                    onClick={() => handleIgnoreIssue(issue)}
+                    onClick={() => handleIgnoreIssue(issue, '', ignoreDurationDays)}
                     className="rounded border border-amber-400/30 bg-amber-500/10 px-2 py-1 text-[11px] font-medium text-amber-200 hover:bg-amber-500/20 disabled:opacity-50"
                     title="Ignore this issue and record in version history"
                   >
-                    Ignore issue
+                    Ignore
                   </button>
                 </div>)}
                 <fieldset disabled={settingsLoading || savingEventChecks !== null} className="rounded-lg border border-white/10 bg-[#031120]/60 p-3">
@@ -1614,6 +1685,20 @@ export default function DataHealthAdmin({
                         <span>{label}{reason && <span className="mt-0.5 block text-[10px] text-amber-200">Effective status: {reason}</span>}</span>
                       </label>;
                     })}
+                  </div>
+                  <div className="mt-3 rounded-lg border border-amber-400/20 bg-amber-500/5 p-3">
+                    <p className="mb-2 text-[10px] text-slate-300">Pause or end suppresses all health issues for this event. Checks resume automatically when newer event rows arrive.</p>
+                    <div className="flex flex-wrap gap-4">
+                      <label className="flex items-center gap-2 text-xs text-slate-200">
+                        <input type="checkbox" aria-label={`${event.eventName}: Event paused`} checked={eventActivityStatus === 'paused'} disabled={dimensionBusy} onChange={change => setEventActivityStatus(event, change.target.checked ? 'paused' : 'active')} className="accent-[#cedc28]" />
+                        Event paused
+                      </label>
+                      <label className="flex items-center gap-2 text-xs text-slate-200">
+                        <input type="checkbox" aria-label={`${event.eventName}: Event ended`} checked={eventActivityStatus === 'ended'} disabled={dimensionBusy} onChange={change => setEventActivityStatus(event, change.target.checked ? 'ended' : 'active')} className="accent-[#cedc28]" />
+                        Event ended / over
+                      </label>
+                      {eventActivityStatus !== 'active' && <span className="text-[10px] text-amber-200">Event is marked {eventActivityStatus}; alerts are suppressed.</span>}
+                    </div>
                   </div>
                   <div className="mt-3 flex flex-wrap items-center gap-3"><button type="button" onClick={() => saveEventChecks(event.eventId, selectedChecks)} className="rounded-lg border border-[#14a6d9]/40 px-3 py-2 text-xs font-semibold text-[#6bd5f7] disabled:opacity-50">{savingEventChecks === event.eventId ? 'Saving…' : `Save ${event.eventName} checks`}</button>{eventCheckNotice?.eventId === event.eventId && <span role={eventCheckNotice.error ? 'alert' : 'status'} className={`text-xs ${eventCheckNotice.error ? 'text-red-300' : 'text-lime-300'}`}>{eventCheckNotice.text}</span>}</div>
                 </fieldset>
@@ -2323,7 +2408,7 @@ export default function DataHealthAdmin({
             </div>
 
             {/* Ignored Issues & Blank Exemptions Manager */}
-            {((dimensionSettings.ignoredIssues?.length || 0) > 0 ||
+            {(activeIgnoredIssues.length > 0 ||
               Object.keys(dimensionSettings.ignoreBlanksByDimension || {}).some(k => dimensionSettings.ignoreBlanksByDimension[k]) ||
               Object.keys(dimensionSettings.ignoreBlanksByEventDimension || {}).length > 0) && (
               <div className="mt-4 rounded-xl border border-white/10 bg-[#041628]/90 p-4 space-y-3">
@@ -2388,16 +2473,19 @@ export default function DataHealthAdmin({
                 )}
 
                 {/* Ignored specific issues */}
-                {(dimensionSettings.ignoredIssues || []).length > 0 && (
+                {activeIgnoredIssues.length > 0 && (
                   <div className="space-y-1.5">
-                    <div className="text-[11px] font-semibold text-slate-300">Ignored Health Issues ({dimensionSettings.ignoredIssues.length}):</div>
+                    <div className="text-[11px] font-semibold text-slate-300">Ignored Health Issues ({activeIgnoredIssues.length}):</div>
                     <div className="flex flex-wrap gap-1.5">
-                      {(dimensionSettings.ignoredIssues || []).map(item => {
+                      {activeIgnoredIssues.map(item => {
                         const key = typeof item === 'string' ? item : item.key;
                         const label = typeof item === 'object' && item.eventName ? `${item.eventName} (${item.status})` : key;
+                        const expiration = typeof item === 'object' && item.expiresAt
+                          ? ` · until ${formatTimestamp(item.expiresAt)}`
+                          : '';
                         return (
                           <span key={key} className="inline-flex items-center gap-1.5 rounded bg-amber-500/10 border border-amber-400/40 px-2.5 py-1 text-xs text-amber-200">
-                            <span>{label}</span>
+                            <span>{label}{expiration}</span>
                             <button
                               type="button"
                               disabled={dimensionBusy}

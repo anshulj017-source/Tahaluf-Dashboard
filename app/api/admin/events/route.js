@@ -16,7 +16,7 @@ import {
 } from '../../../../lib/sheetCache.mjs';
 import { GET as refreshSheet } from '../../sheets/route';
 import { withUsageScope } from '../../../../lib/apiUsage.mjs';
-import { summarizeDimensions, getDimensionSettings } from '../../../../lib/dimensionMonitoring.mjs';
+import { summarizeDimensions, getDimensionSettings, clearResumedEventStatuses } from '../../../../lib/dimensionMonitoring.mjs';
 import { dimensionHealthForSource, applyHealthCheckSettings, eventHealthChecks } from '../../../../lib/dimensionStandards.mjs';
 
 export const dynamic = 'force-dynamic';
@@ -181,7 +181,7 @@ async function getEvents(request) {
         })
       );
     }
-    const sheetHealth = dataSources.map(source => applyHealthCheckSettings({
+    const rawSheetHealth = dataSources.map(source => ({
       ...source,
       ...(source.cacheKey
         ? healthByKey[source.cacheKey]
@@ -195,7 +195,19 @@ async function getEvents(request) {
           }),
       ...(source.cacheKey ? getEventDataStats(source, healthByKey[source.cacheKey] || {}) : {}),
       dimensionHealth: dimensionHealthForSource(source, healthByKey[source.cacheKey]?.dimensionValidation, checkSettings)
-    }, checkSettings));
+    }));
+    const resumedSettings = await clearResumedEventStatuses(rawSheetHealth
+      .filter(source =>
+        source.kind === 'Actuals' &&
+        ['paused', 'ended'].includes(checkSettings.eventStatuses?.[source.eventId]?.status)
+      )
+      .map(source => ({
+        eventId: source.eventId,
+        lastDataDate: source.lastDataDate,
+        eventRows: source.eventRows
+      })));
+    if (resumedSettings) checkSettings = resumedSettings;
+    const sheetHealth = rawSheetHealth.map(source => applyHealthCheckSettings(source, checkSettings));
     return NextResponse.json({
       success: true,
       config,

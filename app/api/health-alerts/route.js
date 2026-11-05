@@ -3,7 +3,7 @@ import { GET as getEventsHealth } from '../admin/events/route.js';
 import { getHealthIssues } from '../../../lib/healthNotificationUtils.mjs';
 import { getDimensionSettings } from '../../../lib/dimensionMonitoring.mjs';
 import { getHealthNotificationState } from '../../../lib/healthNotifications.mjs';
-import { isIssueIgnored } from '../../../lib/dimensionStandards.mjs';
+import { isHealthCheckEnabled, isIssueIgnored } from '../../../lib/dimensionStandards.mjs';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,6 +14,9 @@ function formatIssueHeadline(issue) {
   }
   if (issue.status === 'spend-cliff') {
     const drop = issue.anomalyDetails?.dropPercent != null ? `${issue.anomalyDetails.dropPercent}%` : '≥ 40%';
+    if (issue.anomalyDetails?.partialDay) {
+      return `Spend Pace Alert: ${ev} is ${drop} below expected pace`;
+    }
     return `Spend Cliff Detected: ${ev} Daily Spend Dropped by ${drop}`;
   }
   if (issue.status === 'missing-data') {
@@ -65,7 +68,14 @@ export async function GET() {
     }
 
     const rawIssues = getHealthIssues(healthPayload.sheetHealth || [], dimensionSettings);
-    const activeIssues = rawIssues.filter(issue => !isIssueIgnored(issue, dimensionSettings));
+    const currentGroups = new Set(rawIssues.map(issue => `${issue.eventId}:${issue.kind}:${issue.category}`));
+    const retainedIssues = Object.values(state?.activeIssues || {})
+      .map(item => item.issue)
+      .filter(issue => issue &&
+        !currentGroups.has(`${issue.eventId}:${issue.kind}:${issue.category}`) &&
+        isHealthCheckEnabled(issue, dimensionSettings));
+    const activeIssues = [...rawIssues, ...retainedIssues]
+      .filter(issue => !isIssueIgnored(issue, dimensionSettings));
 
     const formattedIssues = activeIssues.map(issue => {
       const severity = issue.severity || (
@@ -113,4 +123,3 @@ export async function GET() {
     }, { status: 500 });
   }
 }
-
