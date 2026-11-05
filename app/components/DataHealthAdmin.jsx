@@ -6,7 +6,7 @@ import {
   Check, HelpCircle, Info, Search, Filter, Globe, TrendingUp, TrendingDown, Layers, ShieldCheck
 } from 'lucide-react';
 import { auth } from '../../lib/firebase';
-import { DEFAULT_HEALTH_NOTIFICATION_SETTINGS, getHealthIssues } from '../../lib/healthNotificationUtils.mjs';
+import { ALLOWED_DAILY_ALERT_LIMITS, ALLOWED_NOTIFICATION_BATCH_WINDOWS, DEFAULT_HEALTH_NOTIFICATION_SETTINGS, getHealthIssues } from '../../lib/healthNotificationUtils.mjs';
 import * as FeatureCtx from './DashboardFeatureContext';
 
 const useLowQuotaMode = typeof FeatureCtx.useLowQuotaMode === 'function' ? FeatureCtx.useLowQuotaMode : () => false;
@@ -15,6 +15,7 @@ import {
   DIMENSIONS,
   AVAILABLE_METRICS as EXPORTED_METRICS,
   DEFAULT_DIMENSION_SETTINGS,
+  HEALTH_ISSUE_IGNORE_PERIODS,
   isHealthIssueIgnoreActive,
   isIssueIgnored
 } from '../../lib/dimensionStandards.mjs';
@@ -42,6 +43,8 @@ function formatMetricVal(metricId, val, unit = '') {
 const formatTimestamp = (value) => value
   ? new Date(value).toLocaleString()
   : 'Never';
+
+const getIgnorePeriodLabel = value => HEALTH_ISSUE_IGNORE_PERIODS.find(option => option.value === value)?.label || value;
 
 const formatDuration = (from, to) => {
   const minutes = Math.max(0, Math.round((Date.parse(to) - Date.parse(from)) / 60000));
@@ -105,7 +108,7 @@ const getStatus = (source, dimensionSettings = null) => {
 const statusPresentation = {
   disabled: { label: 'Checks disabled', className: 'text-gray-300 border-gray-500/30 bg-gray-500/10' },
   paused: { label: 'Event paused', className: 'text-amber-300 border-amber-400/40 bg-amber-500/10' },
-  ended: { label: 'Event ended', className: 'text-slate-300 border-slate-400/40 bg-slate-500/10' },
+  ended: { label: 'Event completed', className: 'text-slate-300 border-slate-400/40 bg-slate-500/10' },
   healthy: { label: 'Healthy', className: 'text-lime-300 border-lime-400/30 bg-lime-500/10' },
   stale: { label: 'Serving saved data', className: 'text-amber-300 border-amber-400/30 bg-amber-500/10' },
   unavailable: { label: 'Unavailable', className: 'text-red-300 border-red-400/30 bg-red-500/10' },
@@ -157,7 +160,7 @@ export default function DataHealthAdmin({
   const [emailConfigured, setEmailConfigured] = useState(false);
   const [issueHistory, setIssueHistory] = useState([]);
   const [persistedIssues, setPersistedIssues] = useState([]);
-  const [ignoreDurationDays, setIgnoreDurationDays] = useState(1);
+  const [ignoreDuration, setIgnoreDuration] = useState('1d');
   const [loading, setLoading] = useState(true);
   const [settingsLoading, setSettingsLoading] = useState(true);
   const [savingSettings, setSavingSettings] = useState(false);
@@ -190,6 +193,7 @@ export default function DataHealthAdmin({
   const auditExportAllowed = useDashboardFeature('auditExport');
   const pacingGuardianAllowed = useDashboardFeature('pacingGuardian');
   const budgetReconciliationAllowed = useDashboardFeature('budgetReconciliation');
+  const eventActivityControlsAllowed = useDashboardFeature('eventActivityControls');
   const [savedSettings, setSavedSettings] = useState(DEFAULT_HEALTH_NOTIFICATION_SETTINGS);
   const [savedDimensionDraft, setSavedDimensionDraft] = useState('');
   const [eventSearch, setEventSearch] = useState('');
@@ -935,7 +939,7 @@ export default function DataHealthAdmin({
     }
   };
 
-  const handleIgnoreIssue = async (issue, reason = '', durationDays = ignoreDurationDays) => {
+  const handleIgnoreIssue = async (issue, reason = '', duration = ignoreDuration) => {
     setDimensionBusy(true);
     setDimensionNotice(null);
     try {
@@ -952,8 +956,8 @@ export default function DataHealthAdmin({
           message: issue.message,
           category: issue.category,
           dimensionFindings: issue.dimensionFindings,
-          reason: reason || `Ignored ${issue.category || 'health'} issue: ${issue.status} for ${durationDays} day${durationDays === 1 ? '' : 's'}`,
-          durationDays
+          reason: reason || `Ignored ${issue.category || 'health'} issue: ${issue.status} for ${getIgnorePeriodLabel(duration)}`,
+          duration
         })
       });
       const result = await response.json();
@@ -963,7 +967,7 @@ export default function DataHealthAdmin({
       }
       setDimensionNotice({
         type: 'success',
-        text: `Issue "${issue.eventName} (${issue.status})" ignored for ${durationDays} day${durationDays === 1 ? '' : 's'}. It will be checked again automatically after the ignore period.`
+        text: `Issue "${issue.eventName} (${issue.status})" ignored for ${getIgnorePeriodLabel(duration)}. It will be checked again automatically after the ignore period.`
       });
       await Promise.all([reloadHealth(true), reloadHistory()]);
     } catch (err) {
@@ -1188,6 +1192,39 @@ export default function DataHealthAdmin({
     }
   };
 
+  const renderIssueEventControls = issue => {
+    if (!eventActivityControlsAllowed || !issue.eventId) return null;
+    const event = eventGroups.find(group => group.eventId === issue.eventId);
+    if (!event) return null;
+    const actuals = event.sources.find(source => source.kind === 'Actuals');
+    const status = actuals?.eventStatus || dimensionSettings.eventStatuses?.[event.eventId]?.status || 'active';
+    return (
+      <div className="flex flex-wrap items-center gap-1.5" aria-label={`${issue.eventName} event status controls`}>
+        {status !== 'paused' && <button
+          type="button"
+          aria-label={`Pause ${issue.eventName}`}
+          disabled={dimensionBusy}
+          onClick={() => setEventActivityStatus(event, 'paused')}
+          className="rounded border border-amber-400/30 bg-amber-500/10 px-2 py-1 text-[11px] font-medium text-amber-200 hover:bg-amber-500/20 disabled:opacity-50"
+        >Pause event</button>}
+        {status !== 'ended' && <button
+          type="button"
+          aria-label={`Close ${issue.eventName}`}
+          disabled={dimensionBusy}
+          onClick={() => setEventActivityStatus(event, 'ended')}
+          className="rounded border border-slate-400/30 bg-slate-500/10 px-2 py-1 text-[11px] font-medium text-slate-200 hover:bg-slate-500/20 disabled:opacity-50"
+        >Close event</button>}
+        {status !== 'active' && <button
+          type="button"
+          aria-label={`Resume ${issue.eventName}`}
+          disabled={dimensionBusy}
+          onClick={() => setEventActivityStatus(event, 'active')}
+          className="rounded border border-lime-400/30 bg-lime-500/10 px-2 py-1 text-[11px] font-medium text-lime-200 hover:bg-lime-500/20 disabled:opacity-50"
+        >Resume event</button>}
+      </div>
+    );
+  };
+
   const historyCategory = item => item.category || (item.dimensionFindings?.length || String(item.status || '').includes('dimension') ? 'dimensions' : String(item.status || '').includes('metric') ? 'metrics' : 'feed');
   const overviewEvents = [...new Set(currentIssues.map(issue => issue.eventName).filter(Boolean))].sort();
   const filteredOverviewIssues = currentIssues.filter(issue =>
@@ -1218,6 +1255,8 @@ export default function DataHealthAdmin({
     if (eventStatusFilter === 'issues' && issues.length === 0) return false;
     if (eventStatusFilter === 'healthy' && event.sources.every(source => getStatus(source, dimensionSettings) !== 'healthy')) return false;
     if (eventStatusFilter === 'disabled' && event.sources.every(source => getStatus(source, dimensionSettings) !== 'disabled')) return false;
+    if (eventStatusFilter === 'paused' && event.sources.every(source => getStatus(source, dimensionSettings) !== 'paused')) return false;
+    if (eventStatusFilter === 'completed' && event.sources.every(source => getStatus(source, dimensionSettings) !== 'ended')) return false;
     if (eventCategoryFilter !== 'all' && !issues.some(issue => issue.category === eventCategoryFilter)) return false;
     return true;
   });
@@ -1283,7 +1322,7 @@ export default function DataHealthAdmin({
             <ul className="list-disc list-inside space-y-1 text-[11px] text-slate-300">
               <li><strong>Monitored Metrics:</strong> Enable/disable metrics, adjust drop tolerances, or add custom metrics.</li>
               <li><strong>Monitored Dimensions:</strong> Select dimensions to validate and add custom accepted values.</li>
-              <li><strong>Issue Suppression:</strong> Ignore individual issues for up to five days; event-level pauses and endings automatically clear when new Actuals data arrives.</li>
+              <li><strong>Issue Suppression:</strong> Ignore individual issues for up to five days or one calendar week, month, quarter, or year. Event pause/completion controls are managed separately in Events and automatically clear when new Actuals data arrives.</li>
             </ul>
           </div>
         </div>
@@ -1315,7 +1354,7 @@ export default function DataHealthAdmin({
               <label className="text-[10px] font-semibold uppercase text-slate-400">Event<select value={overviewEventFilter} onChange={event => { setOverviewEventFilter(event.target.value); setOverviewIssuePage(0); }} className="mt-1 w-full rounded-lg border border-white/10 bg-[#041628] px-3 py-2 text-xs normal-case text-white"><option value="all">All events</option>{overviewEvents.map(name => <option key={name} value={name}>{name}</option>)}</select></label>
               <label className="text-[10px] font-semibold uppercase text-slate-400">Issue category<select value={overviewCategoryFilter} onChange={event => { setOverviewCategoryFilter(event.target.value); setOverviewIssuePage(0); }} className="mt-1 w-full rounded-lg border border-white/10 bg-[#041628] px-3 py-2 text-xs normal-case text-white"><option value="all">All categories</option><option value="feed">Feed / sheet</option><option value="metrics">Metrics</option><option value="dimensions">Dimensions</option><option value="activity">Activity & Velocity</option></select></label>
             </div>
-            <ul className="mt-3 space-y-2">
+            <ul id="overview-issue-list" className="mt-3 space-y-2">
             {visibleOverviewIssues.map(issue => <li key={issue.key} className="rounded-lg border border-white/10 bg-[#031120]/70 p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex flex-wrap items-center gap-2">
@@ -1324,16 +1363,17 @@ export default function DataHealthAdmin({
                   <span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${statusPresentation[issue.status]?.className || 'border-amber-400/30 text-amber-200'}`}>{statusPresentation[issue.status]?.label || issue.status}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
+                  {renderIssueEventControls(issue)}
                   <label className="flex items-center gap-1 text-[10px] text-slate-400">
                     <span>Ignore</span>
-                    <select aria-label={`Ignore ${issue.eventName} for`} value={ignoreDurationDays} onChange={event => setIgnoreDurationDays(Number(event.target.value))} className="rounded border border-white/10 bg-[#041628] px-1.5 py-1 text-[11px] text-white">
-                      {[1, 2, 3, 4, 5].map(days => <option key={days} value={days}>{days} day{days === 1 ? '' : 's'}</option>)}
+                    <select aria-label={`Ignore ${issue.eventName} for`} value={ignoreDuration} onChange={event => setIgnoreDuration(event.target.value)} className="rounded border border-white/10 bg-[#041628] px-1.5 py-1 text-[11px] text-white">
+                      {HEALTH_ISSUE_IGNORE_PERIODS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
                     </select>
                   </label>
                   <button
                     type="button"
                     disabled={dimensionBusy}
-                    onClick={() => handleIgnoreIssue(issue, '', ignoreDurationDays)}
+                    onClick={() => handleIgnoreIssue(issue)}
                     className="rounded border border-amber-400/30 bg-amber-500/10 px-2 py-1 text-[11px] font-medium text-amber-200 hover:bg-amber-500/20 disabled:opacity-50"
                     title="Ignore this issue and record in version history"
                   >
@@ -1404,11 +1444,21 @@ export default function DataHealthAdmin({
                         <span className="text-slate-400">Pacing Status:</span>
                         <span className="font-semibold text-rose-300">⚠️ {activeActivityIssues.length} Delivery Dropout / Cliff Detected</span>
                       </div>
-                      {activeActivityIssues.slice(0, 3).map(issue => (
-                        <div key={issue.key} className="rounded bg-rose-500/10 border border-rose-500/20 p-2 text-[11px] text-rose-200">
-                          <strong className="text-white">{issue.eventName}:</strong> {issue.message}
-                        </div>
-                      ))}
+                      <p className="text-[11px] text-slate-400">
+                        These are the same activity alerts shown in the Overview issue list, not a separate set.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOverviewEventFilter('all');
+                          setOverviewCategoryFilter('activity');
+                          setOverviewIssuePage(0);
+                          document.getElementById('overview-issue-list')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }}
+                        className="text-[11px] font-semibold text-[#6bd5f7] hover:text-white"
+                      >
+                        Review all {activeActivityIssues.length} activity issue{activeActivityIssues.length === 1 ? '' : 's'} in Overview
+                      </button>
                     </div>
                   ) : (
                     <>
@@ -1634,8 +1684,8 @@ export default function DataHealthAdmin({
         <div className="grid gap-2 md:grid-cols-4">
           <label className="text-[10px] font-semibold uppercase text-slate-400">Search events<input value={eventSearch} onChange={event => setEventSearch(event.target.value)} placeholder="Search name or ID" className="mt-1 w-full rounded-lg border border-white/10 bg-[#041628] px-3 py-2 text-xs normal-case text-white placeholder:text-slate-500" /></label>
           <label className="text-[10px] font-semibold uppercase text-slate-400">Source kind<select value={eventKindFilter} onChange={event => setEventKindFilter(event.target.value)} className="mt-1 w-full rounded-lg border border-white/10 bg-[#041628] px-3 py-2 text-xs normal-case text-white"><option value="all">All sources</option><option value="Actuals">Actuals</option><option value="Planned">Planned</option></select></label>
-          <label className="text-[10px] font-semibold uppercase text-slate-400">Health status<select value={eventStatusFilter} onChange={event => setEventStatusFilter(event.target.value)} className="mt-1 w-full rounded-lg border border-white/10 bg-[#041628] px-3 py-2 text-xs normal-case text-white"><option value="all">All statuses</option><option value="issues">Has active issue</option><option value="healthy">Healthy</option><option value="disabled">Checks disabled</option></select></label>
-          <label className="text-[10px] font-semibold uppercase text-slate-400">Issue category<select value={eventCategoryFilter} onChange={event => setEventCategoryFilter(event.target.value)} className="mt-1 w-full rounded-lg border border-white/10 bg-[#041628] px-3 py-2 text-xs normal-case text-white"><option value="all">All categories</option><option value="feed">Feed / sheet</option><option value="metrics">Metrics</option><option value="dimensions">Dimensions</option></select></label>
+          <label className="text-[10px] font-semibold uppercase text-slate-400">Health status<select value={eventStatusFilter} onChange={event => setEventStatusFilter(event.target.value)} className="mt-1 w-full rounded-lg border border-white/10 bg-[#041628] px-3 py-2 text-xs normal-case text-white"><option value="all">All statuses</option><option value="issues">Has active issue</option><option value="healthy">Healthy</option><option value="paused">Event paused</option><option value="completed">Event completed</option><option value="disabled">Checks disabled</option></select></label>
+          <label className="text-[10px] font-semibold uppercase text-slate-400">Issue category<select value={eventCategoryFilter} onChange={event => setEventCategoryFilter(event.target.value)} className="mt-1 w-full rounded-lg border border-white/10 bg-[#041628] px-3 py-2 text-xs normal-case text-white"><option value="all">All categories</option><option value="feed">Feed / sheet</option><option value="metrics">Metrics</option><option value="dimensions">Dimensions</option><option value="activity">Activity & velocity</option></select></label>
         </div>
         <p className="text-[11px] text-slate-400">{filteredEvents.length} of {eventGroups.length} events · Actuals and Planned are shown separately. Event controls affect both sources; disabled checks do not stop dashboard data loading.</p>
         <div className="space-y-3">
@@ -1656,19 +1706,20 @@ export default function DataHealthAdmin({
                   </div>
                   <label className="flex items-center gap-1 text-[10px] text-slate-400">
                     <span>Ignore</span>
-                    <select aria-label={`Ignore ${issue.eventName} for`} value={ignoreDurationDays} onChange={change => setIgnoreDurationDays(Number(change.target.value))} className="rounded border border-white/10 bg-[#041628] px-1.5 py-1 text-[11px] text-white">
-                      {[1, 2, 3, 4, 5].map(days => <option key={days} value={days}>{days} day{days === 1 ? '' : 's'}</option>)}
+                    <select aria-label={`Ignore ${issue.eventName} for`} value={ignoreDuration} onChange={change => setIgnoreDuration(change.target.value)} className="rounded border border-white/10 bg-[#041628] px-1.5 py-1 text-[11px] text-white">
+                      {HEALTH_ISSUE_IGNORE_PERIODS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
                     </select>
                   </label>
                   <button
                     type="button"
                     disabled={dimensionBusy}
-                    onClick={() => handleIgnoreIssue(issue, '', ignoreDurationDays)}
+                    onClick={() => handleIgnoreIssue(issue)}
                     className="rounded border border-amber-400/30 bg-amber-500/10 px-2 py-1 text-[11px] font-medium text-amber-200 hover:bg-amber-500/20 disabled:opacity-50"
                     title="Ignore this issue and record in version history"
                   >
                     Ignore
                   </button>
+                  {renderIssueEventControls(issue)}
                 </div>)}
                 <fieldset disabled={settingsLoading || savingEventChecks !== null} className="rounded-lg border border-white/10 bg-[#031120]/60 p-3">
                   <legend className="px-1 text-xs font-semibold text-white">Event monitoring controls</legend>
@@ -1686,7 +1737,7 @@ export default function DataHealthAdmin({
                       </label>;
                     })}
                   </div>
-                  <div className="mt-3 rounded-lg border border-amber-400/20 bg-amber-500/5 p-3">
+                  {eventActivityControlsAllowed && <div className="mt-3 rounded-lg border border-amber-400/20 bg-amber-500/5 p-3">
                     <p className="mb-2 text-[10px] text-slate-300">Pause or end suppresses all health issues for this event. Checks resume automatically when newer event rows arrive.</p>
                     <div className="flex flex-wrap gap-4">
                       <label className="flex items-center gap-2 text-xs text-slate-200">
@@ -1695,11 +1746,11 @@ export default function DataHealthAdmin({
                       </label>
                       <label className="flex items-center gap-2 text-xs text-slate-200">
                         <input type="checkbox" aria-label={`${event.eventName}: Event ended`} checked={eventActivityStatus === 'ended'} disabled={dimensionBusy} onChange={change => setEventActivityStatus(event, change.target.checked ? 'ended' : 'active')} className="accent-[#cedc28]" />
-                        Event ended / over
+                        Event completed / over
                       </label>
-                      {eventActivityStatus !== 'active' && <span className="text-[10px] text-amber-200">Event is marked {eventActivityStatus}; alerts are suppressed.</span>}
+                      {eventActivityStatus !== 'active' && <span className="text-[10px] text-amber-200">Event is marked {eventActivityStatus === 'ended' ? 'completed' : eventActivityStatus}; alerts are suppressed.</span>}
                     </div>
-                  </div>
+                  </div>}
                   <div className="mt-3 flex flex-wrap items-center gap-3"><button type="button" onClick={() => saveEventChecks(event.eventId, selectedChecks)} className="rounded-lg border border-[#14a6d9]/40 px-3 py-2 text-xs font-semibold text-[#6bd5f7] disabled:opacity-50">{savingEventChecks === event.eventId ? 'Saving…' : `Save ${event.eventName} checks`}</button>{eventCheckNotice?.eventId === event.eventId && <span role={eventCheckNotice.error ? 'alert' : 'status'} className={`text-xs ${eventCheckNotice.error ? 'text-red-300' : 'text-lime-300'}`}>{eventCheckNotice.text}</span>}</div>
                 </fieldset>
                 {event.sources.map(source => {
@@ -2482,7 +2533,9 @@ export default function DataHealthAdmin({
                         const label = typeof item === 'object' && item.eventName ? `${item.eventName} (${item.status})` : key;
                         const expiration = typeof item === 'object' && item.expiresAt
                           ? ` · until ${formatTimestamp(item.expiresAt)}`
-                          : '';
+                          : typeof item === 'object' && (item.permanent || item.ignorePeriod === 'forever')
+                            ? ' · forever'
+                            : '';
                         return (
                           <span key={key} className="inline-flex items-center gap-1.5 rounded bg-amber-500/10 border border-amber-400/40 px-2.5 py-1 text-xs text-amber-200">
                             <span>{label}{expiration}</span>
@@ -2517,6 +2570,8 @@ export default function DataHealthAdmin({
             {[[ 'metricEmailEnabled', 'Email metric issues' ], [ 'dimensionEmailEnabled', 'Email dimension issues' ], [ 'activityEmailEnabled', 'Email activity pause & spend cliff issues' ]].map(([key, label]) => <label key={key} className="flex items-center gap-2 rounded-lg border border-white/10 p-3 text-xs text-slate-200"><input type="checkbox" checked={settings[key] !== false} disabled={settingsLoading || !settings.emailEnabled} onChange={event => setSettings(previous => ({ ...previous, [key]: event.target.checked }))} className="accent-[#cedc28]" />{label}</label>)}
             <label className="text-[10px] font-semibold uppercase text-slate-400">Email frequency<select value={settings.frequency} onChange={event => setSettings(previous => ({ ...previous, frequency: event.target.value }))} disabled={settingsLoading || !settings.emailEnabled} className="mt-1 w-full rounded-lg border border-white/10 bg-[#041628] px-3 py-2 text-xs normal-case text-white"><option value="immediate">Immediate when detected</option><option value="daily">Daily digest</option><option value="immediate_and_daily">Immediate + daily digest</option></select></label>
             <label className="text-[10px] font-semibold uppercase text-slate-400">Alert delay<select value={settings.alertDelayMinutes ?? 5} onChange={event => setSettings(previous => ({ ...previous, alertDelayMinutes: Number(event.target.value) }))} disabled={settingsLoading || !settings.emailEnabled || settings.frequency === 'daily'} className="mt-1 w-full rounded-lg border border-white/10 bg-[#041628] px-3 py-2 text-xs normal-case text-white">{[0, 1, 2, 3, 4, 5, 10, 15, 20, 25, 30].map(minutes => <option key={minutes} value={minutes}>{minutes === 0 ? 'Immediate (0 min)' : `After ${minutes} minute${minutes === 1 ? '' : 's'}${minutes === 5 ? ' (default)' : ''}`}</option>)}</select></label>
+            <label className="text-[10px] font-semibold uppercase text-slate-400">Maximum immediate alerts per issue per day<select value={settings.maxAlertsPerIssuePerDay ?? 1} onChange={event => setSettings(previous => ({ ...previous, maxAlertsPerIssuePerDay: Number(event.target.value) }))} disabled={settingsLoading || !settings.emailEnabled || settings.frequency === 'daily'} className="mt-1 w-full rounded-lg border border-white/10 bg-[#041628] px-3 py-2 text-xs normal-case text-white">{ALLOWED_DAILY_ALERT_LIMITS.map(limit => <option key={limit} value={limit}>{limit} alert{limit === 1 ? '' : 's'} per issue</option>)}</select><span className="mt-1 block text-[10px] normal-case text-slate-400">Default: once per Dubai calendar day. Increase this to allow repeat alerts during testing.</span></label>
+            <label className="text-[10px] font-semibold uppercase text-slate-400">Group email alerts<select value={settings.notificationBatchWindowMinutes ?? 10} onChange={event => setSettings(previous => ({ ...previous, notificationBatchWindowMinutes: Number(event.target.value) }))} disabled={settingsLoading || !settings.emailEnabled} className="mt-1 w-full rounded-lg border border-white/10 bg-[#041628] px-3 py-2 text-xs normal-case text-white">{ALLOWED_NOTIFICATION_BATCH_WINDOWS.map(minutes => <option key={minutes} value={minutes}>{minutes === 0 ? 'Send without waiting' : `Group for ${minutes} minutes`}</option>)}</select><span className="mt-1 block text-[10px] normal-case text-slate-400">Combines alert emails and recovery emails separately. The timer restarts when another issue joins the batch.</span></label>
           </div>
           <div className="border-t border-white/10 pt-3"><label className="text-[10px] font-semibold uppercase text-slate-400">Email recipients</label><div className="mt-1 flex gap-2"><input type="email" value={recipientDraft} onChange={event => setRecipientDraft(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); addRecipient(); } }} placeholder="admin@example.com" className="min-w-0 flex-1 rounded-lg border border-white/10 bg-[#041628] px-3 py-2 text-xs text-white" /><button type="button" onClick={addRecipient} aria-label="Add email recipient" className="rounded-lg border border-[#14a6d9]/40 px-3 text-[#6bd5f7]"><Plus className="h-4 w-4" /></button></div><div className="mt-2 flex flex-wrap gap-2">{settings.emailRecipients.map(email => <span key={email} className="inline-flex items-center gap-1 rounded-full border border-white/10 px-2 py-1 text-[10px] text-slate-200">{email}<button type="button" onClick={() => setSettings(previous => ({ ...previous, emailRecipients: previous.emailRecipients.filter(recipient => recipient !== email) }))} aria-label={`Remove ${email}`} className="text-slate-400 hover:text-red-300"><Trash2 className="h-3 w-3" /></button></span>)}{!settings.emailRecipients.length && <span className="text-[10px] text-slate-500">No recipients selected.</span>}</div></div>
 
@@ -2583,7 +2638,7 @@ export default function DataHealthAdmin({
               </div>
             </div>
           )}
-          <div className="flex flex-wrap gap-2 border-t border-white/10 pt-3"><button type="button" onClick={saveSettings} disabled={settingsLoading || savingSettings} className="inline-flex items-center gap-2 rounded-lg border border-[#14a6d9]/40 px-3 py-2 text-xs font-semibold text-[#6bd5f7] disabled:opacity-50"><Save className="h-3.5 w-3.5" />{savingSettings ? 'Saving…' : 'Save notification settings'}</button><button type="button" onClick={sendTestEmail} disabled={!emailConfigured || settingsLoading || sendingTestEmail || !settings.emailRecipients.length} className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs text-slate-200 disabled:opacity-40"><Mail className="h-3.5 w-3.5" />{sendingTestEmail ? 'Sending…' : 'Send test email'}</button><p className="basis-full text-[10px] text-slate-500">Health checks run when sheet data is requested; the scheduled full check and digest may vary by about an hour on Vercel Hobby.</p></div>
+          <div className="flex flex-wrap gap-2 border-t border-white/10 pt-3"><button type="button" onClick={saveSettings} disabled={settingsLoading || savingSettings} className="inline-flex items-center gap-2 rounded-lg border border-[#14a6d9]/40 px-3 py-2 text-xs font-semibold text-[#6bd5f7] disabled:opacity-50"><Save className="h-3.5 w-3.5" />{savingSettings ? 'Saving…' : 'Save notification settings'}</button><button type="button" onClick={sendTestEmail} disabled={!emailConfigured || settingsLoading || sendingTestEmail || !settings.emailRecipients.length} className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs text-slate-200 disabled:opacity-40"><Mail className="h-3.5 w-3.5" />{sendingTestEmail ? 'Sending…' : 'Send test email'}</button><p className="basis-full text-[10px] text-slate-500">Health checks run when sheet data is requested; the scheduled full check and pending-issue digest run daily around 11 PM Dubai time (Vercel Hobby timing may vary by about an hour).</p></div>
         </section>
       </section>
     </section>
