@@ -14,6 +14,7 @@ import { GET as getEventsHealth } from '../events/route.js';
 import { getSmtpTransportConfig } from '../../../../lib/healthEmailTransport.mjs';
 import {
   getDimensionSettings,
+  saveEventActivityStatus,
   saveDimensionSelection,
   saveMetricSelection,
   addCustomMetric,
@@ -52,8 +53,10 @@ export async function GET(request) {
   try {
     await reconcileDisabledHealthChecks();
     const state = await getHealthNotificationState();
-    let issues = [];
     const dimensionSettings = await getDimensionSettings();
+    let issues = Object.values(state.activeIssues || {})
+      .map(item => item.issue)
+      .filter(Boolean);
     if (new URL(request.url).searchParams.get('includeHealth') === 'true') {
       const healthResponse = await getEventsHealth(new Request('http://localhost/api/admin/events?inspectOnly=true'));
       const healthPayload = await healthResponse.json();
@@ -61,6 +64,12 @@ export async function GET(request) {
         throw new Error(healthPayload.error || 'Could not load event health.');
       }
       issues = getHealthIssues(healthPayload.sheetHealth || [], dimensionSettings);
+      const currentIssues = getHealthIssues(healthPayload.sheetHealth || [], dimensionSettings);
+      const currentGroups = new Set(currentIssues.map(issue => `${issue.eventId}:${issue.kind}:${issue.category}`));
+      const retainedIssues = issues.filter(issue =>
+        !currentGroups.has(`${issue.eventId}:${issue.kind}:${issue.category}`)
+      );
+      issues = [...currentIssues, ...retainedIssues];
     }
     return NextResponse.json({
       success: true,
@@ -96,6 +105,21 @@ export async function POST(request) {
         return NextResponse.json({ success: false, error: 'Unknown event.' }, { status: 400 });
       }
       const dimensionSettings = await saveEventHealthChecks(body.eventId, body.checks);
+      await reconcileDisabledHealthChecks();
+      return NextResponse.json({ success: true, dimensionSettings });
+    }
+    if (body.action === 'set-event-activity-status') {
+      const config = await getEventsConfig();
+      if (!config.events.some(event => event.id === body.eventId)) {
+        return NextResponse.json({ success: false, error: 'Unknown event.' }, { status: 400 });
+      }
+      const dimensionSettings = await saveEventActivityStatus({
+        eventId: body.eventId,
+        status: body.status,
+        lastDataDate: body.lastDataDate ?? null,
+        eventRows: body.eventRows ?? 0,
+        author: request.headers.get('x-admin-email') || 'Admin'
+      });
       await reconcileDisabledHealthChecks();
       return NextResponse.json({ success: true, dimensionSettings });
     }
@@ -190,7 +214,8 @@ export async function POST(request) {
         status: body.status,
         message: body.message,
         reason: body.reason,
-        author: adminEmail
+        author: adminEmail,
+        durationDays: body.durationDays
       });
       await markIssueIgnoredInHistory({
         issueKey: body.issueKey,

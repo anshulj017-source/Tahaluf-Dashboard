@@ -367,7 +367,10 @@ test('routine health inspection does not hydrate missing sheets or load configur
       storeSheetSnapshot: () => { assert.fail('routine inspection must not repair or write snapshots'); }
     },
     '../../sheets/route': {},
-    '../../../../lib/dimensionMonitoring.mjs': { getDimensionSettings: async () => ({}) },
+    '../../../../lib/dimensionMonitoring.mjs': {
+      getDimensionSettings: async () => ({}),
+      clearResumedEventStatuses: async () => null
+    },
     '../../../../lib/dimensionStandards.mjs': dimensionRules,
     '../../../../lib/apiUsage.mjs': { withUsageScope: handler => handler }
   }, {
@@ -1149,7 +1152,7 @@ test('getHealthIssues filters out explicitly ignored issues and markIssueIgnored
   assert.equal(activeIssues[0].key, 'saif:Actuals:dimensions');
 
   const filteredIssues = healthUtils.getHealthIssues([source], {
-    ignoredIssues: ['saif:Actuals:dimensions']
+    ignoredIssues: [{ key: 'saif:Actuals:dimensions', expiresAt: new Date(Date.now() + 60_000).toISOString() }]
   });
   assert.equal(filteredIssues.length, 0, 'ignored issue is excluded from active health issues');
 });
@@ -1714,6 +1717,7 @@ test('disabling event sheet checks retires only that event feed issue without fa
 test('event monitoring endpoint rejects unauthorized and unknown events before persisting', async () => {
   let authorized = false;
   let writes = 0;
+  let statusWrites = 0;
   let reconciles = 0;
   const route = await loadInstrumentedModule('../app/api/admin/health-notifications/route.js', {
     'next/server': { NextResponse: { json: (body, options) => Response.json(body, options) } },
@@ -1723,9 +1727,16 @@ test('event monitoring endpoint rejects unauthorized and unknown events before p
     '../../../../lib/requireAdminRequest.js': { isAdminRequest: async () => authorized },
     '../events/route.js': {},
     '../../../../lib/healthEmailTransport.mjs': {},
-    '../../../../lib/dimensionMonitoring.mjs': { saveEventHealthChecks: async (id, checks) => { writes++; return { eventChecks: { [id]: checks } }; } }
+    '../../../../lib/dimensionMonitoring.mjs': {
+      saveEventHealthChecks: async (id, checks) => { writes++; return { eventChecks: { [id]: checks } }; },
+      saveEventActivityStatus: async options => { statusWrites++; return { eventStatuses: { [options.eventId]: { status: options.status } } }; }
+    }
   });
   const request = eventId => ({ json: async () => ({ action: 'save-event-checks', eventId, checks: { monitoringEnabled: false } }) });
+  const statusRequest = (eventId, status) => ({
+    headers: new Headers({ 'x-admin-email': 'admin@example.com' }),
+    json: async () => ({ action: 'set-event-activity-status', eventId, status, lastDataDate: '2026-11-04', eventRows: 10 })
+  });
   assert.equal((await route.POST(request('gsts'))).status, 401);
   authorized = true;
   assert.equal((await route.POST(request('unknown'))).status, 400);
@@ -1733,6 +1744,11 @@ test('event monitoring endpoint rejects unauthorized and unknown events before p
   assert.equal((await route.POST(request('gsts'))).status, 200);
   assert.equal(writes, 1);
   assert.equal(reconciles, 1);
+  assert.equal((await route.POST(statusRequest('unknown', 'paused'))).status, 400);
+  assert.equal(statusWrites, 0);
+  assert.equal((await route.POST(statusRequest('gsts', 'paused'))).status, 200);
+  assert.equal(statusWrites, 1);
+  assert.equal(reconciles, 2);
 });
 
 test('ignored health issues are completely suppressed from health issues, alerts, and active issues', async () => {
@@ -1752,7 +1768,8 @@ test('ignored health issues are completely suppressed from health issues, alerts
         eventId: 'bio-cphi-main',
         eventName: 'BIO 26 & CPHI 26',
         category: 'dimensions',
-        status: 'dimension-discrepancy'
+        status: 'dimension-discrepancy',
+        expiresAt: new Date(Date.now() + 60_000).toISOString()
       }
     ]
   };
@@ -1775,11 +1792,28 @@ test('ignored health issues are completely suppressed from health issues, alerts
   assert.equal(issues.length, 0);
 
   const harness = await resolutionHarness();
+  const siblingIssue = {
+    ...issue,
+    key: 'bio-cphi-main:Actuals:metrics',
+    category: 'metrics',
+    status: 'metric-discrepancy'
+  };
   await harness.health.observeHealthSource(issue.key, issue);
+  await harness.health.observeHealthSource(siblingIssue.key, siblingIssue);
   assert.ok(harness.state().activeIssues[issue.key]);
+  assert.ok(harness.state().activeIssues[siblingIssue.key]);
+  await harness.health.markIssueIgnoredInHistory({
+    issueKey: issue.key,
+    eventId: issue.eventId,
+    category: issue.category,
+    status: issue.status
+  });
+  assert.equal(harness.state().activeIssues[issue.key], undefined);
+  assert.ok(harness.state().activeIssues[siblingIssue.key], 'ignoring one issue must not clear other categories for the same event');
   harness.checks(settings);
   await harness.health.reconcileDisabledHealthChecks();
   assert.equal(harness.state().activeIssues[issue.key], undefined);
+  assert.ok(harness.state().activeIssues[siblingIssue.key]);
   assert.equal(harness.state().history[0].resolution, 'ignored');
 });
 
@@ -1921,7 +1955,16 @@ test('Activity Pause & Spend Cliff Radar detects delivery drops and activity hal
   assert.equal(issues.length, 1);
   assert.equal(issues[0].category, 'activity');
   assert.equal(issues[0].status, 'spend-cliff');
-  assert.ok(issues[0].key.includes('activity:Black Hat:spend-cliff:2026-11-02'));
+  assert.equal(issues[0].key, 'black-hat:Actuals:activity:Black Hat:spend-cliff');
+  const nextDayIssue = healthUtils.getHealthIssues([{
+    ...source,
+    activityAnomalies: cliffResult.activityAnomalies.map(anomaly => ({
+      ...anomaly,
+      id: `${anomaly.eventName}:spend-cliff:2026-11-03`,
+      date: '2026-11-03'
+    }))
+  }]);
+  assert.equal(nextDayIssue[0].key, issues[0].key, 'same ongoing activity issue keeps a stable identity across dates');
 
   // Test 4: eventHealthChecks respects activityChecksEnabled override
   const checksActive = eventHealthChecks('black-hat', { activityChecksEnabled: true });
@@ -1963,6 +2006,138 @@ test('Activity Pause & Spend Cliff Radar detects delivery drops and activity hal
   assert.equal(gstsAnomaly.currentSpend, 0);
   assert.equal(gstsAnomaly.currentRows, 0);
   assert.equal(gstsAnomaly.dropPercent, 100);
+});
+
+test('activity radar flags recent missing days and low-baseline near-zero spend', async () => {
+  const { detectActivityAnomalies } = await import('../lib/metricIntegrity.mjs');
+  const missingDayRows = [
+    'Date,Event Name DB,Channel,Cost,Impressions,Clicks',
+    '2026-10-28,GSTS 26,Meta,100,10000,100',
+    '2026-10-29,GSTS 26,Meta,100,10000,100',
+    '2026-10-30,GSTS 26,Meta,100,10000,100',
+    '2026-10-31,GSTS 26,Meta,100,10000,100',
+    '2026-11-01,GSTS 26,Meta,100,10000,100',
+    '2026-11-02,GSTS 26,Meta,100,10000,100'
+  ].join('\n');
+  const missingDay = detectActivityAnomalies(missingDayRows, '', { currentDay: '2026-11-05' }).activityAnomalies[0];
+  assert.equal(missingDay.type, 'activity-halt');
+  assert.equal(missingDay.date, '2026-11-04');
+  assert.match(missingDay.message, /last reported 2026-11-02/);
+
+  const missingAfterCliffRows = missingDayRows.replace(
+    '2026-11-02,GSTS 26,Meta,100,10000,100',
+    '2026-11-02,GSTS 26,Meta,50,5000,50'
+  );
+  const missingAfterCliff = detectActivityAnomalies(missingAfterCliffRows, '', { currentDay: '2026-11-05' }).activityAnomalies;
+  assert.equal(missingAfterCliff.length, 1);
+  assert.equal(missingAfterCliff[0].type, 'activity-halt', 'missing reporting days supersede an older spend cliff');
+
+  const lowSpendRows = [
+    'Date,Event Name DB,Channel,Cost,Impressions,Clicks',
+    '2026-10-31,KoG 26,Meta,30,10000,100',
+    '2026-10-31,KoG 26,Google Ads,30,10000,100',
+    '2026-11-01,KoG 26,Meta,30,10000,100',
+    '2026-11-01,KoG 26,Google Ads,30,10000,100',
+    '2026-11-02,KoG 26,Meta,30,10000,100',
+    '2026-11-02,KoG 26,Google Ads,30,10000,100',
+    '2026-11-03,KoG 26,Meta,30,10000,100',
+    '2026-11-03,KoG 26,Google Ads,30,10000,100',
+    '2026-11-04,KoG 26,Meta,30,10000,100',
+    '2026-11-04,KoG 26,Google Ads,30,10000,100',
+    '2026-11-05,KoG 26,Meta,1.24,100,1',
+    '2026-11-05,KoG 26,Google Ads,1.24,100,1'
+  ].join('\n');
+  const lowSpend = detectActivityAnomalies(lowSpendRows, '', { currentDay: '2026-11-06' }).activityAnomalies[0];
+  assert.equal(lowSpend.type, 'spend-cliff');
+  assert.equal(lowSpend.eventName, 'KoG 26');
+  assert.equal(lowSpend.date, '2026-11-05');
+  assert.equal(lowSpend.currentSpend, 2.48);
+  assert.ok(lowSpend.dropPercent >= 90);
+
+  const partialSpendRows = [
+    'Date,Event Name DB,Channel,Cost,Impressions,Clicks',
+    '2026-10-31,KoG 26,Meta,30,10000,100',
+    '2026-10-31,KoG 26,Google Ads,30,10000,100',
+    '2026-11-01,KoG 26,Meta,30,10000,100',
+    '2026-11-01,KoG 26,Google Ads,30,10000,100',
+    '2026-11-02,KoG 26,Meta,30,10000,100',
+    '2026-11-02,KoG 26,Google Ads,30,10000,100',
+    '2026-11-03,KoG 26,Meta,30,10000,100',
+    '2026-11-03,KoG 26,Google Ads,30,10000,100',
+    '2026-11-04,KoG 26,Meta,30,10000,100',
+    '2026-11-04,KoG 26,Google Ads,30,10000,100',
+    '2026-11-05,KoG 26,Meta,1.24,100,1',
+    '2026-11-05,KoG 26,Google Ads,1.23,100,1'
+  ].join('\n');
+  const partialSpend = detectActivityAnomalies(partialSpendRows, '', {
+    currentTime: '2026-11-05T08:45:00.000Z'
+  }).activityAnomalies[0];
+  assert.equal(partialSpend.type, 'spend-cliff');
+  assert.equal(partialSpend.date, '2026-11-05');
+  assert.ok(partialSpend.dropPercent >= 85, 'partial-day spend is compared with the time-scaled daily baseline');
+  assert.match(partialSpend.message, /expected pace/);
+});
+
+test('health issue ignores expire within five days and event pause/ended status auto-resumes on new data', async () => {
+  const now = Date.now();
+  const issue = {
+    key: 'kog-26:Actuals:activity:KoG 26:spend-cliff',
+    eventId: 'kog-26',
+    eventName: 'KoG 26',
+    category: 'activity',
+    status: 'spend-cliff'
+  };
+  assert.equal(dimensionRules.isIssueIgnored(issue, {
+    ignoredIssues: [{ key: issue.key, ignoredAt: new Date(now - 6 * 24 * 60 * 60 * 1000).toISOString() }]
+  }), false, 'legacy timed ignores expire after the five-day maximum');
+  assert.equal(dimensionRules.isIssueIgnored(issue, {
+    ignoredIssues: [{ key: issue.key, expiresAt: new Date(now - 1000).toISOString() }]
+  }), false);
+  assert.equal(dimensionRules.isIssueIgnored(issue, {
+    ignoredIssues: [{ key: issue.key, expiresAt: new Date(now + 60_000).toISOString() }]
+  }), true);
+  assert.equal(dimensionRules.isIssueIgnored(issue, {
+    ignoredIssues: [issue.key]
+  }), false, 'legacy untimed ignores cannot bypass the five-day limit');
+
+  let settings = structuredClone(dimensionRules.DEFAULT_DIMENSION_SETTINGS);
+  const monitoring = await loadInstrumentedModule('../lib/dimensionMonitoring.mjs', {
+    './adminSettingsStore.mjs': {
+      readAdminSetting: async (_key, defaults) => ({ ...defaults, ...settings }),
+      updateAdminSetting: async (_key, defaults, update) => {
+        settings = update({ ...defaults, ...settings });
+        return settings;
+      }
+    },
+    './dimensionStandards.mjs': dimensionRules
+  });
+  settings = await monitoring.saveEventActivityStatus({
+    eventId: 'kog-26',
+    status: 'paused',
+    lastDataDate: '2026-11-04',
+    eventRows: 12
+  });
+  assert.equal(dimensionRules.isIssueIgnored(issue, settings), true);
+  await monitoring.clearResumedEventStatuses([{ eventId: 'kog-26', lastDataDate: '2026-11-04', eventRows: 12 }]);
+  assert.equal(settings.eventStatuses['kog-26'].status, 'paused', 'same date and row count does not auto-resume');
+  settings = await monitoring.clearResumedEventStatuses([{ eventId: 'kog-26', lastDataDate: '2026-11-05', eventRows: 1 }]);
+  assert.equal(settings.eventStatuses['kog-26'], undefined);
+  assert.equal(settings.versionHistory[0].action, 'EVENT_ALERTS_AUTO_RESUMED');
+  settings = await monitoring.ignoreHealthIssue({
+    issueKey: issue.key,
+    eventId: issue.eventId,
+    eventName: issue.eventName,
+    status: issue.status,
+    category: issue.category,
+    durationDays: 5
+  });
+  assert.equal(dimensionRules.isIssueIgnored(issue, settings), true);
+  assert.equal(Date.parse(settings.ignoredIssues[0].expiresAt) - Date.parse(settings.ignoredIssues[0].ignoredAt), 5 * 24 * 60 * 60 * 1000);
+  await assert.rejects(() => monitoring.ignoreHealthIssue({
+    issueKey: issue.key,
+    eventId: issue.eventId,
+    durationDays: 6
+  }), /1 to 5 days/);
 });
 
 test('healthAlertPopup feature and /api/health-alerts delivery for non-admin viewers', async () => {
@@ -2036,7 +2211,7 @@ test('healthAlertPopup feature and /api/health-alerts delivery for non-admin vie
 
   // 3. Ignored issues are cleanly filtered out
   const settingsWithIgnore = {
-    ignoredIssues: [{ key: haltIssue.key }]
+    ignoredIssues: [{ key: haltIssue.key, expiresAt: new Date(Date.now() + 60_000).toISOString() }]
   };
   const filteredIssues = getHealthIssues(mockSheetHealth, settingsWithIgnore);
   assert.equal(filteredIssues.length, 1);
