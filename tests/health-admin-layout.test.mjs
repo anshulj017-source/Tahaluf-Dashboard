@@ -6,7 +6,7 @@ import { createRequire } from 'node:module';
 import ts from 'typescript';
 import React from 'react';
 import { DEFAULT_HEALTH_NOTIFICATION_SETTINGS, getHealthIssues } from '../lib/healthNotificationUtils.mjs';
-import { DEFAULT_DIMENSION_SETTINGS, isIssueIgnored } from '../lib/dimensionStandards.mjs';
+import { DEFAULT_DIMENSION_SETTINGS, HEALTH_ISSUE_IGNORE_PERIODS, isIssueIgnored } from '../lib/dimensionStandards.mjs';
 
 const require = createRequire(import.meta.url);
 
@@ -184,10 +184,16 @@ async function setupHealthAdmin(sourceFixture, { delaySettings = false, globalCh
     react: harness.hooks,
     'lucide-react': new Proxy({}, { get: () => icon }),
     '../../lib/firebase': { auth: { currentUser: null } },
-    '../../lib/healthNotificationUtils.mjs': { DEFAULT_HEALTH_NOTIFICATION_SETTINGS, getHealthIssues },
+    '../../lib/healthNotificationUtils.mjs': {
+      DEFAULT_HEALTH_NOTIFICATION_SETTINGS,
+      getHealthIssues,
+      ALLOWED_DAILY_ALERT_LIMITS: [1, 2, 3, 5, 10],
+      ALLOWED_NOTIFICATION_BATCH_WINDOWS: [0, 5, 10]
+    },
     './DashboardFeatureContext': { useLowQuotaMode: () => false, useDashboardFeature: () => true },
     '../../lib/dimensionStandards.mjs': {
       DEFAULT_DIMENSION_SETTINGS,
+      HEALTH_ISSUE_IGNORE_PERIODS,
       DIMENSIONS: [{ id: 'geo', label: 'Geo' }],
       AVAILABLE_METRICS: [{ id: 'cost', label: 'Cost / Spend', unit: '$' }],
       isIssueIgnored: typeof isIssueIgnored === 'function' ? isIssueIgnored : () => false
@@ -408,6 +414,72 @@ test('event list filters by search, source kind, and issue status while preservi
   assert.ok(nodeText(section(tree, 'Event health and controls')).includes('Event A'));
 });
 
+test('event status filters include paused and completed events', async () => {
+  const { render } = await setupHealthAdmin([
+    makeSource('paused', 'Paused Event', 'Actuals', 'healthy', { eventStatus: 'paused' }),
+    makeSource('completed', 'Completed Event', 'Actuals', 'healthy', { eventStatus: 'ended' }),
+    makeSource('active', 'Active Event', 'Actuals')
+  ]);
+  let tree = render();
+  byText(tree, 'button', 'Events').props.onClick();
+  tree = render();
+  let eventsSection = section(tree, 'Event health and controls');
+  let filters = nodes(eventsSection, node => node.type === 'select');
+  const statusFilter = filters.find(select => nodes(select, option => nodeText(option) === 'Event paused').length);
+  assert.ok(statusFilter, 'paused filter is available');
+  statusFilter.props.onChange({ target: { value: 'paused' } });
+  tree = render();
+  eventsSection = section(tree, 'Event health and controls');
+  assert.ok(nodeText(eventsSection).includes('1 of 3 events'));
+  assert.ok(nodeText(eventsSection).includes('Paused Event'));
+  assert.ok(!nodeText(eventsSection).includes('Completed Event'));
+
+  filters = nodes(eventsSection, node => node.type === 'select');
+  const updatedStatusFilter = filters.find(select => nodes(select, option => nodeText(option) === 'Event completed').length);
+  assert.ok(updatedStatusFilter, 'completed filter is available');
+  updatedStatusFilter.props.onChange({ target: { value: 'completed' } });
+  tree = render();
+  eventsSection = section(tree, 'Event health and controls');
+  assert.ok(nodeText(eventsSection).includes('1 of 3 events'));
+  assert.ok(nodeText(eventsSection).includes('Completed Event'));
+  assert.ok(!nodeText(eventsSection).includes('Paused Event'));
+});
+
+test('issue cards expose pause and close actions and ignore periods include calendar options and forever', async () => {
+  const { render, requests, settle } = await setupHealthAdmin();
+  let tree = render();
+  const issueSection = section(tree, 'Health overview');
+  const pauseButton = nodes(issueSection, node => node.type === 'button' && nodeText(node) === 'Pause event')[0];
+  const closeButton = nodes(issueSection, node => node.type === 'button' && nodeText(node) === 'Close event')[0];
+  assert.ok(pauseButton, 'overview issue card can pause its event');
+  assert.ok(closeButton, 'overview issue card can close its event');
+
+  const ignoreSelect = nodes(issueSection, node => node.type === 'select' && node.props['aria-label'] === 'Ignore Event A for')[0];
+  const ignoreOptions = nodes(ignoreSelect, node => node.type === 'option').map(nodeText);
+  assert.ok(ignoreOptions.includes('1 week'));
+  assert.ok(ignoreOptions.includes('1 month'));
+  assert.ok(ignoreOptions.includes('1 quarter'));
+  assert.ok(ignoreOptions.includes('1 year'));
+  assert.ok(ignoreOptions.includes('Forever (until restored)'));
+
+  byText(tree, 'button', 'Events').props.onClick();
+  tree = render();
+  assert.ok(nodes(section(tree, 'Event health and controls'), node => node.type === 'button' && nodeText(node) === 'Pause event').length, 'event issue list also exposes event status actions');
+  byText(tree, 'button', 'Overview').props.onClick();
+  tree = render();
+  await pauseButton.props.onClick();
+  await settle();
+  const statusRequest = requests.find(request => request.options.method === 'POST' &&
+    JSON.parse(request.options.body).action === 'set-event-activity-status');
+  assert.ok(statusRequest);
+  const statusBody = JSON.parse(statusRequest.options.body);
+  assert.equal(statusBody.eventId, 'event-a');
+  assert.equal(statusBody.status, 'paused');
+
+  tree = render();
+  assert.ok(nodes(section(tree, 'Health overview'), node => node.type === 'button' && nodeText(node) === 'Close event').length);
+});
+
 test('event controls report effective global disables and preserve dirty settings across tabs', async () => {
   const { render, dirtyStates } = await setupHealthAdmin();
   let tree = render();
@@ -420,6 +492,8 @@ test('event controls report effective global disables and preserve dirty setting
     'Global checks and standards', 'Dimension standards', 'Enable metric health checks',
     'Enable dimension health checks', 'Notifications and email', 'Send resolution email',
     'Email metric issues', 'Email dimension issues', 'Email frequency', 'Alert delay',
+    'Maximum immediate alerts per issue per day',
+    'Group email alerts',
     'Email recipients', 'Save notification settings', 'Send test email', 'Refresh standards'
   ]) assert.ok(nodeText(settingsSection).includes(setting), `settings preserve ${setting}`);
   assert.equal(dashboardAlerts.props.checked, true);

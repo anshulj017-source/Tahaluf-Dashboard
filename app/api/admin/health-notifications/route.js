@@ -215,6 +215,7 @@ export async function POST(request) {
         message: body.message,
         reason: body.reason,
         author: adminEmail,
+        duration: body.duration,
         durationDays: body.durationDays
       });
       await markIssueIgnoredInHistory({

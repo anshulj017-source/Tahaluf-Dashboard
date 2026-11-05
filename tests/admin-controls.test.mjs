@@ -556,6 +556,8 @@ test('default configuration preserves existing views and protects admin-only hea
   assert.equal(isFeatureEnabled(DEFAULT_FEATURE_CONFIG, 'summary'), true);
   assert.equal(isFeatureEnabled(DEFAULT_FEATURE_CONFIG, 'webtraffic', 'admin'), false);
   assert.equal(isFeatureEnabled(DEFAULT_FEATURE_CONFIG, 'healthBanner', 'standard'), false);
+  assert.equal(isFeatureEnabled(DEFAULT_FEATURE_CONFIG, 'eventActivityControls', 'standard'), false);
+  assert.equal(isFeatureEnabled(DEFAULT_FEATURE_CONFIG, 'eventActivityControls', 'admin'), true);
   assert.equal(isFeatureEnabled(DEFAULT_FEATURE_CONFIG, 'unknown', 'admin'), false);
   assert.equal(isFeatureEnabled(DEFAULT_FEATURE_CONFIG, 'admin', 'standard'), false);
   assert.equal(new Set(DASHBOARD_FEATURES.map(feature => feature.id)).size, DASHBOARD_FEATURES.length);
@@ -850,8 +852,8 @@ test('health observations skip unchanged writes while preserving issue opening a
 async function resolutionHarness(persistent = true) {
   const clock = fakeClock();
   let state = {
-    settings: { ...healthUtils.DEFAULT_HEALTH_NOTIFICATION_SETTINGS, alertDelayMinutes: 0, emailRecipients: ['admin@example.test'] },
-    activeIssues: {}, history: [], lastDigestDate: null
+    settings: { ...healthUtils.DEFAULT_HEALTH_NOTIFICATION_SETTINGS, alertDelayMinutes: 0, notificationBatchWindowMinutes: 0, emailRecipients: ['admin@example.test'] },
+    activeIssues: {}, pendingAlerts: {}, pendingResolutions: {}, history: [], lastDigestDate: null
   };
   let writes = 0;
   let failure = false;
@@ -888,8 +890,8 @@ async function resolutionHarness(persistent = true) {
     './dimensionStandards.mjs': dimensionRules,
     './healthEmailTransport.mjs': { getSmtpTransportConfig: () => ({ host: 'smtp.example.test' }) },
     './healthEmailTemplates.mjs': {
-      formatHealthAlertEmail: () => ({ subject: 'Issue', text: 'Issue' }),
-      formatHealthResolvedEmail: () => ({ subject: 'Resolved', text: 'Resolved' }),
+      formatHealthAlertBatchEmail: issues => ({ subject: issues.length > 1 ? `Issues (${issues.length})` : 'Issue', text: issues.map(issue => issue.eventName).join(', ') }),
+      formatHealthResolvedBatchEmail: entries => ({ subject: entries.length > 1 ? `Resolved (${entries.length})` : 'Resolved', text: entries.map(entry => entry.issue.eventName).join(', ') }),
       formatDailyDigestEmail: () => ({ subject: 'Digest', text: 'Digest' })
     },
     './firebaseAdmin.js': { getFirebaseAdmin: () => ({ adminDb: db }) },
@@ -951,6 +953,10 @@ test('resolution failure persists after recovery and retries after five minutes 
 
 test('status changes retain eligibility when the replacement alert fails before recovery', async () => {
   const harness = await resolutionHarness();
+  await harness.health.saveHealthNotificationSettings({
+    ...harness.state().settings,
+    maxAlertsPerIssuePerDay: 2
+  });
   await harness.health.observeHealthSource(recoveryIssue.key, recoveryIssue);
   harness.clock.advance(1000);
   harness.fail(true);
@@ -1333,6 +1339,12 @@ test('dimension settings cache standards for a day, coalesces fetches and retain
 });
 
 test('new category email preferences default enabled and filter immediate, digest and resolution sends', async () => {
+  assert.equal(healthUtils.normalizeHealthNotificationSettings({}).notificationBatchWindowMinutes, 10);
+  assert.equal(healthUtils.normalizeHealthNotificationSettings({ notificationBatchWindowMinutes: 5 }).notificationBatchWindowMinutes, 5);
+  assert.equal(healthUtils.normalizeHealthNotificationSettings({ notificationBatchWindowMinutes: 3 }).notificationBatchWindowMinutes, 10);
+  assert.equal(healthUtils.normalizeHealthNotificationSettings({}).maxAlertsPerIssuePerDay, 1);
+  assert.equal(healthUtils.normalizeHealthNotificationSettings({ maxAlertsPerIssuePerDay: 3 }).maxAlertsPerIssuePerDay, 3);
+  assert.equal(healthUtils.normalizeHealthNotificationSettings({ maxAlertsPerIssuePerDay: 4 }).maxAlertsPerIssuePerDay, 1);
   assert.equal(healthUtils.normalizeHealthNotificationSettings({}).metricEmailEnabled, true);
   assert.equal(healthUtils.normalizeHealthNotificationSettings({}).dimensionEmailEnabled, true);
   assert.equal(healthUtils.normalizeHealthNotificationSettings({}).activityEmailEnabled, true);
@@ -1357,14 +1369,58 @@ test('new category email preferences default enabled and filter immediate, diges
   }
 });
 
+test('immediate health alerts respect a configurable daily per-issue cap and reset on the next Dubai day', async () => {
+  const harness = await resolutionHarness();
+  await harness.health.observeHealthSource(recoveryIssue.key, recoveryIssue);
+  await harness.health.observeHealthSource(recoveryIssue.key, { ...recoveryIssue, message: 'Still unavailable' });
+  assert.equal(harness.sent.length, 1, 'default cap sends the same issue only once per day');
+  assert.equal(harness.state().activeIssues[recoveryIssue.key].dailyAlertCount, 1);
+
+  harness.clock.advance(20 * 60 * 60 * 1000);
+  await harness.health.observeHealthSource(recoveryIssue.key, recoveryIssue);
+  assert.equal(harness.sent.length, 2, 'the same active issue can alert again on the next Dubai calendar day');
+  assert.equal(harness.state().activeIssues[recoveryIssue.key].dailyAlertCount, 1);
+
+  const testHarness = await resolutionHarness();
+  await testHarness.health.saveHealthNotificationSettings({
+    ...testHarness.state().settings,
+    maxAlertsPerIssuePerDay: 2
+  });
+  await testHarness.health.observeHealthSource(recoveryIssue.key, recoveryIssue);
+  testHarness.clock.advance(5 * 60_000);
+  await testHarness.health.observeHealthSource(recoveryIssue.key, recoveryIssue);
+  assert.equal(testHarness.sent.length, 2, 'raising the configured cap allows repeated alerts during testing');
+  testHarness.clock.advance(5 * 60_000);
+  await testHarness.health.observeHealthSource(recoveryIssue.key, recoveryIssue);
+  assert.equal(testHarness.sent.length, 2, 'the configured cap still limits additional repeats');
+});
+
+test('daily digest waits for pending issues and sends at most once per Dubai calendar day', async () => {
+  const harness = await resolutionHarness();
+  const empty = await harness.health.sendDailyHealthDigest([]);
+  assert.equal(empty.sent, false);
+  assert.equal(empty.reason, 'no-active-issues');
+  assert.equal(harness.state().lastDigestDate, null, 'an empty run does not consume the daily digest');
+
+  const first = await harness.health.sendDailyHealthDigest([recoveryIssue]);
+  assert.equal(first.sent, true, 'pending issues receive the scheduled daily summary');
+  assert.equal(first.issueCount, 1);
+  assert.equal(harness.state().lastDigestDate, '2026-10-27');
+  const repeat = await harness.health.sendDailyHealthDigest([recoveryIssue]);
+  assert.equal(repeat.sent, false);
+  assert.equal(repeat.reason, 'already-sent');
+  assert.equal(harness.sent.length, 1);
+});
+
 test('source-scoped observations resolve only recovered categories, even when another send fails', async () => {
   const harness = await resolutionHarness();
   const metrics = { ...recoveryIssue, key: `${recoveryIssue.key}:metrics`, category: 'metrics' };
   const dimensions = { ...recoveryIssue, key: `${recoveryIssue.key}:dimensions`, category: 'dimensions' };
   await harness.health.observeHealthSourceIssues(recoveryIssue.key, [metrics, dimensions]);
-  assert.equal(harness.sent.length, 2);
+  assert.equal(harness.sent.length, 1, 'same-cycle category alerts share one email');
+  assert.equal(harness.sent[0].subject, 'Issues (2)');
   await harness.health.observeHealthSourceIssues(recoveryIssue.key, [dimensions]);
-  assert.equal(harness.sent.length, 3);
+  assert.equal(harness.sent.length, 2, 'the recovered category sends one resolution email');
   assert.ok(harness.state().activeIssues[dimensions.key]);
   assert.equal(harness.state().activeIssues[metrics.key], undefined);
   assert.equal(harness.state().history.filter(item => item.resolvedAt).length, 1);
@@ -1375,7 +1431,87 @@ test('source-scoped observations resolve only recovered categories, even when an
   const failing = await resolutionHarness();
   failing.beforeSend(async () => { if (failing.sent.length === 1) throw new Error('one category failed'); });
   await assert.rejects(failing.health.observeHealthSourceIssues(recoveryIssue.key, [metrics, dimensions]), /one category failed/);
-  assert.equal(failing.sent.length, 2, 'one failed send must not suppress the other category');
+  assert.equal(failing.sent.length, 1, 'a grouped delivery is attempted once');
+  assert.equal(Object.keys(failing.state().pendingAlerts).length, 2, 'failed grouped alerts remain pending for retry');
+  failing.beforeSend(null);
+  failing.clock.advance(5 * 60_000);
+  await failing.health.observeHealthIssues([metrics, dimensions]);
+  assert.equal(failing.sent.length, 2, 'the grouped batch retries after the delivery cooldown');
+  assert.equal(Object.keys(failing.state().pendingAlerts).length, 0);
+});
+
+test('alert batches wait for a quiet window, restart when another alert joins, and suppress recovered unsent issues', async () => {
+  const harness = await resolutionHarness();
+  await harness.health.saveHealthNotificationSettings({
+    ...harness.state().settings,
+    notificationBatchWindowMinutes: 10
+  });
+  const first = { ...recoveryIssue, eventName: 'First Event' };
+  const second = { ...recoveryIssue, key: 'second:Actuals', eventName: 'Second Event' };
+  const third = { ...recoveryIssue, key: 'third:Actuals', eventName: 'Third Event' };
+
+  await harness.health.observeHealthSourceIssues('events', [first, second]);
+  assert.equal(harness.sent.length, 0, 'alerts wait while the batch is open');
+  harness.clock.advance(9 * 60_000);
+  await harness.health.observeHealthSourceIssues('events', [first, second, third]);
+  assert.equal(harness.sent.length, 0, 'a newly queued alert restarts the quiet window');
+  harness.clock.advance(9 * 60_000);
+  await harness.health.observeHealthIssues([first, second, third]);
+  assert.equal(harness.sent.length, 0);
+  harness.clock.advance(60_000);
+  await harness.health.observeHealthIssues([first, second, third]);
+  assert.equal(harness.sent.length, 1);
+  assert.equal(harness.sent[0].subject, 'Issues (3)');
+  assert.match(harness.sent[0].text, /First Event, Second Event, Third Event/);
+
+  const recovered = { ...recoveryIssue, key: 'recovered:Actuals', eventName: 'Recovered Event' };
+  await harness.health.observeHealthSource(recovered.key, recovered);
+  await harness.health.observeHealthSource(recovered.key, null);
+  harness.clock.advance(10 * 60_000);
+  await harness.health.observeHealthSourceIssues('events', [first, second, third]);
+  assert.equal(harness.sent.length, 1, 'an issue resolved before delivery is removed from the alert batch');
+  assert.equal(Object.keys(harness.state().pendingAlerts).length, 0);
+  assert.equal(Object.keys(harness.state().pendingResolutions).length, 0, 'undelivered alerts do not generate recovery emails');
+});
+
+test('an in-flight alert does not discard a newer status for the same issue', async () => {
+  const harness = await resolutionHarness();
+  const updated = { ...recoveryIssue, status: 'stale', message: 'Serving saved data' };
+  let observed = false;
+  harness.beforeSend(async () => {
+    if (observed) return;
+    observed = true;
+    await harness.health.observeHealthSource(updated.key, updated);
+  });
+
+  await harness.health.observeHealthSource(recoveryIssue.key, recoveryIssue);
+  assert.equal(harness.sent.length, 1);
+  assert.equal(harness.state().activeIssues[updated.key].signature, 'stale');
+  assert.equal(Object.keys(harness.state().pendingAlerts).length, 1, 'the newer status remains tracked instead of being cleared by the first send');
+});
+
+test('recovery notifications for multiple events are grouped after the configured quiet window', async () => {
+  const harness = await resolutionHarness();
+  await harness.health.saveHealthNotificationSettings({
+    ...harness.state().settings,
+    notificationBatchWindowMinutes: 10
+  });
+  const first = { ...recoveryIssue, eventName: 'First Event' };
+  const second = { ...recoveryIssue, key: 'second:Actuals', eventName: 'Second Event' };
+  await harness.health.observeHealthSourceIssues('events', [first, second]);
+  harness.clock.advance(10 * 60_000);
+  await harness.health.observeHealthSourceIssues('events', [first, second]);
+  assert.equal(harness.sent.length, 1, 'both initial alerts were grouped');
+
+  await harness.health.observeHealthIssues([]);
+  assert.equal(harness.sent.length, 1, 'recoveries wait for the quiet window');
+  assert.equal(Object.keys(harness.state().pendingResolutions).length, 2);
+  harness.clock.advance(10 * 60_000);
+  await harness.health.observeHealthIssues([]);
+  assert.equal(harness.sent.length, 2);
+  assert.equal(harness.sent[1].subject, 'Resolved (2)');
+  assert.match(harness.sent[1].text, /First Event, Second Event/);
+  assert.equal(Object.keys(harness.state().pendingResolutions).length, 0);
 });
 
 test('dimension alert templates escape raw values and identify the category without claiming full recovery', () => {
@@ -1392,6 +1528,42 @@ test('dimension alert templates escape raw values and identify the category with
   assert.ok(alert.text.includes('CSV records 2, 3'));
   const resolved = healthTemplates.formatHealthResolvedEmail(issue, new Date().toISOString());
   assert.ok(resolved.html.includes('Other issue categories may still require attention'));
+});
+
+test('grouped alert and recovery templates identify every event and escape HTML content', () => {
+  const first = { ...recoveryIssue, eventName: 'GSTS 26' };
+  const second = { ...recoveryIssue, key: 'blackhat:Actuals', eventName: '<script>Black Hat</script>' };
+  const alert = healthTemplates.formatHealthAlertBatchEmail([first, second], 'https://dashboard.example.test');
+  assert.match(alert.subject, /2 health issues across 2 events/);
+  assert.ok(alert.text.includes('GSTS 26'));
+  assert.ok(alert.text.includes('<script>Black Hat</script>'));
+  assert.ok(alert.html.includes('&lt;script&gt;Black Hat&lt;/script&gt;'));
+  assert.ok(!alert.html.includes('<script>'));
+
+  const resolved = healthTemplates.formatHealthResolvedBatchEmail([
+    { issue: first, resolvedAt: '2026-10-27T00:00:00.000Z' },
+    { issue: second, resolvedAt: '2026-10-27T00:01:00.000Z' }
+  ], 'https://dashboard.example.test');
+  assert.match(resolved.subject, /2 health issues recovered across 2 events/);
+  assert.ok(resolved.text.includes('GSTS 26'));
+  assert.ok(resolved.text.includes('Black Hat'));
+  assert.ok(resolved.html.includes('Issues Recovered'));
+});
+
+test('health digest clearly separates activity halts from spend cliffs and partial-day pace alerts', () => {
+  const digest = healthTemplates.formatDailyDigestEmail([
+    { eventName: 'GSTS 2026', kind: 'Actuals', status: 'activity-halt', message: 'No rows were reported.' },
+    { eventName: 'Black Hat', kind: 'Actuals', status: 'spend-cliff', anomalyDetails: { partialDay: true }, message: 'Spend is below expected pace.' },
+    { eventName: 'CPHI', kind: 'Actuals', status: 'spend-cliff', message: 'Spend dropped against its baseline.' }
+  ]);
+  assert.match(digest.html, /Activity halts: <strong[^>]*>1<\/strong>/);
+  assert.ok(digest.html.includes('Activity Halted'));
+  assert.ok(digest.html.includes('Spend Pace Alert'));
+  assert.ok(digest.html.includes('Spend Cliff'));
+  assert.ok(digest.text.includes('[Activity Halted]'));
+  assert.ok(digest.text.includes('[Spend Pace Alert]'));
+  assert.ok(digest.text.includes('[Spend Cliff]'));
+  assert.ok(!digest.text.includes('[activity-halt]'));
 });
 
 test('Health Monitor renders all selected dimensions and independent enabled category email checkboxes', async () => {
@@ -1817,7 +1989,7 @@ test('ignored health issues are completely suppressed from health issues, alerts
   assert.equal(harness.state().history[0].resolution, 'ignored');
 });
 
-test('all 36 dashboard features map to explicit navigation routes and sections', async () => {
+test('all dashboard features map to explicit navigation routes and sections', async () => {
   const adminFeatureNavMap = {
     adminEvents: { section: 'events' },
     adminHealth: { section: 'health', healthView: 'overview' },
@@ -1828,6 +2000,7 @@ test('all 36 dashboard features map to explicit navigation routes and sections',
     pacingGuardian: { section: 'health', healthView: 'overview', scrollId: 'pacing-guardian' },
     budgetReconciliation: { section: 'health', healthView: 'overview', scrollId: 'budget-reconciliation' },
     healthWebhooks: { section: 'health', healthView: 'settings', scrollId: 'webhook-integrations' },
+    eventActivityControls: { section: 'health', healthView: 'events' },
     dimensionExport: { section: 'health', healthView: 'settings', scrollId: 'standards-manager' },
     bulkDimensionImport: { section: 'health', healthView: 'settings', scrollId: 'standards-manager' },
     auditExport: { section: 'health', healthView: 'history', scrollId: 'audit-trail-export' },
@@ -1888,7 +2061,7 @@ test('all 36 dashboard features map to explicit navigation routes and sections',
   assert.equal(
     Object.keys(adminFeatureNavMap).length + Object.keys(dashboardFeatureNavMap).length,
     DASHBOARD_FEATURES.length,
-    'All 36 registered features have dedicated navigation mappings without overlap'
+    'All registered features have dedicated navigation mappings without overlap'
   );
 });
 
@@ -2024,6 +2197,26 @@ test('activity radar flags recent missing days and low-baseline near-zero spend'
   assert.equal(missingDay.date, '2026-11-04');
   assert.match(missingDay.message, /last reported 2026-11-02/);
 
+  const staleEventRows = [
+    'Date,Event Name DB,Channel,Cost,Impressions,Clicks',
+    '2026-09-25,Legacy Event,Meta,100,10000,100',
+    '2026-09-26,Legacy Event,Meta,100,10000,100',
+    '2026-09-27,Legacy Event,Meta,100,10000,100',
+    '2026-09-28,Legacy Event,Meta,100,10000,100',
+    '2026-09-29,Legacy Event,Meta,100,10000,100'
+  ].join('\n');
+  const staleEvent = detectActivityAnomalies(staleEventRows, '', { currentDay: '2026-11-05' }).activityAnomalies[0];
+  assert.equal(staleEvent.type, 'activity-halt');
+  assert.equal(staleEvent.date, '2026-11-04');
+  assert.match(staleEvent.message, /last reported 2026-09-29/);
+
+  const resumedEventRows = `${missingDayRows}\n2026-11-05,GSTS 26,Meta,100,10000,100`;
+  assert.deepEqual(
+    detectActivityAnomalies(resumedEventRows, '', { currentDay: '2026-11-05' }).activityAnomalies,
+    [],
+    'newer reporting data suppresses a false halt for the previous target day'
+  );
+
   const missingAfterCliffRows = missingDayRows.replace(
     '2026-11-02,GSTS 26,Meta,100,10000,100',
     '2026-11-02,GSTS 26,Meta,50,5000,50'
@@ -2111,6 +2304,12 @@ test('health issue ignores expire within five days and event pause/ended status 
     },
     './dimensionStandards.mjs': dimensionRules
   });
+  assert.equal(monitoring.getHealthIssueIgnoreExpiry('week', '2026-11-05T12:00:00.000Z'), '2026-11-12T12:00:00.000Z');
+  assert.equal(monitoring.getHealthIssueIgnoreExpiry('month', '2026-01-31T12:00:00.000Z'), '2026-02-28T12:00:00.000Z');
+  assert.equal(monitoring.getHealthIssueIgnoreExpiry('quarter', '2026-01-31T12:00:00.000Z'), '2026-04-30T12:00:00.000Z');
+  assert.equal(monitoring.getHealthIssueIgnoreExpiry('year', '2024-02-29T12:00:00.000Z'), '2025-02-28T12:00:00.000Z');
+  assert.equal(monitoring.getHealthIssueIgnoreExpiry('forever', '2026-11-05T12:00:00.000Z'), null);
+  assert.throws(() => monitoring.getHealthIssueIgnoreExpiry('6d'), /supported health issue ignore period/);
   settings = await monitoring.saveEventActivityStatus({
     eventId: 'kog-26',
     status: 'paused',
@@ -2129,15 +2328,38 @@ test('health issue ignores expire within five days and event pause/ended status 
     eventName: issue.eventName,
     status: issue.status,
     category: issue.category,
-    durationDays: 5
+    duration: 'month'
   });
   assert.equal(dimensionRules.isIssueIgnored(issue, settings), true);
+  assert.equal(settings.ignoredIssues[0].ignorePeriod, 'month');
+  assert.equal(settings.versionHistory[0].ignorePeriod, 'month');
+  settings = await monitoring.ignoreHealthIssue({
+    issueKey: issue.key,
+    eventId: issue.eventId,
+    eventName: issue.eventName,
+    status: issue.status,
+    category: issue.category,
+    duration: 'forever'
+  });
+  assert.equal(settings.ignoredIssues[0].ignorePeriod, 'forever');
+  assert.equal(settings.ignoredIssues[0].expiresAt, null);
+  assert.equal(dimensionRules.isHealthIssueIgnoreActive(settings.ignoredIssues[0], Date.parse('2099-01-01T00:00:00.000Z')), true);
+  assert.equal(settings.versionHistory[0].ignorePeriod, 'forever');
+  settings = await monitoring.ignoreHealthIssue({
+    issueKey: issue.key,
+    eventId: issue.eventId,
+    eventName: issue.eventName,
+    status: issue.status,
+    category: issue.category,
+    durationDays: 5
+  });
+  assert.equal(settings.ignoredIssues[0].ignorePeriod, '5d');
   assert.equal(Date.parse(settings.ignoredIssues[0].expiresAt) - Date.parse(settings.ignoredIssues[0].ignoredAt), 5 * 24 * 60 * 60 * 1000);
   await assert.rejects(() => monitoring.ignoreHealthIssue({
     issueKey: issue.key,
     eventId: issue.eventId,
-    durationDays: 6
-  }), /1 to 5 days/);
+    duration: '6d'
+  }), /valid ignore period/);
 });
 
 test('healthAlertPopup feature and /api/health-alerts delivery for non-admin viewers', async () => {

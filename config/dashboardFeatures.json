@@ -1,6 +1,6 @@
 {
-  "revision": 11,
-  "updatedAt": "2026-10-30T04:59:57.302Z",
+  "revision": 12,
+  "updatedAt": "2026-11-05T08:03:37.619Z",
   "modes": {
     "summary": "public",
     "campaign": "public",
@@ -26,7 +26,7 @@
     "creativeFatigue": "admin_only",
     "tvCustomization": "admin_only",
     "healthBanner": "admin_only",
-    "healthAlertPopup": "public",
+    "healthAlertPopup": "admin_only",
     "adminEvents": "admin_only",
     "adminHealth": "admin_only",
     "adminQuotas": "admin_only",
@@ -36,6 +36,7 @@
     "pacingGuardian": "admin_only",
     "budgetReconciliation": "admin_only",
     "healthWebhooks": "admin_only",
+    "eventActivityControls": "admin_only",
     "channelSaturation": "admin_only",
     "auditExport": "admin_only",
     "advancedPptx": "admin_only"
@@ -139,8 +140,8 @@
       "updatedBy": "System Baseline"
     },
     "healthAlertPopup": {
-      "updatedAt": "2026-11-03T15:30:00.000Z",
-      "updatedBy": "System Baseline"
+      "updatedAt": "2026-11-05T08:03:37.619Z",
+      "updatedBy": "analytics.ksa@umww.com"
     },
     "adminEvents": {
       "updatedAt": "2026-10-29T09:37:00.000Z",
@@ -190,5 +191,203 @@
       "updatedAt": "2026-11-02T22:50:00.000Z",
       "updatedBy": "System Baseline"
     }
-  }
+  },
+  "updatedBy": "analytics.ksa@umww.com",
+  "history": [
+    {
+      "revision": 11,
+      "timestamp": "2026-10-30T04:59:57.302Z",
+      "author": "System / Admin",
+      "modes": {
+        "summary": "public",
+        "campaign": "public",
+        "weekly": "public",
+        "channel": "public",
+        "market": "public",
+        "detailed": "public",
+        "webtraffic": "disabled",
+        "creative": "public",
+        "tv": "admin_only",
+        "tvAutoCycle": "admin_only",
+        "exports": "public",
+        "quickJump": "admin_only",
+        "dimensionExport": "admin_only",
+        "bulkDimensionImport": "admin_only",
+        "currency": "public",
+        "aiSummary": "disabled",
+        "budgetSimulator": "disabled",
+        "channelQuadrant": "disabled",
+        "granularTimeline": "admin_only",
+        "benchmarkComparison": "admin_only",
+        "launchForecaster": "admin_only",
+        "creativeFatigue": "admin_only",
+        "tvCustomization": "admin_only",
+        "healthBanner": "admin_only",
+        "healthAlertPopup": "public",
+        "adminEvents": "admin_only",
+        "adminHealth": "admin_only",
+        "adminQuotas": "admin_only",
+        "adminAnalytics": "admin_only",
+        "adminUsers": "super_admin_only",
+        "adminFeatures": "super_admin_only",
+        "pacingGuardian": "admin_only",
+        "budgetReconciliation": "admin_only",
+        "healthWebhooks": "admin_only",
+        "channelSaturation": "admin_only",
+        "auditExport": "admin_only",
+        "advancedPptx": "admin_only"
+      },
+      "customUsers": {},
+      "featureUpdated": {
+        "summary": {
+          "updatedAt": "2026-10-29T09:37:00.000Z",
+          "updatedBy": "System Baseline"
+        },
+        "campaign": {
+          "updatedAt": "2026-10-29T09:37:00.000Z",
+          "updatedBy": "System Baseline"
+        },
+        "weekly": {
+          "updatedAt": "2026-10-29T09:37:00.000Z",
+          "updatedBy": "System Baseline"
+        },
+        "channel": {
+          "updatedAt": "2026-10-29T09:37:00.000Z",
+          "updatedBy": "System Baseline"
+        },
+        "market": {
+          "updatedAt": "2026-10-29T09:37:00.000Z",
+          "updatedBy": "System Baseline"
+        },
+        "detailed": {
+          "updatedAt": "2026-10-29T09:37:00.000Z",
+          "updatedBy": "System Baseline"
+        },
+        "webtraffic": {
+          "updatedAt": "2026-10-29T09:37:00.000Z",
+          "updatedBy": "System Baseline"
+        },
+        "creative": {
+          "updatedAt": "2026-10-29T09:37:00.000Z",
+          "updatedBy": "System Baseline"
+        },
+        "tv": {
+          "updatedAt": "2026-10-30T04:59:00.000Z",
+          "updatedBy": "System Baseline"
+        },
+        "tvAutoCycle": {
+          "updatedAt": "2026-10-30T04:59:00.000Z",
+          "updatedBy": "System Baseline"
+        },
+        "exports": {
+          "updatedAt": "2026-10-29T09:37:00.000Z",
+          "updatedBy": "System Baseline"
+        },
+        "quickJump": {
+          "updatedAt": "2026-10-30T08:28:00.000Z",
+          "updatedBy": "System Baseline"
+        },
+        "dimensionExport": {
+          "updatedAt": "2026-10-30T04:59:00.000Z",
+          "updatedBy": "System Baseline"
+        },
+        "bulkDimensionImport": {
+          "updatedAt": "2026-10-30T04:59:00.000Z",
+          "updatedBy": "System Baseline"
+        },
+        "currency": {
+          "updatedAt": "2026-10-29T09:37:00.000Z",
+          "updatedBy": "System Baseline"
+        },
+        "aiSummary": {
+          "updatedAt": "2026-11-01T14:20:00.000Z",
+          "updatedBy": "System Baseline"
+        },
+        "budgetSimulator": {
+          "updatedAt": "2026-10-30T04:59:00.000Z",
+          "updatedBy": "System Baseline"
+        },
+        "channelQuadrant": {
+          "updatedAt": "2026-11-01T14:20:00.000Z",
+          "updatedBy": "System Baseline"
+        },
+        "granularTimeline": {
+          "updatedAt": "2026-11-01T14:20:00.000Z",
+          "updatedBy": "System Baseline"
+        },
+        "benchmarkComparison": {
+          "updatedAt": "2026-11-01T14:20:00.000Z",
+          "updatedBy": "System Baseline"
+        },
+        "launchForecaster": {
+          "updatedAt": "2026-11-01T14:20:00.000Z",
+          "updatedBy": "System Baseline"
+        },
+        "creativeFatigue": {
+          "updatedAt": "2026-11-01T14:20:00.000Z",
+          "updatedBy": "System Baseline"
+        },
+        "tvCustomization": {
+          "updatedAt": "2026-10-30T04:59:00.000Z",
+          "updatedBy": "System Baseline"
+        },
+        "healthBanner": {
+          "updatedAt": "2026-10-29T09:37:00.000Z",
+          "updatedBy": "System Baseline"
+        },
+        "healthAlertPopup": {
+          "updatedAt": "2026-11-03T15:30:00.000Z",
+          "updatedBy": "System Baseline"
+        },
+        "adminEvents": {
+          "updatedAt": "2026-10-29T09:37:00.000Z",
+          "updatedBy": "System Baseline"
+        },
+        "adminHealth": {
+          "updatedAt": "2026-10-29T09:37:00.000Z",
+          "updatedBy": "System Baseline"
+        },
+        "adminQuotas": {
+          "updatedAt": "2026-10-29T09:37:00.000Z",
+          "updatedBy": "System Baseline"
+        },
+        "adminAnalytics": {
+          "updatedAt": "2026-11-01T14:20:00.000Z",
+          "updatedBy": "System Baseline"
+        },
+        "adminUsers": {
+          "updatedAt": "2026-10-31T18:00:00.000Z",
+          "updatedBy": "System Baseline"
+        },
+        "adminFeatures": {
+          "updatedAt": "2026-10-31T12:19:00.000Z",
+          "updatedBy": "System Baseline"
+        },
+        "pacingGuardian": {
+          "updatedAt": "2026-11-02T22:50:00.000Z",
+          "updatedBy": "System Baseline"
+        },
+        "budgetReconciliation": {
+          "updatedAt": "2026-11-02T22:50:00.000Z",
+          "updatedBy": "System Baseline"
+        },
+        "healthWebhooks": {
+          "updatedAt": "2026-11-02T22:50:00.000Z",
+          "updatedBy": "System Baseline"
+        },
+        "channelSaturation": {
+          "updatedAt": "2026-11-02T22:50:00.000Z",
+          "updatedBy": "System Baseline"
+        },
+        "auditExport": {
+          "updatedAt": "2026-11-02T22:50:00.000Z",
+          "updatedBy": "System Baseline"
+        },
+        "advancedPptx": {
+          "updatedAt": "2026-11-02T22:50:00.000Z",
+          "updatedBy": "System Baseline"
+        }
+      }
+    }
+  ]
 }
