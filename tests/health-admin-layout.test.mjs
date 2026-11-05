@@ -5,7 +5,7 @@ import vm from 'node:vm';
 import { createRequire } from 'node:module';
 import ts from 'typescript';
 import React from 'react';
-import { DEFAULT_HEALTH_NOTIFICATION_SETTINGS, getHealthIssues } from '../lib/healthNotificationUtils.mjs';
+import { DEFAULT_HEALTH_NOTIFICATION_SETTINGS, getHealthIssues, mergeHealthIssues } from '../lib/healthNotificationUtils.mjs';
 import { DEFAULT_DIMENSION_SETTINGS, HEALTH_ISSUE_IGNORE_PERIODS, isIssueIgnored } from '../lib/dimensionStandards.mjs';
 
 const require = createRequire(import.meta.url);
@@ -187,6 +187,7 @@ async function setupHealthAdmin(sourceFixture, { delaySettings = false, globalCh
     '../../lib/healthNotificationUtils.mjs': {
       DEFAULT_HEALTH_NOTIFICATION_SETTINGS,
       getHealthIssues,
+      mergeHealthIssues,
       ALLOWED_DAILY_ALERT_LIMITS: [1, 2, 3, 5, 10],
       ALLOWED_NOTIFICATION_BATCH_WINDOWS: [0, 5, 10]
     },
@@ -478,6 +479,26 @@ test('issue cards expose pause and close actions and ignore periods include cale
 
   tree = render();
   assert.ok(nodes(section(tree, 'Health overview'), node => node.type === 'button' && nodeText(node) === 'Close event').length);
+});
+
+test('overview issue list keeps the latest unique issue per event and category', async () => {
+  const { render } = await setupHealthAdmin([
+    makeSource('event-a', 'Event A', 'Actuals', 'stale', {
+      lastDataDate: '2026-11-03',
+      lastError: 'Older issue details.',
+      metricChecksEnabled: false
+    }),
+    makeSource('event-a', 'Event A', 'Planned', 'stale', {
+      lastDataDate: '2026-11-05',
+      lastError: 'Latest issue details.',
+      metricChecksEnabled: false
+    })
+  ]);
+  const tree = render();
+  const overviewList = nodes(section(tree, 'Health overview'), node => node.type === 'ul' && node.props.id === 'overview-issue-list')[0];
+  const eventAIssues = nodes(overviewList, node => node.type === 'li' && nodeText(node).includes('Event A'));
+  assert.equal(eventAIssues.length, 1, 'same-category issues across Actuals and Planned appear once');
+  assert.ok(nodeText(eventAIssues[0]).includes('Latest issue details'), 'the newest source details are displayed');
 });
 
 test('event controls report effective global disables and preserve dirty settings across tabs', async () => {

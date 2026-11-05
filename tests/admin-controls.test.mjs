@@ -1369,6 +1369,24 @@ test('new category email preferences default enabled and filter immediate, diges
   }
 });
 
+test('health issues are unique per event and category with the newest detected details taking precedence', () => {
+  const detected = [
+    { eventId: 'event-a', eventName: 'Event A', kind: 'Actuals', category: 'activity', status: 'spend-cliff', message: 'Older activity details', observedAt: '2026-11-04' },
+    { eventId: 'event-a', eventName: 'Event A', kind: 'Actuals', category: 'metrics', status: 'metric-discrepancy', message: 'Metric issue' },
+    { eventId: 'event-a', eventName: 'Event A', kind: 'Planned', category: 'activity', status: 'activity-halt', message: 'Latest activity details', observedAt: '2026-11-05' }
+  ];
+  const persisted = [
+    { eventId: 'event-a', eventName: 'Event A', kind: 'Actuals', category: 'activity', status: 'activity-halt', message: 'Old persisted details', openedAt: '2026-11-03' },
+    { eventId: 'event-b', eventName: 'Event B', kind: 'Actuals', category: 'feed', status: 'unavailable', message: 'Different event issue' }
+  ];
+
+  const merged = healthUtils.mergeHealthIssues(detected, persisted);
+  assert.equal(merged.length, 3, 'two distinct event A issue categories and one event B issue remain');
+  assert.deepEqual(merged.map(issue => issue.category), ['activity', 'metrics', 'feed']);
+  assert.equal(merged[0].status, 'activity-halt');
+  assert.equal(merged[0].message, 'Latest activity details');
+});
+
 test('immediate health alerts respect a configurable daily per-issue cap and reset on the next Dubai day', async () => {
   const harness = await resolutionHarness();
   await harness.health.observeHealthSource(recoveryIssue.key, recoveryIssue);
@@ -1512,6 +1530,43 @@ test('recovery notifications for multiple events are grouped after the configure
   assert.equal(harness.sent[1].subject, 'Resolved (2)');
   assert.match(harness.sent[1].text, /First Event, Second Event/);
   assert.equal(Object.keys(harness.state().pendingResolutions).length, 0);
+});
+
+test('notification emails collapse duplicate event-category alerts from multiple source feeds', async () => {
+  const harness = await resolutionHarness();
+  await harness.health.saveHealthNotificationSettings({
+    ...harness.state().settings,
+    notificationBatchWindowMinutes: 10
+  });
+  const actualsIssue = {
+    key: 'event-a:Actuals:activity:Event A:activity-halt',
+    eventId: 'event-a',
+    eventName: 'Event A',
+    kind: 'Actuals',
+    category: 'activity',
+    status: 'activity-halt',
+    message: 'Actuals detail'
+  };
+  const plannedIssue = {
+    ...actualsIssue,
+    key: 'event-a:Planned:activity:Event A:activity-halt',
+    kind: 'Planned',
+    message: 'Planned detail'
+  };
+
+  await harness.health.observeHealthSourceIssues('event-a:Actuals', [actualsIssue]);
+  await harness.health.observeHealthSourceIssues('event-a:Planned', [plannedIssue]);
+  harness.clock.advance(10 * 60_000);
+  await harness.health.observeHealthIssues([actualsIssue, plannedIssue]);
+  assert.equal(harness.sent.length, 1);
+  assert.equal(harness.sent[0].subject, 'Issue', 'duplicate source issues render as one alert item');
+
+  await harness.health.observeHealthSourceIssues('event-a:Actuals', []);
+  await harness.health.observeHealthSourceIssues('event-a:Planned', []);
+  harness.clock.advance(10 * 60_000);
+  await harness.health.observeHealthIssues([]);
+  assert.equal(harness.sent.length, 2);
+  assert.equal(harness.sent[1].subject, 'Resolved', 'duplicate source recoveries render as one recovery item');
 });
 
 test('dimension alert templates escape raw values and identify the category without claiming full recovery', () => {
