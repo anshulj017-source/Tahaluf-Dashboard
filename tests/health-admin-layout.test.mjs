@@ -238,6 +238,49 @@ async function setupHealthAdmin(sourceFixture, { delaySettings = false, globalCh
   return { tree, render, requests, dirtyStates, sources, history, healthReads: () => healthReads, settle, pendingSettings };
 }
 
+async function setupHealthAlertBanner(isAdmin) {
+  const harness = createHookHarness();
+  const source = await fs.readFile(new URL('../app/components/HealthAlertBanner.jsx', import.meta.url), 'utf8');
+  const compiled = ts.transpileModule(source, { compilerOptions: {
+    module: ts.ModuleKind.CommonJS,
+    target: ts.ScriptTarget.ES2022,
+    jsx: ts.JsxEmit.React,
+    esModuleInterop: true
+  } }).outputText;
+  const moduleObject = { exports: {} };
+  const icon = () => null;
+  const fetch = async () => ({
+    ok: true,
+    json: async () => ({
+      success: true,
+      issues: [],
+      eventStatuses: [
+        { eventId: 'paused', eventName: 'Paused Event', status: 'paused' },
+        { eventId: 'closed', eventName: 'Closed Event', status: 'ended' }
+      ]
+    })
+  });
+  vm.runInNewContext(compiled, {
+    module: moduleObject,
+    exports: moduleObject.exports,
+    require: name => name === 'react'
+      ? harness.hooks
+      : name === 'lucide-react'
+        ? new Proxy({}, { get: () => icon })
+        : require(name),
+    console,
+    fetch,
+    setInterval: () => 1,
+    clearInterval() {},
+    window: { addEventListener() {}, removeEventListener() {} }
+  });
+  const component = moduleObject.exports.default;
+  const render = () => expand(harness.render(component, { isAdmin, alertsEnabled: false }));
+  render();
+  await new Promise(resolve => setImmediate(resolve));
+  return render();
+}
+
 function byText(tree, type, text) {
   return nodes(tree, node => node.type === type && nodeText(node) === text)[0];
 }
@@ -424,6 +467,9 @@ test('event status filters include paused and completed events', async () => {
   let tree = render();
   byText(tree, 'button', 'Events').props.onClick();
   tree = render();
+  assert.ok(nodeText(section(tree, 'Event health and controls')).includes('Event-level status'));
+  assert.ok(nodeText(section(tree, 'Event health and controls')).includes('Paused Event: Paused'));
+  assert.ok(nodeText(section(tree, 'Event health and controls')).includes('Completed Event: Closed'));
   let eventsSection = section(tree, 'Event health and controls');
   let filters = nodes(eventsSection, node => node.type === 'select');
   const statusFilter = filters.find(select => nodes(select, option => nodeText(option) === 'Event paused').length);
@@ -433,7 +479,8 @@ test('event status filters include paused and completed events', async () => {
   eventsSection = section(tree, 'Event health and controls');
   assert.ok(nodeText(eventsSection).includes('1 of 3 events'));
   assert.ok(nodeText(eventsSection).includes('Paused Event'));
-  assert.ok(!nodeText(eventsSection).includes('Completed Event'));
+  assert.ok(nodeText(eventsSection).includes('Event paused'), 'event status is visible in the collapsed event row');
+  assert.equal(nodes(eventsSection, node => node.type === 'details').length, 1, 'event filter contains only the paused event card');
 
   filters = nodes(eventsSection, node => node.type === 'select');
   const updatedStatusFilter = filters.find(select => nodes(select, option => nodeText(option) === 'Event completed').length);
@@ -443,7 +490,18 @@ test('event status filters include paused and completed events', async () => {
   eventsSection = section(tree, 'Event health and controls');
   assert.ok(nodeText(eventsSection).includes('1 of 3 events'));
   assert.ok(nodeText(eventsSection).includes('Completed Event'));
-  assert.ok(!nodeText(eventsSection).includes('Paused Event'));
+  assert.equal(nodes(eventsSection, node => node.type === 'details').length, 1, 'event filter contains only the closed event card');
+});
+
+test('global event status banner is visible to users while status actions remain admin-only', async () => {
+  const userTree = await setupHealthAlertBanner(false);
+  assert.ok(nodeText(userTree).includes('Paused Event: Paused'));
+  assert.ok(nodeText(userTree).includes('Closed Event: Closed'));
+  assert.equal(byText(userTree, 'button', 'Manage event status'), undefined);
+
+  const adminTree = await setupHealthAlertBanner(true);
+  assert.ok(nodeText(adminTree).includes('Paused Event: Paused'));
+  assert.ok(byText(adminTree, 'button', 'Manage event status'));
 });
 
 test('issue cards expose pause and close actions and ignore periods include calendar options and forever', async () => {
@@ -514,7 +572,7 @@ test('event controls report effective global disables and preserve dirty setting
     'Enable dimension health checks', 'Notifications and email', 'Send resolution email',
     'Email metric issues', 'Email dimension issues', 'Email frequency', 'Alert delay',
     'Maximum immediate alerts per issue per day',
-    'Group email alerts',
+    'Group immediate emails',
     'Email recipients', 'Save notification settings', 'Send test email', 'Refresh standards'
   ]) assert.ok(nodeText(settingsSection).includes(setting), `settings preserve ${setting}`);
   assert.equal(dashboardAlerts.props.checked, true);

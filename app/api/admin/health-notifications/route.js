@@ -32,6 +32,7 @@ import {
   unignoreHealthIssue
 } from '../../../../lib/dimensionMonitoring.mjs';
 import { getEventsConfig } from '../../../../lib/eventsConfig.js';
+import { isHealthEventId } from '../../../../lib/healthEventGroups.mjs';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -99,7 +100,7 @@ export async function POST(request) {
     const body = await request.json();
     if (body.action === 'save-event-checks') {
       const config = await getEventsConfig();
-      if (!config.events.some(event => event.id === body.eventId)) {
+      if (!isHealthEventId(config.events, body.eventId)) {
         return NextResponse.json({ success: false, error: 'Unknown event.' }, { status: 400 });
       }
       const dimensionSettings = await saveEventHealthChecks(body.eventId, body.checks);
@@ -108,7 +109,7 @@ export async function POST(request) {
     }
     if (body.action === 'set-event-activity-status') {
       const config = await getEventsConfig();
-      if (!config.events.some(event => event.id === body.eventId)) {
+      if (!isHealthEventId(config.events, body.eventId)) {
         return NextResponse.json({ success: false, error: 'Unknown event.' }, { status: 400 });
       }
       const dimensionSettings = await saveEventActivityStatus({
@@ -116,6 +117,7 @@ export async function POST(request) {
         status: body.status,
         lastDataDate: body.lastDataDate ?? null,
         eventRows: body.eventRows ?? 0,
+        sourceObservations: body.sourceObservations ?? [],
         author: request.headers.get('x-admin-email') || 'Admin'
       });
       await reconcileDisabledHealthChecks();

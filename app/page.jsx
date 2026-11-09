@@ -3880,7 +3880,7 @@ export default function App() {
               } else if (featureId === 'exports') {
                 setActiveTab('summary');
                 scrollToTarget('dashboard-exports');
-              } else if (featureId === 'healthBanner' || featureId === 'healthAlertPopup') {
+              } else if (featureId === 'healthBanner' || featureId === 'healthAlertPopup' || featureId === 'eventStatusBanner') {
                 setActiveTab('summary');
                 scrollToTarget('health-alert-banner');
               } else {
@@ -3894,10 +3894,12 @@ export default function App() {
         <main className="flex-1 overflow-y-auto p-3 sm:p-5 md:p-6 lg:p-8 pb-24 lg:pb-8 custom-scrollbar touch-scroll relative z-10">
           <ReactTooltip id="market-tooltip" className="z-50" style={{ backgroundColor: '#0a2442', color: '#eef7f5', border: '1px solid #cedc2830', borderRadius: '8px', zIndex: 1000 }} />
           <div className="absolute top-0 right-0 w-full h-[500px] bg-gradient-to-br from-[#062f2e]/20 via-transparent to-transparent pointer-events-none -z-10"></div>
-          {(featureAllowed('healthAlertPopup') || featureAllowed('healthBanner')) && !tvMode && (
+          {!tvMode && (
             <div id="health-alert-banner">
-              <HealthAlertBanner 
+              <HealthAlertBanner
                 isAdmin={canAccessAdmin}
+                alertsEnabled={featureAllowed('healthAlertPopup') || featureAllowed('healthBanner')}
+                statusBannerEnabled={featureAllowed('eventStatusBanner')}
                 isModalOpen={healthModalOpen}
                 onToggleModal={setHealthModalOpen}
                 onAlertCountChange={setHealthAlertCount}

@@ -22,6 +22,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import * as healthTemplates from '../lib/healthEmailTemplates.mjs';
 import { summarizeSheetData, storeSheetSnapshot, getSheetCacheHealth } from '../lib/sheetCache.mjs';
+import * as healthEventGroups from '../lib/healthEventGroups.mjs';
 
 const require = createRequire(import.meta.url);
 
@@ -38,6 +39,7 @@ async function loadInstrumentedModule(relativePath, overrides = {}, globals = {}
     require: name => {
       if (Object.hasOwn(overrides, name)) return overrides[name];
       if (name.endsWith('/firestoreCollections.mjs') || name === './firestoreCollections.mjs') return firestoreCollections;
+      if (name.endsWith('/healthEventGroups.mjs') || name === './healthEventGroups.mjs') return healthEventGroups;
       return localRequire(name);
     },
     process, console, structuredClone, URL, setTimeout, clearTimeout, ...globals
@@ -558,6 +560,9 @@ test('default configuration preserves existing views and protects admin-only hea
   assert.equal(isFeatureEnabled(DEFAULT_FEATURE_CONFIG, 'healthBanner', 'standard'), false);
   assert.equal(isFeatureEnabled(DEFAULT_FEATURE_CONFIG, 'eventActivityControls', 'standard'), false);
   assert.equal(isFeatureEnabled(DEFAULT_FEATURE_CONFIG, 'eventActivityControls', 'admin'), true);
+  assert.equal(isFeatureEnabled(DEFAULT_FEATURE_CONFIG, 'eventStatusBanner', 'standard'), false);
+  assert.equal(isFeatureEnabled(DEFAULT_FEATURE_CONFIG, 'eventStatusBanner', 'admin'), true);
+  assert.equal(isFeatureEnabled({ modes: { eventStatusBanner: 'public' } }, 'eventStatusBanner', 'standard'), true);
   assert.equal(isFeatureEnabled(DEFAULT_FEATURE_CONFIG, 'unknown', 'admin'), false);
   assert.equal(isFeatureEnabled(DEFAULT_FEATURE_CONFIG, 'admin', 'standard'), false);
   assert.equal(new Set(DASHBOARD_FEATURES.map(feature => feature.id)).size, DASHBOARD_FEATURES.length);
@@ -852,7 +857,7 @@ test('health observations skip unchanged writes while preserving issue opening a
 async function resolutionHarness(persistent = true) {
   const clock = fakeClock();
   let state = {
-    settings: { ...healthUtils.DEFAULT_HEALTH_NOTIFICATION_SETTINGS, alertDelayMinutes: 0, notificationBatchWindowMinutes: 0, emailRecipients: ['admin@example.test'] },
+    settings: { ...healthUtils.DEFAULT_HEALTH_NOTIFICATION_SETTINGS, frequency: 'immediate', alertDelayMinutes: 0, notificationBatchWindowMinutes: 0, emailRecipients: ['admin@example.test'] },
     activeIssues: {}, pendingAlerts: {}, pendingResolutions: {}, history: [], lastDigestDate: null
   };
   let writes = 0;
@@ -1339,6 +1344,12 @@ test('dimension settings cache standards for a day, coalesces fetches and retain
 });
 
 test('new category email preferences default enabled and filter immediate, digest and resolution sends', async () => {
+  assert.equal(healthUtils.normalizeHealthNotificationSettings({}).frequency, 'daily_with_critical');
+  assert.equal(
+    healthUtils.normalizeHealthNotificationSettings({ frequency: 'immediate_and_daily' }).frequency,
+    'daily_with_critical',
+    'previous combined settings migrate to the daily combined + critical policy'
+  );
   assert.equal(healthUtils.normalizeHealthNotificationSettings({}).notificationBatchWindowMinutes, 10);
   assert.equal(healthUtils.normalizeHealthNotificationSettings({ notificationBatchWindowMinutes: 5 }).notificationBatchWindowMinutes, 5);
   assert.equal(healthUtils.normalizeHealthNotificationSettings({ notificationBatchWindowMinutes: 3 }).notificationBatchWindowMinutes, 10);
@@ -1387,6 +1398,29 @@ test('health issues are unique per event and category with the newest detected d
   assert.equal(merged[0].message, 'Latest activity details');
 });
 
+test('BIO and CPHI health events group their shared and dedicated sheets under separate event IDs', async () => {
+  const { getHealthEventDefinitions, getHealthEventSources, isHealthEventId } =
+    await import('../lib/healthEventGroups.mjs');
+  const configEvents = [
+    { id: 'bio-cphi-main', name: 'BIO 26 & CPHI 26', sourceName: 'BIO / CPHI', gid: 'shared-gid' },
+    { id: 'cphi-li', name: 'CPHI 26 (LinkedIn)', sourceName: 'CPHI 26', gid: 'linkedin-gid' }
+  ];
+  const definitions = getHealthEventDefinitions(configEvents);
+  assert.deepEqual(definitions.map(event => [event.id, event.name]), [
+    ['bio-26', 'BIO 26'],
+    ['cphi-26', 'CPHI 26']
+  ]);
+  const sources = getHealthEventSources(configEvents);
+  assert.deepEqual(sources.map(source => [source.eventId, source.gid, source.sourceDocumentName]), [
+    ['bio-26', 'shared-gid', 'BIO / CPHI shared sheet'],
+    ['cphi-26', 'shared-gid', 'BIO / CPHI shared sheet'],
+    ['cphi-26', 'linkedin-gid', 'CPHI 26 (LinkedIn)']
+  ]);
+  assert.equal(isHealthEventId(configEvents, 'bio-26'), true);
+  assert.equal(isHealthEventId(configEvents, 'cphi-26'), true);
+  assert.equal(isHealthEventId(configEvents, 'bio-cphi-main'), false);
+});
+
 test('immediate health alerts respect a configurable daily per-issue cap and reset on the next Dubai day', async () => {
   const harness = await resolutionHarness();
   await harness.health.observeHealthSource(recoveryIssue.key, recoveryIssue);
@@ -1415,6 +1449,7 @@ test('immediate health alerts respect a configurable daily per-issue cap and res
 
 test('daily digest waits for pending issues and sends at most once per Dubai calendar day', async () => {
   const harness = await resolutionHarness();
+  await harness.health.saveHealthNotificationSettings({ ...harness.state().settings, frequency: 'daily_with_critical' });
   const empty = await harness.health.sendDailyHealthDigest([]);
   assert.equal(empty.sent, false);
   assert.equal(empty.reason, 'no-active-issues');
@@ -1428,6 +1463,57 @@ test('daily digest waits for pending issues and sends at most once per Dubai cal
   assert.equal(repeat.sent, false);
   assert.equal(repeat.reason, 'already-sent');
   assert.equal(harness.sent.length, 1);
+});
+
+test('daily combined policy sends routine issues together and keeps critical alerts immediate', async () => {
+  const harness = await resolutionHarness();
+  await harness.health.saveHealthNotificationSettings({
+    ...harness.state().settings,
+    frequency: 'daily_with_critical'
+  });
+  const routineIssues = [
+    { key: 'idws:actuals:cliff', eventId: 'idws', eventName: 'IDWS', kind: 'Actuals', category: 'activity', status: 'spend-cliff', severity: 'warning', message: 'Spend dropped.' },
+    { key: 'bio:actuals:cliff', eventId: 'bio', eventName: 'BIO', kind: 'Actuals', category: 'activity', status: 'spend-cliff', severity: 'warning', message: 'Spend dropped.' },
+    { key: 'cphi:actuals:cliff', eventId: 'cphi', eventName: 'CPHI', kind: 'Actuals', category: 'activity', status: 'spend-cliff', severity: 'warning', message: 'Spend dropped.' }
+  ];
+
+  for (const issue of routineIssues) await harness.health.observeHealthSource(issue.key, issue);
+  assert.equal(harness.sent.length, 0, 'routine issues do not send separate immediate emails');
+  const digest = await harness.health.sendDailyHealthDigest(routineIssues);
+  assert.equal(digest.sent, true);
+  assert.equal(digest.issueCount, 3);
+  assert.equal(harness.sent.length, 1, 'all active events are included in one daily email');
+
+  const criticalIssue = {
+    key: 'saif:actuals:halt',
+    eventId: 'saif',
+    eventName: 'SAIF',
+    kind: 'Actuals',
+    category: 'activity',
+    status: 'activity-halt',
+    severity: 'critical',
+    message: 'Delivery halted.'
+  };
+  await harness.health.observeHealthSource(criticalIssue.key, criticalIssue);
+  assert.equal(harness.sent.length, 2, 'critical event alerts can be delivered separately and immediately');
+});
+
+test('public event status summary omits admin-only events and inactive statuses', () => {
+  const statuses = healthUtils.getVisibleEventActivityStatuses([
+    { id: 'public-event', name: 'Public Event', status: 'active' },
+    { id: 'private-event', name: 'Private Event', visibility: 'admin_only' },
+    { id: 'inactive-event', name: 'Inactive Event' }
+  ], {
+    'public-event': { status: 'paused' },
+    'private-event': { status: 'ended' },
+    'inactive-event': { status: 'active' },
+    unknown: { status: 'paused' }
+  });
+  assert.deepEqual(statuses, [{
+    eventId: 'public-event',
+    eventName: 'Public Event',
+    status: 'paused'
+  }]);
 });
 
 test('source-scoped observations resolve only recovered categories, even when another send fails', async () => {
@@ -2087,6 +2173,7 @@ test('all dashboard features map to explicit navigation routes and sections', as
     exports: { tab: 'summary', scrollId: 'dashboard-exports' },
     healthBanner: { tab: 'summary', scrollId: 'health-alert-banner' },
     healthAlertPopup: { tab: 'summary', scrollId: 'health-alert-banner' },
+    eventStatusBanner: { tab: 'summary', scrollId: 'health-alert-banner' },
   };
 
   // Ensure every feature in DASHBOARD_FEATURES has an explicit, non-default mapping
@@ -2377,6 +2464,26 @@ test('health issue ignores expire within five days and event pause/ended status 
   settings = await monitoring.clearResumedEventStatuses([{ eventId: 'kog-26', lastDataDate: '2026-11-05', eventRows: 1 }]);
   assert.equal(settings.eventStatuses['kog-26'], undefined);
   assert.equal(settings.versionHistory[0].action, 'EVENT_ALERTS_AUTO_RESUMED');
+  settings = await monitoring.saveEventActivityStatus({
+    eventId: 'cphi-26',
+    status: 'paused',
+    lastDataDate: '2026-11-08',
+    eventRows: 14,
+    sourceObservations: [
+      { sourceKey: 'bio-cphi-main', lastDataDate: '2026-11-08', eventRows: 10 },
+      { sourceKey: 'cphi-li', lastDataDate: '2026-11-08', eventRows: 4 }
+    ]
+  });
+  settings = await monitoring.clearResumedEventStatuses([
+    { eventId: 'cphi-26', sourceKey: 'bio-cphi-main', lastDataDate: '2026-11-08', eventRows: 10 },
+    { eventId: 'cphi-26', sourceKey: 'cphi-li', lastDataDate: '2026-11-08', eventRows: 4 }
+  ]);
+  assert.equal(settings.eventStatuses['cphi-26'].status, 'paused', 'unchanged documents keep the event paused');
+  settings = await monitoring.clearResumedEventStatuses([
+    { eventId: 'cphi-26', sourceKey: 'bio-cphi-main', lastDataDate: '2026-11-08', eventRows: 10 },
+    { eventId: 'cphi-26', sourceKey: 'cphi-li', lastDataDate: '2026-11-09', eventRows: 1 }
+  ]);
+  assert.equal(settings.eventStatuses['cphi-26'], undefined, 'new data from either event document resumes the event');
   settings = await monitoring.ignoreHealthIssue({
     issueKey: issue.key,
     eventId: issue.eventId,

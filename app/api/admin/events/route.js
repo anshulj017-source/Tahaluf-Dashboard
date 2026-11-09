@@ -18,6 +18,7 @@ import { GET as refreshSheet } from '../../sheets/route';
 import { withUsageScope } from '../../../../lib/apiUsage.mjs';
 import { summarizeDimensions, getDimensionSettings, clearResumedEventStatuses } from '../../../../lib/dimensionMonitoring.mjs';
 import { dimensionHealthForSource, applyHealthCheckSettings, eventHealthChecks } from '../../../../lib/dimensionStandards.mjs';
+import { getHealthEventSources } from '../../../../lib/healthEventGroups.mjs';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -124,12 +125,7 @@ async function getEvents(request) {
     } catch (err) {
       console.warn('[ADMIN EVENTS] Failed to get dimension settings, using defaults:', err?.message || err);
     }
-    const dataSources = config.events.flatMap(event => [
-      { eventId: event.id, eventName: event.name, sourceName: event.sourceName || event.name, kind: 'Actuals', gid: event.gid || '' },
-      ...(event.plannedGid
-        ? [{ eventId: event.id, eventName: event.name, sourceName: event.sourceName || event.name, kind: 'Planned', gid: event.plannedGid }]
-        : [])
-    ]).map(source => ({
+    const dataSources = getHealthEventSources(config.events).map(source => ({
       ...source,
       cacheKey: sheetBaseUrl
         ? getSheetCacheKey(sheetBaseUrl + (source.gid ? `&gid=${source.gid}` : ''))
@@ -194,7 +190,9 @@ async function getEvents(request) {
             lastError: 'COMBINED_COUNTRY_CSV_URL is not configured'
           }),
       ...(source.cacheKey ? getEventDataStats(source, healthByKey[source.cacheKey] || {}) : {}),
-      dimensionHealth: dimensionHealthForSource(source, healthByKey[source.cacheKey]?.dimensionValidation, checkSettings)
+      dimensionHealth: dimensionHealthForSource(source, healthByKey[source.cacheKey]?.dimensionValidation, checkSettings),
+      sourceDocumentName: source.sourceDocumentName,
+      sourceDocumentId: source.sourceDocumentId
     }));
     const resumedSettings = await clearResumedEventStatuses(rawSheetHealth
       .filter(source =>
@@ -203,6 +201,7 @@ async function getEvents(request) {
       )
       .map(source => ({
         eventId: source.eventId,
+        sourceKey: source.sourceDocumentId || `${source.eventId}:${source.kind}`,
         lastDataDate: source.lastDataDate,
         eventRows: source.eventRows
       })));

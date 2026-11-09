@@ -196,7 +196,7 @@ function testHealthNotifications() {
   });
   assert(settings.emailRecipients.length === 2, 'Notification settings normalize and deduplicate email recipients');
   assert(settings.emailRecipients[0] === 'admin@example.com', 'Notification recipient addresses are normalized');
-  assert(settings.frequency === 'immediate_and_daily', 'Notification settings accept immediate and daily delivery');
+  assert(settings.frequency === 'daily_with_critical', 'Legacy immediate-and-daily settings migrate to the combined daily and critical policy');
   assert(DEFAULT_HEALTH_NOTIFICATION_SETTINGS.alertDelayMinutes === 5, 'Default alert delay is set to 5 minutes');
   assert(DEFAULT_HEALTH_NOTIFICATION_SETTINGS.sendResolutionEmail === true, 'Default send resolution email is enabled');
 
