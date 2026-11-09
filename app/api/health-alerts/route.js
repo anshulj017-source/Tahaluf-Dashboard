@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
 import { GET as getEventsHealth } from '../admin/events/route.js';
-import { getHealthIssues, mergeHealthIssues } from '../../../lib/healthNotificationUtils.mjs';
+import { getHealthIssues, getVisibleEventActivityStatuses, mergeHealthIssues } from '../../../lib/healthNotificationUtils.mjs';
 import { getDimensionSettings } from '../../../lib/dimensionMonitoring.mjs';
 import { getHealthNotificationState } from '../../../lib/healthNotifications.mjs';
 import { isHealthCheckEnabled, isIssueIgnored } from '../../../lib/dimensionStandards.mjs';
+import { getEventsConfig } from '../../../lib/eventsConfig.js';
+import { getHealthEventDefinitions } from '../../../lib/healthEventGroups.mjs';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,10 +48,12 @@ export async function GET() {
 
     // If dashboard alerts are disabled in health settings, return clean empty list
     if (state?.settings?.dashboardEnabled === false) {
+      const config = await getEventsConfig();
       return NextResponse.json({
         success: true,
         count: 0,
-        issues: []
+        issues: [],
+        eventStatuses: getVisibleEventActivityStatuses(getHealthEventDefinitions(config.events), dimensionSettings?.eventStatuses)
       }, {
         headers: {
           'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60'
@@ -73,6 +77,10 @@ export async function GET() {
       .filter(issue => issue && isHealthCheckEnabled(issue, dimensionSettings));
     const activeIssues = mergeHealthIssues(rawIssues, retainedIssues)
       .filter(issue => !isIssueIgnored(issue, dimensionSettings));
+    const eventStatuses = getVisibleEventActivityStatuses(
+      getHealthEventDefinitions(healthPayload.config?.events || []),
+      dimensionSettings?.eventStatuses
+    );
 
     const formattedIssues = activeIssues.map(issue => {
       const severity = issue.severity || (
@@ -106,7 +114,8 @@ export async function GET() {
     return NextResponse.json({
       success: true,
       count: formattedIssues.length,
-      issues: formattedIssues
+      issues: formattedIssues,
+      eventStatuses
     }, {
       headers: {
         'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60'

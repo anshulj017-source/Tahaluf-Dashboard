@@ -5,13 +5,15 @@ import { AlertTriangle, AlertOctagon, TrendingDown, Bell, X, ArrowRight, ShieldC
 
 export default function HealthAlertBanner({
   isAdmin = false,
+  alertsEnabled = true,
+  statusBannerEnabled = true,
   isModalOpen = false,
   onToggleModal = null,
   onAlertCountChange = () => {},
   onOpenHealthMonitor = () => {}
 }) {
   const [issues, setIssues] = useState([]);
-  const [enabled, setEnabled] = useState(true);
+  const [eventStatuses, setEventStatuses] = useState([]);
   const [internalModalOpen, setInternalModalOpen] = useState(false);
 
   // Allow controlled or uncontrolled modal state
@@ -26,7 +28,8 @@ export default function HealthAlertBanner({
       if (res.ok) {
         const data = await res.json();
         if (data.success) {
-          const activeIssues = data.issues || [];
+          setEventStatuses(data.eventStatuses || []);
+          const activeIssues = alertsEnabled ? (data.issues || []) : [];
           setIssues(activeIssues);
           onAlertCountChange(activeIssues.length);
           return;
@@ -38,7 +41,7 @@ export default function HealthAlertBanner({
     } catch {
       // Silently handle offline/network issues
     }
-  }, [onAlertCountChange]);
+  }, [alertsEnabled, onAlertCountChange]);
 
   useEffect(() => {
     fetchAlerts();
@@ -60,8 +63,41 @@ export default function HealthAlertBanner({
 
   return (
     <>
+      {statusBannerEnabled && eventStatuses.length > 0 && (
+        <div
+          role="status"
+          aria-label="Paused and closed events"
+          className="mb-5 flex w-full flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-400/30 bg-[#17150c]/90 px-4 py-3 text-left text-xs text-amber-100 shadow-lg backdrop-blur-md"
+        >
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <span className="font-bold text-white">Event status</span>
+            {eventStatuses.map(event => (
+              <span
+                key={event.eventId}
+                className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
+                  event.status === 'ended'
+                    ? 'border-slate-400/40 bg-slate-500/15 text-slate-200'
+                    : 'border-amber-400/40 bg-amber-500/15 text-amber-200'
+                }`}
+              >
+                {event.eventName}: {event.status === 'ended' ? 'Closed' : 'Paused'}
+              </span>
+            ))}
+          </div>
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={onOpenHealthMonitor}
+              className="rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-[11px] font-semibold text-slate-200 hover:bg-white/10"
+            >
+              Manage event status
+            </button>
+          )}
+        </div>
+      )}
+
       {/* 1. INLINE DASHBOARD HEALTH BANNER */}
-      {issues.length > 0 && (
+      {alertsEnabled && issues.length > 0 && (
         <div
           role="alert"
           aria-live="polite"
@@ -110,7 +146,7 @@ export default function HealthAlertBanner({
       )}
 
       {/* 2. HEALTH ALERT POPUP MODAL */}
-      {modalOpen && (
+      {alertsEnabled && modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5">
           {/* Backdrop */}
           <div
