@@ -9,6 +9,7 @@ import FeatureControlsAdmin from './components/FeatureControlsAdmin';
 import { AdminDialog, useAdminView, useAdminDirtyGuard } from './components/AdminUI';
 
 const ROOT_ADMIN_EMAILS = new Set([
+  'mohammad.jhone9@gmail.com',
   'fehmatics@gmail.com'
 ]);
 
@@ -484,7 +485,10 @@ export default function AdminView({
       hour: 'numeric', minute: '2-digit', hour12: true
     }).format(date);
   };
-  const isRootAccount = (email) => (email || '').toLowerCase().trim() === 'fehmatics@gmail.com';
+  const isRootAccount = (email) => {
+    const norm = (email || '').toLowerCase().trim();
+    return norm === 'fehmatics@gmail.com' || norm === 'mohammad.jhone9@gmail.com';
+  };
   const hiddenSystemCount = users.filter(user => isRootAccount(user.email)).length;
   const filteredUsers = users.filter(user => {
     const isRoot = isRootAccount(user.email);

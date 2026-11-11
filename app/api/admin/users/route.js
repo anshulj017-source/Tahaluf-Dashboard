@@ -99,11 +99,13 @@ export async function GET(req) {
 
     const users = listUsersResult.users.map(userRecord => {
       const userData = userRolesMap.get(userRecord.uid) || {};
-      const role = userData.role || (userData.isAdmin ? 'admin' : 'standard');
+      const isRoot = isRootSuperAdmin(userRecord.email);
+      const role = isRoot ? 'super_admin' : (userData.role || (userData.isAdmin ? 'admin' : 'standard'));
       return {
         uid: userRecord.uid,
         email: userRecord.email,
         role,
+        isFixed: isRoot,
         lastSignInTime: userData.lastActive || userRecord.metadata.lastSignInTime || null,
         creationTime: userRecord.metadata.creationTime || null,
       };
