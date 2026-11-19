@@ -164,67 +164,6 @@ export default function AdminView({
       return () => window.removeEventListener('tahaluf:policy-change', handlePolicyChange);
     }
   }, []);
-
-  const handleToggleCpuSaver = async (targetMode = !cpuSaverMode) => {
-    setSavingCpuPolicy(true);
-    try {
-      const res = await fetch('/api/admin/quotas', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'save-policy', lowQuotaMode: targetMode })
-      });
-      const data = await res.json();
-      if (data.success && data.policy) {
-        setCpuSaverMode(data.policy.lowQuotaMode === true);
-        setSubsystemPolicy(data.policy);
-        if (typeof window !== 'undefined') {
-          window.__tahaluf_low_quota_mode = data.policy.lowQuotaMode === true;
-          window.__tahaluf_pause_tracking = data.policy.pauseAnalyticsTracking === true || (data.policy.lowQuotaMode === true && data.policy.pauseAnalyticsTracking !== false);
-          window.dispatchEvent(new CustomEvent('tahaluf:policy-change', { detail: data.policy }));
-        }
-        if (typeof onPolicySaved === 'function') {
-          onPolicySaved(data.policy);
-        }
-      }
-    } catch (err) {
-      console.error('Failed to toggle CPU Saver mode:', err);
-    } finally {
-      setSavingCpuPolicy(false);
-    }
-  };
-
-  const handleToggleSubsystem = async (key, val) => {
-    setSavingCpuPolicy(true);
-    try {
-      const payload = {
-        action: 'save-policy',
-        lowQuotaMode: cpuSaverMode,
-        [key]: val
-      };
-      const res = await fetch('/api/admin/quotas', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      const data = await res.json();
-      if (data.success && data.policy) {
-        setSubsystemPolicy(data.policy);
-        setCpuSaverMode(data.policy.lowQuotaMode === true);
-        if (typeof window !== 'undefined') {
-          window.__tahaluf_low_quota_mode = data.policy.lowQuotaMode === true;
-          window.__tahaluf_pause_tracking = data.policy.pauseAnalyticsTracking === true || (data.policy.lowQuotaMode === true && data.policy.pauseAnalyticsTracking !== false);
-          window.dispatchEvent(new CustomEvent('tahaluf:policy-change', { detail: data.policy }));
-        }
-        if (typeof onPolicySaved === 'function') {
-          onPolicySaved(data.policy);
-        }
-      }
-    } catch (err) {
-      console.error('Failed to update subsystem switch:', err);
-    } finally {
-      setSavingCpuPolicy(false);
-    }
-  };
   
   // New user form state
   const [showAddForm, setShowAddForm] = useState(false);
@@ -348,6 +287,69 @@ export default function AdminView({
       headers['authorization'] = `Bearer ${token}`;
     }
     return headers;
+  };
+
+  const handleToggleCpuSaver = async (targetMode = !cpuSaverMode) => {
+    setSavingCpuPolicy(true);
+    try {
+      const headers = await getAdminHeaders();
+      const res = await fetch('/api/admin/quotas', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ action: 'save-policy', lowQuotaMode: targetMode })
+      });
+      const data = await res.json();
+      if (data.success && data.policy) {
+        setCpuSaverMode(data.policy.lowQuotaMode === true);
+        setSubsystemPolicy(data.policy);
+        if (typeof window !== 'undefined') {
+          window.__tahaluf_low_quota_mode = data.policy.lowQuotaMode === true;
+          window.__tahaluf_pause_tracking = data.policy.pauseAnalyticsTracking === true || (data.policy.lowQuotaMode === true && data.policy.pauseAnalyticsTracking !== false);
+          window.dispatchEvent(new CustomEvent('tahaluf:policy-change', { detail: data.policy }));
+        }
+        if (typeof onPolicySaved === 'function') {
+          onPolicySaved(data.policy);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to toggle CPU Saver mode:', err);
+    } finally {
+      setSavingCpuPolicy(false);
+    }
+  };
+
+  const handleToggleSubsystem = async (key, val) => {
+    setSavingCpuPolicy(true);
+    try {
+      const headers = await getAdminHeaders();
+      const payload = {
+        action: 'save-policy',
+        lowQuotaMode: cpuSaverMode,
+        [key]: val
+      };
+      const res = await fetch('/api/admin/quotas', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.success && data.policy) {
+        setSubsystemPolicy(data.policy);
+        setCpuSaverMode(data.policy.lowQuotaMode === true);
+        if (typeof window !== 'undefined') {
+          window.__tahaluf_low_quota_mode = data.policy.lowQuotaMode === true;
+          window.__tahaluf_pause_tracking = data.policy.pauseAnalyticsTracking === true || (data.policy.lowQuotaMode === true && data.policy.pauseAnalyticsTracking !== false);
+          window.dispatchEvent(new CustomEvent('tahaluf:policy-change', { detail: data.policy }));
+        }
+        if (typeof onPolicySaved === 'function') {
+          onPolicySaved(data.policy);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to update subsystem switch:', err);
+    } finally {
+      setSavingCpuPolicy(false);
+    }
   };
 
   const fetchUsers = async () => {

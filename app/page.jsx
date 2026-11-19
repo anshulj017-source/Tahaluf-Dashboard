@@ -921,9 +921,21 @@ export default function App() {
         lowQuotaMode: nextMode,
         ...(typeof customPolicy === 'object' && customPolicy ? customPolicy : {})
       };
+      let token = '';
+      try {
+        if (auth?.currentUser) token = await auth.currentUser.getIdToken();
+      } catch {}
+      const email = userEmail || auth?.currentUser?.email || (typeof window !== 'undefined' ? localStorage.getItem('tahaluf_cached_email') : '') || '';
+      const role = userRole || (typeof window !== 'undefined' ? localStorage.getItem('tahaluf_cached_role') : '') || 'admin';
+      const headers = {
+        'Content-Type': 'application/json',
+        'x-admin-email': email,
+        'x-admin-role': role,
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      };
       const res = await fetch('/api/admin/quotas', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(payload)
       });
       const data = await res.json();
