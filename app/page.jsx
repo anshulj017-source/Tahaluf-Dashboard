@@ -1055,7 +1055,11 @@ export default function App() {
 
   // TV Wallboard Auto-Cycle Carousel
   useEffect(() => {
-    if (!tvMode || !tvAutoCycle) return;
+    if (!tvMode || !tvAutoCycle || !featureAllowed('tv') || !featureAllowed('tvAutoCycle')) {
+      if (tvMode && !featureAllowed('tv')) setTvMode(false);
+      if (tvAutoCycle && (!featureAllowed('tv') || !featureAllowed('tvAutoCycle'))) setTvAutoCycle(false);
+      return;
+    }
     const baseViews = tvCycleViews.length > 0 ? tvCycleViews : ['summary', 'campaign', 'weekly'];
     const cycleTabs = baseViews.filter(id => featureAllowed(id));
     if (!cycleTabs.length || !featureAllowed('tvAutoCycle')) return;

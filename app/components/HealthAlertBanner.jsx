@@ -43,13 +43,19 @@ export default function HealthAlertBanner({
   }, [alertsEnabled, onAlertCountChange]);
 
   useEffect(() => {
+    if (!alertsEnabled && !statusBannerEnabled) {
+      setIssues([]);
+      setEventStatuses([]);
+      onAlertCountChange(0);
+      return;
+    }
     fetchAlerts();
     if (lowQuotaMode || (typeof window !== 'undefined' && window.__tahaluf_low_quota_mode)) {
       return;
     }
     const interval = setInterval(fetchAlerts, 300_000);
     return () => clearInterval(interval);
-  }, [fetchAlerts, lowQuotaMode]);
+  }, [fetchAlerts, lowQuotaMode, alertsEnabled, statusBannerEnabled]);
 
   // Handle escape key to close modal
   useEffect(() => {
