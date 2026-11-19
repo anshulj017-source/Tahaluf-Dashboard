@@ -898,6 +898,48 @@ export default function App() {
   }, [isAuthenticated]);
 
   useEffect(() => {
+    const handlePolicyChange = (e) => {
+      if (e?.detail?.lowQuotaMode !== undefined) {
+        setLowQuotaMode(e.detail.lowQuotaMode === true);
+        window.__tahaluf_low_quota_mode = e.detail.lowQuotaMode === true;
+        window.__tahaluf_pause_tracking = e.detail.pauseAnalyticsTracking === true || (e.detail.lowQuotaMode === true && e.detail.pauseAnalyticsTracking !== false);
+      }
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('tahaluf:policy-change', handlePolicyChange);
+      return () => window.removeEventListener('tahaluf:policy-change', handlePolicyChange);
+    }
+  }, []);
+
+  const handleToggleLowQuota = async (customPolicy = null) => {
+    try {
+      const nextMode = customPolicy !== null
+        ? (typeof customPolicy === 'boolean' ? customPolicy : (customPolicy?.lowQuotaMode ?? !lowQuotaMode))
+        : !lowQuotaMode;
+      const payload = {
+        action: 'save-policy',
+        lowQuotaMode: nextMode,
+        ...(typeof customPolicy === 'object' && customPolicy ? customPolicy : {})
+      };
+      const res = await fetch('/api/admin/quotas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.success && data.policy) {
+        setLowQuotaMode(data.policy.lowQuotaMode === true);
+        window.__tahaluf_low_quota_mode = data.policy.lowQuotaMode === true;
+        window.__tahaluf_pause_tracking = data.policy.pauseAnalyticsTracking === true || (data.policy.lowQuotaMode === true && data.policy.pauseAnalyticsTracking !== false);
+        window.dispatchEvent(new CustomEvent('tahaluf:policy-change', { detail: data.policy }));
+        return data.policy;
+      }
+    } catch (e) {
+      console.error('Failed to toggle CPU Saver mode:', e);
+    }
+  };
+
+  useEffect(() => {
     if (!featureConfig) return;
     const enabled = id => featureAllowed(id);
     if (activeTab === 'admin' && canAccessAdmin) return;
@@ -3766,6 +3808,8 @@ export default function App() {
             onEventsSaved={setEventsConfiguration}
             onSignOut={handleSignOut}
             lowQuotaMode={lowQuotaMode}
+            onToggleLowQuota={handleToggleLowQuota}
+            onPolicySaved={policy => setLowQuotaMode(policy?.lowQuotaMode === true)}
             onNavigate={(featureId) => {
               const adminRoute = {
                 adminEvents: { section: 'events' },
@@ -3994,7 +4038,44 @@ export default function App() {
             </div>
           )}
 
-          {lowQuotaMode && <p role="status" className="mb-4 p-3 border border-amber-500/40 rounded-xl text-sm text-amber-200">Low-quota mode is active: automatic admin monitoring refreshes and periodic analytics heartbeats are paused. Dashboard data, manual refreshes, and real interactions remain available.</p>}
+          {lowQuotaMode ? (
+            <div
+              role="status"
+              className="mb-4 p-3.5 border border-emerald-500/40 bg-emerald-950/40 rounded-2xl flex flex-wrap items-center justify-between gap-3 text-xs text-emerald-200 shadow-md backdrop-blur-xs"
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <Zap className="w-4 h-4 text-emerald-400 animate-pulse flex-shrink-0" />
+                <span>
+                  <strong>⚡ CPU Saver Mode Active:</strong> Automatic background polling, dwell telemetry &amp; heavy sheet checks are paused to conserve server limits.
+                </span>
+              </div>
+              {canAccessAdmin && (
+                <button
+                  type="button"
+                  onClick={() => handleToggleLowQuota(false)}
+                  className="px-3 py-1 rounded-xl border border-emerald-400/40 bg-emerald-400/15 text-emerald-100 hover:bg-emerald-400/25 font-bold transition-all text-xs shrink-0"
+                >
+                  Turn OFF (Resume Normal Mode)
+                </button>
+              )}
+            </div>
+          ) : canAccessAdmin ? (
+            <div className="mb-4 p-3 border border-slate-700/60 bg-slate-900/40 rounded-2xl flex flex-wrap items-center justify-between gap-3 text-xs text-slate-300 shadow-sm backdrop-blur-xs">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <Zap className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                <span>
+                  <strong>⚡ CPU Saver Mode is OFF:</strong> Standard real-time telemetry and 30s background polling are currently running.
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleToggleLowQuota(true)}
+                className="px-3 py-1 rounded-xl border border-emerald-500/60 bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30 font-bold transition-all text-xs shrink-0"
+              >
+                ⚡ Turn CPU Saver ON
+              </button>
+            </div>
+          ) : null}
           {featureError && <p role="alert" className="mb-4 p-3 border border-red-500/40 rounded-xl text-sm text-red-300">Feature settings could not refresh: {featureError}. {featureConfig ? 'Using the last loaded settings.' : 'Dashboard features are unavailable until settings load. Retrying automatically.'}</p>}
           {featureAllowed(activeTab) ? renderContent() : !featureError && <p className="text-sm text-gray-400">Loading dashboard feature settings...</p>}
         </main>

@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect, useRef } from 'react';
-import { Trash2, UserPlus, Shield, User, RefreshCw, CheckCircle2, Key, Layers, Activity, Users as UsersIcon, BarChart3, Gauge, ChevronDown, LogOut, ArrowLeft, Globe, History, Plus, X, RotateCcw } from 'lucide-react';
+import { Trash2, UserPlus, Shield, User, RefreshCw, CheckCircle2, Key, Layers, Activity, Users as UsersIcon, BarChart3, Gauge, ChevronDown, LogOut, ArrowLeft, Globe, History, Plus, X, RotateCcw, Zap, SlidersHorizontal } from 'lucide-react';
 import EventsAdmin from './components/EventsAdmin';
 import DataHealthAdmin from './components/DataHealthAdmin';
 import AnalyticsAdmin from './components/AnalyticsAdmin';
@@ -128,6 +128,103 @@ export default function AdminView({
   const [dashboardAlertsEnabled, setDashboardAlertsEnabled] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  // CPU Saver / Low-Quota interactive control state
+  const [cpuSaverMode, setCpuSaverMode] = useState(lowQuotaMode);
+  const [subsystemPolicy, setSubsystemPolicy] = useState(null);
+  const [savingCpuPolicy, setSavingCpuPolicy] = useState(false);
+  const [showSubsystemToggles, setShowSubsystemToggles] = useState(false);
+
+  useEffect(() => {
+    setCpuSaverMode(lowQuotaMode);
+  }, [lowQuotaMode]);
+
+  useEffect(() => {
+    if (!active) return;
+    fetch('/api/features')
+      .then(res => res.json())
+      .then(data => {
+        if (data?.policy) {
+          setCpuSaverMode(data.policy.lowQuotaMode === true);
+          setSubsystemPolicy(data.policy);
+        }
+      })
+      .catch(() => {});
+  }, [active]);
+
+  useEffect(() => {
+    const handlePolicyChange = (e) => {
+      if (e?.detail?.lowQuotaMode !== undefined) {
+        setCpuSaverMode(e.detail.lowQuotaMode === true);
+        setSubsystemPolicy(e.detail);
+      }
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('tahaluf:policy-change', handlePolicyChange);
+      return () => window.removeEventListener('tahaluf:policy-change', handlePolicyChange);
+    }
+  }, []);
+
+  const handleToggleCpuSaver = async (targetMode = !cpuSaverMode) => {
+    setSavingCpuPolicy(true);
+    try {
+      const res = await fetch('/api/admin/quotas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'save-policy', lowQuotaMode: targetMode })
+      });
+      const data = await res.json();
+      if (data.success && data.policy) {
+        setCpuSaverMode(data.policy.lowQuotaMode === true);
+        setSubsystemPolicy(data.policy);
+        if (typeof window !== 'undefined') {
+          window.__tahaluf_low_quota_mode = data.policy.lowQuotaMode === true;
+          window.__tahaluf_pause_tracking = data.policy.pauseAnalyticsTracking === true || (data.policy.lowQuotaMode === true && data.policy.pauseAnalyticsTracking !== false);
+          window.dispatchEvent(new CustomEvent('tahaluf:policy-change', { detail: data.policy }));
+        }
+        if (typeof onPolicySaved === 'function') {
+          onPolicySaved(data.policy);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to toggle CPU Saver mode:', err);
+    } finally {
+      setSavingCpuPolicy(false);
+    }
+  };
+
+  const handleToggleSubsystem = async (key, val) => {
+    setSavingCpuPolicy(true);
+    try {
+      const payload = {
+        action: 'save-policy',
+        lowQuotaMode: cpuSaverMode,
+        [key]: val
+      };
+      const res = await fetch('/api/admin/quotas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.success && data.policy) {
+        setSubsystemPolicy(data.policy);
+        setCpuSaverMode(data.policy.lowQuotaMode === true);
+        if (typeof window !== 'undefined') {
+          window.__tahaluf_low_quota_mode = data.policy.lowQuotaMode === true;
+          window.__tahaluf_pause_tracking = data.policy.pauseAnalyticsTracking === true || (data.policy.lowQuotaMode === true && data.policy.pauseAnalyticsTracking !== false);
+          window.dispatchEvent(new CustomEvent('tahaluf:policy-change', { detail: data.policy }));
+        }
+        if (typeof onPolicySaved === 'function') {
+          onPolicySaved(data.policy);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to update subsystem switch:', err);
+    } finally {
+      setSavingCpuPolicy(false);
+    }
+  };
   
   // New user form state
   const [showAddForm, setShowAddForm] = useState(false);
@@ -701,20 +798,146 @@ export default function AdminView({
           </div>
         </aside>
         <main className="min-w-0" aria-label="Admin content">
-        {lowQuotaMode && (
-          <div className="w-full mb-5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 flex items-center justify-between text-xs text-emerald-200 shadow-sm backdrop-blur-xs">
-            <div className="flex items-center gap-2">
-              <span className="font-bold">⚡ CPU Saver Mode Active:</span>
-              <span className="text-emerald-300/80">Background telemetry, polling &amp; non-essential tasks are paused to conserve compute limits.</span>
+        {/* CPU SAVER / LOW-QUOTA MASTER CONTROL BAR - ALWAYS VISIBLE ON ALL ADMIN SCREENS */}
+        <div className={`w-full mb-5 rounded-2xl border transition-all duration-300 shadow-sm backdrop-blur-md ${
+          cpuSaverMode
+            ? 'border-emerald-500/40 bg-gradient-to-r from-emerald-950/70 via-slate-900/90 to-emerald-950/50 text-emerald-200'
+            : 'border-slate-700/60 bg-gradient-to-r from-slate-900/90 via-[#0a2442]/60 to-slate-900/90 text-slate-300'
+        } p-4`}>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className={`p-2.5 rounded-xl flex items-center justify-center shrink-0 ${
+                cpuSaverMode ? 'bg-emerald-500/20 text-emerald-300' : 'bg-slate-800 text-slate-400'
+              }`}>
+                <Zap className={`h-5 w-5 ${cpuSaverMode ? 'animate-pulse text-emerald-400' : ''}`} />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-bold text-white">⚡ CPU Saver &amp; Quota Control</span>
+                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide border ${
+                    cpuSaverMode
+                      ? 'bg-emerald-500/25 text-emerald-300 border-emerald-500/40'
+                      : 'bg-slate-700/60 text-slate-300 border-slate-600/60'
+                  }`}>
+                    {cpuSaverMode ? 'ACTIVE (PAUSED)' : 'OFF (NORMAL)'}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300/80 mt-0.5">
+                  {cpuSaverMode
+                    ? 'Background polling, analytics dwell beacons & sheet regex scans are PAUSED to conserve compute limits.'
+                    : 'Real-time 30s background polling, telemetry heartbeats & automatic crons are currently active.'}
+                </p>
+              </div>
             </div>
-            <button
-              onClick={() => navigate('quotas')}
-              className="ml-3 px-2.5 py-1 rounded-lg border border-emerald-400/40 bg-emerald-400/15 text-emerald-200 hover:bg-emerald-400/25 font-bold transition-all shrink-0"
-            >
-              Manage Toggles
-            </button>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowSubsystemToggles(!showSubsystemToggles)}
+                className="px-3 py-1.5 rounded-xl border border-slate-700 bg-slate-800/90 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs"
+              >
+                <SlidersHorizontal className="h-3.5 w-3.5 text-slate-400" />
+                <span>Subsystems</span>
+                <ChevronDown className={`h-3 w-3 text-slate-400 transition-transform duration-200 ${showSubsystemToggles ? 'rotate-180' : ''}`} />
+              </button>
+
+              <button
+                type="button"
+                disabled={savingCpuPolicy}
+                onClick={() => handleToggleCpuSaver(!cpuSaverMode)}
+                className={`px-4 py-1.5 rounded-xl border font-bold text-xs flex items-center gap-2 transition-all shadow-sm ${
+                  cpuSaverMode
+                    ? 'border-amber-500/50 bg-amber-500/20 text-amber-200 hover:bg-amber-500/30'
+                    : 'border-emerald-500/60 bg-emerald-500/25 text-emerald-200 hover:bg-emerald-500/35'
+                }`}
+              >
+                <Zap className="h-3.5 w-3.5" />
+                <span>
+                  {savingCpuPolicy
+                    ? 'Updating...'
+                    : cpuSaverMode
+                      ? 'Turn OFF (Normal Mode)'
+                      : 'Turn CPU Saver ON'}
+                </span>
+              </button>
+            </div>
           </div>
-        )}
+
+          {/* Granular Subsystem Toggles Drawer */}
+          {showSubsystemToggles && (
+            <div className="mt-4 pt-3.5 border-t border-slate-700/60 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 text-xs">
+              <label className="flex items-center justify-between p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 cursor-pointer">
+                <div>
+                  <div className="font-semibold text-slate-200">Analytics Tracking</div>
+                  <div className="text-[10px] text-slate-400">Heartbeats &amp; dwell beacons</div>
+                </div>
+                <input
+                  type="checkbox"
+                  disabled={savingCpuPolicy}
+                  checked={subsystemPolicy?.pauseAnalyticsTracking ?? cpuSaverMode}
+                  onChange={e => handleToggleSubsystem('pauseAnalyticsTracking', e.target.checked)}
+                  className="rounded border-slate-700 text-emerald-500 focus:ring-emerald-500 h-4 w-4 bg-slate-800 cursor-pointer"
+                />
+              </label>
+
+              <label className="flex items-center justify-between p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 cursor-pointer">
+                <div>
+                  <div className="font-semibold text-slate-200">API Quota Ledger</div>
+                  <div className="text-[10px] text-slate-400">Per-request usage counters</div>
+                </div>
+                <input
+                  type="checkbox"
+                  disabled={savingCpuPolicy}
+                  checked={subsystemPolicy?.pauseApiUsageTracking ?? cpuSaverMode}
+                  onChange={e => handleToggleSubsystem('pauseApiUsageTracking', e.target.checked)}
+                  className="rounded border-slate-700 text-emerald-500 focus:ring-emerald-500 h-4 w-4 bg-slate-800 cursor-pointer"
+                />
+              </label>
+
+              <label className="flex items-center justify-between p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 cursor-pointer">
+                <div>
+                  <div className="font-semibold text-slate-200">Background Polling</div>
+                  <div className="text-[10px] text-slate-400">Health &amp; feature refreshes</div>
+                </div>
+                <input
+                  type="checkbox"
+                  disabled={savingCpuPolicy}
+                  checked={subsystemPolicy?.pauseBackgroundPolling ?? cpuSaverMode}
+                  onChange={e => handleToggleSubsystem('pauseBackgroundPolling', e.target.checked)}
+                  className="rounded border-slate-700 text-emerald-500 focus:ring-emerald-500 h-4 w-4 bg-slate-800 cursor-pointer"
+                />
+              </label>
+
+              <label className="flex items-center justify-between p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 cursor-pointer">
+                <div>
+                  <div className="font-semibold text-slate-200">Sheet Dimension Checks</div>
+                  <div className="text-[10px] text-slate-400">Regex scan on routine hits</div>
+                </div>
+                <input
+                  type="checkbox"
+                  disabled={savingCpuPolicy}
+                  checked={subsystemPolicy?.pauseDimensionValidation ?? cpuSaverMode}
+                  onChange={e => handleToggleSubsystem('pauseDimensionValidation', e.target.checked)}
+                  className="rounded border-slate-700 text-emerald-500 focus:ring-emerald-500 h-4 w-4 bg-slate-800 cursor-pointer"
+                />
+              </label>
+
+              <label className="flex items-center justify-between p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 cursor-pointer">
+                <div>
+                  <div className="font-semibold text-slate-200">Scheduled Health Cron</div>
+                  <div className="text-[10px] text-slate-400">Automated daily health jobs</div>
+                </div>
+                <input
+                  type="checkbox"
+                  disabled={savingCpuPolicy}
+                  checked={subsystemPolicy?.pauseHealthCron ?? cpuSaverMode}
+                  onChange={e => handleToggleSubsystem('pauseHealthCron', e.target.checked)}
+                  className="rounded border-slate-700 text-emerald-500 focus:ring-emerald-500 h-4 w-4 bg-slate-800 cursor-pointer"
+                />
+              </label>
+            </div>
+          )}
+        </div>
         {activeSection !== 'health' && dashboardAlertsEnabled && healthIssueCount > 0 && (
           <button
             onClick={() => navigate('health')}
