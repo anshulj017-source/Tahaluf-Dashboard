@@ -56,7 +56,9 @@ export async function GET() {
         eventStatuses: getVisibleEventActivityStatuses(getHealthEventDefinitions(config.events), dimensionSettings?.eventStatuses)
       }, {
         headers: {
-          'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60'
+          'Cache-Control': 'public, s-maxage=120, stale-while-revalidate=300',
+          'CDN-Cache-Control': 'public, s-maxage=120, stale-while-revalidate=300',
+          'Vercel-CDN-Cache-Control': 'public, s-maxage=120, stale-while-revalidate=300'
         }
       });
     }
@@ -118,7 +120,9 @@ export async function GET() {
       eventStatuses
     }, {
       headers: {
-        'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60'
+        'Cache-Control': 'public, s-maxage=120, stale-while-revalidate=300',
+        'CDN-Cache-Control': 'public, s-maxage=120, stale-while-revalidate=300',
+        'Vercel-CDN-Cache-Control': 'public, s-maxage=120, stale-while-revalidate=300'
       }
     });
   } catch (error) {

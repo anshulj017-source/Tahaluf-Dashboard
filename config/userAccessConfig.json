@@ -9,6 +9,144 @@
   ],
   "history": [
     {
+      "id": "act_1795070299871_0n3mw",
+      "timestamp": "2026-11-19T06:38:19.871Z",
+      "author": "anshul.jaiswal@omc.com",
+      "action": "USER_DELETE",
+      "target": "roula.albradee@tahaluf.com",
+      "details": "Deleted user account roula.albradee@tahaluf.com"
+    },
+    {
+      "id": "act_1795070294351_hlf95",
+      "timestamp": "2026-11-19T06:38:14.351Z",
+      "author": "anshul.jaiswal@omc.com",
+      "action": "USER_DELETE",
+      "target": "nawaf.alnefaie@tahaluf.com",
+      "details": "Deleted user account nawaf.alnefaie@tahaluf.com"
+    },
+    {
+      "id": "act_1795070286573_8qdpa",
+      "timestamp": "2026-11-19T06:38:06.573Z",
+      "author": "anshul.jaiswal@omc.com",
+      "action": "USER_DELETE",
+      "target": "tilly.richards@tahaluf.com",
+      "details": "Deleted user account tilly.richards@tahaluf.com"
+    },
+    {
+      "id": "act_1795070223379_ibl2y",
+      "timestamp": "2026-11-19T06:37:03.379Z",
+      "author": "anshul.jaiswal@omc.com",
+      "action": "USER_DELETE",
+      "target": "mritunjay.mishra@informa.com",
+      "details": "Deleted user account mritunjay.mishra@informa.com"
+    },
+    {
+      "id": "act_1795070216406_s6mgb",
+      "timestamp": "2026-11-19T06:36:56.406Z",
+      "author": "anshul.jaiswal@omc.com",
+      "action": "USER_DELETE",
+      "target": "alex.tomlinson@tahaluf.com",
+      "details": "Deleted user account alex.tomlinson@tahaluf.com"
+    },
+    {
+      "id": "act_1795070211337_h152x",
+      "timestamp": "2026-11-19T06:36:51.337Z",
+      "author": "anshul.jaiswal@omc.com",
+      "action": "USER_DELETE",
+      "target": "kashaan.tajammul@tahaluf.com",
+      "details": "Deleted user account kashaan.tajammul@tahaluf.com"
+    },
+    {
+      "id": "act_1795070206604_aubeu",
+      "timestamp": "2026-11-19T06:36:46.604Z",
+      "author": "anshul.jaiswal@omc.com",
+      "action": "USER_DELETE",
+      "target": "leon.beck@tahaluf.com",
+      "details": "Deleted user account leon.beck@tahaluf.com"
+    },
+    {
+      "id": "act_1795070201648_aqtsi",
+      "timestamp": "2026-11-19T06:36:41.648Z",
+      "author": "anshul.jaiswal@omc.com",
+      "action": "USER_DELETE",
+      "target": "tala.bahri@tahaluf.com",
+      "details": "Deleted user account tala.bahri@tahaluf.com"
+    },
+    {
+      "id": "act_1795070197207_b0s9e",
+      "timestamp": "2026-11-19T06:36:37.207Z",
+      "author": "anshul.jaiswal@omc.com",
+      "action": "USER_DELETE",
+      "target": "dorian.bennett@tahaluf.com",
+      "details": "Deleted user account dorian.bennett@tahaluf.com"
+    },
+    {
+      "id": "act_1795070192105_07j2y",
+      "timestamp": "2026-11-19T06:36:32.105Z",
+      "author": "anshul.jaiswal@omc.com",
+      "action": "USER_DELETE",
+      "target": "rabia.jaffer@tahaluf.com",
+      "details": "Deleted user account rabia.jaffer@tahaluf.com"
+    },
+    {
+      "id": "act_1795070185533_yj65s",
+      "timestamp": "2026-11-19T06:36:25.533Z",
+      "author": "anshul.jaiswal@omc.com",
+      "action": "USER_DELETE",
+      "target": "kitty.draper@tahaluf.com",
+      "details": "Deleted user account kitty.draper@tahaluf.com"
+    },
+    {
+      "id": "act_1795070176811_b2pv8",
+      "timestamp": "2026-11-19T06:36:16.811Z",
+      "author": "anshul.jaiswal@omc.com",
+      "action": "USER_DELETE",
+      "target": "melissa.matar@omc.com",
+      "details": "Deleted user account melissa.matar@omc.com"
+    },
+    {
+      "id": "act_1795070161736_t5fz1",
+      "timestamp": "2026-11-19T06:36:01.736Z",
+      "author": "anshul.jaiswal@omc.com",
+      "action": "USER_DELETE",
+      "target": "lulu.khushaim@informa.com",
+      "details": "Deleted user account lulu.khushaim@informa.com"
+    },
+    {
+      "id": "act_1795070156760_16eoa",
+      "timestamp": "2026-11-19T06:35:56.760Z",
+      "author": "anshul.jaiswal@omc.com",
+      "action": "USER_DELETE",
+      "target": "claudine.waite@tahaluf.com",
+      "details": "Deleted user account claudine.waite@tahaluf.com"
+    },
+    {
+      "id": "act_1795070150044_bp0gn",
+      "timestamp": "2026-11-19T06:35:50.044Z",
+      "author": "anshul.jaiswal@omc.com",
+      "action": "USER_DELETE",
+      "target": "vaishali.balgu@tahaluf.com",
+      "details": "Deleted user account vaishali.balgu@tahaluf.com"
+    },
+    {
+      "id": "act_1794829231255_yajyl",
+      "timestamp": "2026-11-16T11:40:31.255Z",
+      "author": "analytics.ksa@umww.com",
+      "action": "USER_CREATE",
+      "target": "jennah.eleid@omc.com",
+      "details": "Created new user account with role standard",
+      "role": "standard"
+    },
+    {
+      "id": "act_1794829202851_vlhxx",
+      "timestamp": "2026-11-16T11:40:02.851Z",
+      "author": "analytics.ksa@umww.com",
+      "action": "USER_CREATE",
+      "target": "joe.elkhoury@omc.com",
+      "details": "Created new user account with role standard",
+      "role": "standard"
+    },
+    {
       "id": "act_1793469712595_lxp5c",
       "timestamp": "2026-10-31T18:01:52.595Z",
       "author": "analytics.ksa@umww.com",

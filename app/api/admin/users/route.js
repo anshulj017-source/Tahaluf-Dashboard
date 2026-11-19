@@ -4,7 +4,7 @@ import { isAdminRequest, isSuperAdminRequest } from '../../../../lib/requireAdmi
 import { readAdminSetting, updateAdminSetting } from '../../../../lib/adminSettingsStore.mjs';
 import { DEFAULT_FEATURE_CONFIG, isFeatureEnabled } from '../../../../lib/dashboardFeatures.mjs';
 import { getCollectionName } from '../../../../lib/firestoreCollections.mjs';
-import { isProtectedSuperAdmin, PROTECTED_SUPER_ADMINS } from '../../../../lib/authConstants.mjs';
+import { isProtectedSuperAdmin, PROTECTED_SUPER_ADMINS, isRootSuperAdmin } from '../../../../lib/authConstants.mjs';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';

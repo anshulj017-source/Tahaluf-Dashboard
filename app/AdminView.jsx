@@ -73,7 +73,9 @@ export default function AdminView({
   onFeaturesSaved, 
   onEventsSaved, 
   onNavigate,
-  onSignOut
+  onSignOut,
+  lowQuotaMode = false,
+  onPolicySaved = null
 }) {
   const isSuperAdmin = userRole === 'super_admin' || (userRole !== 'admin' && userRole !== 'standard' && userRole !== 'non-finance' && isRootSuperAdmin(currentUserEmail));
 
@@ -699,6 +701,20 @@ export default function AdminView({
           </div>
         </aside>
         <main className="min-w-0" aria-label="Admin content">
+        {lowQuotaMode && (
+          <div className="w-full mb-5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 flex items-center justify-between text-xs text-emerald-200 shadow-sm backdrop-blur-xs">
+            <div className="flex items-center gap-2">
+              <span className="font-bold">⚡ CPU Saver Mode Active:</span>
+              <span className="text-emerald-300/80">Background telemetry, polling &amp; non-essential tasks are paused to conserve compute limits.</span>
+            </div>
+            <button
+              onClick={() => navigate('quotas')}
+              className="ml-3 px-2.5 py-1 rounded-lg border border-emerald-400/40 bg-emerald-400/15 text-emerald-200 hover:bg-emerald-400/25 font-bold transition-all shrink-0"
+            >
+              Manage Toggles
+            </button>
+          </div>
+        )}
         {activeSection !== 'health' && dashboardAlertsEnabled && healthIssueCount > 0 && (
           <button
             onClick={() => navigate('health')}

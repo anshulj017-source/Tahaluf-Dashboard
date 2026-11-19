@@ -10,7 +10,8 @@ export default function HealthAlertBanner({
   isModalOpen = false,
   onToggleModal = null,
   onAlertCountChange = () => {},
-  onOpenHealthMonitor = () => {}
+  onOpenHealthMonitor = () => {},
+  lowQuotaMode = false
 }) {
   const [issues, setIssues] = useState([]);
   const [eventStatuses, setEventStatuses] = useState([]);
@@ -22,9 +23,7 @@ export default function HealthAlertBanner({
 
   const fetchAlerts = useCallback(async () => {
     try {
-      const res = await fetch('/api/health-alerts', {
-        headers: { 'Cache-Control': 'no-cache' }
-      });
+      const res = await fetch('/api/health-alerts');
       if (res.ok) {
         const data = await res.json();
         if (data.success) {
@@ -45,9 +44,12 @@ export default function HealthAlertBanner({
 
   useEffect(() => {
     fetchAlerts();
-    const interval = setInterval(fetchAlerts, 45_000);
+    if (lowQuotaMode || (typeof window !== 'undefined' && window.__tahaluf_low_quota_mode)) {
+      return;
+    }
+    const interval = setInterval(fetchAlerts, 300_000);
     return () => clearInterval(interval);
-  }, [fetchAlerts]);
+  }, [fetchAlerts, lowQuotaMode]);
 
   // Handle escape key to close modal
   useEffect(() => {

@@ -9,7 +9,7 @@ import {
 import { getEventsConfig } from '../../../lib/eventsConfig.js';
 import { observeHealthSourceIssues } from '../../../lib/healthNotifications.mjs';
 import { getHealthIssues } from '../../../lib/healthNotificationUtils.mjs';
-import { observeApiRequest, observeApiUsage, withUsageScope } from '../../../lib/apiUsage.mjs';
+import { observeApiRequest, observeApiUsage, withUsageScope, readMonitoringSettings } from '../../../lib/apiUsage.mjs';
 import { summarizeDimensions, getDimensionSettings } from '../../../lib/dimensionMonitoring.mjs';
 import { dimensionHealthForSource, applyHealthCheckSettings, eventHealthChecks } from '../../../lib/dimensionStandards.mjs';
 
@@ -251,12 +251,21 @@ async function getSheet(request) {
         const checkSettings = await getDimensionSettings();
         const sources = (await getConfiguredSourcesByCacheKey()).get(cacheKey) || [];
         const defaultEventName = sources[0]?.eventName || sources[0]?.name || '';
+        let skipDimensionCheck = false;
+        try {
+          if (typeof readMonitoringSettings === 'function') {
+            const monitoringSettings = await readMonitoringSettings();
+            skipDimensionCheck = monitoringSettings.policy?.pauseDimensionValidation === true ||
+              (monitoringSettings.policy?.lowQuotaMode === true && monitoringSettings.policy?.pauseDimensionValidation !== false);
+          }
+        } catch {}
+
         dataSummary = summarizeSheetData(text, {
           metricChecksEnabled: checkSettings.metricChecksEnabled !== false && sources.some(source => eventHealthChecks(source.eventId, checkSettings).metricChecksEnabled),
           activityChecksEnabled: checkSettings.activityChecksEnabled !== false && sources.some(source => eventHealthChecks(source.eventId, checkSettings).activityChecksEnabled),
           defaultEventName
         });
-        if (sources.some(source => source.kind === 'Actuals' && eventHealthChecks(source.eventId, checkSettings).dimensionChecksEnabled)) {
+        if (!skipDimensionCheck && sources.some(source => source.kind === 'Actuals' && eventHealthChecks(source.eventId, checkSettings).dimensionChecksEnabled)) {
           dataSummary.dimensionValidation = await summarizeDimensions(text);
         }
       } catch (error) {
