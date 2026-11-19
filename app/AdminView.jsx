@@ -225,12 +225,17 @@ export default function AdminView({
       } catch {}
     };
     syncHealthBadge();
+    if (cpuSaverMode || lowQuotaMode) {
+      return () => {
+        cancelled = true;
+      };
+    }
     const interval = setInterval(syncHealthBadge, 60_000);
     return () => {
       cancelled = true;
       clearInterval(interval);
     };
-  }, []);
+  }, [cpuSaverMode, lowQuotaMode]);
   const navigate = section => {
     // Only prompt when navigating AWAY from the section that currently has unacknowledged dirty changes
     if (section !== activeSection && dirtyScopes[activeSection] && !acknowledgedDraftSections.has(activeSection)) {

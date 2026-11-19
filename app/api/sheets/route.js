@@ -115,6 +115,17 @@ async function getSheet(request) {
 
   const now = Date.now();
   const cacheKey = getSheetCacheKey(url);
+
+  let effectiveTtl = CACHE_TTL_MS;
+  try {
+    if (typeof readMonitoringSettings === 'function') {
+      const ms = await readMonitoringSettings();
+      if (ms?.policy?.lowQuotaMode) {
+        effectiveTtl = 15 * 60 * 1000; // 15-minute TTL during CPU Saver / Low-Quota mode
+      }
+    }
+  } catch {}
+
   let cached = sheetCache.get(url);
   if (!cached) {
     try {
@@ -132,14 +143,14 @@ async function getSheet(request) {
   }
 
   // Return fresh cached data immediately if not forcing refresh
-  if (!forceRefresh && cached && (now - cached.timestamp < CACHE_TTL_MS)) {
+  if (!forceRefresh && cached && (now - cached.timestamp < effectiveTtl)) {
     return new NextResponse(cached.data, {
       status: 200,
       headers: {
         'Content-Type': 'text/csv',
-        'Cache-Control': 'public, max-age=300, stale-while-revalidate=600',
-        'CDN-Cache-Control': 'public, s-maxage=600, stale-while-revalidate=1200',
-        'Vercel-CDN-Cache-Control': 'public, s-maxage=600, stale-while-revalidate=1200',
+        'Cache-Control': effectiveTtl > CACHE_TTL_MS ? 'public, max-age=900, stale-while-revalidate=1800' : 'public, max-age=300, stale-while-revalidate=600',
+        'CDN-Cache-Control': effectiveTtl > CACHE_TTL_MS ? 'public, s-maxage=900, stale-while-revalidate=1800' : 'public, s-maxage=600, stale-while-revalidate=1200',
+        'Vercel-CDN-Cache-Control': effectiveTtl > CACHE_TTL_MS ? 'public, s-maxage=900, stale-while-revalidate=1800' : 'public, s-maxage=600, stale-while-revalidate=1200',
         'X-Cache': 'HIT'
       },
     });
