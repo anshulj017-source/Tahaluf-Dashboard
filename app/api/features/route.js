@@ -22,7 +22,15 @@ export async function GET() {
       },
       history: Array.isArray(rawConfig?.history) ? rawConfig.history : []
     };
-    return NextResponse.json({ success: true, config, policy: { lowQuotaMode: budgets.policy?.lowQuotaMode === true } }, { headers: { 'Cache-Control': 'no-store' } });
+    const policy = {
+      lowQuotaMode: budgets.policy?.lowQuotaMode === true,
+      ...(budgets.policy?.pauseAnalyticsTracking !== undefined ? { pauseAnalyticsTracking: budgets.policy.pauseAnalyticsTracking === true } : {}),
+      ...(budgets.policy?.pauseApiUsageTracking !== undefined ? { pauseApiUsageTracking: budgets.policy.pauseApiUsageTracking === true } : {}),
+      ...(budgets.policy?.pauseBackgroundPolling !== undefined ? { pauseBackgroundPolling: budgets.policy.pauseBackgroundPolling === true } : {}),
+      ...(budgets.policy?.pauseDimensionValidation !== undefined ? { pauseDimensionValidation: budgets.policy.pauseDimensionValidation === true } : {}),
+      ...(budgets.policy?.pauseHealthCron !== undefined ? { pauseHealthCron: budgets.policy.pauseHealthCron === true } : {})
+    };
+    return NextResponse.json({ success: true, config, policy }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
     console.error('[FEATURES] Read failed, falling back to local defaults:', error.message || error);
     try {

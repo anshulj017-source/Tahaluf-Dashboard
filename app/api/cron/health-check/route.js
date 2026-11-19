@@ -6,6 +6,7 @@ import { GET as getEventsHealth } from '../../admin/events/route.js';
 import { GET as refreshSheet } from '../../sheets/route.js';
 import { getDimensionSettings } from '../../../../lib/dimensionMonitoring.mjs';
 import { eventHealthChecks } from '../../../../lib/dimensionStandards.mjs';
+import { readMonitoringSettings } from '../../../../lib/apiUsage.mjs';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -36,6 +37,15 @@ export async function GET(request) {
   }
 
   try {
+    const monitoringSettings = await readMonitoringSettings().catch(() => ({}));
+    if (monitoringSettings.policy?.pauseHealthCron === true || (monitoringSettings.policy?.lowQuotaMode === true && monitoringSettings.policy?.pauseHealthCron !== false)) {
+      return NextResponse.json({
+        success: true,
+        paused: true,
+        message: 'Scheduled daily health check cron is paused in CPU Saver / Low-Quota mode.'
+      });
+    }
+
     const config = await getEventsConfig();
     const checkSettings = await getDimensionSettings();
     const sources = config.events.filter(event => {

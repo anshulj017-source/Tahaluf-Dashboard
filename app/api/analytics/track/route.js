@@ -1,13 +1,24 @@
 import { NextResponse } from 'next/server';
 import { recordAnalyticsEvent } from '../../../../lib/analyticsService.mjs';
-import { observeApiRequest, withUsageScope } from '../../../../lib/apiUsage.mjs';
+import { observeApiRequest, withUsageScope, readMonitoringSettings } from '../../../../lib/apiUsage.mjs';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 async function track(req) {
-  await observeApiRequest('analytics');
   try {
+    let isPaused = false;
+    try {
+      if (typeof readMonitoringSettings === 'function') {
+        const budgets = await readMonitoringSettings();
+        isPaused = budgets?.policy?.pauseAnalyticsTracking === true ||
+          (budgets?.policy?.lowQuotaMode === true && budgets?.policy?.pauseAnalyticsTracking !== false);
+      }
+    } catch {}
+    if (isPaused) {
+      return NextResponse.json({ success: true, paused: true, message: 'Analytics tracking paused in CPU saver mode.' }, { status: 200 });
+    }
+    await observeApiRequest('analytics');
     let body = {};
     const contentType = req.headers.get('content-type') || '';
     

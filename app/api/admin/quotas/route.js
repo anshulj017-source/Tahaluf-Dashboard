@@ -72,7 +72,11 @@ export const POST = withUsageScope(async function POST(request) {
       if (typeof body.lowQuotaMode !== 'boolean') {
         return NextResponse.json({ success: false, error: 'lowQuotaMode must be a boolean.' }, { status: 400 });
       }
-      const budgets = await updateAdminSetting('apiBudgets', EMPTY_BUDGETS, state => updateUsagePolicy(state, body.lowQuotaMode));
+      const extraPolicy = {};
+      for (const k of ['pauseAnalyticsTracking', 'pauseApiUsageTracking', 'pauseBackgroundPolling', 'pauseDimensionValidation', 'pauseHealthCron']) {
+        if (typeof body[k] === 'boolean') extraPolicy[k] = body[k];
+      }
+      const budgets = await updateAdminSetting('apiBudgets', EMPTY_BUDGETS, state => updateUsagePolicy(state, body.lowQuotaMode, new Date(), extraPolicy));
       return NextResponse.json({ success: true, policy: budgets.policy });
     }
 

@@ -877,6 +877,7 @@ export default function App() {
           } catch {}
           setLowQuotaMode(json.policy?.lowQuotaMode === true);
           window.__tahaluf_low_quota_mode = json.policy?.lowQuotaMode === true;
+          window.__tahaluf_pause_tracking = json.policy?.pauseAnalyticsTracking === true || (json.policy?.lowQuotaMode === true && json.policy?.pauseAnalyticsTracking !== false);
           setFeatureError('');
         }
       } catch (error) {
@@ -886,8 +887,8 @@ export default function App() {
     };
     refresh();
     const interval = setInterval(() => {
-      if (document.visibilityState === 'visible') refresh();
-    }, 60000);
+      if (document.visibilityState === 'visible' && !window.__tahaluf_low_quota_mode) refresh();
+    }, 300000);
     window.addEventListener('focus', refresh);
     return () => {
       disposed = true;
@@ -1006,10 +1007,14 @@ export default function App() {
     if (!cycleTabs.length || !featureAllowed('tvAutoCycle')) return;
     const intervalMs = Math.max(10, tvCycleIntervalSec) * 1000;
     const interval = setInterval(() => {
+      window.__tahaluf_tv_cycling = true;
       setActiveTab(prev => {
         const nextIdx = (cycleTabs.indexOf(prev) + 1) % cycleTabs.length;
         return cycleTabs[nextIdx];
       });
+      setTimeout(() => {
+        window.__tahaluf_tv_cycling = false;
+      }, 500);
     }, intervalMs);
     return () => clearInterval(interval);
   }, [tvMode, tvAutoCycle, tvCycleIntervalSec, tvCycleViews, featureConfig, userRole, simulatingStandardUser, userEmail]);
@@ -3760,6 +3765,7 @@ export default function App() {
             onFeaturesSaved={setFeatureConfig}
             onEventsSaved={setEventsConfiguration}
             onSignOut={handleSignOut}
+            lowQuotaMode={lowQuotaMode}
             onNavigate={(featureId) => {
               const adminRoute = {
                 adminEvents: { section: 'events' },
@@ -3903,6 +3909,7 @@ export default function App() {
                 isModalOpen={healthModalOpen}
                 onToggleModal={setHealthModalOpen}
                 onAlertCountChange={setHealthAlertCount}
+                lowQuotaMode={lowQuotaMode}
                 onOpenHealthMonitor={() => {
                   const url = new URL(window.location.href);
                   url.searchParams.set('admin', 'health');

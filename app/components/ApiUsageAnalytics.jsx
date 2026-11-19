@@ -118,21 +118,36 @@ export default function ApiUsageAnalytics({ report, onSaved, onPolicySaved, view
     }
   };
 
-  const savePolicy = async () => {
+  const savePolicy = async (customPolicyUpdates = null) => {
     setSavingPolicy(true);
     setError('');
     setNotice('');
     try {
       const token = await auth.currentUser?.getIdToken();
+      const currentPolicy = report.policy || {};
+      const newLowQuota = customPolicyUpdates?.lowQuotaMode !== undefined
+        ? customPolicyUpdates.lowQuotaMode
+        : (customPolicyUpdates ? (currentPolicy.lowQuotaMode === true) : !currentPolicy.lowQuotaMode);
+
+      const payload = {
+        action: 'save-policy',
+        lowQuotaMode: newLowQuota,
+        pauseAnalyticsTracking: customPolicyUpdates?.pauseAnalyticsTracking ?? (customPolicyUpdates ? (currentPolicy.pauseAnalyticsTracking ?? newLowQuota) : newLowQuota),
+        pauseApiUsageTracking: customPolicyUpdates?.pauseApiUsageTracking ?? (customPolicyUpdates ? (currentPolicy.pauseApiUsageTracking ?? newLowQuota) : newLowQuota),
+        pauseBackgroundPolling: customPolicyUpdates?.pauseBackgroundPolling ?? (customPolicyUpdates ? (currentPolicy.pauseBackgroundPolling ?? newLowQuota) : newLowQuota),
+        pauseDimensionValidation: customPolicyUpdates?.pauseDimensionValidation ?? (customPolicyUpdates ? (currentPolicy.pauseDimensionValidation ?? newLowQuota) : newLowQuota),
+        pauseHealthCron: customPolicyUpdates?.pauseHealthCron ?? (customPolicyUpdates ? (currentPolicy.pauseHealthCron ?? newLowQuota) : newLowQuota),
+      };
+
       const response = await fetch('/api/admin/quotas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ action: 'save-policy', lowQuotaMode: !report.policy?.lowQuotaMode })
+        body: JSON.stringify(payload)
       });
       const json = await response.json();
-      if (!response.ok || !json.success) throw new Error(json.error || 'Could not save low-quota mode.');
+      if (!response.ok || !json.success) throw new Error(json.error || 'Could not save policy.');
       await onPolicySaved?.(json.policy);
-      setNotice(`Low-quota mode ${json.policy.lowQuotaMode ? 'enabled' : 'disabled'}.`);
+      setNotice(`Policy settings saved successfully.`);
     } catch (error) {
       setError(error.message);
     } finally {
@@ -196,11 +211,120 @@ export default function ApiUsageAnalytics({ report, onSaved, onPolicySaved, view
         <p role="status" className="text-xs text-gray-400">Email check on this instance: {report.alertDelivery?.status || 'not-checked'}{report.alertDelivery?.lastCheckedAt ? ` (${new Date(report.alertDelivery.lastCheckedAt).toLocaleString()})` : ''}.</p>
         {report.alertDelivery?.lastError && <p role="alert" className="text-xs text-amber-300">Quota notification error: {report.alertDelivery.lastError}</p>}
       </fieldset>
-      <div className="rounded-xl border border-white/10 p-3 space-y-2">
-        <button type="button" role="switch" aria-checked={report.policy?.lowQuotaMode === true} onClick={savePolicy} disabled={savingPolicy} className="px-3 py-2 border border-[#14a6d9]/40 rounded-lg text-xs text-[#14a6d9] disabled:opacity-40">
-          {savingPolicy ? 'Saving mode...' : `Low-quota mode: ${report.policy?.lowQuotaMode ? 'On' : 'Off'}`}
-        </button>
-        <p className="text-xs text-gray-400">Optional, persistent policy. Pauses automatic admin analytics and health refreshes; API reports load on entry or manual refresh only. Other controls pick up changes on the next visible-page policy check (60 seconds), plus up to 60 seconds of instance caching. Essential dashboard data, authentication and configuration remain enabled. No sampling or dropping important events.</p>
+      <div className="rounded-xl border border-white/10 p-4 space-y-4 bg-slate-900/40">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-3">
+          <div>
+            <h4 className="text-sm font-bold text-white flex items-center gap-2">
+              <span>⚡ Master CPU Saver &amp; Low-Quota Mode</span>
+              {report.policy?.lowQuotaMode && (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  ACTIVE
+                </span>
+              )}
+            </h4>
+            <p className="text-xs text-gray-400 mt-1">
+              Pauses high-frequency background polling, analytics dwell tracking, and Firestore quota transactions to protect Vercel compute quotas.
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={report.policy?.lowQuotaMode === true}
+            onClick={() => savePolicy()}
+            disabled={savingPolicy}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all disabled:opacity-40 shadow-sm ${
+              report.policy?.lowQuotaMode
+                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/50 hover:bg-emerald-500/30'
+                : 'bg-white/5 text-slate-300 border border-white/10 hover:bg-white/10'
+            }`}
+          >
+            {savingPolicy ? 'Saving mode...' : `Low-quota mode: ${report.policy?.lowQuotaMode ? 'On' : 'Off'}`}
+          </button>
+        </div>
+
+        <div className="space-y-2 pt-1">
+          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Granular Sub-System Toggles</p>
+          <div className="grid sm:grid-cols-2 gap-3 text-xs">
+            <label className="flex items-start gap-2.5 p-2.5 rounded-lg border border-white/5 bg-white/[0.02] cursor-pointer hover:bg-white/[0.04]">
+              <input
+                type="checkbox"
+                aria-label="Pause Analytics Tracking"
+                checked={report.policy?.pauseAnalyticsTracking ?? (report.policy?.lowQuotaMode === true)}
+                disabled={savingPolicy}
+                onChange={e => savePolicy({ pauseAnalyticsTracking: e.target.checked })}
+                className="mt-0.5 rounded border-slate-600 text-emerald-400 focus:ring-emerald-400"
+              />
+              <div>
+                <span className="font-semibold text-slate-200">Pause Analytics &amp; Dwell Tracking</span>
+                <p className="text-[10px] text-gray-400 mt-0.5">Stops client tracking beacons &amp; Firestore updates for user visits, dwell times and tab switches.</p>
+              </div>
+            </label>
+
+            <label className="flex items-start gap-2.5 p-2.5 rounded-lg border border-white/5 bg-white/[0.02] cursor-pointer hover:bg-white/[0.04]">
+              <input
+                type="checkbox"
+                aria-label="Pause API Quota Telemetry Tracking"
+                checked={report.policy?.pauseApiUsageTracking ?? (report.policy?.lowQuotaMode === true)}
+                disabled={savingPolicy}
+                onChange={e => savePolicy({ pauseApiUsageTracking: e.target.checked })}
+                className="mt-0.5 rounded border-slate-600 text-emerald-400 focus:ring-emerald-400"
+              />
+              <div>
+                <span className="font-semibold text-slate-200">Pause API Quota Database Writes</span>
+                <p className="text-[10px] text-gray-400 mt-0.5">Stops continuous Firestore transaction writes on every API request.</p>
+              </div>
+            </label>
+
+            <label className="flex items-start gap-2.5 p-2.5 rounded-lg border border-white/5 bg-white/[0.02] cursor-pointer hover:bg-white/[0.04]">
+              <input
+                type="checkbox"
+                aria-label="Pause Background Health & Feature Polling"
+                checked={report.policy?.pauseBackgroundPolling ?? (report.policy?.lowQuotaMode === true)}
+                disabled={savingPolicy}
+                onChange={e => savePolicy({ pauseBackgroundPolling: e.target.checked })}
+                className="mt-0.5 rounded border-slate-600 text-emerald-400 focus:ring-emerald-400"
+              />
+              <div>
+                <span className="font-semibold text-slate-200">Pause Automatic Background Polling</span>
+                <p className="text-[10px] text-gray-400 mt-0.5">Stops 45s health banner polling &amp; 60s feature checks across all open browser tabs.</p>
+              </div>
+            </label>
+
+            <label className="flex items-start gap-2.5 p-2.5 rounded-lg border border-white/5 bg-white/[0.02] cursor-pointer hover:bg-white/[0.04]">
+              <input
+                type="checkbox"
+                aria-label="Pause Sheet Dimension Validation"
+                checked={report.policy?.pauseDimensionValidation ?? (report.policy?.lowQuotaMode === true)}
+                disabled={savingPolicy}
+                onChange={e => savePolicy({ pauseDimensionValidation: e.target.checked })}
+                className="mt-0.5 rounded border-slate-600 text-emerald-400 focus:ring-emerald-400"
+              />
+              <div>
+                <span className="font-semibold text-slate-200">Pause Routine Dimension Regex Checks</span>
+                <p className="text-[10px] text-gray-400 mt-0.5">Skips heavy row-by-row regex compliance checks during routine sheet loading.</p>
+              </div>
+            </label>
+
+            <label className="flex items-start gap-2.5 p-2.5 rounded-lg border border-white/5 bg-white/[0.02] cursor-pointer hover:bg-white/[0.04] sm:col-span-2">
+              <input
+                type="checkbox"
+                aria-label="Pause Scheduled Daily Health Cron"
+                checked={report.policy?.pauseHealthCron ?? (report.policy?.lowQuotaMode === true)}
+                disabled={savingPolicy}
+                onChange={e => savePolicy({ pauseHealthCron: e.target.checked })}
+                className="mt-0.5 rounded border-slate-600 text-emerald-400 focus:ring-emerald-400"
+              />
+              <div>
+                <span className="font-semibold text-slate-200">Pause Scheduled Daily Health Cron</span>
+                <p className="text-[10px] text-gray-400 mt-0.5">Stops the nightly 5-minute batch sheet refetching cron job.</p>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <p className="text-xs text-gray-400 border-t border-white/5 pt-2">
+          Optional, persistent policy. Pauses automatic admin analytics and health refreshes; API reports load on entry or manual refresh only. Other controls pick up changes on the next visible-page policy check (60 seconds), plus up to 60 seconds of instance caching. Essential dashboard data, authentication and configuration remain enabled. No sampling or dropping important events.
+        </p>
       </div>
       {editing && <div className="space-y-4">{(report.availableServices || report.services).map(service => <fieldset disabled={saving} key={service.id} className="rounded-lg border border-slate-600 p-3">
         <legend className="px-2 text-sm font-bold">{service.name}{!report.services.some(item => item.id === service.id) ? ' (monitoring disabled)' : ''}</legend>

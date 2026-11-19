@@ -4,7 +4,7 @@ import { isAdminRequest, isSuperAdminRequest } from '../../../../lib/requireAdmi
 import { readAdminSetting, updateAdminSetting } from '../../../../lib/adminSettingsStore.mjs';
 import { DEFAULT_FEATURE_CONFIG, isFeatureEnabled } from '../../../../lib/dashboardFeatures.mjs';
 import { getCollectionName } from '../../../../lib/firestoreCollections.mjs';
-import { isProtectedSuperAdmin, PROTECTED_SUPER_ADMINS } from '../../../../lib/authConstants.mjs';
+import { isProtectedSuperAdmin, PROTECTED_SUPER_ADMINS, isRootSuperAdmin } from '../../../../lib/authConstants.mjs';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -99,11 +99,13 @@ export async function GET(req) {
 
     const users = listUsersResult.users.map(userRecord => {
       const userData = userRolesMap.get(userRecord.uid) || {};
-      const role = userData.role || (userData.isAdmin ? 'admin' : 'standard');
+      const isRoot = isRootSuperAdmin(userRecord.email);
+      const role = isRoot ? 'super_admin' : (userData.role || (userData.isAdmin ? 'admin' : 'standard'));
       return {
         uid: userRecord.uid,
         email: userRecord.email,
         role,
+        isFixed: isRoot,
         lastSignInTime: userData.lastActive || userRecord.metadata.lastSignInTime || null,
         creationTime: userRecord.metadata.creationTime || null,
       };
