@@ -4054,18 +4054,18 @@ export default function App() {
             </div>
           )}
 
-          {lowQuotaMode ? (
-            <div
-              role="status"
-              className="mb-4 p-3.5 border border-emerald-500/40 bg-emerald-950/40 rounded-2xl flex flex-wrap items-center justify-between gap-3 text-xs text-emerald-200 shadow-md backdrop-blur-xs"
-            >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <Zap className="w-4 h-4 text-emerald-400 animate-pulse flex-shrink-0" />
-                <span>
-                  <strong>⚡ CPU Saver Mode Active:</strong> Automatic background polling, dwell telemetry &amp; heavy sheet checks are paused to conserve server limits.
-                </span>
-              </div>
-              {canAccessAdmin && (
+          {canAccessAdmin ? (
+            lowQuotaMode ? (
+              <div
+                role="status"
+                className="mb-4 p-3.5 border border-emerald-500/40 bg-emerald-950/40 rounded-2xl flex flex-wrap items-center justify-between gap-3 text-xs text-emerald-200 shadow-md backdrop-blur-xs"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <Zap className="w-4 h-4 text-emerald-400 animate-pulse flex-shrink-0" />
+                  <span>
+                    <strong>⚡ CPU Saver Mode Active:</strong> Automatic background polling, dwell telemetry &amp; heavy sheet checks are paused to conserve server limits.
+                  </span>
+                </div>
                 <button
                   type="button"
                   onClick={() => handleToggleLowQuota(false)}
@@ -4073,24 +4073,24 @@ export default function App() {
                 >
                   Turn OFF (Resume Normal Mode)
                 </button>
-              )}
-            </div>
-          ) : canAccessAdmin ? (
-            <div className="mb-4 p-3 border border-slate-700/60 bg-slate-900/40 rounded-2xl flex flex-wrap items-center justify-between gap-3 text-xs text-slate-300 shadow-sm backdrop-blur-xs">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <Zap className="w-4 h-4 text-slate-400 flex-shrink-0" />
-                <span>
-                  <strong>⚡ CPU Saver Mode is OFF:</strong> Standard real-time telemetry and 30s background polling are currently running.
-                </span>
               </div>
-              <button
-                type="button"
-                onClick={() => handleToggleLowQuota(true)}
-                className="px-3 py-1 rounded-xl border border-emerald-500/60 bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30 font-bold transition-all text-xs shrink-0"
-              >
-                ⚡ Turn CPU Saver ON
-              </button>
-            </div>
+            ) : (
+              <div className="mb-4 p-3 border border-slate-700/60 bg-slate-900/40 rounded-2xl flex flex-wrap items-center justify-between gap-3 text-xs text-slate-300 shadow-sm backdrop-blur-xs">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <Zap className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                  <span>
+                    <strong>⚡ CPU Saver Mode is OFF:</strong> Standard real-time telemetry and 30s background polling are currently running.
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleToggleLowQuota(true)}
+                  className="px-3 py-1 rounded-xl border border-emerald-500/60 bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30 font-bold transition-all text-xs shrink-0"
+                >
+                  ⚡ Turn CPU Saver ON
+                </button>
+              </div>
+            )
           ) : null}
           {featureError && <p role="alert" className="mb-4 p-3 border border-red-500/40 rounded-xl text-sm text-red-300">Feature settings could not refresh: {featureError}. {featureConfig ? 'Using the last loaded settings.' : 'Dashboard features are unavailable until settings load. Retrying automatically.'}</p>}
           {featureAllowed(activeTab) ? renderContent() : !featureError && <p className="text-sm text-gray-400">Loading dashboard feature settings...</p>}
