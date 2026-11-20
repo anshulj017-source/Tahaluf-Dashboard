@@ -753,6 +753,12 @@ const InitialLoadingScreen = ({ isAuthLoading, progress = 18, statusMessage = ''
 // --- MAIN APP ---
 export default function App() {
   const router = useRouter();
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.hostname === 'tahaluf-dashboard.vercel.app') {
+      window.location.replace(`https://tahalufdashboard.vercel.app${window.location.pathname}${window.location.search}${window.location.hash}`);
+    }
+  }, []);
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     if (typeof window !== 'undefined') {
       try { return Boolean(localStorage.getItem('tahaluf_cached_email')); } catch {}

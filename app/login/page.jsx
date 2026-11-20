@@ -12,6 +12,12 @@ export default function Login() {
   const router = useRouter();
 
   useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.hostname === 'tahaluf-dashboard.vercel.app') {
+      window.location.replace(`https://tahalufdashboard.vercel.app${window.location.pathname}${window.location.search}${window.location.hash}`);
+    }
+  }, []);
+
+  useEffect(() => {
     let resolved = false;
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       resolved = true;

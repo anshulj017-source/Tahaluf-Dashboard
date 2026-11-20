@@ -353,7 +353,16 @@ export default function FeatureControlsAdmin({
     setError('');
     try {
       const response = await fetch('/api/features', { cache: 'no-store' });
-      const json = await response.json();
+      const text = await response.text();
+      let json;
+      try {
+        json = JSON.parse(text);
+      } catch {
+        if (response.status === 402 || text.includes('Payment required') || text.includes('DEPLOYMENT_DISABLED')) {
+          throw new Error('This domain (tahaluf-dashboard.vercel.app) is disabled by Vercel quota. Please use the active live dashboard: https://tahalufdashboard.vercel.app');
+        }
+        throw new Error(text || `Could not load feature controls (${response.status})`);
+      }
       if (!response.ok || !json.success) throw new Error(json.error || 'Could not load feature controls.');
       setConfig(json.config);
       
@@ -463,7 +472,16 @@ export default function FeatureControlsAdmin({
           revision: config?.revision ?? 0 
         })
       });
-      const json = await response.json();
+      const text = await response.text();
+      let json;
+      try {
+        json = JSON.parse(text);
+      } catch {
+        if (response.status === 402 || text.includes('Payment required') || text.includes('DEPLOYMENT_DISABLED')) {
+          throw new Error('This domain (tahaluf-dashboard.vercel.app) is disabled by Vercel quota. Please switch to the active live dashboard: https://tahalufdashboard.vercel.app');
+        }
+        throw new Error(text || `Server responded with status ${response.status}`);
+      }
       if (!response.ok || !json.success) throw new Error(json.error || 'Could not save feature controls.');
       setConfig(json.config);
       setModes(json.config.modes);
@@ -504,7 +522,16 @@ export default function FeatureControlsAdmin({
         headers,
         body: JSON.stringify({ action: 'rollback', targetRevision: targetRev })
       });
-      const json = await response.json();
+      const text = await response.text();
+      let json;
+      try {
+        json = JSON.parse(text);
+      } catch {
+        if (response.status === 402 || text.includes('Payment required') || text.includes('DEPLOYMENT_DISABLED')) {
+          throw new Error('This domain (tahaluf-dashboard.vercel.app) is disabled by Vercel quota. Please switch to the active live dashboard: https://tahalufdashboard.vercel.app');
+        }
+        throw new Error(text || `Server responded with status ${response.status}`);
+      }
       if (!response.ok || !json.success) throw new Error(json.error || 'Could not rollback revision.');
       setConfig(json.config);
       setModes(json.config.modes);
