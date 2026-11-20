@@ -52,6 +52,10 @@ export async function GET(request) {
     return NextResponse.json({ success: false, error: 'Admin access is required.' }, { status: 401 });
   }
   try {
+    const { readAdminSetting } = await import('../../../../lib/adminSettingsStore.mjs');
+    const budgets = await readAdminSetting('apiBudgets', { policy: { lowQuotaMode: false } }).catch(() => ({}));
+    const isLowQuota = budgets?.policy?.lowQuotaMode === true;
+
     await reconcileDisabledHealthChecks();
     const state = await getHealthNotificationState();
     const dimensionSettings = await getDimensionSettings();
@@ -59,8 +63,9 @@ export async function GET(request) {
       .map(item => item.issue)
       .filter(Boolean);
     let issues = persistedIssues;
-    if (new URL(request.url).searchParams.get('includeHealth') === 'true') {
-      const healthResponse = await getEventsHealth(new Request('http://localhost/api/admin/events?inspectOnly=true'));
+    if (!isLowQuota && new URL(request.url).searchParams.get('includeHealth') === 'true') {
+      const headers = new Headers(request.headers);
+      const healthResponse = await getEventsHealth(new Request('http://localhost/api/admin/events?inspectOnly=true', { headers }));
       const healthPayload = await healthResponse.json();
       if (!healthResponse.ok || !healthPayload.success) {
         throw new Error(healthPayload.error || 'Could not load event health.');

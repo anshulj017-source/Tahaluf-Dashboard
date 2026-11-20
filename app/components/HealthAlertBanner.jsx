@@ -43,6 +43,12 @@ export default function HealthAlertBanner({
   }, [alertsEnabled, onAlertCountChange]);
 
   useEffect(() => {
+    if (lowQuotaMode || (typeof window !== 'undefined' && window.__tahaluf_low_quota_mode)) {
+      setIssues([]);
+      setEventStatuses([]);
+      onAlertCountChange(0);
+      return;
+    }
     if (!alertsEnabled && !statusBannerEnabled) {
       setIssues([]);
       setEventStatuses([]);
@@ -50,9 +56,6 @@ export default function HealthAlertBanner({
       return;
     }
     fetchAlerts();
-    if (lowQuotaMode || (typeof window !== 'undefined' && window.__tahaluf_low_quota_mode)) {
-      return;
-    }
     const interval = setInterval(fetchAlerts, 300_000);
     return () => clearInterval(interval);
   }, [fetchAlerts, lowQuotaMode, alertsEnabled, statusBannerEnabled]);
@@ -68,6 +71,10 @@ export default function HealthAlertBanner({
   }, [modalOpen, setModalOpen]);
 
   const uniqueEventNames = Array.from(new Set(issues.map(i => i.eventName))).filter(Boolean);
+
+  if (lowQuotaMode || (typeof window !== 'undefined' && window.__tahaluf_low_quota_mode)) {
+    return null;
+  }
 
   return (
     <>

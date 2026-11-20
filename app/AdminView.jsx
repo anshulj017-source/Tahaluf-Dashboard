@@ -207,6 +207,10 @@ export default function AdminView({
   // Synchronize sidebar health alert badge from server health-notifications
   useEffect(() => {
     let cancelled = false;
+    if (cpuSaverMode || lowQuotaMode) {
+      setHealthIssueCount(0);
+      return;
+    }
     const syncHealthBadge = async () => {
       try {
         const headers = await getAdminHeaders();
@@ -225,11 +229,6 @@ export default function AdminView({
       } catch {}
     };
     syncHealthBadge();
-    if (cpuSaverMode || lowQuotaMode) {
-      return () => {
-        cancelled = true;
-      };
-    }
     const interval = setInterval(syncHealthBadge, 60_000);
     return () => {
       cancelled = true;

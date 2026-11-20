@@ -38,7 +38,7 @@ export async function GET(request) {
 
   try {
     const monitoringSettings = await readMonitoringSettings().catch(() => ({}));
-    if (monitoringSettings.policy?.pauseHealthCron === true || (monitoringSettings.policy?.lowQuotaMode === true && monitoringSettings.policy?.pauseHealthCron !== false)) {
+    if (monitoringSettings.policy?.lowQuotaMode === true || monitoringSettings.policy?.pauseHealthCron === true) {
       return NextResponse.json({
         success: true,
         paused: true,

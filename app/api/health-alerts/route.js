@@ -41,6 +41,25 @@ function formatIssueHeadline(issue) {
 
 export async function GET() {
   try {
+    const { readAdminSetting } = await import('../../../lib/adminSettingsStore.mjs');
+    const budgets = await readAdminSetting('apiBudgets', { policy: { lowQuotaMode: false } }).catch(() => ({}));
+    if (budgets?.policy?.lowQuotaMode === true) {
+      return NextResponse.json({
+        success: true,
+        count: 0,
+        issues: [],
+        eventStatuses: [],
+        paused: true,
+        message: 'Health alerts checking and reporting is completely disabled in CPU Saver mode.'
+      }, {
+        headers: {
+          'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
+          'CDN-Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
+          'Vercel-CDN-Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600'
+        }
+      });
+    }
+
     const [state, dimensionSettings] = await Promise.all([
       getHealthNotificationState().catch(() => ({ settings: { dashboardEnabled: true } })),
       getDimensionSettings().catch(() => ({}))
